@@ -1,0 +1,7 @@
+/* Safepipe tokens v0 — single source. App CSS uses var(--*) only. */
+:root {
+  --bg: #0e1116; --bg-2: #151b24; --surface: #1a222e;
+  --line: #2a3546; --ink: #eef2f7; --muted: #9aa7b8;
+  --teal: #2dd4bf; --amber: #f59e0b; --red: #f87171; --green: #34d399;
+  --radius: 14px; --radius-s: 9px;
+}
