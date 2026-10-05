@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SafePipe — Fix it before it fails</title>
+<link rel="stylesheet" href="/design-system/tokens.css" />
+<style>
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--sp-surface-page);color:var(--sp-ink);font-family:var(--sp-font-ui);font-size:var(--sp-text-md);line-height:1.65;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+/* header nav (from Fig: BG 1072x92, radius 6, Home·About·Services·Login·Signup·Contact Us·Request a demo) */
+.hbar{background:var(--sp-surface-card);border:1px solid var(--sp-border-default);border-radius:6px;box-shadow:var(--sp-elevation-1);display:flex;align-items:center;gap:26px;padding:0 28px;height:72px;margin-top:20px;position:sticky;top:12px;z-index:10}
+.hbar .brand{font-family:var(--sp-font-display);font-weight:700;font-size:19px;color:var(--sp-navy);margin-right:auto}
+.hbar .brand b{color:var(--sp-sky)}
+.hbar nav{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.hbar nav a{font-size:14px;font-weight:600;color:var(--sp-text-secondary);text-decoration:none}
+.hbar nav a.cta-link{background:var(--sp-navy);color:#fff;border-radius:var(--sp-radius-md);padding:9px 18px}
+@media(max-width:860px){.hbar nav a:not(.cta-link){display:none}}
+/* hero = Fig split Hero: Text 491 (logo, divider line, MuseoModerno 60 H1, 20 sub, navy 201x56 btn) + Image 590 */
+.hero{padding:56px 0 8px}
+.split{display:flex;gap:48px;align-items:center}
+.split .t{flex:1;min-width:0}
+.split .logo{font-family:var(--sp-font-display);font-weight:700;font-size:34px;color:var(--sp-navy);display:flex;align-items:center;gap:12px}
+.ring{width:44px;height:44px;border-radius:50%;border:12px solid var(--sp-navy);display:inline-block}
+.rule{height:2px;background:var(--sp-border-strong);margin:22px 0}
+@media(max-width:900px){.split{flex-direction:column}.split .shot{width:100%}}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--sp-sky);margin-bottom:12px}
+h1{font-family:var(--sp-font-display);font-weight:700;font-size:clamp(40px,6vw,68px);line-height:1.02;letter-spacing:-.02em;margin:0;max-width:840px}
+h1 span{color:var(--sp-warning)}
+.lead{margin:20px 0 0;max-width:640px;color:var(--sp-text-secondary);font-size:18px}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+.btn{appearance:none;border:0;border-radius:var(--sp-radius-md);padding:13px 24px;font-family:var(--sp-font-ui);font-weight:700;font-size:15px;cursor:pointer;text-decoration:none;display:inline-block}
+.btn-primary{background:var(--sp-navy);color:#fff;box-shadow:var(--sp-elevation-1)}
+.btn-ghost{background:#fff;color:var(--sp-navy);border:1.5px solid var(--sp-border-strong)}
+.artefact{margin-top:36px;background:var(--sp-navy);border-radius:var(--sp-radius-lg);box-shadow:var(--sp-elevation-2);overflow:hidden;position:relative}
+.artefact img{display:block;width:100%;height:auto}
+.artefact-bar{display:flex;gap:10px;align-items:center;padding:14px 20px;color:#fff;font-size:13px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:var(--sp-radius-full);padding:5px 13px;font-size:12.5px;font-weight:600}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--sp-success)}
+.dot.amber{background:var(--sp-warning)}.dot.sky{background:var(--sp-sky)}
+/* tab strip (DS tab language) */
+.tabs{display:flex;gap:4px;margin:34px 0 0;border-bottom:2px solid var(--sp-border-default);overflow-x:auto}
+.tabs span{padding:10px 18px;font-weight:600;font-size:14px;color:var(--sp-text-muted);white-space:nowrap}
+.tabs span.on{color:var(--sp-navy);border-bottom:3px solid var(--sp-violet);margin-bottom:-2px}
+/* sections + Feature cards */
+.sec{padding:56px 0 8px}
+.label{font-size:12px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--sp-sky);margin-bottom:10px}
+h2{font-family:var(--sp-font-display);font-size:clamp(24px,3.4vw,34px);line-height:1.2;margin:0 0 24px;max-width:760px;font-weight:600}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:860px){.grid3,.grid2,.grid4{grid-template-columns:1fr}}
+.card{background:var(--sp-surface-card);border:1px solid var(--sp-border-default);border-radius:var(--sp-radius-md);padding:24px;box-shadow:var(--sp-elevation-1)}
+.card .n{font-family:var(--sp-font-display);font-size:32px;font-weight:700;color:var(--sp-sky);opacity:.55;line-height:1;margin-bottom:12px}
+.card h3{font-size:16px;margin:0 0 8px}
+.card p{font-size:14.5px;color:var(--sp-text-secondary);margin:0;line-height:1.7}
+.proof{margin-top:14px;padding-top:12px;border-top:1px solid var(--sp-border-default);font-size:13px;color:var(--sp-navy);font-weight:600}
+.block{background:#fff;border-left:4px solid var(--sp-violet);border-radius:0 var(--sp-radius-md) var(--sp-radius-md) 0;padding:26px 28px;box-shadow:var(--sp-elevation-1)}
+.block h3{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--sp-violet);margin:0 0 10px}
+.block p{font-size:15px;color:var(--sp-text-secondary);margin:0;line-height:1.7}
+.stage{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--sp-warning);margin-bottom:8px}
+/* Drive-item rows */
+.drive{display:flex;gap:24px;background:var(--sp-surface-card);border:1px solid var(--sp-border-default);border-radius:var(--sp-radius-md);box-shadow:var(--sp-elevation-1);overflow:hidden;margin-bottom:16px}
+.drive img{width:46%;object-fit:cover;object-position:top;min-height:220px;background:var(--sp-neutral-3)}
+.drive .txt{padding:26px 28px 26px 4px}
+.drive .txt h3{margin:0 0 8px;font-size:18px}
+.drive .txt p{margin:0;font-size:14.5px;color:var(--sp-text-secondary)}
+.drive .file{font-size:12px;color:var(--sp-text-muted);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+@media(max-width:860px){.drive{flex-direction:column}.drive img{width:100%}.drive .txt{padding:0 24px 24px}}
+/* progress (DS) */
+.progress{height:10px;background:var(--sp-neutral-2);border-radius:var(--sp-radius-full);overflow:hidden;margin-top:14px}
+.progress i{display:block;height:100%;width:50%;background:linear-gradient(90deg,var(--sp-sky),var(--sp-violet));border-radius:var(--sp-radius-full)}
+.q{font-weight:700;font-size:15px;margin-bottom:8px}
+/* Contact Us + Field */
+.cta{background:var(--sp-navy);color:#fff;border-radius:var(--sp-radius-lg);padding:56px 48px;margin:64px 0 16px;box-shadow:var(--sp-elevation-2)}
+.cta .label{color:var(--sp-sky)}
+.cta h2{color:#fff}
+.cta p{max-width:620px;color:#cddcee;line-height:1.75;margin:0}
+.field{display:flex;gap:10px;margin-top:26px;max-width:520px;flex-wrap:wrap}
+.field input{flex:1;min-width:220px;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);border-radius:var(--sp-radius-md);padding:13px 16px;color:#fff;font-family:var(--sp-font-ui);font-size:15px}
+.field input::placeholder{color:#8fa9c9}
+.field .btn{background:var(--sp-warning);color:#1c1b1e}
+.note{padding:8px 0 40px;font-size:13px;color:var(--sp-text-muted)}
+a.link{color:var(--sp-text-link)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hbar"><div class="brand">Safe<b>Pipe</b></div><nav><a href="#top">Home</a><a href="#idea">About</a><a href="#how">Services</a><a href="/logic.html">Login</a><a href="#pilot">Signup</a><a href="#pilot">Contact Us</a><a class="cta-link" href="#pilot">Request a demo</a></nav></div>
+
+  <header class="hero" id="top">
+    <div class="split">
+      <div class="t">
+        <div class="logo"><span class="ring"></span>SafePipe</div>
+        <div class="rule"></div>
+        <div class="eyebrow">A web-based pipeline safety documentation software</div>
+        <h1>Fix it before it <span>fails.</span></h1>
+        <p class="lead">Helps pipeline operators reduce violations caused by non-compliance. A living digital twin of your network — every asset, inspection, crew, and compliance record connected, so you work on your schedule, not in an emergency.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#pilot">Request a demo</a>
+          <a class="btn btn-ghost" href="/logic.html">See the working logic</a>
+        </div>
+      </div>
+      <div class="shot" style="flex:1.15">
+    <div class="artefact" style="margin-top:0">
+      <div class="artefact-bar">
+        <span class="pill"><span class="dot"></span>Nueces Bay Pipeline System</span>
+        <span class="pill"><span class="dot amber"></span>Due in 23 days</span>
+        <span class="pill"><span class="dot sky"></span>12 Valid OQs</span>
+        <span class="pill">Pipeline Patrol Main Pipe · In progress</span>
+      </div>
+      <img src="/fig/ops-desktop.png" alt="SafePipe operations work-order screen" />
+    </div>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Record sections">
+      <span>Upcoming</span><span>History</span><span class="on">Fact sheet</span><span>Constructions</span><span>Data</span>
+    </nav>
+  </header>
+
+  <section class="sec">
+    <div class="label">The problem</div>
+    <h2>Running a pipeline means thousands of moving parts — and no single view of them.</h2>
+    <div class="grid3">
+      <div class="card"><div class="n">01</div><h3>Scattered, unverified records</h3><p>Maintenance, inspections, certifications, and maps sit in separate systems. No one can say with confidence who did what, where, and when.</p></div>
+      <div class="card"><div class="n">02</div><h3>Surprise audit gaps</h3><p>Gaps surface when the auditor asks, not before. Preparing takes weeks of reconciling and chasing paper.</p></div>
+      <div class="card"><div class="n">03</div><h3>Crews dispatched blind</h3><p>At assignment time, no one sees whose qualification is about to lapse or which asset is most at risk. Small issues turn into expensive ones.</p></div>
+    </div>
+  </section>
+
+  <section class="sec" id="idea">
+    <div class="label">The idea · Why choose SafePipe</div>
+    <h2>A digital twin that understands your infrastructure — not just stores data about it.</h2>
+    <div class="grid2">
+      <div class="block"><h3>Digital twin</h3><p>Every segment, checkpoint, and piece of equipment has a live virtual counterpart carrying its full history: inspections, repairs, mapped high-consequence areas, test results. The network you operate is the network you see.</p></div>
+      <div class="block"><h3>Ontology of real-world data</h3><p>SafePipe models how things relate: this segment has these checkpoints, this work order applies to that asset, this task requires an operator with a current qualification. Explicit relationships turn separate silos into one system you can question.</p></div>
+    </div>
+  </section>
+
+  <section class="sec" id="how">
+    <div class="label">How it works · Services</div>
+    <h2>Observe. Decide. Act.</h2>
+    <div class="grid3">
+      <div class="card"><div class="stage">Observe</div><h3>Capture at the source</h3><p>Crews record patrols, inspections, and quality checks against the asset they are standing at. An 83-question form system covers patrol, MOC, QC, evaluation scoring, and mileage.</p><div class="proof">Every record lands on the right asset.</div></div>
+      <div class="card"><div class="stage">Decide</div><h3>Surface what needs attention</h3><p>The workforce directory shows each person's workload and OQ certifications with expiry dates. Expiring certs and overdue assets come to you before they become findings.</p><div class="proof">Qualification visible at assignment.</div></div>
+      <div class="card"><div class="stage">Act</div><h3>Send the right crew to the right job</h3><p>Each work order carries the map, client, assignee, and equipment checklist on one screen. Crews go to the highest-priority work — and only qualified operators are assigned.</p><div class="proof">One work order. One shared view.</div><div class="progress"><i></i></div><p style="font-size:12px;margin-top:6px">WO-001 · 50% complete</p></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="label">The product</div>
+    <h2>Designed around the three screens your teams live in.</h2>
+    <div class="drive">
+      <img src="/fig/ops-desktop.png" alt="Operations work-order detail" />
+      <div class="txt"><div class="file">Operations · WO detail</div><h3>The work order is the shared view</h3><p>Map canvas, client (Motiva enterprises), assignee (Raymond Rangel), due pill, equipment checklist — everything a crew needs on one screen, with status transitions guarded so a job can't close with unchecked equipment.</p></div>
+    </div>
+    <div class="drive">
+      <img src="/fig/workforce-desktop.png" alt="Workforce directory and profile" />
+      <div class="txt"><div class="file">Workforce · directory + profile</div><h3>Qualifications at the moment of assignment</h3><p>423 staff, searchable, each row showing live workload ("3 WOs, 32 tasks") and OQ status — valid, expiring within 30 days, grace, expired. No more assigning a tech whose cert lapsed last week.</p></div>
+    </div>
+    <div class="drive">
+      <img src="/fig/pip-readonly.png" alt="PIP pipeline fact-sheet record" />
+      <div class="txt"><div class="file">PIP record · fact sheet</div><h3>The asset's whole story, 14 sections deep</h3><p>Correspondence, Right of Way and Permits, Inspection Team, Welding, Nondestructive Testing, HCA Mapping, As-Built Data — one tabbed record per pipeline, audit-ready by construction.</p></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="label">The compliance backbone</div>
+    <h2>Verify first. Then store. Audit-ready by default.</h2>
+    <div class="grid4">
+      <div class="card"><h3>Right work</h3><p>The task matches the work order.</p></div>
+      <div class="card"><h3>Right time</h3><p>Inside the required window.</p></div>
+      <div class="card"><h3>Right location</h3><p>Tied to the actual asset.</p></div>
+      <div class="card"><h3>Qualified operator</h3><p>Current qualification held.</p></div>
+    </div>
+    <div class="grid3" style="margin-top:16px">
+      <div class="card"><h3>Immutable records</h3><p>Once stored, a record can't be quietly changed. That's what makes it defensible.</p></div>
+      <div class="card"><h3>Pre-built PHMSA workflows</h3><p>Regulatory workflows ship ready to use — not rebuilt from scratch.</p></div>
+      <div class="card"><h3>OQ + GIS + compliance in one</h3><p>One platform replaces the reconciliation between three. Audit prep drops from weeks to near zero — the benchmark set by Everline SP3.</p></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="label">Why it pays</div>
+    <h2>The biggest saving is the incident that never happens.</h2>
+    <div class="grid3">
+      <div class="card"><div class="n">A</div><h3>Fewer unplanned repairs</h3><p>Issues resolved in advance turn emergency work at emergency prices into scheduled work.</p></div>
+      <div class="card"><div class="n">B</div><h3>Audit prep near zero</h3><p>Records are verified and immutable when stored — little left to prepare.</p></div>
+      <div class="card"><div class="n">C</div><h3>One source of truth</h3><p>From the field to the boardroom, everyone works from the same live picture.</p></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="label">Who it is for</div>
+    <h2>Each leader gets what they need.</h2>
+    <div class="grid3">
+      <div class="card"><h3>Operator executive</h3><p>Lower risk exposure, fewer surprise costs, a clear view of network health.</p></div>
+      <div class="card"><h3>Integrity &amp; compliance lead</h3><p>Audit-ready records, pre-built PHMSA workflows, qualification checks before work — not after.</p></div>
+      <div class="card"><h3>Field operations manager</h3><p>The right crew on the right job, checklist and map in one place.</p></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="label">Fair questions</div>
+    <h2>What operators ask first.</h2>
+    <div class="grid3">
+      <div class="card"><div class="q">"We already have GIS, OQ, and maintenance tools."</div><p>SafePipe doesn't replace your data. The ontology connects it — "can this crew work on that asset today?" stops taking four systems.</p></div>
+      <div class="card"><div class="q">"A digital twin sounds like a multi-year project."</div><p>Start with one segment and connect existing records. Value there first, then decide.</p></div>
+      <div class="card"><div class="q">"How do we know the savings are real?"</div><p>A pilot measures unplanned work and audit-prep time against your own baseline.</p></div>
+    </div>
+  </section>
+
+  <section class="cta" id="pilot">
+    <div class="label">Contact us · Next step</div>
+    <h2>Start with one pipeline segment.</h2>
+    <p>We build its digital twin, connect your existing records, and measure unplanned work, audit-prep time, and dispatch quality against your current baseline. You decide on rollout from your own numbers.</p>
+    <form class="field" action="mailto:hello@safepipe.example?subject=SafePipe%20pilot" method="get">
+      <input type="email" name="email" placeholder="Work email" aria-label="Work email" />
+      <button class="btn" type="submit">Request a pilot</button>
+    </form>
+  </section>
+  <p class="note">SafePipe · Pipeline Intelligence Platform — visuals from the 2022 design file, tokens from the SafePipe design system. Logic demo: <a class="link" href="/logic.html">/logic.html</a></p>
+</div>
+</body>
+</html>
