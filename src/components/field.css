@@ -1,0 +1,71 @@
+.spc-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-spacing-xs);
+  font-family: var(--sp-font-ui);
+}
+.spc-field__label {
+  font-size: var(--sp-text-xs);
+  font-weight: var(--sp-fontweight-medium);
+  color: var(--sp-text-secondary);
+}
+.spc-field__box {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-spacing-md);
+  background: var(--sp-surface-card);
+  border: thin solid var(--sp-border-default);
+  border-radius: var(--sp-radius-md);
+  padding: var(--sp-spacing-md) var(--sp-spacing-lg);
+}
+.spc-field--small .spc-field__box { min-height: var(--sp-spacing-2xl); }
+.spc-field--medium .spc-field__box { min-height: var(--sp-spacing-3xl); }
+.spc-field__box:hover { border-color: var(--sp-border-strong); }
+.spc-field__box:focus-within {
+  border-color: var(--sp-sky);
+  outline: medium solid var(--sp-sky);
+  outline-offset: var(--sp-spacing-xs);
+}
+.spc-field__control {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-md);
+  font-weight: var(--sp-fontweight-medium);
+  color: var(--sp-text-primary);
+  width: 100%;
+}
+.spc-field__control::placeholder { color: var(--sp-text-muted); }
+.spc-field__control:focus { outline: none; }
+textarea.spc-field__control {
+  background: var(--sp-surface-card);
+  border: thin solid var(--sp-border-default);
+  border-radius: var(--sp-radius-md);
+  padding: var(--sp-spacing-md) var(--sp-spacing-lg);
+  min-height: var(--sp-spacing-3xl);
+}
+input[type="date"].spc-field__control {
+  background: var(--sp-surface-card);
+  border: thin solid var(--sp-border-default);
+  border-radius: var(--sp-radius-md);
+  padding: var(--sp-spacing-md) var(--sp-spacing-lg);
+}
+.spc-field__trail { color: var(--sp-text-secondary); font-size: var(--sp-text-md); }
+.spc-field__control--readonly {
+  font-size: var(--sp-text-sm);
+  color: var(--sp-text-primary);
+  background: var(--sp-surface-page);
+  border-radius: var(--sp-radius-md);
+  padding: var(--sp-spacing-md) var(--sp-spacing-lg);
+  margin: 0;
+}
+.spc-field--error .spc-field__box { border-color: var(--sp-danger); }
+.spc-field__error {
+  font-size: var(--sp-text-xs);
+  color: var(--sp-danger);
+  margin: 0;
+}
+.spc-field--disabled .spc-field__label { color: var(--sp-text-muted); }
+.spc-field--disabled .spc-field__box { background: var(--sp-surface-page); }
+.spc-field--disabled .spc-field__control { color: var(--sp-text-muted); }

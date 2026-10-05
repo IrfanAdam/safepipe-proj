@@ -1,0 +1,53 @@
+/* Search / Filter — query field + pills. All values via var(--sp-*). */
+.spc-search-filter { font-family: var(--sp-font-ui); display: flex; flex-direction: column; gap: var(--sp-spacing-sm); }
+.spc-search-filter-field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-spacing-lg);
+  background: var(--sp-surface-card);
+  border: 1px solid var(--sp-border-default);
+  border-radius: var(--sp-radius-lg);
+  padding: var(--sp-spacing-md) var(--sp-spacing-xl);
+}
+.spc-search-filter-field:hover { border-color: var(--sp-border-strong); }
+.spc-search-filter-field:focus-within { border-color: var(--sp-accent); outline: 2px solid var(--sp-accent); }
+.spc-search-filter-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.spc-search-filter-icon { color: var(--sp-text-secondary); font-size: var(--sp-text-md); }
+.spc-search-filter-input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-sm);
+  color: var(--sp-text-primary);
+}
+.spc-search-filter-input::placeholder { color: var(--sp-text-muted); }
+.spc-search-filter.is-quiet .spc-search-filter-input::placeholder { color: var(--sp-text-secondary); }
+.spc-search-filter-input:focus { outline: none; }
+.spc-search-filter.is-disabled .spc-search-filter-field { background: var(--sp-surface-page); }
+.spc-search-filter.is-disabled .spc-search-filter-input,
+.spc-search-filter.is-disabled .spc-search-filter-icon { color: var(--sp-text-muted); }
+.spc-search-filter-row { display: flex; flex-wrap: wrap; gap: var(--sp-spacing-sm); }
+.spc-search-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-spacing-sm);
+  background: var(--sp-surface-card);
+  border: 1px solid var(--sp-border-default);
+  border-radius: var(--sp-radius-md);
+  padding: var(--sp-spacing-md) var(--sp-spacing-lg);
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-sm);
+  font-weight: var(--sp-fontweight-medium);
+  color: var(--sp-text-primary);
+  cursor: pointer;
+}
+.spc-search-filter-pill.is-selected { border-color: var(--sp-border-strong); }
+.spc-search-filter-pill:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: var(--sp-spacing-xs); }
+.spc-search-filter-dot {
+  width: var(--sp-spacing-sm);
+  height: var(--sp-spacing-sm);
+  border-radius: var(--sp-radius-full);
+  background: var(--sp-accent);
+}
+.spc-search-filter-error { font-size: var(--sp-text-xs); color: var(--sp-bad); margin: 0; }

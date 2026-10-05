@@ -1,0 +1,58 @@
+.spc-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-spacing-md);
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-md);
+  font-weight: var(--sp-fontweight-bold);
+  line-height: var(--sp-lineheight-lg);
+  border-radius: var(--sp-radius-lg);
+  padding: var(--sp-spacing-md) var(--sp-spacing-xl);
+  border: thin solid transparent;
+  cursor: pointer;
+  min-height: var(--sp-spacing-3xl);
+}
+.spc-button--primary { background: var(--sp-navy); color: var(--sp-text-inverse); }
+.spc-button--neutral { background: var(--sp-surface-input); color: var(--sp-text-primary); }
+.spc-button--ghost {
+  background: var(--sp-surface-input);
+  color: var(--sp-text-link);
+  border-color: var(--sp-border-default);
+  padding: var(--sp-spacing-sm) var(--sp-spacing-lg);
+}
+.spc-button--danger { background: var(--sp-danger); color: var(--sp-text-inverse); }
+.spc-button:hover { filter: brightness(0.94); }
+.spc-button--ghost:hover { border-color: var(--sp-border-strong); }
+.spc-button:active { box-shadow: var(--sp-elevation-0); }
+.spc-button:focus-visible {
+  outline: medium solid var(--sp-sky);
+  outline-offset: var(--sp-spacing-xs);
+}
+.spc-button:disabled,
+.spc-button--loading {
+  background: var(--sp-surface-page);
+  color: var(--sp-text-muted);
+  cursor: not-allowed;
+}
+.spc-button--icon-only {
+  padding: var(--sp-spacing-md) var(--sp-spacing-lg);
+  min-width: var(--sp-spacing-3xl);
+}
+.spc-button__icon { display: inline-flex; line-height: var(--sp-lineheight-md); }
+.spc-button__label--sr {
+  position: absolute;
+  width: var(--sp-spacing-base);
+  height: var(--sp-spacing-base);
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+.spc-button__spinner {
+  width: var(--sp-spacing-lg);
+  height: var(--sp-spacing-lg);
+  border-radius: var(--sp-radius-full);
+  border: var(--sp-spacing-xs) solid var(--sp-border-strong);
+  border-top-color: var(--sp-text-muted);
+  animation: spc-button-spin 0.8s linear infinite;
+}
+@keyframes spc-button-spin { to { transform: rotate(360deg); } }

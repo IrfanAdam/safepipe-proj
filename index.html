@@ -3,62 +3,25 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Safepipe — Pipeline Operations</title>
+<title>Safepipe — Operations</title>
 <link rel="stylesheet" href="./design-system/tokens.css" />
 <link rel="stylesheet" href="./src/styles/main.css" />
+<link rel="stylesheet" href="./src/styles/screens.css" />
 </head>
 <body>
-<header class="top">
-  <div class="brand"><span class="mark"></span> Safepipe <span class="tag">v0 boilerplate</span></div>
-  <nav class="tabs" role="tablist" aria-label="Sections">
-    <button role="tab" aria-selected="true" data-tab="network">Network</button>
-    <button role="tab" aria-selected="false" data-tab="twin">Digital Twin</button>
-    <button role="tab" aria-selected="false" data-tab="integrity">Integrity</button>
-    <button role="tab" aria-selected="false" data-tab="work">Work Orders</button>
+<div class="sp-shell">
+  <nav class="sp-rail" aria-label="Primary">
+    <a href="#/operations" data-route="/operations" title="Operations">Ops</a>
+    <a href="#/workforce" data-route="/workforce" title="Workforce">WF</a>
+    <a href="#/assets" data-route="/assets" title="Assets">As</a>
+    <a href="#/pip" data-route="/pip" title="PIP record">PIP</a>
+    <a href="#/home" data-route="/home" title="Home">⌂</a>
   </nav>
-</header>
-<main class="wrap">
-  <section id="panel-network" role="tabpanel">
-    <div class="grid">
-      <div class="card span2">
-        <h2>Network schematic <small>stub SVG — live twin later</small></h2>
-        <svg id="schematic" viewBox="0 0 640 220" role="img" aria-label="Pipeline schematic">
-          <line x1="40" y1="110" x2="600" y2="110" class="pipe"/>
-          <g id="nodes"></g>
-        </svg>
-        <div id="node-meta" class="meta">Select a segment node…</div>
-      </div>
-      <div class="card">
-        <h2>Throughput <small>stub</small></h2>
-        <div class="kpi">1.24 <span>M bbl/d</span></div>
-        <div class="bar"><i style="width:72%"></i></div>
-        <p class="meta">72% of rated capacity · 2 segments derated</p>
-      </div>
-      <div class="card">
-        <h2>Open risks <small>ontology: RiskEvent</small></h2>
-        <ul id="risks" class="rows"></ul>
-      </div>
-      <div class="card">
-        <h2>Ontology <small>Field → Segment → Sensor</small></h2>
-        <p class="meta" id="onto-count"></p>
-        <code class="code">src/logic/ontology.js</code>
-      </div>
-    </div>
-  </section>
-  <section id="panel-twin" role="tabpanel" hidden>
-    <div class="card"><h2>Digital Twin <small>placeholder</small></h2>
-    <p class="meta">3D/map replica lands here per <code class="code">docs/digital-twin.md</code>. Current build shows the static schematic only.</p></div>
-  </section>
-  <section id="panel-integrity" role="tabpanel" hidden>
-    <div class="card"><h2>Integrity <small>stub table</small></h2>
-    <table class="tbl"><thead><tr><th>Segment</th><th>Last ILI</th><th>Anomaly</th><th>Status</th></tr></thead>
-    <tbody id="ili"></tbody></table></div>
-  </section>
-  <section id="panel-work" role="tabpanel" hidden>
-    <div class="card"><h2>Work Orders <small>stub</small></h2><ul id="wo" class="rows"></ul></div>
-  </section>
-  <p class="foot">Web-first boilerplate · mobile shell stubbed in <code class="code">apps/mobile/</code> · tokens in <code class="code">design-system/tokens.css</code></p>
-</main>
+  <div class="sp-main">
+    <div class="sp-datebar"><span id="sp-date">23rd Sept 2021</span><span>Safepipe · prototype B</span></div>
+    <main class="sp-outlet" id="outlet"></main>
+  </div>
+</div>
 <script type="module" src="./src/app.js"></script>
 </body>
 </html>

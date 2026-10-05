@@ -1,0 +1,77 @@
+/* Sidebar — minimized icon rail. All values via var(--sp-*). */
+.spc-sidebar {
+  width: var(--sp-spacing-3xl);
+  min-height: 100%;
+  background: var(--sp-surface-card);
+  box-shadow: var(--sp-elevation-1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--sp-spacing-lg) 0;
+  gap: var(--sp-spacing-xs);
+  font-family: var(--sp-font-ui);
+}
+.spc-sidebar-logo {
+  font-family: var(--sp-font-display);
+  font-size: var(--sp-text-md);
+  font-weight: var(--sp-fontweight-bold);
+  color: var(--sp-text-primary);
+}
+.spc-sidebar-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--sp-border-default);
+  margin: var(--sp-spacing-sm) 0;
+}
+.spc-sidebar-avatar {
+  width: var(--sp-spacing-3xl);
+  height: var(--sp-spacing-3xl);
+  border-radius: var(--sp-radius-full);
+  border: 1px solid var(--sp-border-default);
+  background: var(--sp-surface-input);
+  color: var(--sp-text-primary);
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-sm);
+  font-weight: var(--sp-fontweight-medium);
+  cursor: pointer;
+}
+.spc-sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-spacing-xs);
+}
+.spc-sidebar-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sp-spacing-3xl);
+  height: var(--sp-spacing-3xl);
+  border-radius: var(--sp-radius-md);
+  padding: var(--sp-spacing-sm);
+  color: var(--sp-text-secondary);
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-sm);
+  font-weight: var(--sp-fontweight-medium);
+  text-decoration: none;
+}
+.spc-sidebar-item:hover {
+  background: var(--sp-surface-input);
+  color: var(--sp-text-primary);
+}
+.spc-sidebar-item.is-active {
+  background: var(--sp-surface-card);
+  color: var(--sp-text-primary);
+  box-shadow: var(--sp-elevation-0);
+}
+.spc-sidebar-item:focus-visible {
+  outline: 2px solid var(--sp-accent);
+  outline-offset: var(--sp-spacing-xs);
+}
+.spc-sidebar-item.is-disabled {
+  color: var(--sp-text-muted);
+  pointer-events: none;
+}
+.spc-sidebar-icon { font-size: var(--sp-text-md); line-height: 1; }

@@ -1,0 +1,52 @@
+.spc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-spacing-sm);
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-sm);
+  font-weight: var(--sp-fontweight-medium);
+  color: var(--sp-text-primary);
+}
+.spc-status__dot {
+  width: var(--sp-spacing-sm);
+  height: var(--sp-spacing-sm);
+  border-radius: var(--sp-radius-full);
+  background: var(--sp-navy);
+  flex: none;
+}
+.spc-status__dot--success { background: var(--sp-success); }
+.spc-status__dot--danger { background: var(--sp-danger); }
+.spc-status__dot--warning { background: var(--sp-warning); }
+.spc-status__dot--accent { background: var(--sp-violet); }
+.spc-status__dot--info { background: var(--sp-sky); }
+.spc-status__dot--neutral { background: var(--sp-navy); }
+.spc-status__dot--pending { background: var(--sp-sky); animation: spc-status-pulse 1.2s ease-in-out infinite; }
+@keyframes spc-status-pulse { 50% { opacity: 0.35; } }
+.spc-status__label { color: var(--sp-text-primary); }
+.spc-status__qualifier { color: var(--sp-text-secondary); }
+.spc-status--card,
+.spc-status--card-vertical {
+  background: var(--sp-surface-card);
+  border: thin solid var(--sp-border-strong);
+  border-radius: var(--sp-radius-md);
+  padding: var(--sp-spacing-sm) var(--sp-spacing-md);
+  gap: var(--sp-spacing-sm);
+}
+.spc-status--card-vertical { flex-direction: column; align-items: flex-start; }
+.spc-status--card:hover { box-shadow: var(--sp-elevation-1); }
+.spc-status__body {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-spacing-sm);
+  flex-wrap: wrap;
+}
+.spc-status--card-vertical .spc-status__body { flex-direction: column; align-items: flex-start; }
+.spc-status__tags { display: inline-flex; gap: var(--sp-spacing-xs); flex-wrap: wrap; }
+.spc-status__action { color: var(--sp-text-link); margin-left: auto; }
+.spc-status:focus-visible {
+  outline: medium solid var(--sp-sky);
+  outline-offset: var(--sp-spacing-xs);
+}
+.spc-status--disabled .spc-status__dot { background: var(--sp-border-strong); }
+.spc-status--disabled .spc-status__label { color: var(--sp-text-muted); }
+.spc-status--toggle .spc-status__label { color: var(--sp-text-secondary); }

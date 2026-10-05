@@ -1,0 +1,52 @@
+/* Progress — pill completion bar. All values via var(--sp-*). */
+.spc-progress { font-family: var(--sp-font-ui); }
+.spc-progress-track {
+  height: var(--sp-spacing-xs);
+  border-radius: var(--sp-radius-md);
+  background: var(--sp-surface-input);
+  position: relative;
+  overflow: visible;
+}
+.spc-progress-track:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: var(--sp-spacing-xs); }
+.spc-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--sp-radius-md);
+  background: var(--sp-violet);
+}
+.spc-progress--sky .spc-progress-fill { background: var(--sp-accent); }
+.spc-progress.is-disabled .spc-progress-fill { background: var(--sp-border-default); }
+.spc-progress.is-disabled { color: var(--sp-text-muted); }
+.spc-progress-knob {
+  position: absolute;
+  top: 50%;
+  width: var(--sp-spacing-lg);
+  height: var(--sp-spacing-lg);
+  border-radius: var(--sp-radius-full);
+  background: var(--sp-surface-card);
+  border: 1px solid var(--sp-border-default);
+  transform: translate(-50%, -50%);
+}
+.spc-progress--card {
+  background: var(--sp-surface-page);
+  border-radius: var(--sp-radius-md);
+  padding: var(--sp-spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-spacing-md);
+}
+.spc-progress-card-head { display: flex; align-items: center; justify-content: space-between; }
+.spc-progress-title { font-size: var(--sp-text-md); font-weight: var(--sp-fontweight-medium); color: var(--sp-text-primary); }
+.spc-progress-action { font-size: var(--sp-text-xs); color: var(--sp-text-link); }
+.spc-progress-counts { display: flex; gap: var(--sp-spacing-md); font-size: var(--sp-text-sm); font-weight: var(--sp-fontweight-medium); }
+.spc-progress-done { color: var(--sp-text-primary); }
+.spc-progress-pending { color: var(--sp-warn); }
+.spc-progress.is-error .spc-progress-pending { color: var(--sp-bad); }
+.spc-progress-header-title { font-size: var(--sp-text-lg); font-weight: var(--sp-fontweight-semibold); color: var(--sp-text-primary); }
+.spc-progress-header-pct { font-size: var(--sp-text-sm); color: var(--sp-accent); }
+.spc-progress-header-due { font-size: var(--sp-text-sm); color: var(--sp-text-secondary); }
+.spc-progress-segs { display: flex; gap: var(--sp-spacing-xs); }
+.spc-progress-seg { flex: 1; height: var(--sp-spacing-xs); border-radius: var(--sp-radius-md); background: var(--sp-accent); }
+.spc-progress-seg--1 { opacity: 0.6; }
+.spc-progress-seg--2 { opacity: 0.3; }
+.spc-progress-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
