@@ -36,14 +36,25 @@ export function createTwin(container, opts = {}) {
   console.log('[ops3d]', network.stats);
 
   let selected = null;
-  const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
-  canvas.addEventListener('click', (e) => {
+  const setNdc = (e) => {
     const r = canvas.getBoundingClientRect();
     ndc.set(
       ((e.clientX - r.left) / r.width) * 2 - 1,
       -((e.clientY - r.top) / r.height) * 2 + 1,
     );
+  };
+  canvas.addEventListener('mousemove', (e) => {
+    setNdc(e);
+    const id = network.pick(ndc, rig.camera);
+    if (network.setHover(id)) canvas.style.cursor = id ? 'pointer' : '';
+  });
+  canvas.addEventListener('mouseleave', () => {
+    network.setHover(null);
+    canvas.style.cursor = '';
+  });
+  canvas.addEventListener('click', (e) => {
+    setNdc(e);
     const id = network.pick(ndc, rig.camera);
     if (id) {
       selected = id;

@@ -20,6 +20,27 @@ const DOT_Y = 0.06;
 const BASE_DOT_SIZE = 0.085;
 const CRITICAL_GAIN = 1.5;
 const DIM_FACTOR = 0.3;
+const HOVER_GAIN = 1.25;
+
+let dotTexture = null;
+/* Soft round sprite so dots stay circular at any zoom (untextured Points
+ * render as squares, which read as pixelation up close). */
+function getDotTexture() {
+  if (dotTexture) return dotTexture;
+  const s = 128;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = s;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.35, 'rgba(255,255,255,1)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0.6)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  dotTexture = new THREE.CanvasTexture(cv);
+  return dotTexture;
+}
 
 function samplePolyline(points, step = 0.18) {
   const out = [];
@@ -77,6 +98,7 @@ export function buildNetwork(scene, feed) {
   let dotTotal = 0;
   let beadTotal = 0;
   let selected = null;
+  let hovered = null;
   const ringHolder = new THREE.Group();
   group.add(ringHolder);
 
@@ -85,7 +107,7 @@ export function buildNetwork(scene, feed) {
     mat.opacity = baseOpacity;
     let entry = byId.get(assetId);
     if (!entry) {
-      entry = { mats: [], dots: null };
+      entry = { mats: [], dots: null, nodes: [] };
       byId.set(assetId, entry);
     }
     entry.mats.push({ m: mat, base: baseOpacity });
@@ -103,6 +125,7 @@ export function buildNetwork(scene, feed) {
       color: colorFor(health),
       size: BASE_DOT_SIZE * (health === 'critical' ? CRITICAL_GAIN : 1),
       sizeAttenuation: true,
+      map: getDotTexture(),
       transparent: true,
       opacity: health === 'nominal' ? 0.55 : 0.95,
       depthWrite: false,
@@ -135,10 +158,11 @@ export function buildNetwork(scene, feed) {
       pipe.points.map(([x, z]) => new THREE.Vector3(x, DOT_Y, z)),
     );
     const proxy = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 32, 0.35, 6, false),
+      new THREE.TubeGeometry(curve, 32, 0.6, 8, false),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
     proxy.userData.assetId = pipe.assetId;
+    proxy.userData.kind = 'pipeline';
     group.add(proxy);
     proxies.push(proxy);
   }
@@ -155,6 +179,7 @@ export function buildNetwork(scene, feed) {
     edges.position.set(fx, h / 2 + 0.02, fz);
     group.add(edges);
     track(fac.assetId, edges.material, 0.9);
+    byId.get(fac.assetId).nodes.push(edges);
 
     const proxy = new THREE.Mesh(
       new THREE.BoxGeometry(w + 0.5, h + 0.5, d + 0.5),
@@ -162,6 +187,7 @@ export function buildNetwork(scene, feed) {
     );
     proxy.position.copy(edges.position);
     proxy.userData.assetId = fac.assetId;
+    proxy.userData.kind = 'facility';
     group.add(proxy);
     proxies.push(proxy);
   }
@@ -178,13 +204,15 @@ export function buildNetwork(scene, feed) {
     mesh.userData.assetId = sen.assetId;
     group.add(mesh);
     track(sen.assetId, mesh.material, health === 'nominal' ? 0.7 : 1);
+    byId.get(sen.assetId).nodes.push(mesh);
 
     const proxy = new THREE.Mesh(
-      new THREE.SphereGeometry(0.3, 8, 6),
+      new THREE.SphereGeometry(0.45, 8, 6),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
     proxy.position.copy(mesh.position);
     proxy.userData.assetId = sen.assetId;
+    proxy.userData.kind = 'sensor';
     group.add(proxy);
     proxies.push(proxy);
   }
@@ -241,8 +269,12 @@ export function buildNetwork(scene, feed) {
         const h = healthById.get(id)?.health ?? 'nominal';
         let s = BASE_DOT_SIZE * (h === 'critical' ? CRITICAL_GAIN : 1);
         if (selected === id) s *= 1.4;
+        else if (hovered === id) s *= HOVER_GAIN;
         entry.dots.material.size = s;
       }
+      // Hovered boxes/diamonds swell slightly so the click target is obvious.
+      const hs = hovered === id && selected !== id ? 1.15 : 1;
+      for (const n of entry.nodes) n.scale.setScalar(hs);
     }
     showRings(selected);
   };
@@ -267,10 +299,23 @@ export function buildNetwork(scene, feed) {
       selected = id ?? null;
       applySelection();
     },
+    setHover(id) {
+      const next = id ?? null;
+      if (next === hovered) return false;
+      hovered = next;
+      applySelection();
+      return true;
+    },
     pick(ndc, camera) {
       raycaster.setFromCamera(ndc, camera);
       const hits = raycaster.intersectObjects(proxies, false);
-      return hits.length ? hits[0].object.userData.assetId : null;
+      if (!hits.length) return null;
+      // Discrete assets (sensor/facility) win over a pipeline tube when the
+      // hits overlap — a box sitting on a line otherwise loses to the tube wall.
+      const near = hits.filter((h) => h.distance - hits[0].distance < 1.0);
+      const rank = { sensor: 0, facility: 1, pipeline: 2 };
+      near.sort((a, b) => rank[a.object.userData.kind] - rank[b.object.userData.kind]);
+      return near[0].object.userData.assetId;
     },
   };
 }
