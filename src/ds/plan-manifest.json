@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T19:15:00.326Z",
+  "generated": "2026-10-05T19:52:15.815Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -7,6 +7,14 @@
     "2026-10-06_003000-ops3d-theatre-style.md"
   ],
   "commits": [
+    {
+      "sha": "bcbdd95",
+      "full": "bcbdd95d3dad33fb629133068afac6dc475a8179",
+      "date": "2026-10-06",
+      "subject": "chore(tracker): plan-track script + manifest, build hook [plan:2026-10-06_003000-ops3d-theatre-style.md#task-8]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-8"
+    },
     {
       "sha": "b5e4c38",
       "full": "b5e4c38762e31110b4063b081671337e369efc1a",
@@ -40,5 +48,8 @@
       "anchor": null
     }
   ],
-  "wip": []
+  "wip": [
+    "allery.html",
+    "src/ops3d/"
+  ]
 }
