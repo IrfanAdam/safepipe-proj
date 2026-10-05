@@ -1,8 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<script>try{var t=localStorage.getItem('sp-theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;}catch(e){}</script>
 <title>Safepipe — Operations</title>
 <link rel="stylesheet" href="./design-system/tokens.css" />
 <link rel="stylesheet" href="./src/styles/main.css" />
@@ -11,14 +13,46 @@
 <body>
 <div class="sp-shell">
   <nav class="sp-rail" aria-label="Primary">
-    <a href="#/operations" data-route="/operations" title="Operations">Ops</a>
-    <a href="#/workforce" data-route="/workforce" title="Workforce">WF</a>
-    <a href="#/assets" data-route="/assets" title="Assets">As</a>
-    <a href="#/pip" data-route="/pip" title="PIP record">PIP</a>
-    <a href="#/home" data-route="/home" title="Home">⌂</a>
+    <a href="#/operations" data-route="/operations" title="Operations" aria-label="Operations"><span class="sp-rail-ic" aria-hidden="true"></span></a>
+    <a href="#/workforce" data-route="/workforce" title="Workforce" aria-label="Workforce"><span class="sp-rail-ic" aria-hidden="true"></span></a>
+    <a href="#/assets" data-route="/assets" title="Assets" aria-label="Assets"><span class="sp-rail-ic" aria-hidden="true"></span></a>
+    <a href="#/pip" data-route="/pip" title="PIP record" aria-label="PIP"><span class="sp-rail-ic" aria-hidden="true"></span></a>
+    <a href="#/home" data-route="/home" title="Home" aria-label="Home"><span class="sp-rail-ic" aria-hidden="true"></span></a>
+    <div class="sp-rail-spacer" aria-hidden="true"></div>
+    <a class="sp-rail-foot" href="/logic.html" target="_blank" title="Logic inspector" aria-label="Logic"><span class="sp-rail-ic small" aria-hidden="true"></span></a>
+    <details class="sp-rail-more"><summary title="More prototypes">⋯</summary>
+      <div class="sp-rail-pop" role="group" aria-label="More routes">
+        <a href="#/ops-construction" data-route="/ops-construction">OC</a>
+        <a href="#/ops-imp" data-route="/ops-imp">IMP</a>
+        <a href="#/questionnaire" data-route="/questionnaire">Q</a>
+        <a href="#/acs-edit" data-route="/acs-edit">ACS</a>
+        <a href="#/vi-edit" data-route="/vi-edit">VI</a>
+        <a href="#/construction-edit" data-route="/construction-edit">CE</a>
+        <a href="#/moc-descrip" data-route="/moc-descrip">MOC</a>
+        <a href="#/crm" data-route="/crm">CRM</a>
+        <a href="#/fac" data-route="/fac">FAC</a>
+        <a href="#/equipments" data-route="/equipments">Eq</a>
+        <a href="#/annuals" data-route="/annuals">An</a>
+        <a href="#/devices" data-route="/devices">Dv</a>
+        <a href="#/valvebox" data-route="/valvebox">Vb</a>
+        <a href="#/mapping" data-route="/mapping">Map</a>
+        <a href="#/reports" data-route="/reports">Rp</a>
+        <a href="#/wo-pmp" data-route="/wo-pmp">PMP</a>
+        <a href="#/wo-moc" data-route="/wo-moc">WM</a>
+        <a href="#/wo-construction" data-route="/wo-construction">WC</a>
+        <a href="#/wo-acs" data-route="/wo-acs">WA</a>
+        <a href="#/wo-vi" data-route="/wo-vi">WV</a>
+        <a href="#/home-queue" data-route="/home-queue">HQ</a>
+        <a href="#/home-alerts" data-route="/home-alerts">HA</a>
+        <a href="#/home-modal" data-route="/home-modal">HM</a>
+        <a href="#/legend" data-route="/legend">Lg</a>
+        <a href="#/modal" data-route="/modal">Mo</a>
+        <a href="#/calendar" data-route="/calendar">Cal</a>
+      </div>
+    </details>
   </nav>
   <div class="sp-main">
-    <div class="sp-datebar"><span id="sp-date">23rd Sept 2021</span><span>Safepipe · prototype B</span></div>
+    <div class="sp-datebar"><span id="sp-date">23rd Sept 2021</span><span>Safepipe · prototype B</span><button id="sp-theme-toggle" type="button" aria-pressed="false" aria-label="Theme">☾</button></div>
     <main class="sp-outlet" id="outlet"></main>
   </div>
 </div>

@@ -33,7 +33,8 @@ export function renderWorkforce(root, fx) {
   }
   function drawProfile() {
     profileEl.innerHTML = `<div class="sp-prof-top"><span class="sp-sq"></span><span class="sp-sq"></span></div>
-      <div class="sp-prof-id"><span class="sp-avatar big"></span>
+      <div class="sp-prof-photo"><span class="sp-avatar big"></span><span class="sp-pill">OQ valid</span></div>
+      <div class="sp-prof-id">
       <h2>${active.name}</h2><p class="sp-meta">${active.certs} Certificates · ${active.location}</p>
       <p><span class="sp-pill">OQ valid</span> <span class="sp-pill">Available</span></p>
       <p class="sp-meta">${active.exp} · ${active.role}</p>
