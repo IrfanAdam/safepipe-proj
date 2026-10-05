@@ -1,3 +1,6 @@
-# Netlify-style redirects — ensure SPA fallback does not hijack logic inspector
+# Netlify-style redirects — explicit pages must not fall through to the SPA fallback
 /logic.html  /logic.html  200
+/pitch.html  /pitch.html  200
+/gallery.html  /gallery.html  200
+/fig/*  /fig/:splat  200
 /*  /index.html  200

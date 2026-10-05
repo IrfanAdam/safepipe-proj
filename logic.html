@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Safepipe — Logic Inspector</title>
-<link rel="stylesheet" href="/design-system/tokens.css" />
+<link rel="stylesheet" href="./design-system/tokens.css" />
 <style>
   /* tokens from /design-system/tokens.css — --bg, --bg-2, --surface, --line, --ink, --muted, --teal, --amber, --red, --green, --radius, --radius-s */
   *{box-sizing:border-box}
@@ -68,12 +68,12 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>Logic Inspector <small>public/logic.html — live harness over <code>src/logic/*</code> · pure ESM, zero DOM</small></h1>
+      <h1>Logic Inspector <small>logic.html — live harness over <code>src/logic/*</code> · pure ESM, zero DOM</small></h1>
       <div class="row" style="margin-top:10px">
-        <span class="pill"><span class="pill-dot"></span> Vite dev · <b>http://127.0.0.1:5175/logic.html</b></span>
+        <span class="pill"><span class="pill-dot"></span> live · <b id="live-badge-host">/logic.html</b></span>
         <span class="pill mono" id="live-badge">loading…</span>
-        <a class="pill" href="/src/logic/fixtures.json" target="_blank" rel="noreferrer">fixtures.json ↗</a>
-        <a class="pill" href="/src/logic/README.md" target="_blank" rel="noreferrer">frozen API ↗</a>
+        <a class="pill" href="https://github.com/IrfanAdam/safepipe-proj/blob/main/src/logic/fixtures.json" target="_blank" rel="noreferrer">fixtures.json ↗</a>
+        <a class="pill" href="https://github.com/IrfanAdam/safepipe-proj/blob/main/src/logic/README.md" target="_blank" rel="noreferrer">frozen API ↗</a>
       </div>
     </div>
     <div class="muted" style="font-size:12px;max-width:280px">Read-only harness. Logic lives in <code>src/logic/*</code> — this page only imports &amp; renders. No edits to logic or tests.</div>
@@ -91,7 +91,7 @@
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <div><span class="k">Client</span><div class="v" id="client-name" style="font-size:20px">—</div><div class="muted mono" id="counts">—</div></div>
-        <div class="muted" style="font-size:12px;text-align:right">Source: <code>src/logic/fixtures.json</code><br>via <code>fetch('/src/logic/fixtures.json')</code><br><span class="mono" id="fixture-import-note"></span></div>
+        <div class="muted" style="font-size:12px;text-align:right">Source: <code>src/logic/fixtures.json</code><br>via bundled <code>import fixtures from './src/logic/fixtures.json'</code><br><span class="mono" id="fixture-import-note"></span></div>
       </div>
     </div>
     <div class="grid grid2">
@@ -239,14 +239,15 @@
     <div class="mono muted" style="font-size:11px;margin-top:8px">Additional helpers (stable, non-frozen): <code>normalizeStatus</code>, <code>canTransition</code>, <code>dueInDays</code>, <code>isOverdue</code>, <code>STATES/TRANSITIONS</code> · <code>daysUntilExpiry</code>, <code>isOQExpired</code>, <code>oqStatus</code> · <code>FORMS</code>, <code>getForm</code>, <code>validateForm</code>, <code>toggleQC</code></div>
   </div>
 
-  <div class="muted mono" style="font-size:11px;margin-top:10px">Layer rule: <code>src/logic/*</code> pure ESM, zero DOM. This harness is <code>public/logic.html</code> (Vite serves <code>public/</code> verbatim at <code>/logic.html</code>). No build step needed in dev.</div>
+  <div class="muted mono" style="font-size:11px;margin-top:10px">Layer rule: <code>src/logic/*</code> pure ESM, zero DOM. This harness is <code>logic.html</code> (Vite MPA input — bundled to <code>dist/logic.html</code>). No edits to logic or tests.</div>
 </div>
 
 <script type="module">
-import { STATES, TRANSITIONS, normalizeStatus, canTransition, woProgress, dueInDays, isOverdue, transitionWO, listWorkOrders } from '/src/logic/workorders.js';
-import { filterStaff, openWorkload } from '/src/logic/workforce.js';
-import { daysUntilExpiry, isOQExpired, oqStatus, expiringOQs } from '/src/logic/qualifications.js';
-import { FORMS, getForm, validateForm, answerQuestionnaire, toggleQC } from '/src/logic/inspections.js';
+import { STATES, TRANSITIONS, normalizeStatus, canTransition, woProgress, dueInDays, isOverdue, transitionWO, listWorkOrders } from './src/logic/workorders.js';
+import { filterStaff, openWorkload } from './src/logic/workforce.js';
+import { daysUntilExpiry, isOQExpired, oqStatus, expiringOQs } from './src/logic/qualifications.js';
+import { FORMS, getForm, validateForm, answerQuestionnaire, toggleQC } from './src/logic/inspections.js';
+import fixtures from './src/logic/fixtures.json';
 
 // tabs
 const tabs = document.querySelectorAll('nav.tabs button');
@@ -256,8 +257,7 @@ tabs.forEach(b=> b.addEventListener('click', ()=>{
   b.setAttribute('aria-selected','true');
   Object.entries(panels).forEach(([k,el])=> el.classList.toggle('hidden', k!==b.dataset.tab));
 }));
-// fixtures data
-const fixtures = await fetch('/src/logic/fixtures.json').then(r=>r.json());
+// fixtures data (bundled JSON import — works in dev and dist)
 const { client, staff, workOrders, pipelines } = fixtures;
 
 document.getElementById('live-badge').textContent = `live · ${staff.length} staff · ${workOrders.length} WOs · ${pipelines.length} pipelines · ${Object.keys(FORMS).length} forms`;
