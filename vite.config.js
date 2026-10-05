@@ -12,6 +12,7 @@ export default defineConfig({
       gallery: resolve(__dirname, 'gallery.html'),
       logic: resolve(__dirname, 'logic.html'),
       pitch: resolve(__dirname, 'pitch.html'),
+      ops3d: resolve(__dirname, 'ops3d.html'),
     } },
   },
 });
