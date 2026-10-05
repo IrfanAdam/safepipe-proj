@@ -1,0 +1,44 @@
+{
+  "generated": "2026-10-05T19:15:00.326Z",
+  "plans": [
+    "2026-10-05_150017-safepipe-domain-logic.md",
+    "2026-10-05_150017-safepipe-ds-extraction.md",
+    "2026-10-05_150017-safepipe-prototype-screens.md",
+    "2026-10-06_003000-ops3d-theatre-style.md"
+  ],
+  "commits": [
+    {
+      "sha": "b5e4c38",
+      "full": "b5e4c38762e31110b4063b081671337e369efc1a",
+      "date": "2026-10-05",
+      "subject": "Prototype screens + fig archive: operations/workforce sizing, variants/records fixtures, mobile shell",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "bbc5d17",
+      "full": "bbc5d172c81d6f2acff7a11557f5c9b51f98829d",
+      "date": "2026-10-05",
+      "subject": "Gallery explorable docs: shell, foundations, 13 component docs, icons, CSS backfill",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "ba00e7f",
+      "full": "ba00e7f6e6c20092608c5056e30755dcb20a36ca",
+      "date": "2026-10-05",
+      "subject": "Plan A: measured DS from live .fig — tokens, 12 specs, 12 components, gallery",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "5370999",
+      "full": "53709998f710f34a300a06a7ea4313648cf61105",
+      "date": "2026-10-05",
+      "subject": "safepipe v0 boilerplate: web-first Vite shell, ontology stub, DS tokens, twin placeholder",
+      "plan": null,
+      "anchor": null
+    }
+  ],
+  "wip": []
+}
