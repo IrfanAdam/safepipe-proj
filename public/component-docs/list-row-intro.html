@@ -1,0 +1,10 @@
+<div class="tp">
+<p class="ch-kicker">Components · Data · List Row</p>
+<h2 class="ch-hero">One action per row. The row is the link.</h2>
+<p class="ch-lede meta">List Row is one record stretched across the page width — leading icon, title, meta line, trailing action — the repeating unit inside every list. Use it when records must scan and compare; reach for card when one record needs depth, footers, or multiple actions.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p><b>The row is a single link.</b> Title, meta at <code>text.xs</code>, <code>tag.md</code> qualifiers, and one trailing <code>text.md</code> icon compose one target with padding <code>spacing.lg / spacing.md</code>. Multi-action records belong in <code>card.md</code>; per-row menus live in the trailing slot only.</p><p class="ch-reject">Reject: three competing links inside one row — stacked targets misfire on touch.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p><b>Selected is border weight plus sky, never a flood.</b> Measured selection is stroke weight with the meta count switching to <code>color.brand.sky</code> — implement as <code>color.border.strong</code> plus the sky accent with <code>aria-current="true"</code>. The page tone stays <code>color.surface.page</code> behind the stack.</p><p class="ch-reject">Reject: a full-bleed tint wash for selection — floods flatten the stack rhythm.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p><b>Meta stays small; hierarchy outgrows the row.</b> Meta at <code>text.xs</code> dense / <code>text.sm</code> record, rows stacked with <code>spacing.md</code> gaps owned by the list. If a record needs heading hierarchy it has outgrown the row and becomes a card.</p><p class="ch-reject">Reject: a bold 18px headline inside a 44px dense line — the row bursts its metrics.</p></div></li>
+</ul>
+</div>

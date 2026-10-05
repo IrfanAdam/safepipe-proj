@@ -36,6 +36,8 @@
 .spc-modal-close:hover { background: var(--sp-surface-input); }
 .spc-modal-close:focus-visible { outline: 2px solid var(--sp-accent); }
 .spc-modal-content { margin-top: var(--sp-spacing-md); font-size: var(--sp-text-md); color: var(--sp-text-primary); }
+.spc-modal-content-body { font-size: var(--sp-text-md); color: var(--sp-text-primary); }
+.spc-modal-loading { color: var(--sp-text-muted); font-size: var(--sp-text-md); margin: 0; }
 .spc-modal-error { font-size: var(--sp-text-sm); color: var(--sp-bad); }
 .spc-modal-dimmed { color: var(--sp-text-muted); }
 .spc-modal-divider { height: 1px; background: var(--sp-border-default); margin: var(--sp-spacing-md) 0; }

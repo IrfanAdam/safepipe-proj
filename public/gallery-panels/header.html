@@ -1,0 +1,62 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">App bar at the window edge, section titles inside content, toolbars above lists. One app bar per screen; section and toolbar forms never take its place.</p>
+<div>
+<header class="spc-header spc-header--appbar" role="banner" data-header data-variant="appbar"><span class="spc-header__brand">Safepipe</span><div class="spc-header__cluster"><span class="spc-header__date">Mon 5 Oct</span><button type="button" class="spc-header__iconbtn" aria-label="Notifications" data-header-action="Notifications"><span aria-hidden="true">○</span></button><button type="button" class="spc-header__iconbtn" aria-label="Search" data-header-action="Search"><span aria-hidden="true">⌕</span></button><span class="spc-header__avatar" aria-hidden="true">IR</span></div></header>
+</div>
+<div>
+<header class="spc-header spc-header--section" data-header data-variant="section"><p class="spc-header__overline">Compliance</p><h2 class="spc-header__title">Crew qualifications</h2><p class="spc-header__meta"><span class="spc-header__meta-value">42</span> <span class="spc-header__meta-qual">crews active</span> · <span class="spc-header__meta-value">3</span> <span class="spc-header__meta-qual">due soon</span></p><hr class="spc-header__divider" /><p class="spc-header__date">Last updated Mon 5 Oct</p></header>
+</div>
+<div>
+<header class="spc-header spc-header--toolbar" data-header data-variant="toolbar"><div class="spc-header__search"><input type="search" class="spc-header__search-input" placeholder="Search crews" aria-label="Search crews" data-header-search /></div><div class="spc-header__cluster"><button type="button" class="spc-header__iconbtn" aria-label="Sort" data-header-action="Sort"><span aria-hidden="true">⇅</span></button><button type="button" class="spc-header__iconbtn" aria-label="Add crew" data-header-action="Add crew"><span aria-hidden="true">+</span></button></div></header>
+</div>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td><code>spc-header--appbar</code></td><td>global chrome</td><td>brand, date, alerts, avatar on <code>var(--sp-surface-card)</code></td></tr>
+<tr><td><code>spc-header--section</code></td><td>introduces a content block</td><td>overline plus <code>var(--sp-text-xl)</code> title, meta, divider</td></tr>
+<tr><td><code>spc-header--toolbar</code></td><td>list toolbar</td><td>search plus icon buttons at <code>var(--sp-spacing-md)</code> gaps</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Only the controls have states — the bar itself never focuses, hovers, or disables. Icon buttons take the input ground on hover, ring sky on focus, mute with <code>aria-disabled</code> when unavailable; loading swaps the meta line to muted placeholder text at the same metric.</p>
+<div>
+<header class="spc-header spc-header--appbar" role="banner" data-header data-variant="appbar"><span class="spc-header__brand">Safepipe</span><div class="spc-header__cluster"><button type="button" class="spc-header__iconbtn" aria-label="Alerts" data-header-action="Alerts"><span aria-hidden="true">○</span></button><button type="button" class="spc-header__iconbtn" aria-label="Settings" disabled aria-disabled="true" data-header-action="Settings"><span aria-hidden="true">⚙</span></button></div></header>
+</div>
+<details class="spec-more"><summary>Spec · states + a11y</summary>
+<table class="ch-roles"><thead><tr><th>State</th><th>What changes</th><th>Code</th></tr></thead><tbody>
+<tr><td>Hover</td><td>icon buttons take <code>var(--sp-surface-input)</code> ground</td><td><code>:hover</code></td></tr>
+<tr><td>Focus</td><td><code>var(--sp-sky)</code> ring on the control only</td><td><code>:focus-visible</code></td></tr>
+<tr><td>Disabled</td><td>icon drops to <code>var(--sp-text-muted)</code></td><td><code>disabled</code> + <code>aria-disabled</code></td></tr>
+<tr><td>Loading</td><td>date and meta swap to <code>var(--sp-text-muted)</code> placeholder text</td><td>skeleton copy</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Bar band at <code>var(--sp-spacing-3xl)</code> height; title in <code>var(--sp-font-display)</code> semibold over a <code>var(--sp-text-sm)</code> secondary updated line, closed by the divider; meta values light sky with secondary qualifiers; right cluster holds the date, <code>var(--sp-text-md)</code> icons and the full-radius avatar.</p>
+<details class="spec-more"><summary>Spec · token map</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Bar background / tint</td><td><code>var(--sp-surface-card)</code> / <code>var(--sp-navy)</code></td></tr>
+<tr><td>Bar height</td><td><code>var(--sp-spacing-3xl)</code></td></tr>
+<tr><td>Title font / size / weight / color</td><td><code>var(--sp-font-display)</code> / <code>var(--sp-text-xl)</code> / <code>var(--sp-fontweight-semibold)</code> / <code>var(--sp-text-primary)</code></td></tr>
+<tr><td>Overline and meta size / color</td><td><code>var(--sp-text-sm)</code> / <code>var(--sp-text-secondary)</code></td></tr>
+<tr><td>Meta value color</td><td><code>var(--sp-sky)</code></td></tr>
+<tr><td>Divider / cluster gap</td><td><code>var(--sp-border-default)</code> / <code>var(--sp-spacing-md)</code></td></tr>
+<tr><td>Icon button fill / avatar radius</td><td><code>var(--sp-surface-input)</code> / <code>var(--sp-radius-full)</code></td></tr>
+<tr><td>Search and button radius</td><td><code>var(--sp-radius-lg)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + do / don't</h3>
+<p class="spec-note">App bar is <code>header</code> with <code>role="banner"</code>, once per page; section titles are real headings inside <code>main</code>. Icon-only controls need names and a <code>var(--sp-spacing-sm)</code> minimum target; sticky bars offset scroll for <code>:target</code> and focus.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p>Do: keep the section form inside content — only the app bar touches the window edge.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p>Do: give the title block at most one <code>var(--sp-text-xl)</code> heading per page.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p>Don't: park commit actions in the bar, or draw the divider in full black.</p></div></li>
+</ul>
+</section>
+</div>

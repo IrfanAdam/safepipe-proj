@@ -1,0 +1,10 @@
+<div class="tp">
+<p class="ch-kicker">Components · Form · Field</p>
+<h2 class="ch-hero">Labels stay visible. Placeholders never replace them.</h2>
+<p class="ch-lede meta">Field captures one value with a persistent label above the box, so validation and read-only states stay unambiguous. Use it when a form needs one named value; reach for search-filter when the input narrows a list, the date or textarea form when the kind is fixed.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p><b>Label — above, always.</b> The visible label is the accessible name, wired with <code>for</code>; the placeholder hints in <code>var(--sp-text-muted)</code> at <code>var(--sp-text-md)</code> while the value speaks in <code>var(--sp-text-primary)</code>.</p><p class="ch-reject">Reject: a placeholder-only field whose question vanishes the moment you type.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p><b>Error — arrives as a pair.</b> <code>var(--sp-danger)</code> border plus the message below it, wired with <code>aria-describedby</code> and <code>aria-invalid</code>; the label never moves and color never speaks alone.</p><p class="ch-reject">Reject: a red border with no message — a screen reader hears nothing change.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p><b>Shape — two heights, one radius.</b> Small and Medium share <code>var(--sp-radius-md)</code> with <code>var(--sp-border-default)</code> chrome; the legacy pill-shaped password field is off-system and must not be copied.</p><p class="ch-reject">Reject: a third height borrowed from the search field, or a fully rounded input.</p></div></li>
+</ul>
+</div>

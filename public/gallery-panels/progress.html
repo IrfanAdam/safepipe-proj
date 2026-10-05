@@ -1,0 +1,50 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">One strip, five housings: the default violet bar, the sky restatement, the titled card form with counts, the stepped segments, and the page-header form. The default fill is the base bar with no modifier. Reject: a bar standing alone with no count text.</p>
+<div class="spc-progress"><div class="spc-progress-track" role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" aria-label="OQ completion"><span class="spc-progress-fill" style="width:45%"></span></div><span class="spc-progress-visually-hidden">45%</span></div>
+<div class="spc-progress spc-progress--sky"><div class="spc-progress-track" role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" aria-label="OQ completion"><span class="spc-progress-fill" style="width:45%"></span></div><span class="spc-progress-visually-hidden">45%</span></div>
+<div class="spc-progress spc-progress--card"><div class="spc-progress-card-head"><span class="spc-progress-title">OQ qualifications</span><a class="spc-progress-action" href="#nav-progress">View all</a></div><div class="spc-progress-track" role="progressbar" aria-valuenow="67" aria-valuemin="0" aria-valuemax="100" aria-label="OQ qualifications"><span class="spc-progress-fill" style="width:67%"></span></div><div class="spc-progress-counts"><span class="spc-progress-done">22 out of 33 OQs acquired</span><span class="spc-progress-pending">11 pending</span></div></div>
+<div class="spc-progress"><div class="spc-progress-segs" role="progressbar" aria-valuenow="66" aria-valuemin="0" aria-valuemax="100" aria-label="Stepped progress"><span class="spc-progress-seg"></span><span class="spc-progress-seg spc-progress-seg--1"></span><span class="spc-progress-seg spc-progress-seg--2"></span></div></div>
+<div class="spc-progress"><span class="spc-progress-header-title">Workforce onboarding</span><span class="spc-progress-header-pct">50 % complete</span><span class="spc-progress-header-due">Due Friday</span><div class="spc-progress-track" role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" aria-label="Workforce onboarding"><span class="spc-progress-fill" style="width:50%"></span></div></div>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td>Bar, violet (default)</td><td>the in-card completion strip</td><td>base bar, violet fill, knob hidden</td></tr>
+<tr><td><code>spc-progress--sky</code></td><td>brand-blue restatement</td><td>same strip, sky fill</td></tr>
+<tr><td><code>spc-progress--card</code></td><td>titled progress with counts</td><td>title row + bar + done/pending pair</td></tr>
+<tr><td>Segmented strip</td><td>stepped display</td><td>three segments, no count text</td></tr>
+<tr><td>Header form</td><td>page-header progress</td><td>title + percent + due copy</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Scrub reveals the <code>spc-progress-knob</code> on the fill end; complete spans the track and collapses the counts; disabled mutes fill and counts with the knob off; errors move the remainder to <code>var(--sp-danger)</code>. Loading holds the last known percent — there is no shimmer master.</p>
+<div class="spc-progress has-knob"><div class="spc-progress-track" role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" aria-label="Scrubbable"><span class="spc-progress-fill" style="width:45%"></span><span class="spc-progress-knob"></span></div><span class="spc-progress-visually-hidden">45%</span></div>
+<div class="spc-progress is-complete"><div class="spc-progress-track" role="progressbar" aria-valuenow="93" aria-valuemin="0" aria-valuemax="100" aria-label="Complete"><span class="spc-progress-fill" style="width:93%"></span><span class="spc-progress-knob"></span></div><span class="spc-progress-visually-hidden">Complete</span></div>
+<div class="spc-progress is-disabled"><div class="spc-progress-track" role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100" aria-label="Disabled"><span class="spc-progress-fill" style="width:45%"></span></div><span class="spc-progress-visually-hidden">45%</span></div>
+<div class="spc-progress spc-progress--card is-error"><div class="spc-progress-card-head"><span class="spc-progress-title">OQ qualifications</span></div><div class="spc-progress-track" role="progressbar" aria-valuenow="67" aria-valuemin="0" aria-valuemax="100" aria-label="OQ qualifications"><span class="spc-progress-fill" style="width:67%"></span></div><div class="spc-progress-counts"><span class="spc-progress-done">22 out of 33 OQs acquired</span><span class="spc-progress-pending">3 overdue</span></div></div>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Track is <code>var(--sp-surface-input)</code> at <code>var(--sp-radius-md)</code> rendering as a 4px pill; fills violet or sky; knob is a card-surface circle at <code>var(--sp-radius-full)</code>; the card shell sits on the page surface with <code>var(--sp-spacing-xl)</code> padding.</p>
+<details class="spec-more"><summary>Spec · anatomy + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Track fill / bar radius</td><td><code>var(--sp-surface-input)</code> / <code>var(--sp-radius-md)</code></td></tr>
+<tr><td>Fill dominant / brand</td><td><code>var(--sp-violet)</code> / <code>var(--sp-sky)</code></td></tr>
+<tr><td>Knob fill / radius</td><td><code>var(--sp-surface-card)</code> / <code>var(--sp-radius-full)</code></td></tr>
+<tr><td>Card shell / radius / padding / gap</td><td><code>var(--sp-surface-page)</code> / <code>var(--sp-radius-md)</code> / <code>var(--sp-spacing-xl)</code> / <code>var(--sp-spacing-md)</code></td></tr>
+<tr><td>Title / count / action</td><td><code>var(--sp-font-ui)</code> <code>var(--sp-text-md)</code> <code>var(--sp-fontweight-medium)</code> <code>var(--sp-text-primary)</code> / <code>var(--sp-text-sm)</code> / <code>var(--sp-text-link)</code> <code>var(--sp-text-xs)</code></td></tr>
+<tr><td>Remainder / error / header pct / due</td><td><code>var(--sp-warning)</code> / <code>var(--sp-danger)</code> / <code>var(--sp-sky)</code> / <code>var(--sp-text-secondary)</code></td></tr>
+<tr><td>Focus ring / disabled</td><td><code>var(--sp-sky)</code> / <code>var(--sp-border-default)</code> + <code>var(--sp-text-muted)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + contract</h3>
+<p class="spec-note">Do: ship the count text with every bar, one bar per record as an inner strip. Don't: round the card shell full, animate from zero, or let the bar speak alone.</p>
+<details class="spec-more"><summary>Spec · a11y + related</summary>
+<p class="meta">A11y — <code>role="progressbar"</code> with value bounds, counts row as the readable equivalent, 3:1 fill-vs-track contrast, knob hit area padded toward <code>var(--sp-spacing-2xl)</code>. Related — card houses the strip · list-row houses row bars · status flags states without percents.</p>
+</details>
+</section>
+</div>

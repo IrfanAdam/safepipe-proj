@@ -1,0 +1,10 @@
+<div class="tp">
+<p class="ch-kicker">Components · Navigation · Sidebar</p>
+<h2 class="ch-hero">The rail never scrolls, never sells, never spins.</h2>
+<p class="ch-lede meta">Sidebar is the persistent minimized icon rail that keeps the seven primary sections one click away while content scrolls. It navigates between sections; reach for the header when the page needs a title, actions, or a back stack.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p><b>Navigation only — never actions.</b> The rail holds the logo slot, client avatar, and <code>tab.md</code> nav items split into primary and utility groups by a <code>color.border.default</code> divider. Commit buttons belong in the header toolbar or content, on <code>color.surface.card</code> over <code>elevation.1</code>.</p><p class="ch-reject">Reject: a "New work order" button parked in the rail — the moment the rail sells, wayfinding dies.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p><b>Minimized is the only collapsed form.</b> All 28 live instances are icon-only; items reuse <code>tab.md</code> exactly at 60×44 with <code>spacing.xs</code> gaps. An expanded label-bearing drawer must be specced before it ships — never improvised.</p><p class="ch-reject">Reject: a forked nav-item style with its own hover fill — second styles drift, then multiply.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p><b>One active section, ring on the item.</b> A single <code>aria-current="page"</code> carries the <code>tab.md</code> selected state; focus rings <code>color.brand.sky</code> inside the item, never on the rail. Section switches show <code>progress.md</code> in content — the rail itself never spins.</p><p class="ch-reject">Reject: two highlights in the rail, or labels at <code>color.text.muted</code> on the active item.</p></div></li>
+</ul>
+</div>

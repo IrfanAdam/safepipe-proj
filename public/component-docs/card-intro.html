@@ -1,0 +1,10 @@
+<div class="tp">
+<p class="ch-kicker">Components · Data · Card</p>
+<h2 class="ch-hero">One record per card. Never a second surface inside.</h2>
+<p class="ch-lede meta">Card is the elevated surface that groups one record — inspection, work order, report — with its status, tags, and metadata, so list pages scan as a stack of equal-weight objects. Use it when a record needs depth; reach for list-row when records must be compared across a shared row.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p><b>Anatomy — surface · title · tags · strip · footer.</b> <code>color.surface.card</code> at <code>radius.lg</code> with <code>spacing.lg / spacing.md</code> padding; title <code>text.lg</code> <code>fontweight.semibold</code>; <code>tag.md</code> row at <code>spacing.xs</code>; optional <code>progress.md</code> strip; divider plus attribution footer.</p><p class="ch-reject">Reject: a card nested inside a card — chips and strips compose, surfaces never do.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p><b>Elevation rests at 2, lifts to 3.</b> Resting shadow is <code>elevation.2</code>; hover alone earns <code>elevation.3</code> with a <code>color.border.strong</code> border. Selected is a <code>color.brand.navy</code> border, never a shadow bump.</p><p class="ch-reject">Reject: two resting shadows stacked for emphasis — doubled elevation reads as a bug.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p><b>Titles stay lg; pages own xl.</b> Card titles never exceed <code>text.lg</code> — page titles belong to <code>header.md</code> at <code>text.xl</code>. Errors report inline in <code>color.semantic.danger</code>; loading swaps the body for <code>color.surface.input</code> skeleton blocks.</p><p class="ch-reject">Reject: a 24px card title competing with the page header — hierarchy collapses.</p></div></li>
+</ul>
+</div>

@@ -1,0 +1,50 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">One record per surface: bare background shell, full inspection card, four-up split-stat tiles, and the dashboard KPI tile. Reject: a card nested inside another card.</p>
+<div class="spc-card spc-card--background" aria-hidden="true"></div>
+<article class="spc-card"><h3 class="spc-card-title">Line 12 — external corrosion</h3><p class="spc-card-subtitle">Work order 0847 · due Thursday</p><div class="spc-card-tags"><span class="spc-card-tag">Coating</span><span class="spc-card-tag">Priority</span></div><div class="spc-card-progress" role="progressbar" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100"><span class="spc-card-progress-fill" style="width:45%"></span></div><div class="spc-card-footer"><span>Crew B · R. Okafor</span><span class="spc-card-action" aria-hidden="true">›</span></div></article>
+<div class="spc-card spc-card--split-stat"><div class="spc-card-stat"><span class="spc-card-stat-value">22</span><span class="spc-card-stat-label">Open</span></div><div class="spc-card-stat"><span class="spc-card-stat-value">11</span><span class="spc-card-stat-label">Pending</span></div><div class="spc-card-stat"><span class="spc-card-stat-value">48</span><span class="spc-card-stat-label">Done</span></div><div class="spc-card-stat"><span class="spc-card-stat-value">3</span><span class="spc-card-stat-label">Overdue</span></div></div>
+<article class="spc-card spc-card--dashboard"><h3 class="spc-card-title">Compliance</h3><p class="spc-card-body">OQ coverage across active crews this week.</p><div class="spc-card-footer"><span>Updated 2h ago</span><span class="spc-card-action" aria-hidden="true">›</span></div></article>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td><code>spc-card--background</code></td><td>bare elevated shell</td><td>no content, <code>var(--sp-elevation-2)</code> only</td></tr>
+<tr><td><code>spc-card</code> (inspection)</td><td>full record card</td><td>title + tags + strip + footer</td></tr>
+<tr><td><code>spc-card--split-stat</code> / <code>--stat</code></td><td>equal-width stat tiles</td><td><code>spc-card-stat</code> value + label pairs</td></tr>
+<tr><td><code>spc-card--report</code></td><td>report card</td><td>record card, report dressing</td></tr>
+<tr><td><code>spc-card--dashboard</code></td><td>KPI tile</td><td>body + counter over background shell</td></tr>
+<tr><td><code>spc-card--stack</code></td><td>vertical card list</td><td>gap <code>var(--sp-spacing-md)</code>, no own surface</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Hover lifts to <code>var(--sp-elevation-3)</code> with a <code>var(--sp-border-strong)</code> border; selected is a <code>var(--sp-navy)</code> border; disabled drops to page surface with muted text and no shadow; loading swaps the body for skeleton blocks; errors report inline.</p>
+<article class="spc-card is-selected"><h3 class="spc-card-title">Selected record</h3><p class="spc-card-subtitle">Navy border, resting elevation</p></article>
+<article class="spc-card is-disabled"><h3 class="spc-card-title">Disabled record</h3><p class="spc-card-subtitle">Page surface, no shadow</p></article>
+<article class="spc-card is-loading"><div class="spc-card-skeleton" aria-hidden="true"><span></span><span></span></div></article>
+<article class="spc-card"><h3 class="spc-card-title">Qualified to edit</h3><p class="spc-card-error" role="alert">You are not qualified to edit this record.</p></article>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Surface at <code>var(--sp-radius-lg)</code> with <code>var(--sp-spacing-lg)</code> inline and <code>var(--sp-spacing-md)</code> block padding; title <code>var(--sp-text-lg)</code> semibold; subtitle <code>var(--sp-text-sm)</code> secondary; stacks gap <code>var(--sp-spacing-md)</code>.</p>
+<details class="spec-more"><summary>Spec · anatomy + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Surface / page behind</td><td><code>var(--sp-surface-card)</code> / <code>var(--sp-surface-page)</code></td></tr>
+<tr><td>Border / hover / selected</td><td><code>var(--sp-border-default)</code> / <code>var(--sp-border-strong)</code> / <code>var(--sp-navy)</code></td></tr>
+<tr><td>Radius / stack gap</td><td><code>var(--sp-radius-lg)</code> / <code>var(--sp-spacing-md)</code></td></tr>
+<tr><td>Shadow rest / hover</td><td><code>var(--sp-elevation-2)</code> / <code>var(--sp-elevation-3)</code></td></tr>
+<tr><td>Title</td><td><code>var(--sp-font-ui)</code> <code>var(--sp-text-lg)</code> <code>var(--sp-fontweight-semibold)</code> <code>var(--sp-text-primary)</code></td></tr>
+<tr><td>Subtitle / error / action</td><td><code>var(--sp-text-secondary)</code> / <code>var(--sp-danger)</code> / <code>var(--sp-text-link)</code></td></tr>
+<tr><td>Skeleton fill / focus ring / disabled text</td><td><code>var(--sp-surface-input)</code> / <code>var(--sp-sky)</code> / <code>var(--sp-text-muted)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + contract</h3>
+<p class="spec-note">Do: one record per card, compare across records in list-row. Don't: nest cards, stack resting shadows, or promote card titles to page size.</p>
+<details class="spec-more"><summary>Spec · a11y + related</summary>
+<p class="meta">A11y — <code>article</code> with a heading; whole-card links target the heading link; focus ring mirrors hover; secondary-on-card clears 4.5:1. Related — list-row compares records · tag chips the tag row · progress the strip · status the state flag.</p>
+</details>
+</section>
+</div>

@@ -1,0 +1,44 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">One pattern, two halves: the query shell plus the pill row. Standard search, quiet placeholder twin, idle pills, and the selected pill with its sky dot. Reject: pills that signal selection by color alone.</p>
+<div class="spc-search-filter"><div class="spc-search-filter-field" role="search"><label class="spc-search-filter-label" for="search-a">Search</label><span class="spc-search-filter-icon" aria-hidden="true">⌕</span><input class="spc-search-filter-input" type="search" id="search-a" placeholder="Search work orders…" value="" /></div><div class="spc-search-filter-row" role="group" aria-label="Filters"><button class="spc-search-filter-pill is-selected" type="button" aria-pressed="true"><span class="spc-search-filter-dot" aria-hidden="true"></span>Operations</button><button class="spc-search-filter-pill" type="button" aria-pressed="false">Assets</button><button class="spc-search-filter-pill" type="button" aria-pressed="false">Workforce</button></div></div>
+<div class="spc-search-filter is-quiet"><div class="spc-search-filter-field" role="search"><label class="spc-search-filter-label" for="search-b">Search</label><span class="spc-search-filter-icon" aria-hidden="true">⌕</span><input class="spc-search-filter-input" type="search" id="search-b" placeholder="Search…" value="" /></div></div>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td>Search, default</td><td>the standard list query</td><td>shell + icon + hint placeholder</td></tr>
+<tr><td>Search, quiet</td><td>non-italic placeholder twin</td><td><code>is-quiet</code>, same chrome</td></tr>
+<tr><td>Filter, idle</td><td>unselected pill</td><td>card fill, primary label</td></tr>
+<tr><td>Filter, selected / with dot</td><td>active filter</td><td>8px <code>var(--sp-sky)</code> dot + strong border</td></tr>
+<tr><td>Filter row — domain sets</td><td>Operations / Assets / Workforce / Compliance</td><td>same row, different pills, <code>var(--sp-spacing-sm)</code> gaps</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Hover strengthens the border; focus adds the <code>var(--sp-sky)</code> ring while typed text swaps to <code>var(--sp-text-primary)</code>; disabled drops shell and pills to page surface with muted text; query failures report below the row.</p>
+<div class="spc-search-filter is-disabled"><div class="spc-search-filter-field" role="search"><label class="spc-search-filter-label" for="search-c">Search</label><span class="spc-search-filter-icon" aria-hidden="true">⌕</span><input class="spc-search-filter-input" type="search" id="search-c" placeholder="Search…" value="" disabled aria-disabled="true" /></div><div class="spc-search-filter-row" role="group" aria-label="Filters"><button class="spc-search-filter-pill" type="button" aria-pressed="false">Operations</button></div></div>
+<div class="spc-search-filter"><div class="spc-search-filter-field" role="search"><label class="spc-search-filter-label" for="search-d">Search</label><span class="spc-search-filter-icon" aria-hidden="true">⌕</span><input class="spc-search-filter-input" type="search" id="search-d" placeholder="Search…" value="line 12" /></div><p class="spc-search-filter-error" role="alert">Search failed — showing unfiltered results.</p></div>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Shell at <code>var(--sp-radius-lg)</code> with <code>var(--sp-spacing-xl)</code> inline and <code>var(--sp-spacing-md)</code> block padding; leading icon in secondary; hint placeholder in muted; pills at <code>var(--sp-radius-md)</code> with <code>var(--sp-spacing-lg)</code> / <code>var(--sp-spacing-md)</code> padding.</p>
+<details class="spec-more"><summary>Spec · anatomy + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Search fill / border / hover</td><td><code>var(--sp-surface-card)</code> / <code>var(--sp-border-default)</code> / <code>var(--sp-border-strong)</code></td></tr>
+<tr><td>Search radius / padding / gap</td><td><code>var(--sp-radius-lg)</code> / <code>var(--sp-spacing-xl)</code> / <code>var(--sp-spacing-md)</code> / <code>var(--sp-spacing-lg)</code></td></tr>
+<tr><td>Icon / placeholder / typed value</td><td><code>var(--sp-text-secondary)</code> / <code>var(--sp-text-muted)</code> / <code>var(--sp-text-primary)</code></td></tr>
+<tr><td>Pill fill / radius / selected border</td><td><code>var(--sp-surface-card)</code> / <code>var(--sp-radius-md)</code> / <code>var(--sp-border-strong)</code></td></tr>
+<tr><td>Pill label</td><td><code>var(--sp-font-ui)</code> <code>var(--sp-text-sm)</code> <code>var(--sp-fontweight-medium)</code> <code>var(--sp-text-primary)</code></td></tr>
+<tr><td>Active dot / row gap / focus / error</td><td><code>var(--sp-sky)</code> / <code>var(--sp-spacing-sm)</code> / <code>var(--sp-sky)</code> / <code>var(--sp-danger)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + contract</h3>
+<p class="spec-note">Do: keep query and pills in one row, announce results politely, wrap only after wide pill sets would clip. Don't: split the pair across rows, or ship the placeholder as the only label.</p>
+<details class="spec-more"><summary>Spec · a11y + related</summary>
+<p class="meta">A11y — <code>input[type="search"]</code> in <code>role="search"</code>, icon <code>aria-hidden</code>, pills are <code>aria-pressed</code> toggles in a labelled group, results via <code>aria-live="polite"</code>. Related — field owns value capture · progress owns result-count loading · status owns error flags.</p>
+</details>
+</section>
+</div>

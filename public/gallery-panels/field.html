@@ -1,0 +1,64 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">One label, one box, one value — Small and Medium share the chrome while textarea, date and read-only change the kind. The legacy pill password field is off-system and stays out.</p>
+<div>
+<div class="spc-field spc-field--small"><label class="spc-field__label" for="spc-field-crew">Crew name</label><div class="spc-field__box"><input type="text" value="" id="spc-field-crew" class="spc-field__control" data-field data-variant="input" placeholder="e.g. Rig 12 night shift" /></div></div>
+<div class="spc-field spc-field--small"><label class="spc-field__label" for="spc-field-provider">Provider</label><div class="spc-field__box"><input type="text" value="Veriforce" id="spc-field-provider" class="spc-field__control" data-field data-variant="input" placeholder="Choose provider" /><span class="spc-field__trail" aria-hidden="true">▾</span></div></div>
+<div class="spc-field spc-field--medium"><label class="spc-field__label" for="spc-field-site">Site address</label><div class="spc-field__box"><input type="text" value="Mile 44, Permian spur" id="spc-field-site" class="spc-field__control" data-field data-variant="input" placeholder="Street and mile marker" /></div></div>
+<div class="spc-field spc-field--medium"><label class="spc-field__label" for="spc-field-notes">Handover notes</label><textarea id="spc-field-notes" class="spc-field__control" data-field data-variant="textarea" placeholder="Shift notes for the next crew"></textarea></div>
+<div class="spc-field spc-field--small"><label class="spc-field__label" for="spc-field-date">Certification date</label><input type="date" value="" id="spc-field-date" class="spc-field__control" data-field data-variant="date" placeholder="Pick a date" /></div>
+<div class="spc-field spc-field--small"><label class="spc-field__label" for="spc-field-readonly">Compliance owner</label><p id="spc-field-readonly" class="spc-field__control spc-field__control--readonly" data-field data-variant="readonly">OQ records office</p></div>
+</div>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td>Small input</td><td>compact form rows</td><td>shorter box, optional <code>spc-field__trail</code> control</td></tr>
+<tr><td>Medium input</td><td>default form input</td><td>taller box, plain value</td></tr>
+<tr><td>Textarea</td><td>multi-line notes</td><td>same label, growing control</td></tr>
+<tr><td>Date</td><td>fixed-kind picker</td><td>date control in the same box</td></tr>
+<tr><td>Read-only</td><td>uneditable value</td><td>no box chrome, <code>var(--sp-surface-page)</code> ground, <code>var(--sp-text-sm)</code> value</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Hover steps the border up, focus rings sky and promotes the label, disabled mutes box and text together, error pairs the danger border with its message. Async lookups show progress beside the field, never inside it.</p>
+<div>
+<div class="spc-field spc-field--small spc-field--error"><label class="spc-field__label" for="spc-field-badge">Badge ID</label><div class="spc-field__box"><input type="text" value="VF-00" id="spc-field-badge" class="spc-field__control" data-field data-variant="input" placeholder="e.g. VF-1042" aria-invalid="true" aria-describedby="spc-field-badge-error" /></div><p class="spc-field__error" id="spc-field-badge-error" role="alert">Enter a valid badge ID to continue.</p></div>
+<div class="spc-field spc-field--small spc-field--disabled"><label class="spc-field__label" for="spc-field-locked">Region</label><div class="spc-field__box"><input type="text" value="Permian" id="spc-field-locked" class="spc-field__control" data-field data-variant="input" placeholder="Region" disabled aria-disabled="true" /></div></div>
+</div>
+<details class="spec-more"><summary>Spec · states + a11y</summary>
+<table class="ch-roles"><thead><tr><th>State</th><th>What changes</th><th>Code</th></tr></thead><tbody>
+<tr><td>Hover</td><td>border steps to <code>var(--sp-border-strong)</code></td><td><code>:hover</code></td></tr>
+<tr><td>Focus</td><td><code>var(--sp-sky)</code> border and ring, label steps to <code>var(--sp-text-primary)</code></td><td><code>:focus</code> + <code>:focus-within</code></td></tr>
+<tr><td>Disabled</td><td>box <code>var(--sp-surface-page)</code>, value and label <code>var(--sp-text-muted)</code></td><td><code>disabled</code> + <code>spc-field--disabled</code></td></tr>
+<tr><td>Error</td><td>border plus message in <code>var(--sp-danger)</code>, focus stays in the field</td><td><code>spc-field--error</code> + <code>aria-invalid</code> + <code>aria-describedby</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Label at <code>var(--sp-text-xs)</code> medium in <code>var(--sp-text-secondary)</code> sits above the box at a <code>var(--sp-spacing-xs)</code> gap; the box fills <code>var(--sp-surface-card)</code> at <code>var(--sp-radius-md)</code> with inline <code>var(--sp-spacing-lg)</code> and block <code>var(--sp-spacing-md)</code> padding; value speaks <code>var(--sp-text-md)</code> medium, placeholder mutes.</p>
+<details class="spec-more"><summary>Spec · token map</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Label color / size / weight</td><td><code>var(--sp-text-secondary)</code> / <code>var(--sp-text-xs)</code> / <code>var(--sp-fontweight-medium)</code></td></tr>
+<tr><td>Box fill / read-only fill</td><td><code>var(--sp-surface-card)</code> / <code>var(--sp-surface-page)</code></td></tr>
+<tr><td>Box border / hover border</td><td><code>var(--sp-border-default)</code> / <code>var(--sp-border-strong)</code></td></tr>
+<tr><td>Box radius / padding</td><td><code>var(--sp-radius-md)</code> / <code>var(--sp-spacing-lg)</code> + <code>var(--sp-spacing-md)</code></td></tr>
+<tr><td>Value color / placeholder</td><td><code>var(--sp-text-primary)</code> / <code>var(--sp-text-muted)</code></td></tr>
+<tr><td>Value font / size / weight</td><td><code>var(--sp-font-ui)</code> / <code>var(--sp-text-md)</code> / <code>var(--sp-fontweight-medium)</code></td></tr>
+<tr><td>Read-only value size</td><td><code>var(--sp-text-sm)</code></td></tr>
+<tr><td>Focus border / error</td><td><code>var(--sp-sky)</code> / <code>var(--sp-danger)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + do / don't</h3>
+<p class="spec-note">Every input carries a programmatic label; errors wire <code>aria-describedby</code> with <code>aria-invalid</code> and keep focus after a failed submit. Touch height pads toward 44px and placeholder contrast must clear 4.5:1.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p>Do: keep the label visible at every state — placeholders hint, they never name.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p>Do: change border and message together; never signal error with color alone.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p>Don't: invent a third height, copy the legacy pill field, or move the label on error.</p></div></li>
+</ul>
+</section>
+</div>

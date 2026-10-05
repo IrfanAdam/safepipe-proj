@@ -1,0 +1,45 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">One variant ships: the minimized icon rail. The ladder below is the active section moving — Workforce, then Operations with a disabled destination. Reject: an expanded label drawer improvised without a spec.</p>
+<nav class="spc-sidebar" aria-label="Primary"><div class="spc-sidebar-logo" aria-hidden="true">SP</div><div class="spc-sidebar-divider" aria-hidden="true"></div><button class="spc-sidebar-avatar" type="button" aria-label="Account: Client">C</button><ul class="spc-sidebar-list"><li><a class="spc-sidebar-item is-active" href="#nav-workforce" title="Workforce" aria-current="page" aria-label="Workforce"><span class="spc-sidebar-icon" aria-hidden="true">◈</span></a></li><li><a class="spc-sidebar-item" href="#nav-operations" title="Operations" aria-label="Operations"><span class="spc-sidebar-icon" aria-hidden="true">⬢</span></a></li><li><a class="spc-sidebar-item" href="#nav-assets" title="Assets" aria-label="Assets"><span class="spc-sidebar-icon" aria-hidden="true">▣</span></a></li><li><a class="spc-sidebar-item" href="#nav-settings" title="Settings" aria-label="Settings"><span class="spc-sidebar-icon" aria-hidden="true">⚙</span></a></li></ul></nav>
+<nav class="spc-sidebar" aria-label="Primary"><div class="spc-sidebar-logo" aria-hidden="true">SP</div><div class="spc-sidebar-divider" aria-hidden="true"></div><button class="spc-sidebar-avatar" type="button" aria-label="Account: Client">C</button><ul class="spc-sidebar-list"><li><a class="spc-sidebar-item" href="#nav-workforce" title="Workforce" aria-label="Workforce"><span class="spc-sidebar-icon" aria-hidden="true">◈</span></a></li><li><a class="spc-sidebar-item is-active" href="#nav-operations" title="Operations" aria-current="page" aria-label="Operations"><span class="spc-sidebar-icon" aria-hidden="true">⬢</span></a></li><li><a class="spc-sidebar-item" href="#nav-assets" title="Assets" aria-label="Assets"><span class="spc-sidebar-icon" aria-hidden="true">▣</span></a></li><li><a class="spc-sidebar-item is-disabled" href="#nav-settings" title="Settings" aria-disabled="true" tabindex="-1" aria-label="Settings"><span class="spc-sidebar-icon" aria-hidden="true">⚙</span></a></li></ul></nav>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td>Rail — Workforce</td><td>workforce section active</td><td>WF item <code>is-active</code>, rest default</td></tr>
+<tr><td>Rail — Operations</td><td>operations section active</td><td>Ops item <code>is-active</code>, same frame</td></tr>
+<tr><td>Rail — Assets / Settings</td><td>remaining sections</td><td>active marker moves, structure identical</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Hover fills <code>var(--sp-surface-input)</code> with <code>var(--sp-text-primary)</code> ink; active is the <code>tab.md</code> selected state; focus rings <code>var(--sp-sky)</code> inside the item. Disabled drops to <code>var(--sp-text-muted)</code> with no hover fill — hidden destinations are removed, not disabled. Loading and errors report in content, never in the rail.</p>
+<nav class="spc-sidebar" aria-label="Primary"><div class="spc-sidebar-logo" aria-hidden="true">SP</div><div class="spc-sidebar-divider" aria-hidden="true"></div><button class="spc-sidebar-avatar" type="button" aria-label="Account: Client">C</button><ul class="spc-sidebar-list"><li><a class="spc-sidebar-item is-active" href="#nav-workforce" title="Workforce" aria-current="page" aria-label="Workforce"><span class="spc-sidebar-icon" aria-hidden="true">◈</span></a></li><li><a class="spc-sidebar-item is-disabled" href="#nav-operations" title="Operations" aria-disabled="true" tabindex="-1" aria-label="Operations"><span class="spc-sidebar-icon" aria-hidden="true">⬢</span></a></li></ul></nav>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Fixed-width column on <code>var(--sp-surface-card)</code>, full viewport height, <code>var(--sp-elevation-1)</code> on the content edge. Logo slot up top, circular avatar below the divider, vertical tab-item stack grouped into primary and utility sections.</p>
+<details class="spec-more"><summary>Spec · anatomy + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Rail background</td><td><code>var(--sp-surface-card)</code></td></tr>
+<tr><td>Rail shadow</td><td><code>var(--sp-elevation-1)</code></td></tr>
+<tr><td>Rail width / item height</td><td><code>var(--sp-spacing-3xl)</code></td></tr>
+<tr><td>Section divider</td><td><code>var(--sp-border-default)</code></td></tr>
+<tr><td>Item radius / gap / padding</td><td><code>var(--sp-radius-md)</code> / <code>var(--sp-spacing-xs)</code> / <code>var(--sp-spacing-sm)</code></td></tr>
+<tr><td>Item label / label hover</td><td><code>var(--sp-text-secondary)</code> / <code>var(--sp-text-primary)</code></td></tr>
+<tr><td>Item hover fill</td><td><code>var(--sp-surface-input)</code></td></tr>
+<tr><td>Item font / size / weight</td><td><code>var(--sp-font-ui)</code> / <code>var(--sp-text-sm)</code> / <code>var(--sp-fontweight-medium)</code></td></tr>
+<tr><td>Avatar radius</td><td><code>var(--sp-radius-full)</code></td></tr>
+<tr><td>Focus ring</td><td><code>var(--sp-sky)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + contract</h3>
+<p class="spec-note">Do: one active section, icon-only items with names plus tooltips, keyboard order logo → avatar → primary → utility. Don't: fork a second nav-item style, nest a second highlight, or park actions in the rail.</p>
+<details class="spec-more"><summary>Spec · a11y + related</summary>
+<p class="meta">A11y — <code>nav[aria-label="Primary"]</code> with list markup, current page <code>aria-current="page"</code>, hit target ≥ <code>var(--sp-spacing-3xl)</code> square. Related — header owns page actions · tab owns the item state · progress owns section-load feedback.</p>
+</details>
+</section>
+</div>

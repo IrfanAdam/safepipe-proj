@@ -1,0 +1,10 @@
+<div class="tp">
+<p class="ch-kicker">Components · Data · Progress</p>
+<h2 class="ch-hero">The fill never speaks without its count.</h2>
+<p class="ch-lede meta">Progress is the 4px pill bar that reports completion for tasks, qualifications, and work orders — living inside cards, rows, and page headers, never as its own surface. Use it when work is partially done; reach for status when a record needs a state flag with no percent behind it.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p><b>Every bar ships its counts row.</b> The card form's "22 out of 33" pair — value in <code>color.text.primary</code>, remainder in <code>color.semantic.warning</code> at <code>text.sm</code> <code>fontweight.medium</code> — is the human-readable equivalent of <code>aria-valuenow</code>. The bar alone never carries the value.</p><p class="ch-reject">Reject: a bare 4px strip with the percent only in a tooltip — at a glance it is decoration.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p><b>An inner strip, never a surface.</b> Track is <code>color.surface.input</code> at <code>radius.md</code>, fill <code>color.accent.violet</code> (or <code>color.brand.sky</code>), knob <code>radius.full</code> shown only for scrub. <code>card.md</code> owns the container, <code>list-row.md</code> owns the row.</p><p class="ch-reject">Reject: a progress card wrapped around a single bar — one bar per record, housed, not showcased.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p><b>Incomplete is not failed.</b> Pending stays <code>color.semantic.warning</code>; <code>color.semantic.danger</code> is reserved for overdue or errored records. Hold the last known percent while loading — never animate from zero when the number is already known.</p><p class="ch-reject">Reject: a bar that replays 0→45% on every render — motion where a number belongs.</p></div></li>
+</ul>
+</div>

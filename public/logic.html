@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Safepipe — Logic Inspector</title>
+<link rel="stylesheet" href="/design-system/tokens.css" />
+<style>
+  /* tokens from /design-system/tokens.css — --bg, --bg-2, --surface, --line, --ink, --muted, --teal, --amber, --red, --green, --radius, --radius-s */
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:14px/1.5 ui-sans-system,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  a{color:var(--teal);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 20px 40px}
+  header{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px}
+  header h1{margin:0;font-size:22px;letter-spacing:.02em;font-weight:700}
+  header h1 small{display:block;font-weight:400;color:var(--muted);font-size:12px;margin-top:4px}
+  .pill{display:inline-flex;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;color:var(--muted);font-size:12px}
+  .pill b{color:var(--ink)}
+  .pill-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 20%,transparent)}
+  nav.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 18px}
+  nav.tabs button{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--muted);padding:8px 14px;border-radius:999px;cursor:pointer;font-weight:600;font-size:13px;transition:.15s}
+  nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  nav.tabs button:hover{border-color:var(--muted);color:var(--ink)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .grid{display:grid;gap:14px}
+  .grid2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  @media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr}}
+  .k{color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+  .v{font-weight:600}
+  .muted{color:var(--muted)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;background:var(--bg-2)}
+  tr:last-child td{border-bottom:none}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--line);background:var(--bg-2);color:var(--muted)}
+  .badge.teal{color:var(--teal);border-color:color-mix(in srgb,var(--teal) 30%,var(--line))}
+  .badge.amber{color:var(--amber);border-color:color-mix(in srgb,var(--amber) 30%,var(--line))}
+  .badge.green{color:var(--green);border-color:color-mix(in srgb,var(--green) 30%,var(--line))}
+  .badge.red{color:var(--red);border-color:color-mix(in srgb,var(--red) 30%,var(--line))}
+  .progress{height:10px;background:var(--bg-2);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .progress i{display:block;height:100%;background:var(--teal);border-radius:999px;transition:width .3s}
+  input,select,textarea{width:100%;background:var(--bg-2);border:1px solid var(--line);color:var(--ink);border-radius:var(--radius-s);padding:8px 10px;font:inherit}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);outline-offset:1px;border-color:var(--teal)}
+  textarea{min-height:56px;resize:vertical}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .btn{appearance:none;border:1px solid var(--line);background:var(--bg-2);color:var(--ink);padding:6px 12px;border-radius:999px;cursor:pointer;font-weight:600;font-size:12px}
+  .btn:hover{border-color:var(--muted)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.primary{background:var(--teal);color:var(--bg);border-color:var(--teal)}
+  .callout{padding:10px 12px;border-radius:var(--radius-s);border:1px solid var(--line);background:var(--bg-2);font-size:13px}
+  .callout.ok{border-color:color-mix(in srgb,var(--green) 35%,var(--line));background:color-mix(in srgb,var(--green) 10%,var(--bg-2))}
+  .callout.err{border-color:color-mix(in srgb,var(--red) 35%,var(--line));background:color-mix(in srgb,var(--red) 10%,var(--bg-2))}
+  .callout.warn{border-color:color-mix(in srgb,var(--amber) 35%,var(--line));background:color-mix(in srgb,var(--amber) 10%,var(--bg-2))}
+  .hidden{display:none !important}
+  .api{overflow:auto}
+  .api table{min-width:720px}
+  code{background:var(--bg-2);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:12px}
+  .split{display:grid;grid-template-columns:1.15fr .85fr;gap:14px}
+  @media(max-width:900px){.split{grid-template-columns:1fr}}
+  .q-input{display:flex;gap:8px;align-items:center}
+  .section-title{margin:0 0 6px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Logic Inspector <small>public/logic.html — live harness over <code>src/logic/*</code> · pure ESM, zero DOM</small></h1>
+      <div class="row" style="margin-top:10px">
+        <span class="pill"><span class="pill-dot"></span> Vite dev · <b>http://127.0.0.1:5175/logic.html</b></span>
+        <span class="pill mono" id="live-badge">loading…</span>
+        <a class="pill" href="/src/logic/fixtures.json" target="_blank" rel="noreferrer">fixtures.json ↗</a>
+        <a class="pill" href="/src/logic/README.md" target="_blank" rel="noreferrer">frozen API ↗</a>
+      </div>
+    </div>
+    <div class="muted" style="font-size:12px;max-width:280px">Read-only harness. Logic lives in <code>src/logic/*</code> — this page only imports &amp; renders. No edits to logic or tests.</div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Inspector tabs">
+    <button role="tab" aria-selected="true" data-tab="fixtures">Fixtures</button>
+    <button role="tab" aria-selected="false" data-tab="workorders">Workorders</button>
+    <button role="tab" aria-selected="false" data-tab="workforce">Workforce + OQ</button>
+    <button role="tab" aria-selected="false" data-tab="inspections">Inspections</button>
+  </nav>
+
+  <!-- TAB 1: FIXTURES -->
+  <section id="panel-fixtures" class="grid">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div><span class="k">Client</span><div class="v" id="client-name" style="font-size:20px">—</div><div class="muted mono" id="counts">—</div></div>
+        <div class="muted" style="font-size:12px;text-align:right">Source: <code>src/logic/fixtures.json</code><br>via <code>fetch('/src/logic/fixtures.json')</code><br><span class="mono" id="fixture-import-note"></span></div>
+      </div>
+    </div>
+    <div class="grid grid2">
+      <div class="card">
+        <h3 class="section-title">Staff — 12</h3>
+        <div style="overflow:auto;max-height:420px">
+          <table id="staff-table"><thead><tr><th>ID</th><th>Name</th><th>Role / Location</th><th>Avail</th><th>OQs</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="section-title">Work Orders — 8</h3>
+        <div style="overflow:auto;max-height:420px">
+          <table id="wo-table"><thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Due</th><th>Assignee</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="section-title">Pipelines — 3 · 14 sections · 5 tabs each</h3>
+      <div id="pipelines" class="grid grid3"></div>
+    </div>
+  </section>
+
+  <!-- TAB 2: WORKORDERS -->
+  <section id="panel-workorders" class="grid hidden">
+    <div class="split">
+      <div class="card">
+        <h3 class="section-title">Workorder playground</h3>
+        <label class="k">Select WO</label>
+        <select id="wo-select"></select>
+        <div id="wo-detail" style="margin-top:12px"></div>
+        <div id="wo-guard" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <h3 class="section-title">State machine</h3>
+        <div class="mono" style="font-size:11px;color:var(--muted);margin-bottom:8px">STATES: <code>draft → assigned → in_progress → completed</code> · alias <code>created==draft</code><br>TRANSITIONS: <code>{draft:['assigned'], assigned:['in_progress'], in_progress:['completed']}</code></div>
+        <div class="row" id="transition-btns"></div>
+        <div class="mono" style="margin-top:10px;font-size:12px" id="can-matrix"></div>
+        <div style="margin-top:12px">
+          <label class="k">Equipment checklist (toggle to affect <code>woProgress</code> + <code>completed</code> guard)</label>
+          <div id="equip-toggles"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="section-title">listWorkOrders filter demo — mirrors <code>listWorkOrders(workOrders, {status, assigneeId, system})</code></h3>
+      <div class="grid grid3">
+        <label><span class="k">status (normalized)</span><input id="f-status" placeholder="e.g. In progress, Complated, 50 % complete" /></label>
+        <label><span class="k">assigneeId</span><input id="f-assignee" placeholder="e.g. ST-01" /></label>
+        <label><span class="k">system</span><input id="f-system" placeholder="e.g. Nueces Bay Pipeline System" /></label>
+      </div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="f-clear">Clear</button><span class="muted mono" id="f-count"></span></div>
+      <div style="overflow:auto;margin-top:10px">
+        <table id="f-table"><thead><tr><th>ID</th><th>Status → normalized</th><th>System</th><th>Assignee</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="mono muted" style="font-size:11px;margin-top:8px">Normalization handles legacy: <code>Complated→completed</code>, <code>In progress . San Patricio… → in_progress</code>, <code>50 % complete → in_progress</code>, case-insensitive.</div>
+    </div>
+  </section>
+
+  <!-- TAB 3: WORKFORCE + OQ -->
+  <section id="panel-workforce" class="grid hidden">
+    <div class="split">
+      <div class="card">
+        <h3 class="section-title">Directory — <code>filterStaff</code></h3>
+        <div class="grid grid2">
+          <label><span class="k">Search the members</span><input id="wf-query" placeholder="Raymond · Colorado · Texas · Repair & maintenance · 32 Veriforce…" /></label>
+          <label class="row" style="align-items:center;padding-top:18px"><input type="checkbox" id="wf-available" style="width:auto" /> <span class="k" style="margin:0">availableOnly (strict <code>availability===true</code>)</span></label>
+        </div>
+        <div class="muted mono" id="wf-count" style="margin-top:8px"></div>
+        <div style="overflow:auto;max-height:360px;margin-top:8px">
+          <table id="wf-table"><thead><tr><th>Name</th><th>Role / Location</th><th>Workload</th><th>Avail</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="section-title">Open workload — <code>openWorkload(staffId, workOrders)</code></h3>
+        <div class="muted" style="font-size:12px">Counts non-completed WOs assigned to staff; <code>tasks = sum(equipment.length)</code> — fig row <code>In progress 3 WOs, 32 tasks</code></div>
+        <div id="workload-chips" class="row" style="margin-top:10px"></div>
+        <div style="overflow:auto;max-height:320px;margin-top:10px">
+          <table id="workload-table"><thead><tr><th>Staff</th><th>Open WOs</th><th>Tasks</th><th>Fixture workload</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h3 class="section-title" style="margin:0">Expiring OQs — <code>expiringOQs(staffList, withinDays, now)</code></h3>
+        <label class="row"><span class="k" style="margin:0">withinDays</span><input type="range" id="oq-range" min="0" max="90" value="30" style="width:160px" /><span class="mono badge" id="oq-days">30</span></label>
+      </div>
+      <div class="muted mono" id="oq-count" style="margin-top:6px"></div>
+      <div style="overflow:auto;max-height:340px;margin-top:8px">
+        <table id="oq-table"><thead><tr><th>Staff</th><th>OQ</th><th>Expiry</th><th>Days until</th><th>Status</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="mono muted" style="font-size:11px;margin-top:8px">Sorted soonest first · <code>daysUntilExpiry = ceil((expiry-now)/86400000)</code> · statuses: <code>valid &gt;30 · expiring 0..30 · grace -30..-1 · expired &lt;-30</code></div>
+    </div>
+  </section>
+
+  <!-- TAB 4: INSPECTIONS -->
+  <section id="panel-inspections" class="grid hidden">
+    <div class="split">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h3 class="section-title" style="margin:0">Forms — <code>FORMS</code> · 6 forms</h3>
+          <span class="mono badge" id="form-stats">—</span>
+        </div>
+        <label class="k">Select form</label>
+        <select id="form-select"></select>
+        <div style="overflow:auto;max-height:520px;margin-top:10px">
+          <table id="form-table"><thead><tr><th>#</th><th>Question</th><th>Type</th><th>Required</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="card" style="background:var(--bg-2)">
+          <h3 class="section-title">Live questionnaire — <code>answerQuestionnaire(formId, answers)</code> + <code>validateForm</code></h3>
+          <div id="q-fields" class="grid"></div>
+          <div id="q-result" style="margin-top:12px"></div>
+          <div class="row" style="margin-top:10px"><button class="btn" id="q-clear">Clear answers</button><button class="btn primary" id="q-fill">Fill sample valid</button></div>
+          <div class="mono muted" style="font-size:11px;margin-top:8px">Evaluation forms score: <code>Good=3 Fair=2 Poor=1 Critical=0</code> · mileage validates numeric ≥0</div>
+        </div>
+        <div class="card">
+          <h3 class="section-title">QC toggle — <code>toggleQC({items}, itemId)</code> · Added=No → Added=Yes</h3>
+          <div class="muted" style="font-size:12px">Mirrors SYMBOL Added=Yes/No flow (33 variants in Fig)</div>
+          <div id="qc-list" class="grid" style="margin-top:10px"></div>
+          <pre class="mono" id="qc-state" style="background:var(--bg-2);border:1px solid var(--line);padding:10px;border-radius:var(--radius-s);overflow:auto;margin-top:10px"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- API TABLE -->
+  <div class="card" style="margin-top:18px">
+    <h3 class="section-title">Frozen API — copy-paste · <code>src/logic/README.md</code></h3>
+    <div class="api">
+      <table>
+        <thead><tr><th>Signature</th><th>Module</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">loadFixtures() → {client, staff[], workOrders[], pipelines[]}</td><td class="mono">fixtures.js</td><td>Deep-clone of fixtures.json</td></tr>
+          <tr><td class="mono">listWorkOrders(workOrders, filter?) → WorkOrder[]</td><td class="mono">workorders.js</td><td>Filter by {status, assigneeId|assignee, system} — status normalized (Complated→completed, In progress→in_progress, 50 %→in_progress) case-insensitive</td></tr>
+          <tr><td class="mono">transitionWO(wo, toStatus) → WorkOrder</td><td class="mono">workorders.js</td><td>Immutable; throws on disallowed edge or completed with unchecked equipment. States draft → assigned → in_progress → completed (created==draft).</td></tr>
+          <tr><td class="mono">woProgress(wo) → {percent, checked, total}</td><td class="mono">workorders.js</td><td>checked/total from equipment:{name,checked} (legacy string/boolean fallbacks).</td></tr>
+          <tr><td class="mono">filterStaff(staffList, {query?, availableOnly?}) → Staff[]</td><td class="mono">workforce.js</td><td>Query substring over name/role/location/certs/qualifications (case-insensitive); availableOnly strict availability===true</td></tr>
+          <tr><td class="mono">openWorkload(staffId, workOrders) → {wos, tasks}</td><td class="mono">workforce.js</td><td>Counts non-completed WOs assigned to staff; tasks = sum(equipment.length) — mirrors fig row In progress 3 WOs, 32 tasks</td></tr>
+          <tr><td class="mono">expiringOQs(staffList, withinDays=30, now?) → [{staffId, oq, daysUntilExpiry}]</td><td class="mono">qualifications.js</td><td>OQs expiring in 0..withinDays days (daysUntilExpiry = ceil((expiry-now)/86400000)); sorted soonest first</td></tr>
+          <tr><td class="mono">answerQuestionnaire(formId, answers) → {complete, missing:string[], answered, total, score?}</td><td class="mono">inspections.js</td><td>Data-driven FORMS (6 forms × 39 qs: pipelinePatrol, qcPipeline, qcFacility, moc, evaluation, mileage); evaluation scores Good=3…Critical=0</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="mono muted" style="font-size:11px;margin-top:8px">Additional helpers (stable, non-frozen): <code>normalizeStatus</code>, <code>canTransition</code>, <code>dueInDays</code>, <code>isOverdue</code>, <code>STATES/TRANSITIONS</code> · <code>daysUntilExpiry</code>, <code>isOQExpired</code>, <code>oqStatus</code> · <code>FORMS</code>, <code>getForm</code>, <code>validateForm</code>, <code>toggleQC</code></div>
+  </div>
+
+  <div class="muted mono" style="font-size:11px;margin-top:10px">Layer rule: <code>src/logic/*</code> pure ESM, zero DOM. This harness is <code>public/logic.html</code> (Vite serves <code>public/</code> verbatim at <code>/logic.html</code>). No build step needed in dev.</div>
+</div>
+
+<script type="module">
+import { STATES, TRANSITIONS, normalizeStatus, canTransition, woProgress, dueInDays, isOverdue, transitionWO, listWorkOrders } from '/src/logic/workorders.js';
+import { filterStaff, openWorkload } from '/src/logic/workforce.js';
+import { daysUntilExpiry, isOQExpired, oqStatus, expiringOQs } from '/src/logic/qualifications.js';
+import { FORMS, getForm, validateForm, answerQuestionnaire, toggleQC } from '/src/logic/inspections.js';
+
+// tabs
+const tabs = document.querySelectorAll('nav.tabs button');
+const panels = { fixtures: document.getElementById('panel-fixtures'), workorders: document.getElementById('panel-workorders'), workforce: document.getElementById('panel-workforce'), inspections: document.getElementById('panel-inspections') };
+tabs.forEach(b=> b.addEventListener('click', ()=>{
+  tabs.forEach(x=> x.setAttribute('aria-selected','false'));
+  b.setAttribute('aria-selected','true');
+  Object.entries(panels).forEach(([k,el])=> el.classList.toggle('hidden', k!==b.dataset.tab));
+}));
+// fixtures data
+const fixtures = await fetch('/src/logic/fixtures.json').then(r=>r.json());
+const { client, staff, workOrders, pipelines } = fixtures;
+
+document.getElementById('live-badge').textContent = `live · ${staff.length} staff · ${workOrders.length} WOs · ${pipelines.length} pipelines · ${Object.keys(FORMS).length} forms`;
+document.getElementById('client-name').textContent = client.name;
+document.getElementById('counts').textContent = `${staff.length} staff · ${workOrders.length} work orders · ${pipelines.length} pipelines`;
+document.getElementById('fixture-import-note').textContent = `import fixtures.json (loadFixtures is Node-only)`;
+
+// TAB1 tables
+const staffTbody = document.querySelector('#staff-table tbody');
+staff.forEach(s=>{
+  const tr=document.createElement('tr');
+  const avail = s.availability ? '<span class="badge green">Available</span>' : '<span class="badge">Unavailable</span>';
+  const oqs = (s.qualifications||[]).map(q=> `<span class="badge ${q.status==='expiring'?'amber':q.status==='valid'?'teal':q.status==='grace'?'amber':'red'}">${q.name.slice(0,18)}…</span>`).join(' ');
+  tr.innerHTML = `<td class="mono">${s.id}</td><td><b>${s.name}</b><div class="muted" style="font-size:12px">${s.experienceYears} yrs</div></td><td>${s.role}<div class="muted">${s.location}</div></td><td>${avail}</td><td>${oqs}</td>`;
+  staffTbody.appendChild(tr);
+});
+const woTbody = document.querySelector('#wo-table tbody');
+workOrders.forEach(w=>{
+  const norm = normalizeStatus(w.status);
+  const badge = norm==='completed'?'green': norm==='in_progress'?'amber':'teal';
+  trAdd(woTbody, `<td class="mono">${w.id}</td><td>${w.title}<div class="muted" style="font-size:12px">${w.system}</div></td><td><span class="badge ${badge}">${w.status}</span><div class="mono muted" style="font-size:11px">→ ${norm}</div></td><td class="mono">${w.dueInDays}d<div class="muted">${w.dueDate}</div></td><td class="mono">${w.assigneeId}</td>`);
+});
+function trAdd(tbody, html){ const tr=document.createElement('tr'); tr.innerHTML=html; tbody.appendChild(tr); }
+const pipeWrap = document.getElementById('pipelines');
+pipelines.forEach(p=>{
+  const d=document.createElement('div');
+  d.className='card'; d.style.background='var(--bg-2)';
+  d.innerHTML = `<b>${p.name}</b><div class="muted mono" style="font-size:11px">${p.id} · ${p.system}</div>
+    <div style="margin-top:8px"><span class="k">Tabs (5)</span><div class="row" style="margin-top:4px">${p.tabs.map(t=>`<span class="badge">${t}</span>`).join('')}</div></div>
+    <div style="margin-top:10px"><span class="k">Sections (14)</span><ul class="mono" style="margin:6px 0 0;padding-left:16px;font-size:12px">${p.sections.map(s=>`<li>${s}</li>`).join('')}</ul></div>`;
+  pipeWrap.appendChild(d);
+});
+
+// TAB2 playground
+let selectedId = workOrders[0].id;
+let draftWO = JSON.parse(JSON.stringify(workOrders.find(w=>w.id===selectedId)));
+
+const woSelect = document.getElementById('wo-select');
+workOrders.forEach(w=>{ const o=document.createElement('option'); o.value=w.id; o.textContent=`${w.id} — ${w.title} · ${w.status}`; woSelect.appendChild(o); });
+woSelect.value = selectedId;
+
+function renderWO(){
+  const w = draftWO;
+  const prog = woProgress(w);
+  const due = dueInDays(w);
+  const over = isOverdue(w);
+  const norm = normalizeStatus(w.status);
+  const detail = document.getElementById('wo-detail');
+  detail.innerHTML = `
+    <div class="k">Status · normalized</div><div><span class="badge ${norm==='completed'?'green':norm==='in_progress'?'amber':'teal'}">${w.status}</span> <span class="mono muted">→ ${norm}</span> <span class="mono muted">· STATES[${STATES.indexOf(norm)}]</span></div>
+    <div class="k" style="margin-top:10px">Progress — ${prog.checked}/${prog.total} · ${prog.percent}%</div>
+    <div class="progress"><i style="width:${prog.percent}%"></i></div>
+    <div class="row" style="margin-top:8px"><span class="badge ${over?'red':'teal'}">${over?'Overdue':'Due in '+due+' days'}</span><span class="mono muted">${w.dueDate} · isOverdue=${over} · dueInDays=${due}</span></div>
+    <div class="muted" style="font-size:12px;margin-top:6px">${w.lastInspected} · ${w.county}</div>
+    <div class="mono muted" style="font-size:11px;margin-top:4px">equipment: ${w.equipment.map(e=> e.name + (e.checked?' ✓':' ✗')).join(' · ')}</div>
+  `;
+  // transition buttons
+  const btnWrap = document.getElementById('transition-btns');
+  btnWrap.innerHTML = '';
+  STATES.forEach(s=>{
+    const btn=document.createElement('button');
+    btn.className='btn'; btn.textContent='→ '+s;
+    const allowed = canTransition(norm, s);
+    btn.disabled = !allowed;
+    btn.title = allowed ? `transitionWO → ${s}` : `canTransition(${norm}→${s}) = false`;
+    btn.addEventListener('click', ()=>{
+      const guard = document.getElementById('wo-guard');
+      try{
+        const next = transitionWO(w, s);
+        draftWO = next;
+        guard.innerHTML = `<div class="callout ok mono">✓ transitionWO(${w.id}, "${s}") → status="${next.status}"</div>`;
+        renderWO(); renderEquip(); renderCanMatrix();
+      }catch(e){
+        guard.innerHTML = `<div class="callout err mono">✗ ${e.message}</div>`;
+      }
+    });
+    btnWrap.appendChild(btn);
+  });
+  // also reset button
+  const reset=document.createElement('button');
+  reset.className='btn'; reset.textContent='Reset';
+  reset.addEventListener('click', ()=>{ draftWO=JSON.parse(JSON.stringify(workOrders.find(x=>x.id===woSelect.value))); document.getElementById('wo-guard').innerHTML=''; renderWO(); renderEquip(); renderCanMatrix(); });
+  btnWrap.appendChild(reset);
+}
+function renderEquip(){
+  const wrap=document.getElementById('equip-toggles');
+  wrap.innerHTML='';
+  (draftWO.equipment||[]).forEach((e,idx)=>{
+    const row=document.createElement('label');
+    row.className='row'; row.style.marginTop='6px';
+    row.innerHTML=`<input type="checkbox" ${e.checked?'checked':''} style="width:auto" /><span>${e.name}</span><span class="mono muted">${e.checked?'checked':'unchecked'}</span>`;
+    row.querySelector('input').addEventListener('change', (ev)=>{
+      draftWO.equipment[idx].checked = ev.target.checked;
+      renderWO(); // refresh progress + guard
+      document.getElementById('wo-guard').innerHTML = `<div class="callout warn mono">equipment toggled — retry transition to see guard</div>`;
+    });
+    wrap.appendChild(row);
+  });
+}
+function renderCanMatrix(){
+  const cur = normalizeStatus(draftWO.status);
+  const el=document.getElementById('can-matrix');
+  el.innerHTML = STATES.map(to=> `${cur}→${to}: <b style="color:${canTransition(cur,to)?'var(--green)':'var(--muted)'}">${canTransition(cur,to)}</b>`).join(' · ');
+}
+woSelect.addEventListener('change', ()=>{ draftWO=JSON.parse(JSON.stringify(workOrders.find(w=>w.id===woSelect.value))); document.getElementById('wo-guard').innerHTML=''; renderWO(); renderEquip(); renderCanMatrix(); });
+renderWO(); renderEquip(); renderCanMatrix();
+
+// listWorkOrders filter demo
+const fStatus=document.getElementById('f-status'), fAssignee=document.getElementById('f-assignee'), fSystem=document.getElementById('f-system');
+const fTableBody=document.querySelector('#f-table tbody'), fCount=document.getElementById('f-count');
+function renderFilter(){
+  const filter={};
+  if(fStatus.value.trim()) filter.status=fStatus.value;
+  if(fAssignee.value.trim()) filter.assigneeId=fAssignee.value;
+  if(fSystem.value.trim()) filter.system=fSystem.value;
+  const out = listWorkOrders(workOrders, Object.keys(filter).length?filter:undefined);
+  fCount.textContent = `${out.length} / ${workOrders.length} match · filter=${Object.keys(filter).length?JSON.stringify(filter):'{}'}`;
+  fTableBody.innerHTML='';
+  out.forEach(w=>{
+    const norm=normalizeStatus(w.status);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="mono">${w.id}</td><td><span class="badge">${w.status}</span> <span class="mono muted">→ ${norm}</span></td><td>${w.system}</td><td class="mono">${w.assigneeId}</td>`;
+    fTableBody.appendChild(tr);
+  });
+  if(!out.length){ const tr=document.createElement('tr'); tr.innerHTML=`<td colspan="4" class="muted" style="text-align:center;padding:16px">No match — try status "In progress" or "Complated" or "50 % complete"</td>`; fTableBody.appendChild(tr); }
+}
+[fStatus,fAssignee,fSystem].forEach(el=> el.addEventListener('input', renderFilter));
+document.getElementById('f-clear').addEventListener('click', ()=>{ fStatus.value=''; fAssignee.value=''; fSystem.value=''; renderFilter(); });
+renderFilter();
+
+// TAB3 workforce + OQ
+const wfQuery=document.getElementById('wf-query'), wfAvail=document.getElementById('wf-available');
+const wfTbody=document.querySelector('#wf-table tbody'), wfCount=document.getElementById('wf-count');
+const workloadBody=document.querySelector('#workload-table tbody');
+const workloadChips=document.getElementById('workload-chips');
+function renderWF(){
+  const filtered = filterStaff(staff, { query: wfQuery.value, availableOnly: wfAvail.checked });
+  wfCount.textContent = `${filtered.length} / ${staff.length} match · filterStaff(staffList, {query:"${wfQuery.value}", availableOnly:${wfAvail.checked}})`;
+  wfTbody.innerHTML='';
+  filtered.forEach(s=>{
+    const wl = openWorkload(s.id, workOrders);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><b>${s.name}</b><div class="mono muted">${s.id}</div></td><td>${s.role}<div class="muted">${s.location}</div><div class="mono muted" style="font-size:11px">${s.certs.join(' · ')}</div></td><td class="mono">${wl.wos} WOs · ${wl.tasks} tasks</td><td>${s.availability?'<span class="badge green">Available</span>':'<span class="badge">Unavailable</span>'}</td>`;
+    wfTbody.appendChild(tr);
+  });
+  if(!filtered.length){ const tr=document.createElement('tr'); tr.innerHTML=`<td colspan="4" class="muted" style="text-align:center;padding:16px">No match</td>`; wfTbody.appendChild(tr); }
+  // workload table (for filtered)
+  workloadBody.innerHTML='';
+  filtered.forEach(s=>{
+    const wl=openWorkload(s.id, workOrders);
+    const tr=document.createElement('tr');
+    const match = (wl.wos===s.workload.wos && wl.tasks===s.workload.tasks) ? '<span class="badge green">✓ fixture match</span>' : '<span class="badge amber">differs</span>';
+    tr.innerHTML=`<td><b>${s.name}</b> <span class="mono muted">${s.id}</span></td><td class="mono">${wl.wos}</td><td class="mono">${wl.tasks}</td><td class="mono">${s.workload.wos} WOs, ${s.workload.tasks} tasks ${match}</td>`;
+    workloadBody.appendChild(tr);
+  });
+  // chips
+  workloadChips.innerHTML = filtered.slice(0,6).map(s=>{
+    const wl=openWorkload(s.id, workOrders);
+    return `<span class="badge">${s.name.split(' ')[0]}: ${wl.wos} WOs · ${wl.tasks} tasks</span>`;
+  }).join('') || '<span class="muted">no staff</span>';
+}
+wfQuery.addEventListener('input', renderWF);
+wfAvail.addEventListener('change', renderWF);
+renderWF();
+
+// expiringOQs
+const oqRange=document.getElementById('oq-range'), oqDays=document.getElementById('oq-days');
+const oqBody=document.querySelector('#oq-table tbody'), oqCount=document.getElementById('oq-count');
+function renderOQ(){
+  const within=Number(oqRange.value);
+  oqDays.textContent=within;
+  const list = expiringOQs(staff, within);
+  oqCount.textContent = `${list.length} expiring within ${within} days · expiringOQs(staff, ${within}) sorted soonest first`;
+  oqBody.innerHTML='';
+  list.forEach(r=>{
+    const oq=r.oq; const d=r.daysUntilExpiry;
+    const st=oqStatus(oq);
+    const badge = st==='expiring'?'amber': st==='valid'?'teal': st==='grace'?'amber':'red';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="mono">${r.staffId}</td><td>${oq.name}<div class="mono muted" style="font-size:11px">status:${oq.status}</div></td><td class="mono">${oq.expiryDate}</td><td class="mono">${d} days</td><td><span class="badge ${badge}">${st}</span> <span class="mono muted" style="font-size:11px">daysUntilExpiry=${daysUntilExpiry(oq.expiryDate)}</span></td>`;
+    oqBody.appendChild(tr);
+  });
+  if(!list.length){ const tr=document.createElement('tr'); tr.innerHTML=`<td colspan="5" class="muted" style="text-align:center;padding:16px">No OQs expiring within ${within} days</td>`; oqBody.appendChild(tr); }
+}
+oqRange.addEventListener('input', renderOQ);
+renderOQ();
+
+// TAB4 inspections
+const formSelect=document.getElementById('form-select'), formBody=document.querySelector('#form-table tbody'), formStats=document.getElementById('form-stats');
+const qFields=document.getElementById('q-fields'), qResult=document.getElementById('q-result');
+let currentFormId = Object.keys(FORMS)[0];
+Object.entries(FORMS).forEach(([id, f])=>{
+  const o=document.createElement('option'); o.value=id; o.textContent=`${f.title} (${id}) — ${f.questions.length} qs`; formSelect.appendChild(o);
+});
+formSelect.value=currentFormId;
+let answers={};
+function totalQs(){ return Object.values(FORMS).reduce((s,f)=> s+f.questions.length,0); }
+formStats.textContent = `${Object.keys(FORMS).length} forms · ${totalQs()} questions total`;
+function renderForm(){
+  currentFormId = formSelect.value;
+  const form=getForm(currentFormId);
+  formBody.innerHTML='';
+  form.questions.forEach((q,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="mono">${i+1}</td><td>${q.label}</td><td><span class="badge">${q.type}</span>${q.options?`<div class="mono muted" style="font-size:11px">${q.options.join(' · ')}</div>`:''}</td><td>${q.required?'<span class="badge amber">required</span>':'<span class="badge">optional</span>'}</td>`;
+    formBody.appendChild(tr);
+  });
+  renderQInputs();
+}
+function renderQInputs(){
+  const form=getForm(currentFormId);
+  qFields.innerHTML='';
+  form.questions.forEach(q=>{
+    const wrap=document.createElement('label');
+    wrap.innerHTML=`<span class="k">${q.label} ${q.required?'<span style="color:var(--red)">*</span>':''} <span class="muted" style="text-transform:none;letter-spacing:0">(${q.type}${q.options?' · '+q.options.join('/') :''})</span></span>`;
+    let input;
+    if(q.type==='boolean'){
+      input=document.createElement('select');
+      input.innerHTML=`<option value="">— select —</option><option value="true">Yes</option><option value="false">No</option>`;
+      input.value = answers[q.id] ?? '';
+      input.addEventListener('change', ()=>{ const v=input.value; if(v==='') delete answers[q.id]; else answers[q.id]=(v==='true'); renderQResult(); });
+    } else if(q.type==='choice' || q.type==='evaluation'){
+      input=document.createElement('select');
+      input.innerHTML=`<option value="">— select —</option>` + (q.options||[]).map(o=>`<option value="${o}">${o}</option>`).join('');
+      input.value = answers[q.id] ?? '';
+      input.addEventListener('change', ()=>{ if(!input.value) delete answers[q.id]; else answers[q.id]=input.value; renderQResult(); });
+    } else if(q.type==='textarea'){
+      input=document.createElement('textarea'); input.placeholder=q.label; input.value=answers[q.id]??''; input.addEventListener('input', ()=>{ if(!input.value.trim()) delete answers[q.id]; else answers[q.id]=input.value; renderQResult(); });
+    } else if(q.type==='mileage'){
+      input=document.createElement('input'); input.type='number'; input.min='0'; input.step='any'; input.placeholder='0'; input.value=answers[q.id]??''; input.addEventListener('input', ()=>{ if(input.value==='') delete answers[q.id]; else answers[q.id]=input.value; renderQResult(); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.placeholder=q.label; input.value=answers[q.id]??''; input.addEventListener('input', ()=>{ if(!input.value.trim()) delete answers[q.id]; else answers[q.id]=input.value; renderQResult(); });
+    }
+    wrap.appendChild(input);
+    qFields.appendChild(wrap);
+  });
+  renderQResult();
+}
+function renderQResult(){
+  try{
+    const res = answerQuestionnaire(currentFormId, answers);
+    const missing = res.missing;
+    const score = res.score ? `score: ${res.score.totalScore}/${res.score.maxScore} avg ${res.score.average.toFixed(2)} (${res.score.answered}/${res.score.total} eval answered)` : '';
+    qResult.innerHTML = `
+      <div class="callout ${res.complete?'ok':'warn'} mono">
+        <b>${res.complete?'✓ complete':'○ incomplete'}</b> · answered ${res.answered}/${res.total} · missing: ${missing.length? missing.join(', ') : '—'} ${score? '· '+score:''}
+      </div>
+      <div class="mono muted" style="font-size:11px;margin-top:6px">validateForm → missing: [${missing.map(m=>`"${m}"`).join(', ')}]</div>
+    `;
+  }catch(e){
+    qResult.innerHTML=`<div class="callout err mono">${e.message}</div>`;
+  }
+}
+formSelect.addEventListener('change', ()=>{ answers={}; renderForm(); });
+document.getElementById('q-clear').addEventListener('click', ()=>{ answers={}; renderQInputs(); });
+document.getElementById('q-fill').addEventListener('click', ()=>{
+  const form=getForm(currentFormId);
+  answers={};
+  form.questions.forEach(q=>{
+    if(q.type==='boolean') answers[q.id]=true;
+    else if(q.type==='choice' || q.type==='evaluation') answers[q.id]=q.options[0];
+    else if(q.type==='mileage') answers[q.id]='42';
+    else if(q.type==='textarea') answers[q.id]='Sample text';
+    else answers[q.id]='2024-01-15';
+  });
+  renderQInputs();
+});
+renderForm();
+
+// QC demo
+let qcState = { items: [{id:'qc-1', added:false, label:'Coating disbonding — Structure A'}, {id:'qc-2', added:true, label:'Valve locked — Station 3'}, {id:'qc-3', added:false, label:'HCA mapping — Segment 12'}] };
+const qcList=document.getElementById('qc-list'), qcPre=document.getElementById('qc-state');
+function renderQC(){
+  qcList.innerHTML='';
+  qcState.items.forEach(it=>{
+    const row=document.createElement('div');
+    row.className='row'; row.style.justifyContent='space-between'; row.style.padding='8px 10px'; row.style.border='1px solid var(--line)'; row.style.borderRadius='var(--radius-s)'; row.style.background='var(--bg-2)';
+    row.innerHTML=`<span><b>${it.label}</b> <span class="mono muted">${it.id}</span> <span class="badge ${it.added?'green':'amber'}">${it.added?'Added=Yes':'Added=No'}</span></span>`;
+    const btn=document.createElement('button');
+    btn.className='btn'; btn.textContent='toggleQC';
+    btn.addEventListener('click', ()=>{ qcState = toggleQC(qcState, it.id); renderQC(); });
+    row.appendChild(btn);
+    qcList.appendChild(row);
+  });
+  qcPre.textContent = JSON.stringify(qcState, null, 2);
+}
+renderQC();
+</script>
+</body>
+</html>

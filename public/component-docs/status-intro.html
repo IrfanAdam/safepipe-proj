@@ -1,0 +1,10 @@
+<div class="tp">
+<p class="ch-kicker">Components · Data · Status</p>
+<h2 class="ch-hero">Every dot ships with its label. Color never speaks alone.</h2>
+<p class="ch-lede meta">Status is the at-a-glance state indicator — a dot plus label for rows, and a composite card grouping compliance counts with their tags. Use it when a row needs a state; reach for a tag when the word only classifies, progress when the state is still computing.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p><b>Pairing — dot plus words, always.</b> The dot is <code>aria-hidden</code> decoration; the visible label carries the meaning and goes live through <code>role="status"</code> when the state changes at runtime.</p><p class="ch-reject">Reject: a lone red dot with the state locked inside a tooltip nobody opens.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p><b>Card — one form per list.</b> The horizontal strip is the default with <code>var(--sp-radius-md)</code> row padding; vertical lives on narrow rails only. The card is a row, not a dialog — it never takes dialog radius.</p><p class="ch-reject">Reject: a vertical card stretched across a full-width list, or dialog chrome on a strip.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p><b>Tone — maps one-to-one.</b> Each measured hue maps to its key: <code>var(--sp-success)</code> compliant, <code>var(--sp-danger)</code> non-compliant, <code>var(--sp-warning)</code> due, <code>var(--sp-violet)</code> upload, <code>var(--sp-navy)</code> incomplete. Never recolor a state to fit a palette.</p><p class="ch-reject">Reject: a teal failed because the dashboard theme is teal.</p></div></li>
+</ul>
+</div>

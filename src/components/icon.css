@@ -1,0 +1,11 @@
+/* Icon — inline SVG glyph. Sizing via the size attribute mapped to var(--sp-*). */
+.spc-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+  color: inherit;
+}
+.spc-icon[size="12"] { width: var(--sp-text-xs); height: var(--sp-text-xs); }
+.spc-icon[size="16"] { width: var(--sp-text-md); height: var(--sp-text-md); }
+.spc-icon[size="20"] { width: var(--sp-text-xl); height: var(--sp-text-xl); }
+.spc-icon[size="28"] { width: var(--sp-text-2xl); height: var(--sp-text-2xl); }

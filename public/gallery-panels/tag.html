@@ -1,0 +1,77 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">Neutral classifies, inverse marks selection, provider carries identity with its count, overflow collapses the long list, status banners compliance in uppercase, toggle switches state. One color, one meaning — danger only fails.</p>
+<div>
+<span class="spc-tag" data-tag data-variant="neutral"><span>Work order</span></span>
+<span class="spc-tag spc-tag--inverse" data-tag data-variant="neutral"><span>Selected</span></span>
+<span class="spc-tag spc-tag--provider" data-tag data-variant="provider"><span class="spc-tag__count" aria-hidden="true">32</span><span>Veriforce</span></span>
+<span class="spc-tag spc-tag--provider spc-tag--danger" data-tag data-variant="provider"><span>Eweb</span></span>
+<span class="spc-tag spc-tag--provider spc-tag--success" data-tag data-variant="provider"><span>Avetta</span></span>
+<span class="spc-tag spc-tag--overflow" data-tag data-variant="overflow"><span>+2 more</span></span>
+</div>
+<div>
+<span class="spc-tag spc-tag--status spc-tag--danger" data-tag data-variant="status"><span>Non compliant</span></span>
+<span class="spc-tag spc-tag--status spc-tag--warning" data-tag data-variant="status"><span>Grace period</span></span>
+<span class="spc-tag spc-tag--status spc-tag--success" data-tag data-variant="status"><span>Compliant</span></span>
+</div>
+<div>
+<button type="button" class="spc-tag spc-tag--toggle" aria-pressed="false" data-tag data-variant="toggle"><span>Liquid</span></button>
+<button type="button" class="spc-tag spc-tag--toggle spc-tag--selected" aria-pressed="true" data-tag data-variant="toggle"><span>Gas</span></button>
+</div>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td><code>spc-tag</code></td><td>default classification chip</td><td><code>var(--sp-surface-input)</code> fill, <code>var(--sp-text-primary)</code> label</td></tr>
+<tr><td><code>spc-tag--inverse</code></td><td>selected / outline state</td><td>card fill, <code>var(--sp-sky)</code> label and edge</td></tr>
+<tr><td><code>spc-tag--provider</code></td><td>provider identity + count</td><td><code>var(--sp-violet)</code> fill, inverse label, <code>spc-tag__count</code> prefix</td></tr>
+<tr><td><code>spc-tag--overflow</code></td><td>collapse long lists</td><td><code>var(--sp-warning)</code> fill, primary label</td></tr>
+<tr><td><code>spc-tag--status</code></td><td>compliance banner</td><td>taller block, uppercase, tone fill + matching ink</td></tr>
+<tr><td><code>spc-tag--toggle</code></td><td>selectable tag</td><td><code>button</code> with <code>aria-pressed</code>, border on hover</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Tags are static ink — only toggles take hover, selection and focus. Selected swaps to the semantic or provider fill; disabled drops to page fill with muted text. Loading and error do not exist at tag level.</p>
+<div>
+<span class="spc-tag" data-tag data-variant="neutral"><span>Default</span></span>
+<span class="spc-tag spc-tag--selected" data-tag data-variant="neutral"><span>Selected</span></span>
+<button type="button" class="spc-tag spc-tag--toggle spc-tag--disabled" disabled aria-disabled="true" data-tag data-variant="toggle"><span>Disabled</span></button>
+</div>
+<details class="spec-more"><summary>Spec · states + a11y</summary>
+<table class="ch-roles"><thead><tr><th>State</th><th>What changes</th><th>Code</th></tr></thead><tbody>
+<tr><td>Hover</td><td>toggle only: border appears in <code>var(--sp-border-strong)</code></td><td><code>:hover</code></td></tr>
+<tr><td>Selected</td><td>fill switches to semantic or provider color, label <code>var(--sp-text-inverse)</code></td><td><code>spc-tag--selected</code></td></tr>
+<tr><td>Focus</td><td>toggle only: <code>var(--sp-sky)</code> ring around the chip</td><td><code>:focus-visible</code></td></tr>
+<tr><td>Disabled</td><td>fill <code>var(--sp-surface-page)</code>, label <code>var(--sp-text-muted)</code></td><td><code>disabled</code> + <code>spc-tag--disabled</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Rounded chip at <code>var(--sp-radius-sm)</code> with inline <code>var(--sp-spacing-xs)</code> and block <code>var(--sp-spacing-base)</code> padding; label at <code>var(--sp-text-xs)</code> bold with the optional count ahead of it. The status form grows taller with <code>var(--sp-spacing-sm)</code> padding and uppercase type.</p>
+<details class="spec-more"><summary>Spec · token map</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Neutral fill / label</td><td><code>var(--sp-surface-input)</code> / <code>var(--sp-text-primary)</code></td></tr>
+<tr><td>Inverse label</td><td><code>var(--sp-text-inverse)</code></td></tr>
+<tr><td>Compliance fill</td><td><code>var(--sp-danger)</code></td></tr>
+<tr><td>Provider fill</td><td><code>var(--sp-violet)</code></td></tr>
+<tr><td>Overflow fill</td><td><code>var(--sp-warning)</code></td></tr>
+<tr><td>Selected outline</td><td><code>var(--sp-sky)</code></td></tr>
+<tr><td>Border / radius</td><td><code>var(--sp-border-strong)</code> / <code>var(--sp-radius-sm)</code></td></tr>
+<tr><td>Padding (inline / block) / gap</td><td><code>var(--sp-spacing-xs)</code> / <code>var(--sp-spacing-base)</code> / <code>var(--sp-spacing-xs)</code></td></tr>
+<tr><td>Label font / size / weight</td><td><code>var(--sp-font-ui)</code> / <code>var(--sp-text-xs)</code> / <code>var(--sp-fontweight-bold)</code></td></tr>
+<tr><td>Disabled label</td><td><code>var(--sp-text-muted)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + do / don't</h3>
+<p class="spec-note">Static tags get no role — plain text in context. Toggle tags are buttons with <code>aria-pressed</code> and a <code>var(--sp-spacing-sm)</code> minimum hit height. White on danger clears at <code>var(--sp-text-xs)</code>; warning always takes dark ink, never white.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p>Do: give every color exactly one meaning — danger never appears on a passing row.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p>Do: let the uppercase label carry status meaning so it reads without color.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p>Don't: shrink below <code>var(--sp-text-xs)</code> to fit — shorten the word instead; don't hand-pick near-gray ink.</p></div></li>
+</ul>
+</section>
+</div>

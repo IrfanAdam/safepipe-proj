@@ -1,0 +1,65 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">Primary commits, neutral cancels, ghost adds, danger destroys, icon-only serves the toolbar. One navy commit per region — everything else steps down.</p>
+<div>
+<button type="button" class="spc-button spc-button--primary" data-button data-variant="primary"><span>Save crew</span></button>
+<button type="button" class="spc-button spc-button--neutral" data-button data-variant="neutral"><span>Cancel</span></button>
+<button type="button" class="spc-button spc-button--ghost" data-button data-variant="ghost"><span class="spc-button__icon" aria-hidden="true">+</span><span>Add to a crew</span></button>
+<button type="button" class="spc-button spc-button--danger" data-button data-variant="danger"><span>Delete file</span></button>
+<button type="button" class="spc-button spc-button--neutral spc-button--icon-only" aria-label="Close" data-button data-variant="neutral"><span class="spc-button__label--sr">Close</span><span class="spc-button__icon" aria-hidden="true">×</span></button>
+</div>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td><code>spc-button--primary</code></td><td>the single commit</td><td><code>var(--sp-navy)</code> fill, <code>var(--sp-text-inverse)</code> label</td></tr>
+<tr><td><code>spc-button--neutral</code></td><td>low-emphasis action</td><td><code>var(--sp-surface-input)</code> fill, <code>var(--sp-text-primary)</code> label</td></tr>
+<tr><td><code>spc-button--ghost</code></td><td>additive / inline action</td><td><code>var(--sp-surface-input)</code> fill, <code>var(--sp-text-link)</code> label, leading icon</td></tr>
+<tr><td><code>spc-button--danger</code></td><td>irreversible only</td><td><code>var(--sp-danger)</code> fill, <code>var(--sp-text-inverse)</code> label</td></tr>
+<tr><td><code>spc-button--icon-only</code></td><td>toolbar / close</td><td>square target, screen-reader label, <code>aria-label</code> required</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Hover deepens one step, active presses without lift, focus always rings, disabled mutes and drops the pointer, loading holds the frame with the spinner in and <code>aria-busy</code> set.</p>
+<div>
+<button type="button" class="spc-button spc-button--primary spc-button--loading" disabled aria-disabled="true" aria-busy="true" data-button data-variant="primary"><span class="spc-button__spinner" aria-hidden="true"></span><span>Saving</span></button>
+<button type="button" class="spc-button spc-button--neutral" disabled aria-disabled="true" data-button data-variant="neutral"><span>Cancel</span></button>
+</div>
+<details class="spec-more"><summary>Spec · states + a11y</summary>
+<table class="ch-roles"><thead><tr><th>State</th><th>What changes</th><th>Code</th></tr></thead><tbody>
+<tr><td>Hover</td><td>fill darkens one step, ghost gains <code>var(--sp-border-default)</code></td><td><code>:hover</code></td></tr>
+<tr><td>Active</td><td>full-strength fill at <code>var(--sp-elevation-0)</code>, no scale transform</td><td><code>:active</code></td></tr>
+<tr><td>Focus</td><td><code>var(--sp-sky)</code> ring at <code>var(--sp-radius-lg)</code>, never clipped</td><td><code>:focus-visible</code></td></tr>
+<tr><td>Disabled</td><td>fill <code>var(--sp-surface-page)</code>, label <code>var(--sp-text-muted)</code>, no pointer</td><td><code>disabled</code></td></tr>
+<tr><td>Loading</td><td>spinner in at label metric, width held, name kept</td><td><code>spc-button--loading</code> + <code>aria-busy</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Rounded rectangle at <code>var(--sp-radius-lg)</code> with inline <code>var(--sp-spacing-xl)</code> and block <code>var(--sp-spacing-md)</code> padding; label at <code>var(--sp-text-md)</code> bold with <code>var(--sp-lineheight-lg)</code>; leading icon sized to the label at a <code>var(--sp-spacing-md)</code> gap; icon-only squares pad to <code>var(--sp-spacing-lg)</code>.</p>
+<details class="spec-more"><summary>Spec · token map</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Primary fill / label</td><td><code>var(--sp-navy)</code> / <code>var(--sp-text-inverse)</code></td></tr>
+<tr><td>Neutral fill / label</td><td><code>var(--sp-surface-input)</code> / <code>var(--sp-text-primary)</code></td></tr>
+<tr><td>Ghost fill / label</td><td><code>var(--sp-surface-input)</code> / <code>var(--sp-text-link)</code></td></tr>
+<tr><td>Destructive fill</td><td><code>var(--sp-danger)</code></td></tr>
+<tr><td>Disabled fill / label</td><td><code>var(--sp-surface-page)</code> / <code>var(--sp-text-muted)</code></td></tr>
+<tr><td>Border radius</td><td><code>var(--sp-radius-lg)</code></td></tr>
+<tr><td>Padding (inline / block) / gap</td><td><code>var(--sp-spacing-xl)</code> / <code>var(--sp-spacing-md)</code> / <code>var(--sp-spacing-md)</code></td></tr>
+<tr><td>Label font / size / weight</td><td><code>var(--sp-font-ui)</code> / <code>var(--sp-text-md)</code> / <code>var(--sp-fontweight-bold)</code></td></tr>
+<tr><td>Focus ring / hover border</td><td><code>var(--sp-sky)</code> / <code>var(--sp-border-default)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + do / don't</h3>
+<p class="spec-note">Native <code>button</code> with a 44px minimum target; inverse on navy clears contrast at <code>var(--sp-text-md)</code>; loading keeps its accessible name under <code>aria-busy</code> and the ring is never clipped by dialog overflow.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p>Do: ship one navy commit per region — a second primary is a decision, not a style.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p>Do: name every icon-only square; the target is not a label.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p>Don't: spend danger on anything reversible, or mix a third padding pair into the set.</p></div></li>
+</ul>
+</section>
+</div>

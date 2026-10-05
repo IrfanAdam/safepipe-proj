@@ -1,0 +1,10 @@
+<div class="tp">
+<p class="ch-kicker">Components · Overlays · Modal</p>
+<h2 class="ch-hero">One dialog per decision. The page waits.</h2>
+<p class="ch-lede meta">Modal is the blocking dialog for a single focused task — import data, add a profile — that keeps the page behind it inert until confirmed or dismissed. Use it when the user must decide before continuing; reach for card or list-row when content is meant to be read, not resolved.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p><b>Content composes fields, never dialogs.</b> The body may hold <code>field.md</code> grids and <code>tab.md</code> tabs at <code>spacing.md</code> gaps inside the <code>spacing.xl</code> shell — but never a second modal. Sizes run compact → medium → large → wide; the library index strip is not a dialog.</p><p class="ch-reject">Reject: a confirm dialog opening a second dialog — stacked decisions strand focus.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p><b>Footer is right-aligned, cancel before confirm.</b> Neutral secondary plus a single <code>color.brand.navy</code> primary at <code>spacing.md</code> gap above a <code>color.border.default</code> divider. The primary is the only navy element in the dialog.</p><p class="ch-reject">Reject: two navy buttons, or confirm-left-of-cancel — muscle memory misfires.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p><b>Focus is trapped, Esc always exits.</b> <code>role="dialog"</code> with <code>aria-modal="true"</code>, labelled by the <code>text.2xl</code> title; focus trapped inside with <code>color.brand.sky</code> rings, restored to the trigger on close. Background stays inert; errors report inline in <code>color.semantic.danger</code> with the dialog open.</p><p class="ch-reject">Reject: a dialog that closes on submit-failure and eats the error with it.</p></div></li>
+</ul>
+</div>

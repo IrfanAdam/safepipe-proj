@@ -1,0 +1,73 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">Dots flag rows, toggles flip inline state, cards group counts with their tags. The horizontal strip is the default; vertical lives on narrow rails only.</p>
+<div>
+<span class="spc-status" role="status" data-status data-variant="dot" data-tone="success"><span class="spc-status__dot spc-status__dot--success" aria-hidden="true"></span><span class="spc-status__label">Compliant</span></span>
+<span class="spc-status" role="status" data-status data-variant="dot" data-tone="danger"><span class="spc-status__dot spc-status__dot--danger" aria-hidden="true"></span><span class="spc-status__label">Non-compliant</span></span>
+<span class="spc-status" role="status" data-status data-variant="dot" data-tone="warning"><span class="spc-status__dot spc-status__dot--warning" aria-hidden="true"></span><span class="spc-status__label">Due soon</span><span class="spc-status__qualifier">under 30 days</span></span>
+<span class="spc-status" role="status" data-status data-variant="dot" data-tone="accent"><span class="spc-status__dot spc-status__dot--accent" aria-hidden="true"></span><span class="spc-status__label">Data upload</span></span>
+<span class="spc-status" role="status" data-status data-variant="dot" data-tone="neutral"><span class="spc-status__dot spc-status__dot--neutral" aria-hidden="true"></span><span class="spc-status__label">Incomplete</span></span>
+<span class="spc-status" role="status" data-status data-variant="dot" data-tone="info"><span class="spc-status__dot spc-status__dot--info" aria-hidden="true"></span><span class="spc-status__label">Grace period</span></span>
+</div>
+<div>
+<span class="spc-status spc-status--toggle" data-status data-variant="toggle"><span class="spc-status__dot spc-status__dot--success" aria-hidden="true"></span><span class="spc-status__label">Active</span></span>
+<span class="spc-status spc-status--toggle" data-status data-variant="toggle"><span class="spc-status__dot spc-status__dot--neutral" aria-hidden="true"></span><span class="spc-status__label">Inactive</span></span>
+</div>
+<div>
+<div class="spc-status spc-status--card" role="status" data-status data-variant="card" data-tone="danger"><span class="spc-status__dot spc-status__dot--danger" aria-hidden="true"></span><span class="spc-status__body"><span class="spc-status__label">Crew compliance</span><span class="spc-status__qualifier">3 open items</span><span class="spc-status__tags"><span>Liquid</span><span>Work order</span></span></span><span class="spc-status__action" aria-hidden="true">›</span></div>
+<div class="spc-status spc-status--card-vertical" role="status" data-status data-variant="card-vertical" data-tone="warning"><span class="spc-status__dot spc-status__dot--warning" aria-hidden="true"></span><span class="spc-status__body"><span class="spc-status__label">Due soon</span><span class="spc-status__qualifier">under 30 days</span></span></div>
+</div>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td>Dot tones</td><td>row-level state flag</td><td>success / danger / warning / accent / neutral / info dots with label</td></tr>
+<tr><td><code>spc-status--toggle</code></td><td>inline active switch</td><td>text-only state, dot follows activity</td></tr>
+<tr><td><code>spc-status--card</code></td><td>default inline strip</td><td><code>var(--sp-surface-card)</code> fill, border, tags plus trailing slot</td></tr>
+<tr><td><code>spc-status--card-vertical</code></td><td>narrow rail form</td><td>stacked content for tight columns</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Hover lifts the card and reveals the link; focus always rings; disabled neutralizes dot and label; pending pulses the sky dot. Status never changes its own state on hover — only the card chrome responds.</p>
+<div>
+<span class="spc-status" role="status" data-status data-variant="dot" data-tone="info"><span class="spc-status__dot spc-status__dot--pending" aria-hidden="true"></span><span class="spc-status__label">Syncing</span></span>
+<span class="spc-status spc-status--disabled" role="status" data-status data-variant="dot" data-tone="neutral"><span class="spc-status__dot spc-status__dot--neutral" aria-hidden="true"></span><span class="spc-status__label">Archived</span></span>
+</div>
+<details class="spec-more"><summary>Spec · states + a11y</summary>
+<table class="ch-roles"><thead><tr><th>State</th><th>What changes</th><th>Code</th></tr></thead><tbody>
+<tr><td>Hover</td><td>card lifts to <code>var(--sp-elevation-1)</code>, trailing slot reveals <code>var(--sp-text-link)</code></td><td><code>:hover</code></td></tr>
+<tr><td>Focus</td><td><code>var(--sp-sky)</code> ring at <code>var(--sp-spacing-xs)</code></td><td><code>:focus-visible</code></td></tr>
+<tr><td>Disabled</td><td>neutral dot, label <code>var(--sp-text-muted)</code></td><td><code>spc-status--disabled</code></td></tr>
+<tr><td>Pending</td><td>indeterminate sky dot pulse, label stays</td><td><code>spc-status__dot--pending</code></td></tr>
+<tr><td>Error</td><td><code>var(--sp-danger)</code> dot plus the text label — never color alone</td><td>tone <code>danger</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Dot at <code>var(--sp-radius-full)</code> leads the <code>var(--sp-text-sm)</code> medium label at a <code>var(--sp-spacing-sm)</code> gap, qualifier trailing in secondary. The card wraps them with tags at <code>var(--sp-spacing-xs)</code> gaps, row padding and a 28px trailing slot.</p>
+<details class="spec-more"><summary>Spec · token map</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Card fill / tinted fill</td><td><code>var(--sp-surface-card)</code> / <code>var(--sp-surface-page)</code></td></tr>
+<tr><td>Card border / radius / padding</td><td><code>var(--sp-border-strong)</code> / <code>var(--sp-radius-md)</code> / <code>var(--sp-spacing-md)</code> + <code>var(--sp-spacing-sm)</code></td></tr>
+<tr><td>Card hover elevation</td><td><code>var(--sp-elevation-1)</code></td></tr>
+<tr><td>Dot success / danger / warning</td><td><code>var(--sp-success)</code> / <code>var(--sp-danger)</code> / <code>var(--sp-warning)</code></td></tr>
+<tr><td>Dot accent / neutral</td><td><code>var(--sp-violet)</code> / <code>var(--sp-navy)</code></td></tr>
+<tr><td>Dot radius / gap to label</td><td><code>var(--sp-radius-full)</code> / <code>var(--sp-spacing-sm)</code></td></tr>
+<tr><td>Label font / size / weight</td><td><code>var(--sp-font-ui)</code> / <code>var(--sp-text-sm)</code> / <code>var(--sp-fontweight-medium)</code></td></tr>
+<tr><td>Value / qualifier / disabled</td><td><code>var(--sp-text-primary)</code> / <code>var(--sp-text-secondary)</code> / <code>var(--sp-text-muted)</code></td></tr>
+<tr><td>Focus ring</td><td><code>var(--sp-sky)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + do / don't</h3>
+<p class="spec-note">The dot is <code>aria-hidden</code>; the label carries meaning and goes live with <code>aria-live</code> when it changes. Dots need 3:1 against the card at their size — grow to <code>var(--sp-spacing-sm)</code> if the token fails. The trailing control is its own tab stop with its own name.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p>Do: ship every colored dot with its text label — danger alone never means non-compliant.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p>Do: use one card form per list — horizontal by default, vertical for rails.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p>Don't: recolor a state to fit a palette, or give the card dialog radius and padding.</p></div></li>
+</ul>
+</section>
+</div>

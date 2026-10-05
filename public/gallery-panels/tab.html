@@ -1,0 +1,71 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">Pills filter, underlines navigate, floating toggles — one set per view. Selection always pairs the label step with a second cue: the dot on pills, full-strength type on underlines, lift on floating.</p>
+<div role="tablist" aria-label="Pill tabs">
+<button type="button" class="spc-tab spc-tab--pill spc-tab--medium" role="tab" aria-selected="false" data-tab data-variant="pill"><span class="spc-tab__label">All crews</span></button>
+<button type="button" class="spc-tab spc-tab--pill spc-tab--medium spc-tab--selected" role="tab" aria-selected="true" data-tab data-variant="pill"><span class="spc-tab__icon" aria-hidden="true">◆</span><span class="spc-tab__label">Assigned</span><span class="spc-tab__dot" aria-hidden="true"></span></button>
+</div>
+<div role="tablist" aria-label="Underline tabs">
+<button type="button" class="spc-tab spc-tab--underline spc-tab--medium" role="tab" aria-selected="false" data-tab data-variant="underline"><span class="spc-tab__label">Dashboard</span></button>
+<button type="button" class="spc-tab spc-tab--underline spc-tab--medium spc-tab--selected" role="tab" aria-selected="true" data-tab data-variant="underline"><span class="spc-tab__label">Compliance</span></button>
+<button type="button" class="spc-tab spc-tab--underline spc-tab--large" role="tab" aria-selected="false" data-tab data-variant="underline"><span class="spc-tab__label">Reports</span></button>
+</div>
+<div role="tablist" aria-label="Floating tabs">
+<button type="button" class="spc-tab spc-tab--floating spc-tab--medium" role="tab" aria-selected="false" data-tab data-variant="floating"><span class="spc-tab__label">Day</span></button>
+<button type="button" class="spc-tab spc-tab--floating spc-tab--medium spc-tab--selected" role="tab" aria-selected="true" data-tab data-variant="floating"><span class="spc-tab__label">Week</span></button>
+</div>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td><code>spc-tab--pill</code></td><td>filter chips in bars</td><td><code>var(--sp-surface-input)</code> fill, <code>var(--sp-radius-md)</code>, <code>var(--sp-text-sm)</code> label</td></tr>
+<tr><td><code>spc-tab--underline</code></td><td>page-level nav</td><td>transparent, <code>var(--sp-text-md)</code> / <code>var(--sp-text-lg)</code>, selection is full-strength type</td></tr>
+<tr><td><code>spc-tab--floating</code></td><td>raised toggle</td><td><code>var(--sp-border-strong)</code> edge, selected adds <code>var(--sp-surface-card)</code> plus <code>var(--sp-elevation-1)</code></td></tr>
+<tr><td><code>spc-tab__dot</code></td><td>data indicator</td><td><code>var(--sp-sky)</code> dot trailing the label at <code>var(--sp-spacing-xs)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Hover darkens one step and steps the label up; selected holds full weight with its second cue; focus always rings; disabled mutes and drops the pointer. Tabs swap instantly, so loading and error live in the panel below, never on the tab.</p>
+<div role="tablist" aria-label="Tab states">
+<button type="button" class="spc-tab spc-tab--pill spc-tab--medium" role="tab" aria-selected="false" data-tab data-variant="pill"><span class="spc-tab__label">Default</span></button>
+<button type="button" class="spc-tab spc-tab--pill spc-tab--medium spc-tab--selected" role="tab" aria-selected="true" data-tab data-variant="pill"><span class="spc-tab__label">Selected</span></button>
+<button type="button" class="spc-tab spc-tab--pill spc-tab--medium spc-tab--disabled" role="tab" aria-selected="false" disabled aria-disabled="true" data-tab data-variant="pill"><span class="spc-tab__label">Disabled</span></button>
+</div>
+<details class="spec-more"><summary>Spec · states + a11y</summary>
+<table class="ch-roles"><thead><tr><th>State</th><th>What changes</th><th>Code</th></tr></thead><tbody>
+<tr><td>Hover</td><td>container darkens toward <code>var(--sp-border-default)</code>, label steps to <code>var(--sp-text-primary)</code></td><td><code>:hover</code></td></tr>
+<tr><td>Selected</td><td>full-strength <code>var(--sp-text-primary)</code> label plus dot or <code>var(--sp-elevation-1)</code></td><td><code>spc-tab--selected</code> + <code>aria-selected</code></td></tr>
+<tr><td>Focus</td><td><code>var(--sp-sky)</code> ring at <code>var(--sp-spacing-xs)</code> offset, never removed</td><td><code>:focus-visible</code></td></tr>
+<tr><td>Disabled</td><td>label <code>var(--sp-text-muted)</code>, pointer events off</td><td><code>disabled</code> + <code>spc-tab--disabled</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Container holds label, optional leading icon and trailing dot at <code>var(--sp-spacing-xs)</code> gaps, with inline <code>var(--sp-spacing-md)</code> and block <code>var(--sp-spacing-sm)</code> padding. Roving <code>tabindex</code> moves with the arrows; the hit area pads out to <code>var(--sp-spacing-2xl)</code> square.</p>
+<details class="spec-more"><summary>Spec · token map</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Container fill</td><td><code>var(--sp-surface-input)</code></td></tr>
+<tr><td>Selected container fill</td><td><code>var(--sp-surface-card)</code></td></tr>
+<tr><td>Container radius</td><td><code>var(--sp-radius-md)</code></td></tr>
+<tr><td>Container padding (inline / block)</td><td><code>var(--sp-spacing-md)</code> / <code>var(--sp-spacing-sm)</code></td></tr>
+<tr><td>Container gap</td><td><code>var(--sp-spacing-xs)</code></td></tr>
+<tr><td>Label font / size / weight</td><td><code>var(--sp-font-ui)</code> / <code>var(--sp-text-sm)</code> / <code>var(--sp-fontweight-medium)</code></td></tr>
+<tr><td>Label color (default / selected)</td><td><code>var(--sp-text-secondary)</code> / <code>var(--sp-text-primary)</code></td></tr>
+<tr><td>Data dot fill</td><td><code>var(--sp-sky)</code></td></tr>
+<tr><td>Floating selected elevation</td><td><code>var(--sp-elevation-1)</code></td></tr>
+<tr><td>Focus ring / disabled label</td><td><code>var(--sp-sky)</code> / <code>var(--sp-text-muted)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + do / don't</h3>
+<p class="spec-note">Wrapper <code>role="tablist"</code>, each tab <code>role="tab"</code> with <code>aria-selected</code>; arrows move focus with roving <code>tabindex</code>. Inactive labels must clear 4.5:1, and the ring must read on both card and page surfaces.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p>Do: keep one tab set per view — tabs swap content in place, they never navigate to a different page.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p>Do: pair the label step with lift or dot so selection survives without color.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p>Don't: stack past two pill rows, or invent a label size between nav and pill text.</p></div></li>
+</ul>
+</section>
+</div>

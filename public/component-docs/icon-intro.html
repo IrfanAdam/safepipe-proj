@@ -1,0 +1,10 @@
+<div class="tp">
+<p class="ch-kicker">Components · Foundations · Icon</p>
+<h2 class="ch-hero">Icons speak before labels load.</h2>
+<p class="ch-lede meta">Icon is the inline SVG glyph set behind rails, rows and dialogs — 31 masters lifted from the live library, instance-resolved and translated to origin. Use it when a control needs a glanceable mark; reach for text alone when the meaning cannot survive without words.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p><b>Geometry — one master, one glyph.</b> Every icon resolves its <code>Icon=</code> master to vector paths with a normalized viewBox, sized by the <code>size</code> attribute onto <code>var(--sp-text-xs)</code> through <code>var(--sp-text-2xl)</code> — 12, 16, 20, 28 and nothing else.</p><p class="ch-reject">Reject: a hand-traced glyph at an off-grid box, or a pixel-sized rule that bypasses the size scale.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p><b>Ink — currentColor, always.</b> Glyphs carry no baked fill; they inherit the surrounding text token (<code>var(--sp-text-primary)</code>, <code>var(--sp-danger)</code>, <code>var(--sp-sky)</code>), so tone changes with context instead of forking new assets.</p><p class="ch-reject">Reject: a hex-baked glyph that cannot follow a danger row or an inverse surface.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p><b>Meaning — never color or glyph alone.</b> Decorative icons stay <code>aria-hidden</code>; a meaningful icon repeats its label in adjacent text or names its control — the glyph accelerates, it never carries meaning solo.</p><p class="ch-reject">Reject: an icon-only button with no accessible name, or a status told by color with no word beside it.</p></div></li>
+</ul>
+</div>

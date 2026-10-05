@@ -1,0 +1,10 @@
+<div class="tp">
+<p class="ch-kicker">Components · Navigation · Tab</p>
+<h2 class="ch-hero">Tabs swap views in place. They never navigate away.</h2>
+<p class="ch-lede meta">Tab is the single-select control that switches views of the same dataset without leaving the page — page headers, filter bars, step panels. Use it when content swaps in place; reach for a link when the destination is a different page, a tag when the word only classifies.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p><b>Selection — reads without color alone.</b> The selected tab steps its label to full-strength <code>var(--sp-text-primary)</code> and pairs it with a second cue: <code>var(--sp-elevation-1)</code> lift on floating tabs, the <code>var(--sp-sky)</code> data dot on pills.</p><p class="ch-reject">Reject: a selected tab that differs only in hue — without the lift or the dot, the state vanishes for colorblind users.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p><b>Scale — one set per view, two rows max.</b> Pills wrap onto the multi-row pattern; past two rows the IA needs rethinking. Nav tabs set <code>var(--sp-text-md)</code>, filter pills <code>var(--sp-text-sm)</code> — never a size between the two.</p><p class="ch-reject">Reject: three stacked pill rows, or a halfway label size invented to squeeze one more tab in.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p><b>Focus — roving keys, full-size target.</b> The wrapper owns <code>role="tablist"</code>, each tab <code>role="tab"</code> with <code>aria-selected</code> and arrow-key roving <code>tabindex</code>; the <code>var(--sp-sky)</code> ring is never removed and the hit area pads out to <code>var(--sp-spacing-2xl)</code>.</p><p class="ch-reject">Reject: every tab in the tab order with no visible ring — a keyboard user must always see where they are.</p></div></li>
+</ul>
+</div>

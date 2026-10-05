@@ -75,3 +75,6 @@
   pointer-events: none;
 }
 .spc-sidebar-icon { font-size: var(--sp-text-md); line-height: 1; }
+/* Variant hooks — one per Sidebar `variant` the factory emits. */
+.spc-sidebar--rail { width: var(--sp-spacing-3xl); }
+.spc-sidebar--rail .spc-sidebar-item { justify-content: center; }

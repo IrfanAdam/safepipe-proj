@@ -1,0 +1,54 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">Docs render dialogs inline — no overlay behavior here, so each dialog sits in a bordered stage box standing in for the scrim. Sizes run compact → medium → large → wide. Reject: a second dialog inside any of these.</p>
+<div style="border:1px solid var(--sp-border-default);border-radius:var(--sp-radius-lg);padding:var(--sp-spacing-md);background:var(--sp-surface-page);margin-bottom:var(--sp-spacing-md)">
+<div class="spc-modal-scrim is-open"><div class="spc-modal spc-modal--compact" role="dialog" aria-modal="true" aria-labelledby="modal-compact-title" aria-describedby="modal-compact-desc" id="modal-compact"><div class="spc-modal-head"><div><h2 class="spc-modal-title" id="modal-compact-title">Discard changes?</h2><p class="spc-modal-subtitle" id="modal-compact-desc">Unsaved edits will be lost.</p></div><button class="spc-modal-close" type="button" aria-label="Close dialog">✕</button></div><div class="spc-modal-content"><p>Confirm to continue.</p></div><div class="spc-modal-divider" aria-hidden="true"></div><div class="spc-modal-footer"><button class="spc-modal-btn spc-modal-btn--secondary" type="button">Cancel</button><button class="spc-modal-btn spc-modal-btn--primary" type="button">Discard</button></div></div></div>
+</div>
+<div style="border:1px solid var(--sp-border-default);border-radius:var(--sp-radius-lg);padding:var(--sp-spacing-md);background:var(--sp-surface-page);margin-bottom:var(--sp-spacing-md)">
+<div class="spc-modal-scrim is-open"><div class="spc-modal spc-modal--medium" role="dialog" aria-modal="true" aria-labelledby="modal-medium-title" aria-describedby="modal-medium-desc" id="modal-medium"><div class="spc-modal-head"><div><h2 class="spc-modal-title" id="modal-medium-title">Import OQ data</h2><p class="spc-modal-subtitle" id="modal-medium-desc">Upload a file to continue.</p></div><button class="spc-modal-close" type="button" aria-label="Close dialog">✕</button></div><div class="spc-modal-content"><p>Drop a CSV anywhere in this region.</p></div><div class="spc-modal-divider" aria-hidden="true"></div><div class="spc-modal-footer"><button class="spc-modal-btn spc-modal-btn--secondary" type="button">Cancel</button><button class="spc-modal-btn spc-modal-btn--primary" type="button">Import</button></div></div></div>
+</div>
+<div style="border:1px solid var(--sp-border-default);border-radius:var(--sp-radius-lg);padding:var(--sp-spacing-md);background:var(--sp-surface-page);margin-bottom:var(--sp-spacing-md)">
+<div class="spc-modal-scrim is-open"><div class="spc-modal spc-modal--large" role="dialog" aria-modal="true" aria-labelledby="modal-large-title" aria-describedby="modal-large-desc" id="modal-large"><div class="spc-modal-head"><div><h2 class="spc-modal-title" id="modal-large-title">Add a profile</h2><p class="spc-modal-subtitle" id="modal-large-desc">Two-column field grid.</p></div><button class="spc-modal-close" type="button" aria-label="Close dialog">✕</button></div><div class="spc-modal-content"><p>Name, role, crew, and qualification fields.</p></div><div class="spc-modal-divider" aria-hidden="true"></div><div class="spc-modal-footer"><button class="spc-modal-btn spc-modal-btn--secondary" type="button">Cancel</button><button class="spc-modal-btn spc-modal-btn--primary" type="button">Save profile</button></div></div></div>
+</div>
+<div style="border:1px solid var(--sp-border-default);border-radius:var(--sp-radius-lg);padding:var(--sp-spacing-md);background:var(--sp-surface-page)">
+<div class="spc-modal-scrim is-open"><div class="spc-modal spc-modal--wide" role="dialog" aria-modal="true" aria-labelledby="modal-wide-title" aria-describedby="modal-wide-desc" id="modal-wide"><div class="spc-modal-head"><div><h2 class="spc-modal-title" id="modal-wide-title">Review import</h2><p class="spc-modal-subtitle" id="modal-wide-desc">Data-heavy layout.</p></div><button class="spc-modal-close" type="button" aria-label="Close dialog">✕</button></div><div class="spc-modal-content"><p>Mapped columns with row-level warnings.</p></div><div class="spc-modal-divider" aria-hidden="true"></div><div class="spc-modal-footer"><button class="spc-modal-btn spc-modal-btn--secondary" type="button">Back</button><button class="spc-modal-btn spc-modal-btn--primary" type="button">Confirm</button></div></div></div>
+</div>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td><code>spc-modal--compact</code></td><td>narrow confirmation</td><td>one decision, no field grid</td></tr>
+<tr><td><code>spc-modal--medium</code></td><td>import / confirm dialog</td><td>tabs plus upload region</td></tr>
+<tr><td><code>spc-modal--large</code></td><td>create / edit form</td><td>two-column field grid</td></tr>
+<tr><td><code>spc-modal--wide</code></td><td>data-heavy layouts</td><td>widest shell, same chrome</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Close control hovers to <code>var(--sp-surface-input)</code>; submitting disables the secondary pair while the primary loads and content dims to <code>var(--sp-text-muted)</code>; errors report inline above the divider with the dialog held open. Esc, close, and scrim click share one cancel path.</p>
+<div style="border:1px solid var(--sp-border-default);border-radius:var(--sp-radius-lg);padding:var(--sp-spacing-md);background:var(--sp-surface-page)">
+<div class="spc-modal-scrim is-open"><div class="spc-modal spc-modal--medium" role="dialog" aria-modal="true" aria-labelledby="modal-state-title" id="modal-state"><div class="spc-modal-head"><div><h2 class="spc-modal-title" id="modal-state-title">Import OQ data</h2></div><button class="spc-modal-close" type="button" aria-label="Close dialog">✕</button></div><div class="spc-modal-content"><div class="spc-modal-dimmed"><p>Submitting — content dimmed.</p></div></div><p class="spc-modal-error" role="alert">Two rows failed validation; fix and retry.</p><div class="spc-modal-divider" aria-hidden="true"></div><div class="spc-modal-footer"><button class="spc-modal-btn spc-modal-btn--secondary" type="button">Cancel</button><button class="spc-modal-btn spc-modal-btn--primary" type="button" disabled aria-disabled="true">Import</button></div></div></div>
+</div>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Dialog surface at <code>var(--sp-radius-lg)</code> with <code>var(--sp-spacing-xl)</code> padding under <code>var(--sp-elevation-3)</code>; title <code>var(--sp-text-2xl)</code> bold with a <code>var(--sp-text-md)</code> semibold subtitle; 48px close control on the page surface; footer right-aligned at <code>var(--sp-spacing-md)</code> gap.</p>
+<details class="spec-more"><summary>Spec · anatomy + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Dialog surface / border / radius</td><td><code>var(--sp-surface-card)</code> / <code>var(--sp-border-default)</code> / <code>var(--sp-radius-lg)</code></td></tr>
+<tr><td>Dialog padding / shadow</td><td><code>var(--sp-spacing-xl)</code> / <code>var(--sp-elevation-3)</code></td></tr>
+<tr><td>Title / subtitle</td><td><code>var(--sp-text-2xl)</code> <code>var(--sp-fontweight-bold)</code> / <code>var(--sp-text-md)</code> <code>var(--sp-fontweight-semibold)</code> <code>var(--sp-text-primary)</code></td></tr>
+<tr><td>Close fill / hover / radius</td><td><code>var(--sp-surface-page)</code> / <code>var(--sp-surface-input)</code> / <code>var(--sp-radius-md)</code></td></tr>
+<tr><td>Content gap / divider / footer gap</td><td><code>var(--sp-spacing-md)</code> / <code>var(--sp-border-default)</code> / <code>var(--sp-spacing-md)</code></td></tr>
+<tr><td>Primary / secondary / error / focus</td><td><code>var(--sp-navy)</code> / <code>var(--sp-surface-input)</code> / <code>var(--sp-danger)</code> / <code>var(--sp-sky)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + contract</h3>
+<p class="spec-note">Do: right-aligned footer with cancel left of confirm, one navy primary, measured padding pair. Don't: open a second dialog, or use a dialog for long-form reading.</p>
+<details class="spec-more"><summary>Spec · a11y + related</summary>
+<p class="meta">A11y — <code>role="dialog"</code> <code>aria-modal="true"</code>, labelled by the title, described by the subtitle; focus trapped and restored; background inert; Esc closes; title first heading, unclipped at 200% zoom. Related — field owns the grid · button owns the footer pair · card owns long-form reading.</p>
+</details>
+</section>
+</div>

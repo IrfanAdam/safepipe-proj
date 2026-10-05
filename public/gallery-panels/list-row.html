@@ -1,0 +1,51 @@
+<div class="pad spec-grid">
+<section class="specimen">
+<h3>Spec — variant ladder</h3>
+<p class="spec-note">One record stretched wide, four densities: default row, collapsed group header, dense line item, and the tall record row with status and expiry. The tile shell ships empty. Reject: a bordered row nested inside another row.</p>
+<div class="spc-list-row"><span class="spc-list-row-icon" aria-hidden="true">◈</span><span class="spc-list-row-main"><a class="spc-list-row-title" href="#nav-row">Compressor station 4</a><span class="spc-list-row-meta">12 Tasks · 32 Crew members</span><span class="spc-list-row-chips"><span class="spc-list-row-chip">OQ Providers</span><span class="spc-list-row-chip">Staffing</span></span></span><span class="spc-list-row-divider" aria-hidden="true"></span><span class="spc-list-row-trailing" aria-hidden="true">›</span></div>
+<div class="spc-list-row spc-list-row--collapsed"><a class="spc-list-row-title" href="#nav-group">Workstream</a><span class="spc-list-row-count">12 tasks</span></div>
+<div class="spc-list-row"><span class="spc-list-row-icon" aria-hidden="true">⬢</span><span class="spc-list-row-main"><a class="spc-list-row-title" href="#nav-dense">Valve set VS-118</a></span><span class="spc-list-row-divider" aria-hidden="true"></span><span class="spc-list-row-trailing" aria-hidden="true">›</span></div>
+<div class="spc-list-row spc-list-row--record"><span class="spc-list-row-icon" aria-hidden="true">▣</span><span class="spc-list-row-main"><a class="spc-list-row-title" href="#nav-record">Valve no : VS-118</a><span class="spc-list-row-meta">Last inspected March · Crew B</span><span class="spc-list-row-status">Certified</span><span class="spc-list-row-expiry">32 days</span></span><span class="spc-list-row-divider" aria-hidden="true"></span><span class="spc-list-row-trailing" aria-hidden="true">›</span></div>
+<div class="spc-list-row spc-list-row--tile"></div>
+<details class="spec-more"><summary>Spec · variants + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Variant</th><th>Job</th><th>Key differences</th></tr></thead><tbody>
+<tr><td>Row, default</td><td>unselected workstream row</td><td>title + meta + chips + divider + trailing icon</td></tr>
+<tr><td><code>spc-list-row--collapsed</code></td><td>section header in a list</td><td>no surface, title + count only</td></tr>
+<tr><td>Dense line item</td><td>compact asset line</td><td>base row, icon + single title line, no divider</td></tr>
+<tr><td><code>spc-list-row--record</code></td><td>tall record with status</td><td><code>var(--sp-radius-lg)</code>, key/value title, status chip, expiry</td></tr>
+<tr><td><code>spc-list-row--tile</code></td><td>collapsed tile shell</td><td>empty surface, children unspecified</td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — states</h3>
+<p class="spec-note">Selected is border weight plus the meta count switching to <code>var(--sp-sky)</code> with <code>aria-current</code> — never a background flood. Disabled mutes to page surface; loading swaps content for skeleton bars; errors arrive as a trailing qualifier chip.</p>
+<div class="spc-list-row is-selected" aria-current="true"><span class="spc-list-row-icon" aria-hidden="true">◈</span><span class="spc-list-row-main"><a class="spc-list-row-title" href="#nav-row">Compressor station 4</a><span class="spc-list-row-meta">12 Tasks · 32 Crew members</span></span><span class="spc-list-row-divider" aria-hidden="true"></span><span class="spc-list-row-trailing" aria-hidden="true">›</span></div>
+<div class="spc-list-row is-disabled"><span class="spc-list-row-icon" aria-hidden="true">◈</span><span class="spc-list-row-main"><a class="spc-list-row-title" href="#nav-row">Compressor station 4</a><span class="spc-list-row-meta">12 Tasks · 32 Crew members</span></span><span class="spc-list-row-divider" aria-hidden="true"></span><span class="spc-list-row-trailing" aria-hidden="true">›</span></div>
+<div class="spc-list-row is-loading"><div class="spc-list-row-skeleton" aria-hidden="true"><span></span><span></span></div></div>
+<div class="spc-list-row"><span class="spc-list-row-icon" aria-hidden="true">◈</span><span class="spc-list-row-main"><a class="spc-list-row-title" href="#nav-row">Compressor station 4</a><span class="spc-list-row-meta">12 Tasks · 32 Crew members</span><span class="spc-list-row-errchip">Failed</span></span><span class="spc-list-row-divider" aria-hidden="true"></span><span class="spc-list-row-trailing" aria-hidden="true">›</span></div>
+</section>
+<section class="specimen">
+<h3>Spec — anatomy + tokens</h3>
+<p class="spec-note">Row surface at <code>var(--sp-radius-md)</code> with <code>var(--sp-spacing-lg)</code> inline and <code>var(--sp-spacing-md)</code> block padding; title <code>var(--sp-text-sm)</code> medium; meta <code>var(--sp-text-xs)</code> secondary; qualifier chips on a <code>var(--sp-spacing-base)</code> row.</p>
+<details class="spec-more"><summary>Spec · anatomy + tokens</summary>
+<table class="ch-roles"><thead><tr><th>Property</th><th>Token</th></tr></thead><tbody>
+<tr><td>Row surface / collapsed surface</td><td><code>var(--sp-surface-card)</code> / <code>var(--sp-surface-page)</code></td></tr>
+<tr><td>Border / hover + selected</td><td><code>var(--sp-border-default)</code> / <code>var(--sp-border-strong)</code></td></tr>
+<tr><td>Row radius / record radius</td><td><code>var(--sp-radius-md)</code> / <code>var(--sp-radius-lg)</code></td></tr>
+<tr><td>Padding / stack gap / content gap</td><td><code>var(--sp-spacing-lg)</code> / <code>var(--sp-spacing-md)</code> / <code>var(--sp-spacing-md)</code> / <code>var(--sp-spacing-xs)</code></td></tr>
+<tr><td>Title / group header</td><td><code>var(--sp-font-ui)</code> <code>var(--sp-text-sm)</code> <code>var(--sp-fontweight-medium)</code> <code>var(--sp-text-primary)</code> / <code>var(--sp-navy)</code></td></tr>
+<tr><td>Meta / record key / expiry</td><td><code>var(--sp-text-xs)</code> <code>var(--sp-text-secondary)</code> / <code>var(--sp-text-lg)</code> semibold / <code>var(--sp-warning)</code></td></tr>
+<tr><td>Selected accent / divider / icons</td><td><code>var(--sp-sky)</code> / <code>var(--sp-border-default)</code> / <code>var(--sp-text-secondary)</code></td></tr>
+<tr><td>Hover elevation / focus / disabled / skeleton / error</td><td><code>var(--sp-elevation-1)</code> / <code>var(--sp-sky)</code> / <code>var(--sp-surface-page)</code> + <code>var(--sp-text-muted)</code> / <code>var(--sp-surface-input)</code> / <code>var(--sp-danger)</code></td></tr>
+</tbody></table>
+</details>
+</section>
+<section class="specimen">
+<h3>Spec — a11y + contract</h3>
+<p class="spec-note">Do: one action per row on a real link, <code>spacing.md</code> gaps owned by the list. Don't: nest row surfaces, flood the selected background, or grow meta into heading sizes.</p>
+<details class="spec-more"><summary>Spec · a11y + related</summary>
+<p class="meta">A11y — row is <code>li</code> / <code>tr</code> with the title as its name, real links not div handlers, hit height ≥ <code>var(--sp-spacing-2xl)</code>, selection never color-only, divider decorative. Related — card owns multi-action records · status owns the trailing chip rule · tag owns qualifier chips.</p>
+</details>
+</section>
+</div>

@@ -69,3 +69,10 @@ input[type="date"].spc-field__control {
 .spc-field--disabled .spc-field__label { color: var(--sp-text-muted); }
 .spc-field--disabled .spc-field__box { background: var(--sp-surface-page); }
 .spc-field--disabled .spc-field__control { color: var(--sp-text-muted); }
+/* Variant + size hooks — one selector per Field `variant`/`size` the factory emits. */
+.spc-field--input .spc-field__box { background: var(--sp-surface-card); }
+.spc-field--textarea textarea.spc-field__control { resize: vertical; }
+.spc-field--date input[type="date"].spc-field__control { color: var(--sp-text-primary); }
+.spc-field--readonly .spc-field__label { color: var(--sp-text-secondary); }
+.spc-field--large .spc-field__box { min-height: var(--sp-spacing-3xl); }
+.spc-field--large .spc-field__control { font-size: var(--sp-text-lg); }

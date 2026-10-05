@@ -1,0 +1,10 @@
+<div class="tp">
+<p class="ch-kicker">Components · Data · Tag</p>
+<h2 class="ch-hero">Tags label. They never act.</h2>
+<p class="ch-lede meta">Tag is the compact, non-interactive chip that classifies an object — provider, work type, compliance state — so lists stay scannable. Use it when a word describes; reach for the toggle form only when it switches state, a tab when it navigates, a filter when it narrows a list.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p><b>Meaning — one color, one meaning.</b> <code>var(--sp-danger)</code> never appears on a tag that is not a compliance failure; <code>var(--sp-warning)</code> collapses overflow, <code>var(--sp-violet)</code> carries provider identity, <code>var(--sp-success)</code> confirms.</p><p class="ch-reject">Reject: a violet tag on a failed row because it matches the brand — color is a contract, not decoration.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p><b>Behavior — labels, not buttons.</b> Static tags carry no role and take no click; only the toggle form renders a <code>button</code> with <code>aria-pressed</code>. If it filters or navigates it belongs to search-filter or tab.</p><p class="ch-reject">Reject: a clickable chip-shaped div with no name, no role, and no keyboard path.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p><b>Ink — follows the fill.</b> <code>var(--sp-text-inverse)</code> on fills darker than <code>var(--sp-border-strong)</code>, <code>var(--sp-text-primary)</code> on light fills; the label stays <code>var(--sp-text-xs)</code> bold — shorten the word, never shrink below it.</p><p class="ch-reject">Reject: hand-picked gray on violet, or tiny type squeezed so the tag fits the column.</p></div></li>
+</ul>
+</div>

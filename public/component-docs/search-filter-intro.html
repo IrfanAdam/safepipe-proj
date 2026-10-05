@@ -1,0 +1,10 @@
+<div class="tp">
+<p class="ch-kicker">Components · Form · Search / Filter</p>
+<h2 class="ch-hero">Query narrows the text, pills narrow the facets — one row.</h2>
+<p class="ch-lede meta">Search / Filter is the query-plus-narrowing pair that sits above every list: one free-text input, one row of toggleable filter pills. Use it when the user narrows a list; reach for field when capturing a single value to keep.</p>
+<ul class="ch-laws">
+<li class="ch-law"><span class="ch-num">01</span><div><p><b>Search and filters are one pattern.</b> The <code>color.surface.card</code> shell at <code>radius.lg</code> with <code>spacing.xl / spacing.md</code> padding and the pill row at <code>spacing.sm</code> gaps ship together and reflow together — loading swaps the results count for <code>progress.md</code>, never the row width.</p><p class="ch-reject">Reject: the query in the toolbar and the pills three sections down — split rows desync.</p></div></li>
+<li class="ch-law"><span class="ch-num">02</span><div><p><b>Selected is dot plus border, never color alone.</b> The active pill keeps its <code>color.surface.card</code> fill and adds the 8px <code>color.brand.sky</code> dot with a <code>color.border.strong</code> border — and stays a real toggle with <code>aria-pressed</code> inside a labelled group.</p><p class="ch-reject">Reject: a tint change as the only selected signal — color alone fails color-blind users.</p></div></li>
+<li class="ch-law"><span class="ch-num">03</span><div><p><b>The placeholder is a hint, never the label.</b> Placeholder sits at <code>text.sm</code> in <code>color.text.muted</code>; the field still needs an accessible name, the icon stays <code>aria-hidden</code>, and results announce through <code>aria-live="polite"</code>.</p><p class="ch-reject">Reject: the measured pale placeholder as the only label — it fails contrast and vanishes on type.</p></div></li>
+</ul>
+</div>

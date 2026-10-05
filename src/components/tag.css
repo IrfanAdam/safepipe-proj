@@ -46,3 +46,5 @@
   pointer-events: none;
 }
 .spc-tag__count { font-weight: var(--sp-fontweight-bold); }
+.spc-tag__label { overflow: hidden; text-overflow: ellipsis; }
+.spc-tag--neutral { background: var(--sp-surface-input); color: var(--sp-text-primary); }

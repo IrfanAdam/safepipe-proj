@@ -71,6 +71,9 @@
   color: var(--sp-text-secondary);
 }
 .spc-card-action { color: var(--sp-text-link); font-size: var(--sp-text-md); }
+.spc-card-attribution { color: var(--sp-text-secondary); font-size: var(--sp-text-sm); }
+.spc-card--inspection { border-color: var(--sp-border-default); }
+.spc-card.is-loading .spc-card-body { color: var(--sp-text-muted); }
 .spc-card-skeleton span {
   display: block;
   height: var(--sp-text-lg);

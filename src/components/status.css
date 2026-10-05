@@ -50,3 +50,5 @@
 .spc-status--disabled .spc-status__dot { background: var(--sp-border-strong); }
 .spc-status--disabled .spc-status__label { color: var(--sp-text-muted); }
 .spc-status--toggle .spc-status__label { color: var(--sp-text-secondary); }
+/* Variant hooks — dot is the default inline indicator form. */
+.spc-status--dot { gap: var(--sp-spacing-sm); }
