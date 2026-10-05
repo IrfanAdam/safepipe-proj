@@ -106,10 +106,15 @@
       <div class="pad spec-grid" data-doc="gallery-panels/modal.html"><p class="meta">loading modal spec…</p></div>
     </div>
     <div class="frame" data-panel="ops3d" hidden>
-      <div class="pad"><p class="meta">Ops 3D twin specimen lands with Task 7 — live mount + health states.</p></div>
+      <div class="pad"><div id="ops3d-specimen" style="height:70vh;min-height:420px;position:relative;background:#0b0c0c;"></div></div>
     </div>
   </main>
 </div>
 <script type="module" src="./src/ds/gallery-shell.js"></script>
+<script type="module">
+  import { createTwin } from './src/ops3d/twin.js';
+  const el = document.getElementById('ops3d-specimen');
+  if (el) createTwin(el, {});
+</script>
 </body>
 </html>
