@@ -37,9 +37,10 @@ void main() {
   vec3 base = mix(vec3(0.078, 0.082, 0.086), vec3(0.118, 0.122, 0.125), clamp(r, 0.0, 1.0));
 
   // Diagonal micro-grid: two 45° line sets, faint, pitch from uniform.
+  // fwidth anti-aliasing keeps lines exactly ~1px at any zoom (no raster crawl).
   vec2 d1 = vec2(vXZ.x + vXZ.y, vXZ.x - vXZ.y) / uPitch;
-  vec2 g = abs(fract(d1) - 0.5);
-  float line = 1.0 - smoothstep(0.0, 0.06, min(g.x, g.y));
+  vec2 gv = abs(fract(d1 - 0.5) - 0.5) / max(fwidth(d1), vec2(1e-4));
+  float line = 1.0 - min(min(gv.x, gv.y), 1.0);
   // Fade the grid with distance so far field stays calm.
   float gridFade = 1.0 - smoothstep(20.0, 90.0, length(vXZ));
   base += vec3(0.05, 0.055, 0.06) * line * gridFade;

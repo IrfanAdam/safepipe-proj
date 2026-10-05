@@ -6,7 +6,7 @@
  *   camera.js:       createRig(canvas) → {camera, setPreset, flyTo, update}
  *   table.js:        addTable(scene) → {update?}
  *   health-feed.js:  loadFeed() → feed[], healthRollup(feed) → {nominal,watch,critical}
- *   network.js:      buildNetwork(scene, feed) → {update, setSelection, pick, stats}
+ *   network.js:      buildNetwork(scene, feed) → {update, setSelection, setHover, pick, setSize, stats}
  *   zones.js:        buildZones(scene, feed) → {update}
  */
 import * as THREE from 'three';
@@ -76,8 +76,11 @@ export function createTwin(container, opts = {}) {
   const size = () => {
     const w = container.clientWidth || 2;
     const h = container.clientHeight || 2;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    const pr = Math.min(window.devicePixelRatio || 1, 2);
+    renderer.setPixelRatio(pr);
     renderer.setSize(w, h, false);
+    network.setSize?.(Math.floor(w * pr), Math.floor(h * pr));
+    zones.setSize?.(Math.floor(w * pr), Math.floor(h * pr));
   };
   const ro = new ResizeObserver(size);
   ro.observe(container);

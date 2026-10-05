@@ -5,11 +5,14 @@
  * the selected asset's faults get a ground ring. Facilities are wireframe
  * boxes at line junctions, colored by own health; sensors are small diamonds.
  * Picking raycasts invisible fat-tube/box proxies (never the dots).
- * Contract: buildNetwork(scene, feed) → {update, setSelection, pick, stats}.
+ * Contract: buildNetwork(scene, feed) → {update, setSelection, setHover, pick, setSize, stats}.
  */
 
 import * as THREE from 'three';
 import { getLayout } from './health-feed.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 const HEALTH_COLOR = {
   nominal: 0x8a857a, // dim bone — recedes
@@ -94,6 +97,7 @@ export function buildNetwork(scene, feed) {
 
   const byId = new Map(); // assetId → {mats:[{m,base}], dots?, setHealth}
   const proxies = [];
+  const resMats = []; // resolution-dependent fat-line materials (see setSize)
   const raycaster = new THREE.Raycaster();
   let dotTotal = 0;
   let beadTotal = 0;
@@ -172,10 +176,20 @@ export function buildNetwork(scene, feed) {
     const health = healthById.get(fac.assetId)?.health ?? 'nominal';
     const [w, h, d] = fac.size;
     const [fx, fz] = fac.position;
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)),
-      new THREE.LineBasicMaterial({ color: colorFor(health), transparent: true, opacity: 0.9 }),
-    );
+    // Fat lines (resolution-independent width) so box edges stay crisp close up —
+    // 1px LineSegments rasterize into staircases at glancing zoom angles.
+    const edgePos = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)).getAttribute('position');
+    const segGeo = new LineSegmentsGeometry();
+    segGeo.setPositions(Array.from(edgePos.array));
+    const edgeMat = new LineMaterial({
+      color: colorFor(health).getHex(),
+      linewidth: 2.5,
+      transparent: true,
+      opacity: 0.9,
+    });
+    edgeMat.resolution.set(1280, 720);
+    resMats.push(edgeMat);
+    const edges = new LineSegments2(segGeo, edgeMat);
     edges.position.set(fx, h / 2 + 0.02, fz);
     group.add(edges);
     track(fac.assetId, edges.material, 0.9);
@@ -298,6 +312,9 @@ export function buildNetwork(scene, feed) {
     setSelection(id) {
       selected = id ?? null;
       applySelection();
+    },
+    setSize(w, h) {
+      for (const m of resMats) m.resolution.set(w, h);
     },
     setHover(id) {
       const next = id ?? null;
