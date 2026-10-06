@@ -12,7 +12,7 @@ const R_MAP = 20; // mapped-circle radius, km (matches terrain.js)
 const STEP_FINE = 2; // fine grid pitch, km
 const STEP_INDEX = 10; // index line pitch, km
 const Y = 0.02; // draped just above the terrain body (field-mapped below)
-const VEX = 2.5; // must match terrain.js vertical exaggeration
+const VEX = 3.5; // must match terrain.js vertical exaggeration
 const DIV = 40; // subdivisions per line for smooth rim fade
 
 const FINE_COL = new THREE.Color(0x7a1e1e);

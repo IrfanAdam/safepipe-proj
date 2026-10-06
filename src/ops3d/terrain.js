@@ -1,11 +1,12 @@
 /* Safepipe Ops 3D — src/ops3d/terrain.js · Permian-representative holographic topo.
  * buildTerrain(scene) → { mesh, setSize, update, dispose }
  * Representative Permian-basin floor (1 unit = 1 km): eastward dip ~1.5 m/km
- * + broad low swells ±40 m + TWO gentle hills (+30/+22 m, placed in the gaps
+ * + broad low swells ±40 m + TWO gentle hills (+45/+34 m, placed in the gaps
  * between pipe corridors so rings close around real highs) + one shallow
- * hollow (−16 m) + one winding dry draw ~22 m deep + one playa-lake
- * depression ~10 m deep — total relief ≈ −35…+60 m true, VEX 2.5.
- * No rim mountains.
+ * hollow (−24 m) + one winding dry draw ~30 m deep + one playa-lake
+ * depression ~10 m deep — total relief ≈ −40…+75 m true, VEX 3.5.
+ * No rim mountains. The body carries stepped hypsometric tint + baked NW
+ * hillshade so elevation reads as shading at TOP, not just lines.
  * Marching-squares 128×128 grid at 20 levels; unordered segments are
  * chained (quantized-endpoint greedy) into continuous smooth polylines per
  * level and rendered as Line2 strips — two tiers: brighter index lines
@@ -25,7 +26,7 @@ const SIZE = 44; // map extent, km (1 unit = 1 km)
 const R_MAP = 20; // boundary ring radius, km
 const N = 128; // marching-squares grid cells per side
 const LEVELS = 20; // contour levels
-const VEX = 2.5; // vertical exaggeration, fixed (network/gridfloor match this)
+const VEX = 3.5; // vertical exaggeration, fixed (network/gridfloor match this)
 const SLOPE_MIN = 0.0012; // skip contour cells flatter than ~1.2 m/km
 const BASE_COL = new THREE.Color(0x6a7377); // neutral bone-grey base contours
 const INDEX_COL = new THREE.Color(0x9aa3a6); // brighter every-5th index contours
@@ -62,10 +63,10 @@ function lakeWet(x, z) {
 /* Permian-basin representative floor field (km units). Eastward dip ~1.5 m/km,
  * broad low swells ±40 m (damped flat near the playa so it sits in a flat
  * spot), TWO gentle hills in the gaps between pipe corridors — H1 SE
- * (+30 m), H2 far west (+22 m) — so index rings close around real highs,
- * one shallow hollow (−16 m) between the two E-W trunks, one winding dry
- * draw ~22 m deep carved along a meandering centerline, one organic
- * playa-lake depression ~10 m deep. Total relief ≈ −35…+60 m. No rim. */
+ * (+45 m), H2 west (+34 m, clear of the trunks and the vignette crush) —
+ * so index rings close around real highs, one shallow hollow (−24 m) between the two E-W trunks, one winding dry
+ * draw ~30 m deep carved along a meandering centerline, one organic
+ * playa-lake depression ~10 m deep. Total relief ≈ −40…+75 m. No rim. */
 export function field(x, z) {
   const dip = -0.0015 * x; // eastward dip: down ~1.5 m per km east
   const lakeMask = lakeWet(x, z);
@@ -77,11 +78,11 @@ export function field(x, z) {
     const dx = x - ax, dz = z - az;
     return amp * Math.exp(-(dx * dx + dz * dz) / (2 * sig * sig));
   };
-  const hills = bump(7, 9.5, 3.8, 0.030) + bump(-13, -1, 3.0, 0.022);
-  const hollow = bump(7, -3.5, 2.6, -0.016);
+  const hills = bump(7, 9.5, 3.8, 0.045) + bump(-11.5, -0.5, 3.0, 0.034);
+  const hollow = bump(7, -3.5, 2.6, -0.024);
   const zc = drawCenter(x);
   const dd = (z - zc) / DRAW_W;
-  const draw = -0.0225 * Math.exp(-dd * dd); // dry draw, ~22 m deep, steep banks
+  const draw = -0.030 * Math.exp(-dd * dd); // dry draw, ~30 m deep, steep banks
   const playa = -0.01 * lakeMask; // playa depression, ~10 m deep
   return dip + swell + hills + hollow + draw + playa;
 }
@@ -266,16 +267,16 @@ export function buildTerrain(scene) {
     vertexColors: true,
     linewidth: 1.2,
     transparent: true,
-    opacity: 0.64,
+    opacity: 0.5,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
   const indexMat = new LineMaterial({
     color: 0xffffff,
     vertexColors: true,
-    linewidth: 1.8,
+    linewidth: 2.2,
     transparent: true,
-    opacity: 0.76,
+    opacity: 0.9,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -309,29 +310,54 @@ export function buildTerrain(scene) {
   labelGroup.visible = false; // twin.js setDetail reveals on drill-in
   group.add(labelGroup);
 
-  // Solid table body: elevation-tinted surface under the contours — near-black
-  // in the lows rising to neutral grey on the highs, normal blending so it
-  // reads as matter, not light. Lines stay crisp on top.
+  // Summit tags: always-visible elevation proof at TOP — the two hill
+  // summits carry their height so elevation reads before any drill-in.
+  const summitGroup = new THREE.Group();
+  summitGroup.name = 'ops-summits';
+  for (const [sx, sz] of [[7, 9.5], [-11.5, -0.5]]) {
+    const h = field(sx, sz);
+    const tag = elevLabel(`+${Math.round(h * 1000)} m`, sx, h * VEX + 0.6, sz);
+    tag.scale.set(4.2, 1.05, 1); // summit proof must survive TOP distance
+    summitGroup.add(tag);
+  }
+  group.add(summitGroup);
+
+  // Solid table body: stepped hypsometric tint + baked NW hillshade under
+  // the contours — near-black in the lows rising to mid grey on the highs,
+  // normal blending so it reads as matter, not light. Lines stay crisp on top.
   {
     const SEG = 96;
     const body = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
     const pa = body.attributes.position;
     const colors = new Float32Array(pa.count * 3);
-    const cLo = new THREE.Color(0x0b0e10);
-    const cHi = new THREE.Color(0x52585c); // lifted so highs read lighter than lows
+    const cLo = new THREE.Color(0x0e1214);
+    const cHi = new THREE.Color(0x6b7377); // wide enough to survive TOP view
     const tmp = new THREE.Color();
+    // NW key light for the baked hillshade (matches scene key direction).
+    const LX = -0.5, LY = 0.8, LZ = -0.4;
+    const ll = Math.hypot(LX, LY, LZ);
+    const lx = LX / ll, ly = LY / ll, lz = LZ / ll;
+    const E = 0.3; // finite-difference step, km
     const span = (mx - mn) || 1;
     for (let k = 0; k < pa.count; k++) {
       const x = pa.getX(k);
       const z = -pa.getY(k); // plane Y maps to world -Z after rotation
       const h = field(x, z);
       pa.setZ(k, h * VEX - 0.04);
+      // Stepped hypsometric: quantize into LEVELS bands, keep 65% continuous
+      // so bands read as tint steps, not stripes.
       const t = (h - mn) / span;
-      tmp.copy(cLo).lerp(cHi, t); // linear ramp: variance must survive TOP view
+      const stepped = (Math.floor(t * LEVELS) + 0.5) / LEVELS;
+      tmp.copy(cLo).lerp(cHi, t * 0.65 + stepped * 0.35);
+      // Baked hillshade from analytic normals: NW faces lift, SE faces drop.
+      const gx = (field(x + E, z) - field(x - E, z)) / (2 * E) * VEX;
+      const gz = (field(x, z + E) - field(x, z - E)) / (2 * E) * VEX;
+      const nl = Math.hypot(gx, 1, gz);
+      const shade = 0.45 + 0.55 * Math.max(0, (-gx * lx + ly - gz * lz) / nl);
       const f = 1 - smooth(12, 19.5, Math.hypot(x, z));
-      colors[k * 3] = tmp.r * f;
-      colors[k * 3 + 1] = tmp.g * f;
-      colors[k * 3 + 2] = tmp.b * f;
+      colors[k * 3] = tmp.r * shade * f;
+      colors[k * 3 + 1] = tmp.g * shade * f;
+      colors[k * 3 + 2] = tmp.b * shade * f;
     }
     body.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     body.computeVertexNormals();
@@ -522,8 +548,8 @@ export function buildTerrain(scene) {
       drainMat.resolution.set(w, h);
     },
     update(t = 0) {
-      baseMat.opacity = 0.64 + 0.05 * Math.sin(t * 1.2);
-      indexMat.opacity = 0.76 + 0.04 * Math.sin(t * 1.2 + 0.6);
+      baseMat.opacity = 0.5 + 0.05 * Math.sin(t * 1.2);
+      indexMat.opacity = 0.9 + 0.04 * Math.sin(t * 1.2 + 0.6);
       ringMat.opacity = 0.32 + 0.07 * Math.sin(t * 1.2 + 1.3);
     },
     dispose() {

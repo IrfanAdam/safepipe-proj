@@ -15,7 +15,7 @@
 import * as THREE from 'three';
 import { getLayout } from './health-feed.js';
 import { field } from './terrain.js'; // drape buried runs onto the surface
-const VEX = 2.5; // must match terrain.js vertical exaggeration
+const VEX = 3.5; // must match terrain.js vertical exaggeration
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
