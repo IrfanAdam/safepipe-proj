@@ -1,6 +1,6 @@
 /* Safepipe Ops 3D — src/ops3d/camera.js · orbit rig + presets + fly-to.
  * createRig(canvas) → {camera, setPreset, flyTo, update}
- * Presets (yaw°/pitch°/dist): sector 4/25/9 · plan 4/82/55 · wide 4/36/60.
+ * Presets (yaw°/pitch°/dist): sector 4/25/9 · plan 4/78/62 · wide 4/36/60.
  * flyTo eases 600ms; update(dt, t) steps the tween + damping + camera cage
  * (target clamped to r22 / y 0..8, camera radius clamped to 70).
  * Keys 1/2/3 are owned by twin.js — this module only exposes setPreset.
@@ -16,7 +16,7 @@ const FLY_MS = 600;
 
 const PRESETS = {
   sector: { yaw: 4, pitch: 25, dist: 9 },
-  plan: { yaw: 4, pitch: 89, dist: 68 },
+  plan: { yaw: 4, pitch: 78, dist: 62 },
   wide: { yaw: 4, pitch: 36, dist: 60 },
 };
 

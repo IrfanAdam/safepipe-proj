@@ -6,18 +6,17 @@
  * transparent (black, additive) at the rim. Static — no animation.
  */
 import * as THREE from 'three';
-import { field } from './terrain.js';
+import { field, VEX } from './terrain.js';
 
 const R_MAP = 20; // mapped-circle radius, km (matches terrain.js)
 const STEP_FINE = 2; // fine grid pitch, km
 const STEP_INDEX = 10; // index line pitch, km
 const Y = 0.02; // draped just above the terrain body (field-mapped below)
-const VEX = 3.5; // must match terrain.js vertical exaggeration
-const DIV = 40; // subdivisions per line for smooth rim fade
+const DIV = 48; // subdivisions per line for smooth rim fade
 
-const FINE_COL = new THREE.Color(0x7a1e1e);
-const INDEX_COL = new THREE.Color(0xc23a3a);
-const FADE_INNER = 14; // full strength inside this radius
+const FINE_COL = new THREE.Color(0x6b1a1a);
+const INDEX_COL = new THREE.Color(0x9e2b2b);
+const FADE_INNER = 13; // full strength inside this radius
 
 const isIndex = (v) => Math.round(v) % STEP_INDEX === 0;
 
@@ -39,8 +38,8 @@ export function buildGridFloor(scene) {
     const half = chordHalf(v);
     if (half < 0) return; // outside the circle — skipped
     const base = (isIndex(v) ? INDEX_COL : FINE_COL).clone();
-    // Index lines render brighter: fine lines sit at ~0.65 strength.
-    const gain = isIndex(v) ? 1.0 : 0.65;
+    // Index lines render brighter but subordinate to white contours.
+    const gain = isIndex(v) ? 0.9 : 0.42;
     let px = 0;
     let pz = 0;
     let pf = 0;

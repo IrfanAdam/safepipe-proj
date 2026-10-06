@@ -29,6 +29,7 @@ import { buildStructures } from './structures.js';
 import { buildBeacons } from './beacons.js';
 import { buildLabels } from './labels.js';
 import { buildGridFloor } from './gridfloor.js';
+import { buildChecker } from './checker.js';
 import { buildOverlays } from './overlays.js';
 import { ensureAudio, play } from './sound.js';
 import { buildHud } from './hud.js';
@@ -72,6 +73,7 @@ export function createTwin(container, opts = {}) {
 
   const byId = () => new Map(current.map((a) => [a.assetId, a]));
   const gridfloor = buildGridFloor(scene);
+  const checker = buildChecker(scene);
   const labels = buildLabels(scene, { layout, healthById: byId() });
   const overlays = buildOverlays(scene, { layout });
   // Twin-data overlays: O cycles OFF → WEATHER → TECTONIC → FORECAST.
@@ -115,6 +117,7 @@ export function createTwin(container, opts = {}) {
     structures.setDetail?.(levels.name);
     labels.setDetail?.(levels.name);
     terrain.setDetail?.(levels.name); // index-ring elevation numbers on drill-in
+    checker.setDetail?.(levels.name);
     const map = byId();
     const sel = selected ? map.get(selected) ?? null : null;
     const crit = sel?.health === 'critical' ? sel : current.find((a) => a.health === 'critical');
@@ -284,6 +287,7 @@ export function createTwin(container, opts = {}) {
     rig.update(dt, now / 1000);
     table.update?.(now / 1000);
     terrain.update?.(now / 1000);
+    checker.update?.(now / 1000);
     beacons.tick(now / 1000);
     network.tick?.(now / 1000);
     overlays.update?.(now / 1000);
@@ -355,6 +359,7 @@ export function createTwin(container, opts = {}) {
       structures.dispose();
       labels.dispose?.();
       gridfloor.dispose?.();
+      checker.dispose?.();
       overlays.dispose?.();
       terrain.dispose?.();
       renderer.dispose();

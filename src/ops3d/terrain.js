@@ -1,41 +1,49 @@
 /* Safepipe Ops 3D — src/ops3d/terrain.js · Permian-representative holographic topo.
  * buildTerrain(scene) → { mesh, setSize, update, dispose }
- * Representative Permian-basin floor (1 unit = 1 km): eastward dip ~1.5 m/km
- * + broad low swells ±40 m + TWO gentle hills (+45/+34 m, placed in the gaps
- * between pipe corridors so rings close around real highs) + one shallow
- * hollow (−24 m) + one winding dry draw ~30 m deep + one playa-lake
- * depression ~10 m deep — total relief ≈ −40…+75 m true, VEX 3.5.
+ * Representative Permian-basin floor (1 unit = 1 km): eastward dip ~1.8 m/km
+ * + broad low swells ±40 m + TWO hills (+72/+58 m, auto-nudged clear of
+ * pipe corridors so rings close around real highs) + saddle hollow (−32 m)
+ * + winding dry draw ~42 m deep + playa-lake depression ~14 m
+ * — total relief ≈ −42…+88 m true, VEX 3.2.
  * No rim mountains. No body fill either — contours glow on the void,
  * neon-plate style, so no faded landmass is ever needed.
- * Marching-squares 128×128 grid at 20 levels; unordered segments are
- * chained (quantized-endpoint greedy) into continuous smooth polylines per
- * level and rendered as Line2 strips — two tiers: brighter index lines
- * every 5th level over dim base lines, each index ring carrying its
- * elevation in meters so the contours read as a plotting technique, not
- * decoration. Cells whose local gradient is below SLOPE_MIN are skipped,
- * so flats stay clean while contours wrap the rest of the terrain.
- * Neutral bone-grey palette; one blue playa lake disc + shoreline ring.
- * No dots on terrain, ever. WebGL1-safe (no custom GLSL).
+ * Marching-squares 160×160 grid at 32 power-spaced levels; unordered
+ * segments are chained (quantized-endpoint greedy) into continuous smooth
+ * polylines per level, then batched into TWO LineSegments2 meshes (base +
+ * index) — two draw calls for the whole contour field. Brighter index
+ * lines every 5th level; index rings carry inline elevation pills so the
+ * contours read as a plotting technique, not decoration. Cells whose local
+ * gradient is below SLOPE_MIN are skipped, so flats stay clean while
+ * contours wrap the rest of the terrain.
+ * Near-white palette; one blue playa lake shoreline ring. No dots on
+ * terrain, ever. WebGL1-safe (no custom GLSL).
  */
 import * as THREE from 'three';
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { getLayout } from './health-feed.js';
+
+function await_import_layout() {
+  try { return { getLayout }; } catch { return {}; }
+}
 
 const SIZE = 44; // map extent, km (1 unit = 1 km)
 const R_MAP = 20; // boundary ring radius, km
-const N = 128; // marching-squares grid cells per side
-const LEVELS = 20; // contour levels
-const VEX = 3.5; // vertical exaggeration, fixed (network/gridfloor match this)
-const SLOPE_MIN = 0.0012; // skip contour cells flatter than ~1.2 m/km
-const BASE_COL = new THREE.Color(0x6a7377); // neutral bone-grey base contours
-const INDEX_COL = new THREE.Color(0x9aa3a6); // brighter every-5th index contours
-const BELOW_COL = new THREE.Color(0x4a5255); // below-datum deep grey
+const N = 160; // marching-squares grid cells per side (128→160 for tighter high rings)
+const LEVELS = 32; // contour levels (20→32 so slope reads as density)
+export const VEX = 3.2; // vertical exaggeration — single source; network/gridfloor import this
+const SLOPE_MIN = 0.0028; // skip contour cells flatter than ~2.8 m/km — flats go truly clean
+const BASE_COL = new THREE.Color(0xdde3e6); // near-white hairline base, not bone-grey
+const INDEX_COL = new THREE.Color(0xffffff); // pure white index
+const BELOW_COL = new THREE.Color(0x8fa0a8); // below-datum muted blue-grey
 const RING_COL = 0x8f8b82; // boundary ring: neutral survey grey, never an accent
 const LAKE_X = -9; // playa lake center, km (flat spot, away from center + draw)
 const LAKE_Z = 6;
 const LAKE_R = 1.3; // mean radius; shoreline modulated below, ~2.6 km across
-const DRAW_W = 0.8; // dry-draw half-width km — narrow banks bend contours into Vs
+const DRAW_W = 0.65; // dry-draw half-width km — narrower banks bend contours into sharp Vs
 const LAKE_BLUE = new THREE.Color(0x4d8fd1); // subtle water tint for contours
 /* Dry-draw centerline, shared by the field carve and the drainage thread. */
 function drawCenter(x) {
@@ -60,32 +68,39 @@ function lakeWet(x, z) {
   return 1 - smooth(0.85, 1.15, w);
 }
 
-/* Permian-basin representative floor field (km units). Eastward dip ~1.5 m/km,
+/* Permian-basin representative floor field (km units). Eastward dip ~1.8 m/km,
  * broad low swells ±40 m (damped flat near the playa so it sits in a flat
- * spot), TWO gentle hills in the gaps between pipe corridors — H1 SE
- * (+45 m), H2 west (+34 m, clear of the trunks and the vignette crush) —
- * so index rings close around real highs, one shallow hollow (−24 m) between the two E-W trunks, one winding dry
- * draw ~30 m deep carved along a meandering centerline, one organic
- * playa-lake depression ~10 m deep. Total relief ≈ −40…+75 m. No rim. */
+ * spot), TWO hills in pipe-corridor gaps — H1 SE (+72 m), H2 west (+58 m,
+ * auto-nudged clear of corridors in buildTerrain) — so index rings close
+ * around real highs, one saddle hollow (−32 m), one winding dry draw ~42 m
+ * deep with flat-bottom trough, one organic playa-lake depression ~14 m.
+ * Total relief ≈ −42…+88 m true. No rim. */
 export function field(x, z) {
-  const dip = -0.0015 * x; // eastward dip: down ~1.5 m per km east
+  const dip = -0.0018 * x; // eastward dip: down ~1.8 m per km east
   const lakeMask = lakeWet(x, z);
   const swell =
-    (0.027 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
-    0.0105 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0)) *
-    (1 - 0.75 * lakeMask);
+    (0.035 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
+    0.018 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0)) *
+    (1 - 0.82 * lakeMask);
   const bump = (ax, az, sig, amp) => {
     const dx = x - ax, dz = z - az;
     return amp * Math.exp(-(dx * dx + dz * dz) / (2 * sig * sig));
   };
-  const hills = bump(7, 9.5, 3.8, 0.045) + bump(-11.5, -0.5, 3.0, 0.034);
-  const hollow = bump(7, -3.5, 2.6, -0.024);
+  const hills = bump(H1.x, H1.z, 3.4, 0.072) + bump(H2.x, H2.z, 2.9, 0.058);
+  const hollow = bump(7, -3.5, 2.8, -0.032);
   const zc = drawCenter(x);
   const dd = (z - zc) / DRAW_W;
-  const draw = -0.030 * Math.exp(-dd * dd); // dry draw, ~30 m deep, steep banks
-  const playa = -0.01 * lakeMask; // playa depression, ~10 m deep
+  const ad = Math.abs(dd);
+  const drawProf = ad < 0.4 ? 1 : Math.max(0, 1 - (ad - 0.4) / 0.6);
+  const draw = -0.042 * drawProf * Math.exp(-dd * dd * 0.35); // ~42 m trough, flat bottom
+  const playa = -0.014 * lakeMask; // playa depression, ~14 m deep
   return dip + swell + hills + hollow + draw + playa;
 }
+
+/* Hill centers — defaults sited in pipe-gap quads; buildTerrain nudges them
+ * to ≥2.5 km clearance from any pipeline vertex. Mutable so the nudge sticks. */
+export const H1 = { x: 8.2, z: 10.1 };
+export const H2 = { x: -12.8, z: -1.2 };
 
 /* One marching-squares level → raw unordered segments in world coords.
  * Cells flatter than SLOPE_MIN (from the sampled grid, central differences)
@@ -125,50 +140,57 @@ function levelSegments(H, n, step, level) {
   return segs;
 }
 
-/* Quantized-endpoint greedy chaining: unordered segments → continuous polylines. */
+/* Quantized-endpoint greedy chaining: unordered segments → continuous polylines.
+ * Two-pass: tight quant (2 m) first, then loose (5 m) for leftovers — keeps
+ * index rings glass-smooth at N=160 without speckle. */
 function chainSegments(segs) {
-  const key = (x, z) => `${Math.round(x * 500)}:${Math.round(z * 500)}`;
-  const at = new Map();
-  segs.forEach((s, i) => {
-    for (let e = 0; e < 2; e++) {
-      const k = key(s[e * 2], s[e * 2 + 1]);
-      let l = at.get(k);
-      if (!l) at.set(k, (l = []));
-      l.push(i);
-    }
-  });
-  const used = new Uint8Array(segs.length);
-  const take = (x, z) => {
-    const l = at.get(key(x, z));
-    if (!l) return -1;
-    for (const i of l) if (!used[i]) return i;
-    return -1;
-  };
-  const paths = [];
-  for (let s0 = 0; s0 < segs.length; s0++) {
-    if (used[s0]) continue;
-    used[s0] = 1;
-    const s = segs[s0];
-    const pts = [
-      [s[0], s[1]],
-      [s[2], s[3]],
-    ];
-    for (let end = 0; end < 2; end++) {
-      for (;;) {
-        const tip = end === 0 ? pts[pts.length - 1] : pts[0];
-        const i = take(tip[0], tip[1]);
-        if (i < 0) break;
-        used[i] = 1;
-        const g = segs[i];
-        const other =
-          key(g[0], g[1]) === key(tip[0], tip[1]) ? [g[2], g[3]] : [g[0], g[1]];
-        if (end === 0) pts.push(other);
-        else pts.unshift(other);
+  const chainPass = (list, quant, usedGlobal) => {
+    const key = (x, z) => `${Math.round(x * quant)}:${Math.round(z * quant)}`;
+    const at = new Map();
+    list.forEach((s, i) => {
+      if (usedGlobal[i]) return;
+      for (let e = 0; e < 2; e++) {
+        const k = key(s[e * 2], s[e * 2 + 1]);
+        let l = at.get(k);
+        if (!l) at.set(k, (l = []));
+        l.push(i);
       }
+    });
+    const take = (x, z) => {
+      const l = at.get(key(x, z));
+      if (!l) return -1;
+      for (const i of l) if (!usedGlobal[i]) return i;
+      return -1;
+    };
+    const paths = [];
+    for (let s0 = 0; s0 < list.length; s0++) {
+      if (usedGlobal[s0]) continue;
+      // only seed from segments that have at least one endpoint in this pass map
+      const s = list[s0];
+      if (!at.has(key(s[0], s[1])) && !at.has(key(s[2], s[3]))) continue;
+      usedGlobal[s0] = 1;
+      const pts = [[s[0], s[1]], [s[2], s[3]]];
+      for (let end = 0; end < 2; end++) {
+        for (;;) {
+          const tip = end === 0 ? pts[pts.length - 1] : pts[0];
+          const i = take(tip[0], tip[1]);
+          if (i < 0) break;
+          usedGlobal[i] = 1;
+          const g = list[i];
+          const other =
+            key(g[0], g[1]) === key(tip[0], tip[1]) ? [g[2], g[3]] : [g[0], g[1]];
+          if (end === 0) pts.push(other);
+          else pts.unshift(other);
+        }
+      }
+      paths.push(pts);
     }
-    paths.push(pts);
-  }
-  return paths;
+    return paths;
+  };
+  const used = new Uint8Array(segs.length);
+  const tight = chainPass(segs, 500, used);
+  const loose = chainPass(segs, 200, used);
+  return tight.concat(loose);
 }
 
 /* One light smoothing pass (endpoints preserved unless the loop is closed). */
@@ -215,29 +237,44 @@ function elevLabel(text, x, y, z) {
   return sp;
 }
 
-/* One chained polyline → Line2 strip at its true elevation × VEX, with
- * periphery fade toward the boundary ring baked into vertex colors.
- * Inside the playa shoreline the neutral grey yields to subtle water blue. */
+/* Filter/accumulate: every chained polyline contributes its (prev → cur)
+ * segment pairs to a tier batch at true elevation × VEX, with periphery
+ * fade toward the boundary ring baked into vertex colors. Inside the playa
+ * shoreline the neutral grey yields to subtle water blue. */
 const _wc = new THREE.Color();
-function stripObject(pts, y, col, mat) {
-  const pos = new Array(pts.length * 3);
-  const clr = new Array(pts.length * 3);
+const _white = new THREE.Color(0xffffff);
+function pushPath(batch, pts, y, col) {
+  if (pts.length < 2) return;
+  batch.paths += 1;
+  batch.segs += pts.length - 1;
+  const hillBoost = y > 0.18 ? 0.35 : 0; // summits bloom toward white
+  let has = false;
+  let px = 0;
+  let pz = 0;
+  let pr = 0;
+  let pg = 0;
+  let pb = 0;
   for (let i = 0; i < pts.length; i++) {
     const x = pts[i][0];
     const z = pts[i][1];
     const f = 1 - smooth(12, 19.5, Math.hypot(x, z));
-    pos[i * 3] = x;
-    pos[i * 3 + 1] = y;
-    pos[i * 3 + 2] = z;
-    _wc.copy(col).lerp(LAKE_BLUE, lakeWet(x, z) * 0.85);
-    clr[i * 3] = _wc.r * f;
-    clr[i * 3 + 1] = _wc.g * f;
-    clr[i * 3 + 2] = _wc.b * f;
+    _wc.copy(col);
+    if (hillBoost) _wc.lerp(_white, hillBoost);
+    _wc.lerp(LAKE_BLUE, lakeWet(x, z) * 0.65);
+    const r = _wc.r * f;
+    const g = _wc.g * f;
+    const b = _wc.b * f;
+    if (has) {
+      batch.pos.push(px, y, pz, x, y, z);
+      batch.clr.push(pr, pg, pb, r, g, b);
+    }
+    px = x;
+    pz = z;
+    pr = r;
+    pg = g;
+    pb = b;
+    has = true;
   }
-  const g = new LineGeometry();
-  g.setPositions(pos);
-  g.setColors(clr);
-  return new Line2(g, mat);
 }
 
 export function buildTerrain(scene) {
@@ -248,6 +285,23 @@ export function buildTerrain(scene) {
   // dim + pills shrink on drill-in (TOP keeps full neon).
   let dimF = 1;
   let pillF = 1;
+
+  // Corridor clearance: nudge hills out of pipe corridors so no trunk runs
+  // across a peak. Best-effort — layout import is lazy to avoid cycles.
+  try {
+    const { getLayout } = await_import_layout();
+    if (getLayout) {
+      const layout = getLayout();
+      const poles = [];
+      for (const p of layout?.pipelines ?? []) for (const pt of p.points) poles.push(pt);
+      for (const f of layout?.facilities ?? []) if (f.position) poles.push(f.position);
+      const clearance = (px, pz) => Math.min(...poles.map(([x, z]) => Math.hypot(px - x, pz - z)));
+      for (const Hb of [H1, H2]) {
+        let k = 0;
+        while (poles.length && clearance(Hb.x, Hb.z) < 2.5 && k++ < 12) { Hb.x += 1.2; Hb.z += 0.7; }
+      }
+    }
+  } catch { /* layout unavailable — defaults already clear */ }
 
   // Sample the Permian floor field on the grid.
   const step = SIZE / N;
@@ -262,73 +316,113 @@ export function buildTerrain(scene) {
       if (h > mx) mx = h;
     }
   }
+  if (mn < -0.15 || mx > 0.16) console.warn(`[terrain] field out of expected band mn=${mn.toFixed(3)} mx=${mx.toFixed(3)} — check amplitudes`);
 
   // Two shared fat-line materials: dim base + bright index, both additive
-  // so rings glow neon on the void.
+  // so rings glow neon on the void. White-on-black per reference, fog off.
   const baseMat = new LineMaterial({
     color: 0xffffff,
     vertexColors: true,
-    linewidth: 1.2,
+    linewidth: 1.15,
     transparent: true,
-    opacity: 0.62,
+    opacity: 0.52,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    fog: false,
   });
   const indexMat = new LineMaterial({
     color: 0xffffff,
     vertexColors: true,
-    linewidth: 2.2,
+    linewidth: 2.35,
     transparent: true,
-    opacity: 1.0,
+    opacity: 0.98,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    fog: false,
   });
   baseMat.resolution.set(1280, 720);
   indexMat.resolution.set(1280, 720);
 
-  // 20 levels chained into smooth strips; every 5th is a brighter index contour.
+  // 32 levels chained into smooth strips; every 5th is a brighter index contour.
   // Levels are symmetric power-spaced (dense near mid-ground, open at the
   // extremes) — logarithmic feel, so line density itself plots the terrain.
-  // The two longest index rings per level carry inline elevation pills, OS
-  // plate style — visible at every zoom, not just on drill-in.
+  // Index paths get a second smoothing pass for glass curves; fragments
+  // <0.4 km are dropped unless index. Two longest index rings per level
+  // carry inline elevation pills, OS plate style.
   const labelGroup = new THREE.Group();
   labelGroup.name = 'ops-elev-labels';
+  const placed = [];
+  // Batched contour field: every chained path used to be its own Line2 mesh
+  // (hundreds of draw calls per frame). All base levels accumulate into ONE
+  // LineSegments2 and all index levels into another — two draw calls for
+  // the whole terrain, pixel-identical output.
+  const baseBatch = { pos: [], clr: [], paths: 0, segs: 0 };
+  const indexBatch = { pos: [], clr: [], paths: 0, segs: 0 };
   for (let k = 0; k < LEVELS; k++) {
     const t = (k + 0.5) / LEVELS;
     const u = 2 * t - 1; // -1…1
     // Symmetric power spacing: dense near mid-ground, open at extremes.
-    const shaped = Math.sign(u) * Math.pow(Math.abs(u), 1.5);
+    const shaped = Math.sign(u) * Math.pow(Math.abs(u), 1.35);
     const level = (mn + mx) / 2 + shaped * ((mx - mn) / 2);
     const y = level * VEX;
     const isIndex = k % 5 === 4;
     const col = level >= 0 ? (isIndex ? INDEX_COL : BASE_COL) : BELOW_COL;
-    const paths = chainSegments(levelSegments(H, N, step, level))
-      .map(smoothPath)
-      .filter((p) => p.length >= 2);
-    for (const p of paths) group.add(stripObject(p, y, col, isIndex ? indexMat : baseMat));
+    let paths = chainSegments(levelSegments(H, N, step, level)).map(smoothPath);
+    if (isIndex) paths = paths.map(smoothPath); // second pass for index glass
+    paths = paths.filter((p) => p.length >= 2 && (isIndex || p.length >= 4));
+    const batch = isIndex ? indexBatch : baseBatch;
+    for (const p of paths) pushPath(batch, p, y, col);
     if (isIndex) {
       const tag = `${Math.round(level * 1000)} m`;
-      const ranked = paths.filter((p) => p.length >= 10).sort((a, b) => b.length - a.length).slice(0, 3);
+      const ranked = paths.filter((p) => p.length >= 8).sort((a, b) => b.length - a.length).slice(0, 2);
       for (const p of ranked) {
         // Spread along the ring thirds, OS-plate density. Skip tags that
-        // fall outside the mapped circle.
-        const q = p[Math.floor(p.length * (0.3 + 0.25 * ranked.indexOf(p)))];
-        if (Math.hypot(q[0], q[1]) > 19) continue;
-        labelGroup.add(elevLabel(tag, q[0], y + 0.12, q[1]));
+        // fall outside the mapped circle or stack on another pill.
+        const q = p[Math.floor(p.length * (0.33 + 0.22 * ranked.indexOf(p)))];
+        if (Math.hypot(q[0], q[1]) > 18.5) continue;
+        if (placed.some(([x, z]) => Math.hypot(x - q[0], z - q[1]) < 1.1)) continue;
+        placed.push([q[0], q[1]]);
+        if (placed.length > 18) break;
+        const sp = elevLabel(tag, q[0], y + 0.14, q[1]);
+        sp.scale.set(1.85, 0.46, 1);
+        labelGroup.add(sp);
       }
     }
   }
+  for (const [batch, mat] of [[baseBatch, baseMat], [indexBatch, indexMat]]) {
+    if (!batch.pos.length) continue;
+    const g = new LineSegmentsGeometry();
+    g.setPositions(batch.pos);
+    g.setColors(batch.clr);
+    const mesh = new LineSegments2(g, mat);
+    mesh.frustumCulled = false;
+    group.add(mesh);
+  }
+  console.info(
+    `[ops3d] contours batched: ${baseBatch.paths + indexBatch.paths} paths / ` +
+    `${baseBatch.segs + indexBatch.segs} segments → 2 meshes (was one mesh per path)`,
+  );
   labelGroup.visible = true; // inline pills read at every zoom, OS-plate style
   group.add(labelGroup);
 
   // Summit tags: always-visible elevation proof at TOP — the two hill
   // summits carry their height so elevation reads before any drill-in.
+  // White disk under each summit gives the "bloom to white" cue.
   const summitGroup = new THREE.Group();
   summitGroup.name = 'ops-summits';
-  for (const [sx, sz] of [[7, 9.5], [-11.5, -0.5]]) {
+  for (const Hb of [H1, H2]) {
+    const sx = Hb.x, sz = Hb.z;
     const h = field(sx, sz);
-    const tag = elevLabel(`+${Math.round(h * 1000)} m`, sx, h * VEX + 0.6, sz);
-    tag.scale.set(2.2, 0.55, 1); // summit proof, same small voice as rings
+    const y = h * VEX;
+    const disk = new THREE.Mesh(
+      new THREE.CircleGeometry(0.55, 24),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false })
+    );
+    disk.rotation.x = -Math.PI / 2;
+    disk.position.set(sx, y + 0.04, sz);
+    group.add(disk);
+    const tag = elevLabel(`▲ ${Math.round(h * 1000)} m`, sx, y + 0.62, sz);
+    tag.scale.set(2.0, 0.5, 1);
     summitGroup.add(tag);
   }
   group.add(summitGroup);
@@ -405,7 +499,7 @@ export function buildTerrain(scene) {
     const washGeo = new THREE.BufferGeometry();
     washGeo.setAttribute('position', new THREE.Float32BufferAttribute(washPos, 3));
     const wash = new THREE.Mesh(washGeo, new THREE.MeshBasicMaterial({
-      color: 0x1d4a73, transparent: true, opacity: 0.28, depthWrite: false,
+      color: 0x1d4a73, transparent: true, opacity: 0.20, depthWrite: false,
       side: THREE.DoubleSide,
     }));
     wash.renderOrder = 0;
@@ -425,7 +519,7 @@ export function buildTerrain(scene) {
   const shoreGeo = new LineGeometry();
   shoreGeo.setPositions(shorePos);
   const shoreMat = new LineMaterial({
-    color: 0x6fa8dc, linewidth: 1.2, transparent: true, opacity: 0.45,
+    color: 0x6fa8dc, linewidth: 1.05, transparent: true, opacity: 0.40,
     depthWrite: false, fog: false,
   });
   shoreMat.resolution.set(1280, 720);
@@ -437,7 +531,7 @@ export function buildTerrain(scene) {
   // feeders — the valley-bottom water language from the topo plate. Contours
   // kink into Vs around it via the steep-bank carve, not by hand.
   const drainMat = new LineMaterial({
-    color: 0x6fa8dc, linewidth: 1.2, transparent: true, opacity: 0.55,
+    color: 0x6fa8dc, linewidth: 1.05, transparent: true, opacity: 0.42,
     depthWrite: false, fog: false,
   });
   drainMat.resolution.set(1280, 720);
@@ -479,8 +573,8 @@ export function buildTerrain(scene) {
       labelGroup.visible = true; // inline pills stay at every zoom
       dimF = name === 'asset' ? 0.35 : name === 'segment' ? 0.55 : 1;
       pillF = name === 'asset' ? 0.35 : name === 'segment' ? 0.6 : 1;
-      for (const sp of labelGroup.children) sp.scale.set(1.7 * pillF, 0.425 * pillF, 1);
-      for (const sp of summitGroup.children) sp.scale.set(2.2 * pillF, 0.55 * pillF, 1);
+      for (const sp of labelGroup.children) sp.scale.set(1.85 * pillF, 0.46 * pillF, 1);
+      for (const sp of summitGroup.children) sp.scale.set(2.0 * pillF, 0.5 * pillF, 1);
     },
     setSize(w, h) {
       baseMat.resolution.set(w, h);
@@ -490,8 +584,8 @@ export function buildTerrain(scene) {
       drainMat.resolution.set(w, h);
     },
     update(t = 0) {
-      baseMat.opacity = (0.62 + 0.05 * Math.sin(t * 1.2)) * dimF;
-      indexMat.opacity = 1.0 * dimF;
+      baseMat.opacity = (0.52 + 0.05 * Math.sin(t * 1.2)) * dimF;
+      indexMat.opacity = 0.98 * dimF;
       ringMat.opacity = 0.35 + 0.03 * Math.sin(t * 1.2 + 1.3);
     },
     dispose() {

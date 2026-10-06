@@ -6,8 +6,8 @@
 import * as THREE from 'three';
 
 export const CLEAR_COLOR = 0x0b0c0c;
-export const FOG_NEAR = 70;
-export const FOG_FAR = 220;
+export const FOG_NEAR = 58;
+export const FOG_FAR = 260;
 
 export function createScene(canvas) {
   if (!canvas) throw new Error('createScene: canvas required');

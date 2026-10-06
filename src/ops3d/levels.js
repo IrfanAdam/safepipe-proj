@@ -10,7 +10,7 @@ const ORDER = ['network', 'segment', 'asset'];
 
 // Mirror of camera.js preset angles (yaw°/pitch°/dist).
 const VIEWS = {
-  network: { yaw: 4, pitch: 89, dist: 68 },
+  network: { yaw: 4, pitch: 78, dist: 62 },
   segment: { yaw: 4, pitch: 25, dist: 9 },
   asset: { yaw: 4, pitch: 25, dist: 2.2 },
 };
