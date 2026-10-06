@@ -21,13 +21,17 @@ export function createScene(canvas) {
   scene.background = new THREE.Color(CLEAR_COLOR);
   scene.fog = new THREE.Fog(CLEAR_COLOR, FOG_NEAR, FOG_FAR);
 
-  // Neutral base light so future unlit-agnostic meshes (facility boxes,
-  // zone decals) never render pitch black. Shader-driven layers ignore it.
-  const hemi = new THREE.HemisphereLight(0xcfd4d6, 0x0b0c0c, 0.55);
+  // Base light stays dim: every hologram layer (contours, outlines, dots,
+  // beacons) is unlit by design — bright lights only grey-wash the table
+  // and drown thin lines. Lit tubes keep a faint fill for form.
+  const hemi = new THREE.HemisphereLight(0xcfd4d6, 0x0b0c0c, 0.5);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xffffff, 0.7);
+  const key = new THREE.DirectionalLight(0xffffff, 0.65);
   key.position.set(18, 26, 12);
   scene.add(key);
+  const fill = new THREE.DirectionalLight(0x9fc4d8, 0.25);
+  fill.position.set(-14, 10, -18);
+  scene.add(fill);
 
   return { renderer, scene };
 }

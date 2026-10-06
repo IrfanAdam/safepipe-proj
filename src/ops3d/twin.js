@@ -10,7 +10,7 @@
  *   network.js:      buildNetwork(scene, feed) → {update, setSelection, setHover, pick, setSize, stats}
  *   zones.js:        buildZones(scene, feed) → {update}
  *   levels.js:       createLevels(rig, layout, {onChange}) → {name, setLevel, focusAsset(id, at?), cycle}
- *   terrain.js:      buildTerrain(scene) → {mesh, update, dispose}
+ *   terrain.js:      buildTerrain(scene) → {mesh, setSize, update, dispose}
  *   structures.js:   buildStructures(scene, feed, layout) → {group, update, setSelection, dispose}
  *   beacons.js:      buildBeacons(scene, feed, layout) → {update, setSelection, tick, dispose}
  *   hud.js:          buildHud(container, {onSearch, onCreateWO, onLevel}) → {update, dispose}
@@ -197,6 +197,7 @@ export function createTwin(container, opts = {}) {
     const bh = Math.floor(h * pr);
     network.setSize?.(bw, bh);
     zones.setSize?.(bw, bh);
+    terrain.setSize?.(bw, bh);
     post.setSize(bw, bh);
   };
   const ro = new ResizeObserver(size);

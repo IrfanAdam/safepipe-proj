@@ -32,9 +32,12 @@ float hash(vec2 p) {
 }
 
 void main() {
-  // Radial base: #141516 centre → #1E1F20 rim (table-top satin falloff).
+  // All values below are LINEAR (the post composite treats the scene buffer
+  // as linear and converts once at the end) — author sRGB intent ^ 2.2 here,
+  // or the table renders ~8x too bright and drowns thin hologram lines.
+  // Radial base: sRGB #141516 centre → #1E1F20 rim (table-top satin falloff).
   float r = length(vXZ) / ${(SIZE / 2).toFixed(1)};
-  vec3 base = mix(vec3(0.078, 0.082, 0.086), vec3(0.118, 0.122, 0.125), clamp(r, 0.0, 1.0));
+  vec3 base = mix(vec3(0.0036, 0.0041, 0.0046), vec3(0.0091, 0.0098, 0.0103), clamp(r, 0.0, 1.0));
 
   // Diagonal micro-grid: two 45° line sets, faint, pitch from uniform.
   // fwidth anti-aliasing keeps lines exactly ~1px at any zoom (no raster crawl).
@@ -43,19 +46,19 @@ void main() {
   float line = 1.0 - min(min(gv.x, gv.y), 1.0);
   // Fade the grid with distance so far field stays calm.
   float gridFade = 1.0 - smoothstep(20.0, 90.0, length(vXZ));
-  base += vec3(0.05, 0.055, 0.06) * line * gridFade;
+  base += vec3(0.0014, 0.0017, 0.0020) * line * gridFade;
 
   // GGX-ish specular streak: soft lobe leaning top-right of the table.
   vec2 lobe = (vXZ - vec2(28.0, -34.0)) / 70.0;
   float spec = pow(max(0.0, 1.0 - dot(lobe, lobe)), 6.0);
-  base += vec3(0.10, 0.105, 0.11) * spec;
+  base += vec3(0.0063, 0.0070, 0.0078) * spec;
 
   // Noise smudge: barely-there mottling so the dark never bands flat.
   float n = hash(floor(vXZ * 2.0)) - 0.5;
-  base += vec3(n * 0.012);
+  base += vec3(n * 0.0015);
 
   // Slow shimmer on the streak only — the table itself never pulses.
-  base += vec3(0.008) * spec * sin(uTime * 0.6);
+  base += vec3(0.0006) * spec * sin(uTime * 0.6);
 
   gl_FragColor = vec4(base, 1.0);
   #include <fog_fragment>

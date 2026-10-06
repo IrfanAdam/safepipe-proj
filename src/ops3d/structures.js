@@ -1,151 +1,270 @@
-/* Safepipe Ops 3D — src/ops3d/structures.js · procedural facility assets.
- * Compressor station (hall + stacks + cooler fans), valve yard (manifold +
- * valve wheels + fence), tank farm (cylindrical tanks + bund walls), sensor
- * masts (pole + head + health lamp), pipeline trestles along routes.
- * Dark MeshStandardMaterial PBR-ish; emissive windows/lamps follow feed
- * health: bone nominal, amber watch, red critical.
+/* Safepipe Ops 3D — src/ops3d/structures.js · outline-hologram facility assets.
+ * Theatre-style see-through geometry: everything is THREE.LineSegments
+ * (EdgesGeometry over shared unit geoms, or custom segment buffers) plus a
+ * few glowing status dots (MeshBasicMaterial spheres). No solid masses.
+ * FAC-01 gas transmission compressor station (2 gabled halls, suction /
+ * discharge headers on trestles, fin-fan cooler bay, control building,
+ * vent stack, fence); FAC-02 valve yard (manifold grid + handwheels +
+ * fence); FAC-03 tank farm (open ring tanks + bund walls); sensor masts
+ * (pole + head + lamp dot); thin 6-sided pipe tubes (r=0.045) that read as
+ * lines plus health-tinted joint rings.
+ * Health: dim bone 0x8f9797 nominal / amber 0xff8c39 watch / red 0xe31919
+ * outlines + brighter lamp dots. Selection: 1.1x scale + brighten.
  * Contract: buildStructures(scene, feed, layout?) → {group, update, setSelection, dispose}.
  */
 import * as THREE from 'three';
 import { getLayout } from './health-feed.js';
 
-const HEALTH = { nominal: 0xd8d2c2, watch: 0xff8c39, critical: 0xe31919 };
-const col = (h) => new THREE.Color(HEALTH[h] ?? HEALTH.nominal);
+const OUTLINE = { nominal: 0x8f9797, watch: 0xff8c39, critical: 0xe31919 };
+const LAMP = { nominal: 0xf4f1e8, watch: 0xffb066, critical: 0xff4545 };
+const GRAPHITE = 0x5a636b;
+const PIPE_Y = 0.35; // above-ground pipe centerline elevation
+const PIPE_R = 0.045; // thin 6-sided tube radius — reads as a line at map scale
+const UP = new THREE.Vector3(0, 1, 0);
+const WHITE = new THREE.Color(0xffffff);
 
-const M = {
-  metal: new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.55, metalness: 0.65 }),
-  dark: new THREE.MeshStandardMaterial({ color: 0x1b1f25, roughness: 0.7, metalness: 0.5 }),
-  concrete: new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.9, metalness: 0.05 }),
-  pipe: new THREE.MeshStandardMaterial({ color: 0x4d4438, roughness: 0.45, metalness: 0.75 }),
-  roof: new THREE.MeshStandardMaterial({ color: 0x23272e, roughness: 0.6, metalness: 0.6 }),
-  tank: new THREE.MeshStandardMaterial({ color: 0x39404a, roughness: 0.4, metalness: 0.55 }),
-  gravel: new THREE.MeshStandardMaterial({ color: 0x33302a, roughness: 1, metalness: 0 }),
-  blade: new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.5, metalness: 0.7 }),
-};
+const col = (h) => OUTLINE[h] ?? OUTLINE.nominal;
+const lampCol = (h) => LAMP[h] ?? LAMP.nominal;
+
+// Shared unit geoms + cached edge geoms (module singletons, never disposed).
 const GEO = {
   box: new THREE.BoxGeometry(1, 1, 1),
-  cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 12),
   cyl6: new THREE.CylinderGeometry(0.5, 0.5, 1, 6),
+  cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 10),
+  torus: new THREE.TorusGeometry(0.5, 0.07, 6, 20),
   sph: new THREE.SphereGeometry(0.5, 10, 8),
-  torus: new THREE.TorusGeometry(0.5, 0.09, 8, 18),
 };
-function part(geo, mat, sx, sy, sz, x, y, z, ry = 0, rz = 0, rx = 0) {
-  const m = new THREE.Mesh(geo, mat);
-  m.scale.set(sx, sy, sz);
+const EDGE = new Map();
+const edgeOf = (g) => {
+  let e = EDGE.get(g);
+  if (!e) { e = new THREE.EdgesGeometry(g); EDGE.set(g, e); }
+  return e;
+};
+const graphite = new THREE.LineBasicMaterial({ color: GRAPHITE, transparent: true, opacity: 0.9 });
+
+/* Per-asset draw context: one outline material + one lamp material shared by
+ * every line/dot of the asset, so update() recolors with two assignments. */
+function actx(health) {
+  return {
+    group: new THREE.Group(),
+    outline: new THREE.LineBasicMaterial({ color: col(health), transparent: true, opacity: 0.9 }),
+    lampMat: new THREE.MeshBasicMaterial({ color: lampCol(health) }),
+    base: new THREE.Color(col(health)),
+    lampBase: new THREE.Color(lampCol(health)),
+    owned: [], // transient BufferGeometries for dispose()
+  };
+}
+function wire(c, geo, sx, sy, sz, x, y, z, ry = 0, rx = 0, mat = null) {
+  const l = new THREE.LineSegments(edgeOf(geo), mat ?? c.outline);
+  l.scale.set(sx, sy, sz);
+  l.position.set(x, y, z);
+  l.rotation.set(rx, ry, 0);
+  c.group.add(l);
+  return l;
+}
+const box = (c, w, h, d, x, y, z, ry = 0) => wire(c, GEO.box, w, h, d, x, y, z, ry);
+function segs(c, positions, mat = null) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+  c.owned.push(g);
+  const l = new THREE.LineSegments(g, mat ?? c.outline);
+  c.group.add(l);
+  return l;
+}
+function loop(c, pts) {
+  const g = new THREE.BufferGeometry().setFromPoints(pts);
+  c.owned.push(g);
+  const l = new THREE.LineLoop(g, c.outline);
+  c.group.add(l);
+  return l;
+}
+function dot(c, x, y, z, r = 0.05) {
+  const m = new THREE.Mesh(GEO.sph, c.lampMat);
+  m.scale.setScalar(r * 2);
   m.position.set(x, y, z);
-  m.rotation.set(rx, ry, rz);
+  c.group.add(m);
   return m;
 }
-const lampMat = (health) => new THREE.MeshStandardMaterial({
-  color: 0x111111, emissive: col(health), emissiveIntensity: 1.6, roughness: 0.4,
-});
-
-function compressor(root, health) {
-  const lamps = [];
-  root.add(part(GEO.box, M.concrete, 1.5, 0.08, 1.15, 0, 0.04, 0)); // pad
-  root.add(part(GEO.box, M.metal, 1.1, 0.55, 0.85, -0.05, 0.355, 0)); // hall
-  root.add(part(GEO.box, M.roof, 1.2, 0.07, 0.95, -0.05, 0.66, 0)); // roof
-  const win = lampMat(health); lamps.push(win);
-  root.add(part(GEO.box, win, 1.12, 0.1, 0.87, -0.05, 0.48, 0)); // window band
-  for (let i = 0; i < 2; i++) { // exhaust stacks
-    const x = -0.35 + i * 0.5;
-    root.add(part(GEO.cyl, M.dark, 0.14, 0.7, 0.14, x, 1.0, -0.2));
-    const tip = lampMat(health); lamps.push(tip);
-    root.add(part(GEO.cyl, tip, 0.15, 0.06, 0.15, x, 1.36, -0.2));
-  }
-  for (let i = 0; i < 2; i++) { // cooler fans: shroud + 3 blades
-    const x = 0.15 + i * 0.35;
-    root.add(part(GEO.cyl, M.dark, 0.34, 0.12, 0.34, x, 0.76, 0.25));
-    for (let b = 0; b < 3; b++)
-      root.add(part(GEO.box, M.blade, 0.28, 0.02, 0.06, x, 0.83, 0.25, (b * Math.PI) / 3));
-  }
-  root.add(part(GEO.cyl, M.pipe, 0.12, 1.3, 0.12, 0, 0.1, 0.62, 0, Math.PI / 2)); // tie-in pipe
-  return lamps;
+/* Elevated tube between two 3D points (shared 6-sided cylinder edges). */
+function tube(c, x0, y0, z0, x1, y1, z1, r, mat = null) {
+  const a = new THREE.Vector3(x0, y0, z0), b = new THREE.Vector3(x1, y1, z1);
+  const dir = b.clone().sub(a), len = dir.length() || 0.001;
+  const l = new THREE.LineSegments(edgeOf(GEO.cyl6), mat ?? c.outline);
+  l.scale.set(r * 2, len, r * 2);
+  l.position.copy(a).add(b).multiplyScalar(0.5);
+  l.quaternion.setFromUnitVectors(UP, dir.normalize());
+  c.group.add(l);
+  return l;
 }
-function valveYard(root, health) {
-  const lamps = [];
-  root.add(part(GEO.box, M.gravel, 1.2, 0.06, 1.0, 0, 0.03, 0)); // pad
-  for (let i = 0; i < 3; i++) { // manifold runs
-    const z = -0.25 + i * 0.25;
-    root.add(part(GEO.cyl, M.pipe, 0.1, 1.0, 0.1, 0, 0.16, z, 0, Math.PI / 2));
-    for (let k = -1; k <= 1; k += 2) { // riser + valve wheel
-      root.add(part(GEO.cyl, M.pipe, 0.07, 0.3, 0.07, k * 0.3, 0.3, z));
-      const wheel = part(GEO.torus, M.dark, 0.22, 0.22, 0.22, k * 0.3, 0.48, z, 0, 0, Math.PI / 2);
-      root.add(wheel);
-      root.add(part(GEO.cyl, M.dark, 0.04, 0.14, 0.04, k * 0.3, 0.42, z));
+/* Raw-segment helpers (flat xyz pairs). */
+function ringSegs(arr, cx, cy, cz, r, n = 20) {
+  for (let i = 0; i < n; i++) {
+    const a0 = (i / n) * Math.PI * 2, a1 = ((i + 1) / n) * Math.PI * 2;
+    arr.push(cx + Math.cos(a0) * r, cy, cz + Math.sin(a0) * r,
+      cx + Math.cos(a1) * r, cy, cz + Math.sin(a1) * r);
+  }
+}
+function rectSegs(arr, x0, z0, x1, z1, y) {
+  arr.push(x0, y, z0, x1, y, z0, x1, y, z0, x1, y, z1,
+    x1, y, z1, x0, y, z1, x0, y, z1, x0, y, z0);
+}
+const vert = (arr, x, y0, y1, z) => { arr.push(x, y0, z, x, y1, z); };
+/* Gabled hall outline: base + eave rects, corner posts, ridge, 4 slopes. */
+function gable(c, w, wallH, d, roofH, x, y, z) {
+  const arr = [], hx = w / 2;
+  const X0 = x - hx, X1 = x + hx, Z0 = z - d / 2, Z1 = z + d / 2;
+  const y1 = y + wallH, y2 = y1 + roofH;
+  rectSegs(arr, X0, Z0, X1, Z1, y);
+  rectSegs(arr, X0, Z0, X1, Z1, y1);
+  for (const [cx, cz] of [[X0, Z0], [X1, Z0], [X1, Z1], [X0, Z1]]) vert(arr, cx, y, y1, cz);
+  arr.push(X0, y2, z, X1, y2, z);
+  for (const ex of [X0, X1]) arr.push(ex, y2, z, ex, y1, Z0, ex, y2, z, ex, y1, Z1);
+  segs(c, arr);
+  dot(c, x, y2 + 0.04, z, 0.035);
+}
+/* Open tank outline: bottom + top rings, verticals, roof-cone slopes + apex dot. */
+function tank(c, x, z, r = 0.28, h = 0.5, roofH = 0.16, n = 20, m = 8) {
+  const arr = [], y0 = 0.06, y1 = y0 + h;
+  ringSegs(arr, x, y0, z, r, n);
+  ringSegs(arr, x, y1, z, r, n);
+  for (let i = 0; i < m; i++) {
+    const a = (i / m) * Math.PI * 2, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+    vert(arr, px, y0, y1, pz);
+    arr.push(x, y1 + roofH, z, px, y1, pz);
+  }
+  segs(c, arr);
+  dot(c, x, y1 + roofH + 0.04, z, 0.035);
+}
+/* Fence perimeter outline: top rail rect + posts. */
+function fence(c, w, d, h = 0.55, step = 0.6) {
+  const arr = [], hx = w / 2, hz = d / 2;
+  rectSegs(arr, -hx, -hz, hx, hz, h);
+  const nx = Math.max(1, Math.round(w / step)), nz = Math.max(1, Math.round(d / step));
+  for (let i = 0; i <= nx; i++) {
+    const x = -hx + (w * i) / nx;
+    vert(arr, x, 0, h, -hz); vert(arr, x, 0, h, hz);
+  }
+  for (let i = 1; i < nz; i++) {
+    const z = -hz + (d * i) / nz;
+    vert(arr, -hx, 0, h, z); vert(arr, hx, 0, h, z);
+  }
+  segs(c, arr);
+}
+/* Trestle bent: leg pair + crossbar (graphite). */
+function bent(c, x, z, topY = PIPE_Y) {
+  const arr = [];
+  vert(arr, x - 0.12, 0, topY - 0.03, z);
+  vert(arr, x + 0.12, 0, topY - 0.03, z);
+  arr.push(x - 0.16, topY - 0.03, z, x + 0.16, topY - 0.03, z);
+  segs(c, arr, graphite);
+}
+function fanCircle(c, x, y, z, r, n = 24) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    pts.push(new THREE.Vector3(x + Math.cos(a) * r, y, z + Math.sin(a) * r));
+  }
+  loop(c, pts);
+}
+
+/* FAC-01 — gas transmission compressor station. */
+function compressor(c) {
+  box(c, 3.6, 0.06, 2.2, 0, 0.03, 0); // pad outline
+  gable(c, 1.3, 0.75, 0.9, 0.32, -0.7, 0.06, -0.55); // hall A
+  gable(c, 1.3, 0.75, 0.9, 0.32, 0.7, 0.06, -0.55); // hall B
+  for (const z of [0.65, 0.9]) { // suction / discharge headers
+    tube(c, -1.6, PIPE_Y, z, 1.6, PIPE_Y, z, 0.055);
+    for (let x = -1.6; x <= 1.61; x += 0.8) bent(c, x, z);
+  }
+  for (const x of [-0.7, 0.7]) { // risers: hall front up to headers
+    tube(c, x, 0.1, 0.35, x, PIPE_Y, 0.35, 0.04);
+    tube(c, x, PIPE_Y, 0.35, x, PIPE_Y, 0.9, 0.04);
+  }
+  const legs = []; // fin-fan cooler bay: legs + deck + 2 fan circles
+  for (const [lx, lz] of [[-1.75, 0.05], [-0.95, 0.05], [-1.75, 0.45], [-0.95, 0.45]])
+    vert(legs, lx, 0.06, 1.05, lz);
+  segs(c, legs);
+  box(c, 1.0, 0.14, 0.55, -1.35, 1.1, 0.25);
+  fanCircle(c, -1.6, 1.18, 0.25, 0.16);
+  fanCircle(c, -1.1, 1.18, 0.25, 0.16);
+  box(c, 0.6, 0.45, 0.5, 1.35, 0.28, 0.25); // control building
+  wire(c, GEO.cyl, 0.1, 2.3, 0.1, 1.7, 1.2, -0.9); // vent / flare stack
+  dot(c, 1.7, 2.42, -0.9, 0.05);
+  fence(c, 3.6, 2.2);
+}
+/* FAC-02 — valve yard: manifold grid + handwheels + fence. */
+function valveYard(c) {
+  box(c, 1.5, 0.05, 1.2, 0, 0.025, 0); // pad outline
+  for (let i = 0; i < 3; i++) {
+    const z = -0.3 + i * 0.3;
+    tube(c, -0.65, 0.16, z, 0.65, 0.16, z, 0.05);
+    for (const x of [-0.3, 0.3]) {
+      tube(c, x, 0.16, z, x, 0.42, z, 0.035);
+      wire(c, GEO.torus, 0.2, 0.2, 0.2, x, 0.5, z, 0, Math.PI / 2); // handwheel
     }
   }
-  const lamp = lampMat(health); lamps.push(lamp);
-  root.add(part(GEO.sph, lamp, 0.12, 0.12, 0.12, 0.45, 0.75, -0.35)); // yard lamp
-  root.add(part(GEO.cyl, M.dark, 0.05, 0.7, 0.05, 0.45, 0.4, -0.35));
-  const post = new THREE.InstancedMesh(GEO.box, M.dark, 12); // fence posts
-  const d = new THREE.Object3D();
-  let n = 0;
-  for (let i = 0; i < 4; i++) for (let k = 0; k <= 2; k++) {
-    const t = -0.6 + k * 0.6;
-    d.position.set(i < 2 ? t : (i === 2 ? -0.65 : 0.65), 0.3, i < 2 ? (i === 0 ? -0.55 : 0.55) : t * 0.9);
-    d.scale.set(0.05, 0.6, 0.05); d.updateMatrix();
-    post.setMatrixAt(n++, d.matrix);
-  }
-  root.add(post);
-  for (const z of [-0.55, 0.55]) root.add(part(GEO.box, M.dark, 1.35, 0.04, 0.04, 0, 0.55, z));
-  return lamps;
+  const pole = [];
+  vert(pole, 0.6, 0, 0.8, -0.45);
+  segs(c, pole);
+  dot(c, 0.6, 0.86, -0.45, 0.05);
+  fence(c, 1.5, 1.2);
 }
-function tankFarm(root, health) {
-  const lamps = [];
-  root.add(part(GEO.box, M.concrete, 1.6, 0.07, 1.3, 0, 0.035, 0)); // slab
-  const spots = [[-0.4, -0.25], [0.4, -0.25], [0, 0.35]];
-  for (const [x, z] of spots) {
-    root.add(part(GEO.cyl, M.tank, 0.44, 0.5, 0.44, x, 0.32, z));
-    root.add(part(GEO.sph, M.roof, 0.44, 0.16, 0.44, x, 0.57, z));
-    const g = lampMat(health); lamps.push(g);
-    root.add(part(GEO.box, g, 0.06, 0.06, 0.02, x, 0.42, z + 0.23)); // gauge lamp
-  }
-  for (const [w, dd, x, z] of [[1.6, 0.06, 0, -0.62], [1.6, 0.06, 0, 0.62], [0.06, 1.3, -0.77, 0], [0.06, 1.3, 0.77, 0]])
-    root.add(part(GEO.box, M.concrete, w, 0.28, dd, x, 0.14, z)); // bund walls
-  root.add(part(GEO.cyl, M.pipe, 0.09, 1.5, 0.09, 0, 0.12, 0, 0, Math.PI / 2));
-  return lamps;
+/* FAC-03 — tank farm: 3 open outline tanks + bund walls. */
+function tankFarm(c) {
+  box(c, 2.0, 0.06, 1.7, 0, 0.03, 0); // slab outline
+  tank(c, -0.55, -0.3);
+  tank(c, 0.55, -0.3);
+  tank(c, 0, 0.35);
+  box(c, 2.0, 0.25, 0.06, 0, 0.18, -0.79); // bund walls
+  box(c, 2.0, 0.25, 0.06, 0, 0.18, 0.79);
+  box(c, 0.06, 0.25, 1.64, -0.97, 0.18, 0);
+  box(c, 0.06, 0.25, 1.64, 0.97, 0.18, 0);
+  tube(c, -0.9, 0.12, 0.62, 0.9, 0.12, 0.62, PIPE_R); // takeover line
+  for (const x of [-0.55, 0, 0.55]) tube(c, x, 0.12, 0.62, x, 0.3, 0.62, 0.03);
 }
-function sensorMast(root, health) {
-  const lamp = lampMat(health);
-  root.add(part(GEO.cyl, M.dark, 0.06, 1.1, 0.06, 0, 0.55, 0)); // pole
-  root.add(part(GEO.box, M.metal, 0.22, 0.14, 0.16, 0, 1.12, 0)); // head
-  root.add(part(GEO.sph, lamp, 0.14, 0.14, 0.14, 0, 1.28, 0)); // status lamp
-  root.add(part(GEO.box, M.concrete, 0.2, 0.08, 0.2, 0, 0.04, 0)); // footing
-  return [lamp];
+function sensorMast(c) {
+  box(c, 0.22, 0.08, 0.22, 0, 0.04, 0); // footing outline
+  const pole = [];
+  vert(pole, 0, 0.08, 1.1, 0);
+  segs(c, pole);
+  box(c, 0.24, 0.14, 0.18, 0, 1.12, 0); // head outline
+  dot(c, 0, 1.3, 0, 0.06);
 }
-function trestles(group, layout) {
-  const legs = [], bars = [];
+/* Pipe runs: graphite thin-tube outlines + health joint rings + waypoint dots. */
+function pipeRuns(group, layout, healthById, entries) {
   for (const p of layout.pipelines) {
+    const c = actx(healthById.get(p.assetId) ?? 'nominal');
     const pts = p.points;
-    let total = 0; const lens = [];
+    for (let i = 1; i < pts.length; i++)
+      tube(c, pts[i - 1][0], PIPE_Y, pts[i - 1][1], pts[i][0], PIPE_Y, pts[i][1], PIPE_R, graphite);
+    const rings = [];
+    for (const [x, z] of pts) {
+      ringSegs(rings, x, PIPE_Y, z, PIPE_R * 2.1, 10);
+      dot(c, x, PIPE_Y + 0.12, z, 0.03);
+    }
+    segs(c, rings);
+    let total = 0; // trestle bents every ~1.4 units
+    const lens = [];
     for (let i = 1; i < pts.length; i++) {
       const l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
       lens.push(l); total += l;
     }
     const n = Math.max(2, Math.round(total / 1.4));
     for (let k = 0; k <= n; k++) {
-      let target = (k / n) * total, seg = 0;
-      while (seg < lens.length - 1 && target > lens[seg]) { target -= lens[seg]; seg++; }
-      const f = lens[seg] ? target / lens[seg] : 0;
-      const x = pts[seg][0] + (pts[seg + 1][0] - pts[seg][0]) * f;
-      const z = pts[seg][1] + (pts[seg + 1][1] - pts[seg][1]) * f;
-      legs.push([x - 0.12, z], [x + 0.12, z]); bars.push([x, z]);
+      let target = (k / n) * total, s = 0;
+      while (s < lens.length - 1 && target > lens[s]) { target -= lens[s]; s++; }
+      const f = lens[s] ? target / lens[s] : 0;
+      bent(c, pts[s][0] + (pts[s + 1][0] - pts[s][0]) * f, pts[s][1] + (pts[s + 1][1] - pts[s][1]) * f);
     }
+    c.group.userData.assetId = p.assetId;
+    group.add(c.group);
+    entries.set(p.assetId, c);
   }
-  const d = new THREE.Object3D();
-  const legMesh = new THREE.InstancedMesh(GEO.box, M.dark, legs.length);
-  legs.forEach(([x, z], i) => {
-    d.position.set(x, 0.09, z); d.scale.set(0.06, 0.18, 0.06);
-    d.rotation.set(0, 0, 0); d.updateMatrix(); legMesh.setMatrixAt(i, d.matrix);
-  });
-  const barMesh = new THREE.InstancedMesh(GEO.box, M.metal, bars.length);
-  bars.forEach(([x, z], i) => {
-    d.position.set(x, 0.19, z); d.scale.set(0.36, 0.05, 0.12);
-    d.updateMatrix(); barMesh.setMatrixAt(i, d.matrix);
-  });
-  group.add(legMesh, barMesh);
-  return [legMesh, barMesh];
+}
+
+function paint(e, on) {
+  e.outline.color.copy(e.base).lerp(WHITE, on ? 0.45 : 0);
+  e.lampMat.color.copy(e.lampBase).lerp(WHITE, on ? 0.5 : 0);
 }
 
 export function buildStructures(scene, feed, layout) {
@@ -154,56 +273,55 @@ export function buildStructures(scene, feed, layout) {
   const group = new THREE.Group();
   group.name = 'ops-structures';
   scene.add(group);
-  const entries = new Map(); // assetId → {root, lamps}
+  const entries = new Map(); // assetId → actx (facilities, sensors, pipelines)
   const builders = { 'FAC-01': compressor, 'FAC-02': valveYard, 'FAC-03': tankFarm };
   const kinds = { 'FAC-01': 0, 'FAC-02': 1, 'FAC-03': 2 };
   for (const fac of lay.facilities) {
-    const root = new THREE.Group();
-    const [fx, fz] = fac.position;
-    root.position.set(fx, 0, fz);
-    const health = healthById.get(fac.assetId) ?? 'nominal';
+    const c = actx(healthById.get(fac.assetId) ?? 'nominal');
+    c.group.position.set(fac.position[0], 0, fac.position[1]);
     const fn = builders[fac.assetId] ?? [compressor, valveYard, tankFarm][kinds[fac.assetId] ?? 0] ?? compressor;
-    const lamps = fn(root, health);
-    root.userData.assetId = fac.assetId;
-    group.add(root);
-    entries.set(fac.assetId, { root, lamps });
+    fn(c);
+    c.group.userData.assetId = fac.assetId;
+    group.add(c.group);
+    entries.set(fac.assetId, c);
   }
   for (const sen of lay.sensors) {
-    const root = new THREE.Group();
-    root.position.set(sen.position[0] + 0.35, 0, sen.position[1] + 0.25);
-    const lamps = sensorMast(root, healthById.get(sen.assetId) ?? 'nominal');
-    root.userData.assetId = sen.assetId;
-    group.add(root);
-    entries.set(sen.assetId, { root, lamps });
+    const c = actx(healthById.get(sen.assetId) ?? 'nominal');
+    c.group.position.set(sen.position[0] + 0.35, 0, sen.position[1] + 0.25);
+    sensorMast(c);
+    c.group.userData.assetId = sen.assetId;
+    group.add(c.group);
+    entries.set(sen.assetId, c);
   }
-  const trestleMeshes = trestles(group, lay);
+  pipeRuns(group, lay, healthById, entries);
   let selected = null;
   const api = {
     group,
     update(next) {
       for (const f of next ?? []) {
-        healthById.set(f.assetId, f.health ?? 'nominal');
         const e = entries.get(f.assetId);
-        if (e) for (const lm of e.lamps) lm.emissive.copy(col(f.health));
+        if (!e) continue;
+        const h = f.health ?? 'nominal';
+        e.base.set(col(h));
+        e.lampBase.set(lampCol(h));
+        paint(e, selected === f.assetId);
       }
     },
     setSelection(id) {
       selected = id ?? null;
       for (const [aid, e] of entries) {
         const on = selected === aid;
-        e.root.scale.setScalar(on ? 1.1 : 1);
-        for (const lm of e.lamps) lm.emissiveIntensity = on ? 2.6 : 1.6;
+        e.group.scale.setScalar(on ? 1.1 : 1);
+        paint(e, on);
       }
     },
     dispose() {
       scene.remove(group);
-      group.traverse((o) => {
-        if (o.isInstancedMesh || o.isMesh) {
-          if (!Object.values(GEO).includes(o.geometry)) o.geometry?.dispose?.();
-        }
-        const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
-        for (const m of mats) if (!Object.values(M).includes(m)) m.dispose?.();
-      });
+      for (const e of entries.values()) {
+        for (const g of e.owned) g.dispose?.();
+        e.outline.dispose?.();
+        e.lampMat.dispose?.();
+      }
       entries.clear();
     },
   };

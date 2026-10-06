@@ -1,21 +1,34 @@
-/* Safepipe Ops 3D — src/ops3d/terrain.js · procedural night-vision relief.
+/* Safepipe Ops 3D — src/ops3d/terrain.js · holographic topo map.
  * buildTerrain(scene) → { mesh, update, dispose }
- * 200×200 heightfield (128×128 segs) displaced on the CPU with seeded value
- * noise; pipeline corridors + facility pads from getLayout() are carved flat
- * so dots (y=0.06) and facility boxes sit on grade. Unlit ShaderMaterial in
- * near-black teal with height tint + faint contour lines. WebGL1-safe GLSL.
+ * The terrain IS its contour lines: seeded value-noise field contoured on
+ * a 128×128 grid at 20 levels via marching squares → additive
+ * THREE.LineSegments (dim blue-white, brighter every 4th index contour).
+ * Lines run UNDER everything (facilities sit on the terrain, hologram-style)
+ * — no corridor/pad flattening. Faint dark base disc + thin accent boundary
+ * ring + glowing POI dots. Each contour loop rides at its true elevation ×
+ * exaggeration (~1 unit per level step, capped ×4) — steep ground stacks
+ * glowing curves vertically, flats rest as sparse rings near the floor.
+ * WebGL1-safe (no custom GLSL at all).
  */
 import * as THREE from 'three';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { getLayout } from './health-feed.js';
 
-const SIZE = 200;
-const SEGS = 128;
-const FLAT_Y = -0.02; // grade level: above table (-0.05), below dots (0.06)
-const AMP = 3.2; // far-field relief amplitude
+const SIZE = 26; // map extent (world units) — matches TOP framing
+const N = 128; // marching-squares grid cells per side
+const LEVELS = 20; // elevation levels
+const FLAT_Y = -0.02; // grade under corridors/pads
+const AMP = 2.0; // gentle: contour layout varies at most ±2 in Y
 const CORRIDOR_HALF = 1.0; // flat half-width around each pipeline centreline
-const CONTOUR_STEP = 0.5;
+const BASE_COL = [0x63, 0x9c, 0xb8].map((v) => v / 255);
+const BELOW_COL = [0x2c, 0x55, 0x66].map((v) => v / 255);
+const INDEX_COL = [0x9f, 0xd4, 0xe8].map((v) => v / 255);
+const RING_COL = 0x2fa8c7;
+const POI_COL = 0xffc46b;
 
-/* Deterministic integer-lattice value noise (CPU side — no GLSL loops). */
+/* Deterministic integer-lattice value noise (CPU side). */
 function hash2(x, y) {
   let h = (x * 374761393 + y * 668265263) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -64,106 +77,174 @@ const smooth = (a, b, v) => {
   return t * t * (3 - 2 * t);
 };
 
-const VERT = /* glsl */ `
-varying vec2 vXZ;
-varying float vH;
-#include <fog_pars_vertex>
-void main() {
-  vec4 wp = modelMatrix * vec4(position, 1.0);
-  vXZ = wp.xz;
-  vH = wp.y;
-  vec4 mvPosition = viewMatrix * wp;
-  gl_Position = projectionMatrix * mvPosition;
-  #include <fog_vertex>
+/* Seeded relief field. No corridor/pad flattening — the hologram runs
+ * under everything and facilities sit on the terrain (health data reads
+ * by color separation: cyan terrain vs bone/amber/red assets). */
+function field(x, z) {
+  const lumps = fbm(x * 0.09 + 7.3, z * 0.09 + 2.1) - 0.5;
+  const swell = fbm(x * 0.035 + 1.7, z * 0.035 + 9.4) - 0.5;
+  const detail = fbm(x * 0.28 + 3.1, z * 0.28 + 8.8) - 0.5;
+  const h = (lumps * 2.2 + swell * 2.0 + detail * 0.8) * AMP * 0.5;
+  // Guaranteed landforms (noise alone can leave the ops centre flat):
+  // two hills clear of the asset cluster + a rim bowl toward the map edge,
+  // so dense concentric strata exist by construction, not by luck.
+  const gauss = (cx, cz, r, a) => {
+    const dx = x - cx;
+    const dz = z - cz;
+    return a * Math.exp(-(dx * dx + dz * dz) / (r * r));
+  };
+  const land =
+    h + gauss(-8.5, 6.5, 4.5, 2.6) + gauss(9, -7.5, 5, 3.0) + gauss(1, 11, 4, 1.8);
+  const edge = Math.hypot(x, z);
+  const rim = smooth(9.5, 13.5, edge) * 2.4;
+  return FLAT_Y + land + rim;
 }
-`;
 
-const FRAG = /* glsl */ `
-precision highp float;
-varying vec2 vXZ;
-varying float vH;
-uniform float uTime;
-#include <fog_pars_fragment>
-void main() {
-  // Near-black teal base, lifted faintly with height.
-  float hMix = clamp((vH - (${FLAT_Y.toFixed(2)})) / ${AMP.toFixed(1)}, 0.0, 1.0);
-  vec3 base = mix(vec3(0.012, 0.050, 0.055), vec3(0.030, 0.110, 0.115), hMix);
-  // Faint contour lines every CONTOUR_STEP, AA'd so they stay ~1px.
-  float g = vH / ${CONTOUR_STEP.toFixed(1)};
-  float w = max(fwidth(g), 1e-4);
-  float d = abs(fract(g + 0.5) - 0.5);
-  float line = 1.0 - smoothstep(0.0, w * 1.5, d);
-  float fade = 1.0 - smoothstep(30.0, 95.0, length(vXZ));
-  base += vec3(0.05, 0.16, 0.16) * line * fade * (0.55 + 0.1 * sin(uTime * 0.5));
-  gl_FragColor = vec4(base, 1.0);
-  #include <fog_fragment>
+/* One marching-squares level → segments appended to pos/col arrays.
+ * Lines ride at yLevel: true elevation × vertical exaggeration, so steep
+ * ground stacks glowing curves vertically and flats rest near the floor. */
+function contourLevel(H, n, step, level, yLevel, col, pos, cols) {
+  const push = (gx, gz) => {
+    pos.push(-SIZE / 2 + gx * step, yLevel, -SIZE / 2 + gz * step);
+    cols.push(col[0], col[1], col[2]);
+  };
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const a = H[j * (n + 1) + i];
+      const b = H[j * (n + 1) + i + 1];
+      const d = H[(j + 1) * (n + 1) + i];
+      const c = H[(j + 1) * (n + 1) + i + 1];
+      const pts = [];
+      if ((a - level) * (b - level) < 0) pts.push([i + (level - a) / (b - a), j]);
+      if ((b - level) * (c - level) < 0) pts.push([i + 1, j + (level - b) / (c - b)]);
+      if ((d - level) * (c - level) < 0) pts.push([i + (level - d) / (c - d), j + 1]);
+      if ((a - level) * (d - level) < 0) pts.push([i, j + (level - a) / (d - a)]);
+      if (pts.length === 2) {
+        push(pts[0][0], pts[0][1]);
+        push(pts[1][0], pts[1][1]);
+      } else if (pts.length === 4) {
+        push(pts[0][0], pts[0][1]);
+        push(pts[1][0], pts[1][1]);
+        push(pts[2][0], pts[2][1]);
+        push(pts[3][0], pts[3][1]);
+      }
+    }
+  }
 }
-`;
 
 export function buildTerrain(scene) {
   if (!scene) throw new Error('buildTerrain: scene required');
   const layout = getLayout();
+  const group = new THREE.Group();
+  group.name = 'ops-terrain';
 
-  const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEGS, SEGS);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.getAttribute('position');
-
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    // Rolling relief, calm at the ops centre, rising to the far field.
-    const r = Math.hypot(x, z);
-    const n = fbm(x * 0.045 + 7.3, z * 0.045 + 2.1) - 0.5;
-    const ridge = fbm(x * 0.012 + 1.7, z * 0.012 + 9.4) - 0.5;
-    let h = (n * 2.0 + ridge * 2.6) * AMP * 0.5 * smooth(7, 30, r);
-    // Carve pipeline corridors flat: min distance to any centreline segment.
-    let dLine = Infinity;
-    for (const pipe of layout.pipelines) {
-      const pts = pipe.points;
-      for (let s = 1; s < pts.length; s++) {
-        const d = segDist(x, z, pts[s - 1][0], pts[s - 1][1], pts[s][0], pts[s][1]);
-        if (d < dLine) dLine = d;
-      }
+  // Sample the field on the grid.
+  const step = SIZE / N;
+  const H = new Float32Array((N + 1) * (N + 1));
+  let mn = Infinity;
+  let mx = -Infinity;
+  for (let j = 0; j <= N; j++) {
+    for (let i = 0; i <= N; i++) {
+      const h = field(-SIZE / 2 + i * step, -SIZE / 2 + j * step, layout);
+      H[j * (N + 1) + i] = h;
+      if (h < mn) mn = h;
+      if (h > mx) mx = h;
     }
-    // Carve facility pads flat: rounded-rect footprint + margin.
-    let dPad = Infinity;
-    for (const fac of layout.facilities) {
-      const hw = fac.size[0] / 2 + 0.55;
-      const hd = fac.size[2] / 2 + 0.55;
-      const qx = Math.abs(x - fac.position[0]) - hw;
-      const qz = Math.abs(z - fac.position[1]) - hd;
-      const d = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0);
-      if (d < dPad) dPad = d;
-    }
-    const keep = smooth(CORRIDOR_HALF * 0.7, CORRIDOR_HALF + 0.9, Math.min(dLine, dPad));
-    pos.setY(i, FLAT_Y + h * keep);
   }
-  geo.computeVertexNormals();
 
-  const uniforms = THREE.UniformsUtils.merge([
-    THREE.UniformsLib.fog,
-    { uTime: { value: 0 } },
-  ]);
-  const material = new THREE.ShaderMaterial({
-    uniforms,
-    vertexShader: VERT,
-    fragmentShader: FRAG,
-    fog: true,
+  // Extract LEVELS contours; every 4th is a brighter index contour.
+  // True elevation × exaggeration: adjacent levels sit ~1 unit apart in Y.
+  const vStep = (mx - mn) / LEVELS || 1;
+  const VEX = Math.min(4, Math.max(1.5, 1 / vStep));
+  const pos = [];
+  const cols = [];
+  for (let k = 0; k < LEVELS; k++) {
+    const level = mn + ((k + 0.5) / LEVELS) * (mx - mn);
+    const yLevel = FLAT_Y + (level - FLAT_Y) * VEX;
+    // Two-tone datum: above-grade glows cyan, below-grade sinks dim teal —
+    // instant above/below-ground read; every 4th above is a brighter index.
+    const col = level >= FLAT_Y ? (k % 4 === 3 ? INDEX_COL : BASE_COL) : BELOW_COL;
+    contourLevel(H, N, step, level, yLevel, col, pos, cols);
+  }
+  // Fat lines (2px, resolution-independent) — 1px contours can't carry
+  // terrain; same treatment as the network boxes (see network.js).
+  const lineGeo = new LineSegmentsGeometry();
+  lineGeo.setPositions(pos);
+  lineGeo.setColors(cols);
+  const lineMat = new LineMaterial({
+    vertexColors: true,
+    linewidth: 2,
+    transparent: true,
+    opacity: 0.9,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
   });
-  const mesh = new THREE.Mesh(geo, material);
-  mesh.name = 'ops-terrain';
-  mesh.receiveShadow = false;
-  scene.add(mesh);
+  lineMat.resolution.set(1280, 720);
+  group.add(new LineSegments2(lineGeo, lineMat));
+
+  // Faint dark base disc.
+  const discGeo = new THREE.CircleGeometry(SIZE / 2, 64);
+  const discMat = new THREE.MeshBasicMaterial({
+    color: 0x02080c,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+  });
+  const disc = new THREE.Mesh(discGeo, discMat);
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.y = -0.08;
+  group.add(disc);
+
+  // Thin accent ring marking the map boundary.
+  const ringPts = [];
+  for (let i = 0; i <= 128; i++) {
+    const a = (i / 128) * Math.PI * 2;
+    ringPts.push(new THREE.Vector3(Math.cos(a) * (SIZE / 2 - 0.1), 0.02, Math.sin(a) * (SIZE / 2 - 0.1)));
+  }
+  const ringGeo = new THREE.BufferGeometry().setFromPoints(ringPts);
+  const ringMat = new THREE.LineBasicMaterial({
+    color: RING_COL,
+    transparent: true,
+    opacity: 0.7,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    fog: false,
+  });
+  group.add(new THREE.Line(ringGeo, ringMat));
+
+  // Glowing POI dots where corridors meet facilities.
+  const poiGeo = new THREE.BufferGeometry().setFromPoints(
+    layout.facilities.map((f) => new THREE.Vector3(f.position[0], 0.3, f.position[1])),
+  );
+  const poiMat = new THREE.PointsMaterial({
+    color: POI_COL,
+    size: 0.35,
+    transparent: true,
+    opacity: 0.95,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    fog: false,
+  });
+  group.add(new THREE.Points(poiGeo, poiMat));
+
+  scene.add(group);
 
   return {
-    mesh,
+    mesh: group,
+    setSize(w, h) {
+      lineMat.resolution.set(w, h);
+    },
     update(t = 0) {
-      uniforms.uTime.value = t;
+      lineMat.opacity = 0.82 + 0.12 * Math.sin(t * 1.2);
+      ringMat.opacity = 0.55 + 0.2 * Math.sin(t * 1.2 + 1.3);
+      poiMat.size = 0.32 + 0.06 * Math.sin(t * 2.1);
     },
     dispose() {
-      scene.remove(mesh);
-      geo.dispose();
-      material.dispose();
+      scene.remove(group);
+      group.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
     },
   };
 }
