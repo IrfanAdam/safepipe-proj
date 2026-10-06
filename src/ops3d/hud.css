@@ -72,6 +72,12 @@
   white-space: nowrap;
 }
 
+.ops-hud__overlay {
+  margin-top: 4px;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
 /* Top-right critical banner */
 .ops-hud__banner {
   top: 12px;

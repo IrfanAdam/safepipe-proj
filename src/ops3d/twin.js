@@ -29,6 +29,8 @@ import { buildStructures } from './structures.js';
 import { buildBeacons } from './beacons.js';
 import { buildLabels } from './labels.js';
 import { buildGridFloor } from './gridfloor.js';
+import { buildOverlays } from './overlays.js';
+import { ensureAudio, play } from './sound.js';
 import { buildHud } from './hud.js';
 import { createPost } from './post.js';
 
@@ -71,6 +73,17 @@ export function createTwin(container, opts = {}) {
   const byId = () => new Map(current.map((a) => [a.assetId, a]));
   const gridfloor = buildGridFloor(scene);
   const labels = buildLabels(scene, { layout, healthById: byId() });
+  const overlays = buildOverlays(scene, { layout });
+  // Twin-data overlays: O cycles OFF → WEATHER → TECTONIC → FORECAST.
+  let overlayMode = null;
+  const OVERLAY_ORDER = [null, 'weather', 'tectonic', 'forecast'];
+  function cycleOverlay() {
+    overlayMode = OVERLAY_ORDER[(OVERLAY_ORDER.indexOf(overlayMode) + 1) % OVERLAY_ORDER.length];
+    overlays.setMode(overlayMode);
+    ensureAudio();
+    play('toggle');
+    pushHud();
+  }
   const levels = createLevels(rig, layout, {
     onChange: () => pushHud(),
   });
@@ -107,6 +120,7 @@ export function createTwin(container, opts = {}) {
       rollup: healthRollup(current),
       selection: sel,
       level: levels.name,
+      overlay: overlayMode,
       banner: crit ? { kind: crit.faults[0]?.type ?? 'CRITICAL', assetId: crit.assetId } : null,
     });
   }
@@ -147,6 +161,8 @@ export function createTwin(container, opts = {}) {
     structures.setSelection(id);
     beacons.setSelection(id);
     labels.setSelection(id);
+    ensureAudio();
+    play(byId().get(id)?.health === 'critical' ? 'alert' : 'select');
     if (fly) {
       try {
         levels.focusAsset(id, aim);
@@ -184,13 +200,24 @@ export function createTwin(container, opts = {}) {
       -((e.clientY - r.top) / r.height) * 2 + 1,
     );
   };
+  let lastHoverSnd = null;
   canvas.addEventListener('mousemove', (e) => {
     setNdc(e);
     const id = network.pick(ndc, rig.camera);
     if (network.setHover(id)) canvas.style.cursor = id ? 'pointer' : '';
+    beacons.setHover?.(id);
+    if (id !== lastHoverSnd) {
+      lastHoverSnd = id;
+      if (id) {
+        ensureAudio();
+        play('hover');
+      }
+    }
   });
   canvas.addEventListener('mouseleave', () => {
     network.setHover(null);
+    beacons.setHover?.(null);
+    lastHoverSnd = null;
     canvas.style.cursor = '';
   });
   canvas.addEventListener('click', (e) => {
@@ -212,6 +239,8 @@ export function createTwin(container, opts = {}) {
     } else if (e.key === '3') {
       levels.setLevel('asset');
       pushHud();
+    } else if (e.key === 'o' || e.key === 'O') {
+      cycleOverlay();
     } else if (e.key === 'Escape') {
       const atTop = levels.name === 'network';
       levels.cycle(-1);
@@ -254,6 +283,8 @@ export function createTwin(container, opts = {}) {
     table.update?.(now / 1000);
     terrain.update?.(now / 1000);
     beacons.tick(now / 1000);
+    network.tick?.(now / 1000);
+    overlays.update?.(now / 1000);
     labels.update?.(now / 1000);
     if (post.fx.enabled) post.render(now / 1000);
     else renderer.render(scene, rig.camera);
@@ -271,6 +302,13 @@ export function createTwin(container, opts = {}) {
   // Deep link: ?asset=PIPE-07 drills straight to the asset.
   const deep = params.get('asset');
   if (deep) select(deep, { fly: true });
+  // Overlay link: ?overlay=weather|tectonic|forecast opens with it on.
+  const startOverlay = (params.get('overlay') || '').toLowerCase();
+  if (OVERLAY_ORDER.includes(startOverlay) && startOverlay) {
+    overlayMode = startOverlay;
+    overlays.setMode(overlayMode);
+    pushHud();
+  }
   // ?asset=X&view=ISO lands on the segment view of that asset's ground.
   if (deep && (startView === 'iso' || startView === 'segment')) levels.setLevel('segment');
 
@@ -315,6 +353,7 @@ export function createTwin(container, opts = {}) {
       structures.dispose();
       labels.dispose?.();
       gridfloor.dispose?.();
+      overlays.dispose?.();
       terrain.dispose?.();
       renderer.dispose();
       canvas.remove();

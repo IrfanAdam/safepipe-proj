@@ -36,6 +36,7 @@ const GEO = {
   box: new THREE.BoxGeometry(1, 1, 1),
   cyl6: new THREE.CylinderGeometry(0.5, 0.5, 1, 6),
   cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 10),
+  disc: new THREE.CircleGeometry(0.5, 40),
   torus: new THREE.TorusGeometry(0.5, 0.07, 6, 20),
   sph: new THREE.SphereGeometry(0.5, 10, 8),
 };
@@ -57,7 +58,8 @@ function actx(health) {
     outline: new THREE.LineBasicMaterial({ color: col(health), transparent: true, opacity: 0.9 }),
     lampMat: new THREE.MeshBasicMaterial({ color: lampCol(health) }),
     massMat: new THREE.MeshBasicMaterial({
-      color: col(health), transparent: true, opacity: 0.18, depthWrite: false,
+      map: getGlowTex(), color: col(health), transparent: true, opacity: 0.3,
+      blending: THREE.AdditiveBlending, depthWrite: false,
     }),
     base: new THREE.Color(col(health)),
     lampBase: new THREE.Color(lampCol(health)),
@@ -66,14 +68,30 @@ function actx(health) {
     speckle: [], // dot-dust Points, hidden at NEAR (they bloom into soup)
   };
 }
-/* Frosted-glass mass fill under an outline wireframe. Solid GEO.box mesh
- * with shared per-asset translucent material; outlines (renderOrder 2)
- * draw on top of the fill (renderOrder 1). */
+/* Ground-gradient under a facility footprint — outlines stay bare, no boxes.
+ * One shared radial texture, per-asset tinted additive material, flat on
+ * the ground so it reads as projected light, not geometry. */
+let glowTex = null;
+function getGlowTex() {
+  if (glowTex) return glowTex;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255,255,255,0.85)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.28)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  glowTex = new THREE.CanvasTexture(cv);
+  return glowTex;
+}
 function mass(c, geo, sx, sy, sz, x, y, z, ry = 0, rx = 0) {
-  const m = new THREE.Mesh(geo, c.massMat);
-  m.scale.set(sx, sy, sz);
-  m.position.set(x, y, z);
-  m.rotation.set(rx, ry, 0);
+  const r = Math.max(sx, sz) * 0.75;
+  const m = new THREE.Mesh(GEO.disc, c.massMat);
+  m.rotation.x = -Math.PI / 2;
+  m.scale.set(r, r, 1);
+  m.position.set(x, 0.02, z);
   m.renderOrder = 1;
   c.group.add(m);
   return m;

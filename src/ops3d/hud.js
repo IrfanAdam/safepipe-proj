@@ -40,6 +40,8 @@ export function buildHud(container, cbs = {}) {
   sector.appendChild(levelLabel);
   const healthLine = el('div', 'ops-hud__health', 'HEALTH —/—/—');
   sector.appendChild(healthLine);
+  const overlayLabel = el('div', 'ops-hud__overlay', 'OVERLAY · OFF');
+  sector.appendChild(overlayLabel);
   root.appendChild(sector);
 
   // — Top-right critical banner (hidden unless banner set) —
@@ -68,7 +70,7 @@ export function buildHud(container, cbs = {}) {
   legend.appendChild(el(
     'div',
     'ops-hud__hints',
-    'DRAG ORBIT / WHEEL ZOOM / CLICK DRILL / 1-3 VIEWS / ESC UP / H HUD',
+    'DRAG ORBIT / WHEEL ZOOM / CLICK DRILL / 1-3 VIEWS / O OVERLAY / ESC UP / H HUD',
   ));
   root.appendChild(legend);
 
@@ -241,6 +243,7 @@ export function buildHud(container, cbs = {}) {
 
     renderSelection(state.selection ?? null);
     refreshDatalist();
+    overlayLabel.textContent = `OVERLAY · ${state.overlay ? state.overlay.toUpperCase() : 'OFF'}`;
   }
 
   // Numeric 1-3 level shortcut when HUD has focus context; twin.js owns camera.

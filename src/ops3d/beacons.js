@@ -79,6 +79,8 @@ export function buildBeacons(scene, feed, layout) {
   scene.add(group);
 
   let selected = null;
+  let hovered = null; // hover-only status halo: green safe / red alert, subtle
+  const HOVER_COL = { nominal: 0x36d65c, watch: 0xff8c39, critical: 0xff2a1a };
   let haloBase = 1; // per-asset halo scale (pipes 1, pads 0.5, sensors 0.35)
   const flows = []; // {pipeId, pts, cum, total, beads, pos, mat, count, speed}
   let faults = []; // {assetId, mat, rings:[{mesh,mat,phase}], baseOp}
@@ -300,8 +302,18 @@ export function buildBeacons(scene, feed, layout) {
     if (pipeById.has(selected)) { p = polyPoint(pipeById.get(selected).points, 0.5); haloBase = 1; }
     else { p = faultAnchor(selected); haloBase = facById.has(selected) ? 0.5 : 0.35; }
     halo.position.set(p.x, 0.04, p.z);
+    halo.material.color.set(0xbfefff);
     halo.visible = true;
   };
+  /* Hover halo: status color only while the cursor rests on the entity —
+   * green safe / red alert, never competing with the selection halo. */
+  function anchorOf(id) {
+    if (pipeById.has(id)) return { p: polyPoint(pipeById.get(id).points, 0.5), base: 1 };
+    if (facById.has(id) || senById.has(id)) {
+      return { p: faultAnchor(id), base: facById.has(id) ? 0.5 : 0.35 };
+    }
+    return null;
+  }
   // Level-driven declutter: streaming beads are TOP context; at NEAR they
   // cluster into blobs around the camera — hide them, fault kit stays.
   function setDetail(name) {
@@ -342,6 +354,18 @@ export function buildBeacons(scene, feed, layout) {
       selected = id ?? null;
       placeHalo();
     },
+    setHover(id) {
+      hovered = id ?? null;
+      if (!halo) return;
+      if (!hovered || hovered === selected) { placeHalo(); return; }
+      const a = anchorOf(hovered);
+      if (!a) { placeHalo(); return; }
+      const h = healthById.get(hovered)?.health ?? 'nominal';
+      haloBase = a.base;
+      halo.position.set(a.p.x, 0.04, a.p.z);
+      halo.material.color.set(HOVER_COL[h] ?? HOVER_COL.nominal);
+      halo.visible = true;
+    },
     setDetail,
     tick(t) {
       for (const fl of flows) {
@@ -373,7 +397,8 @@ export function buildBeacons(scene, feed, layout) {
       if (halo?.visible) {
         const s = haloBase * (1 + 0.12 * Math.sin(t * 3));
         halo.scale.setScalar(s);
-        halo.material.opacity = 0.45 + 0.2 * Math.sin(t * 3);
+        const hot = hovered && hovered !== selected;
+        halo.material.opacity = hot ? 0.3 : 0.45 + 0.2 * Math.sin(t * 3);
       }
     },
     dispose() {

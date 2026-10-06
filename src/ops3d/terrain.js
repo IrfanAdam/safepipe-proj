@@ -1,13 +1,16 @@
 /* Safepipe Ops 3D — src/ops3d/terrain.js · Permian-representative holographic topo.
  * buildTerrain(scene) → { mesh, setSize, update, dispose }
  * Representative Permian-basin floor (1 unit = 1 km): eastward dip ~1.5 m/km
- * + broad low swells ±25 m + one shallow winding dry draw ~15 m deep —
- * total relief ≈ ±40 m true. No hills, no rim mountains.
- * Marching-squares 128×128 grid at 12 levels (VEX fixed 2); unordered
+ * + broad low swells ±40 m + one shallow winding dry draw ~22 m deep +
+ * one playa-lake depression ~10 m deep — total relief ≈ ±60 m true.
+ * No hills, no rim mountains.
+ * Marching-squares 128×128 grid at 20 levels (VEX fixed 2); unordered
  * segments are chained (quantized-endpoint greedy) into continuous smooth
  * polylines per level and rendered as Line2 strips — two tiers: brighter
- * index lines every 4th level (width 2) over dim base lines (width 1.25).
- * Dense stacked index contours on steeps, sparse faint lines on flats.
+ * index lines every 5th level over dim base lines. Cells whose local
+ * gradient is below SLOPE_MIN are skipped, so flats stay clean while
+ * contours wrap the rest of the terrain.
+ * Neutral bone-grey palette; one blue playa lake disc + shoreline ring.
  * No dots on terrain, ever. WebGL1-safe (no custom GLSL).
  */
 import * as THREE from 'three';
@@ -18,12 +21,16 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 const SIZE = 44; // map extent, km (1 unit = 1 km)
 const R_MAP = 20; // boundary ring radius, km
 const N = 128; // marching-squares grid cells per side
-const LEVELS = 12; // contour levels
+const LEVELS = 20; // contour levels
 const VEX = 2; // vertical exaggeration, fixed
-const BASE_COL = new THREE.Color(0x3f8aa5); // luminous cyan base contours
-const INDEX_COL = new THREE.Color(0x8fdcf5); // bright every-4th index contours
-const BELOW_COL = new THREE.Color(0x2a6a7e); // below-datum deep teal
+const SLOPE_MIN = 0.0012; // skip contour cells flatter than ~1.2 m/km
+const BASE_COL = new THREE.Color(0x6a7377); // neutral bone-grey base contours
+const INDEX_COL = new THREE.Color(0x9aa3a6); // brighter every-5th index contours
+const BELOW_COL = new THREE.Color(0x4a5255); // below-datum deep grey
 const RING_COL = 0x2fa8c7;
+const LAKE_X = -9; // playa lake center, km (flat spot, away from center + draw)
+const LAKE_Z = 6;
+const LAKE_R = 1.3; // ~2.6 km across
 
 const smooth = (a, b, v) => {
   const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
@@ -31,20 +38,28 @@ const smooth = (a, b, v) => {
 };
 
 /* Permian-basin representative floor field (km units). Eastward dip ~1.5 m/km,
- * broad low swells ±25 m, one shallow winding dry draw ~15 m deep carved
- * along a meandering centerline. Total relief ≈ ±40 m. No hills, no rim. */
+ * broad low swells ±40 m (damped flat near the playa so it sits in a flat
+ * spot), one shallow winding dry draw ~22 m deep carved along a meandering
+ * centerline, one playa-lake depression ~10 m deep. Total relief ≈ ±60 m.
+ * No hills, no rim. */
 export function field(x, z) {
   const dip = -0.0015 * x; // eastward dip: down ~1.5 m per km east
+  const ldx = x - LAKE_X, ldz = z - LAKE_Z;
+  const lakeMask = Math.exp(-(ldx * ldx + ldz * ldz) / (2.5 * 2.5));
   const swell =
-    0.018 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
-    0.007 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0);
+    (0.027 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
+    0.0105 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0)) *
+    (1 - 0.75 * lakeMask);
   const zc = 6 * Math.sin(x * 0.22 + 0.5) + 2 * Math.sin(x * 0.55 + 1.1);
   const dd = (z - zc) / 1.2;
-  const draw = -0.015 * Math.exp(-dd * dd); // dry draw, ~15 m deep, ~1.2 km wide
-  return dip + swell + draw;
+  const draw = -0.0225 * Math.exp(-dd * dd); // dry draw, ~22 m deep, ~1.2 km wide
+  const playa = -0.01 * lakeMask; // playa depression, ~10 m deep
+  return dip + swell + draw + playa;
 }
 
-/* One marching-squares level → raw unordered segments in world coords. */
+/* One marching-squares level → raw unordered segments in world coords.
+ * Cells flatter than SLOPE_MIN (from the sampled grid, central differences)
+ * contribute no segments, so flats stay clean. */
 function levelSegments(H, n, step, level) {
   const segs = [];
   const wx = (g) => -SIZE / 2 + g * step;
@@ -54,6 +69,9 @@ function levelSegments(H, n, step, level) {
       const b = H[j * (n + 1) + i + 1];
       const d = H[(j + 1) * (n + 1) + i];
       const c = H[(j + 1) * (n + 1) + i + 1];
+      const gx = ((b + c) - (a + d)) / (2 * step);
+      const gz = ((d + c) - (a + b)) / (2 * step);
+      if (Math.hypot(gx, gz) < SLOPE_MIN) continue;
       const pts = [];
       if ((a - level) * (b - level) < 0) pts.push([i + (level - a) / (b - a), j]);
       if ((b - level) * (c - level) < 0) pts.push([i + 1, j + (level - b) / (c - b)]);
@@ -183,34 +201,34 @@ export function buildTerrain(scene) {
     }
   }
 
-  // Two shared fat-line materials: luminous base (1.25px) + bright index (2px).
-  // Cool cyan carries the terrain so the warm fault zone wins by hue.
+  // Two shared fat-line materials: dim base + brighter index, glow trimmed
+  // ~20% vs before so the neutral contours sit calm under the fault zone.
   const baseMat = new LineMaterial({
     color: 0xffffff,
     vertexColors: true,
-    linewidth: 1.5,
+    linewidth: 1.2,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.64,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
   const indexMat = new LineMaterial({
     color: 0xffffff,
     vertexColors: true,
-    linewidth: 2.25,
+    linewidth: 1.8,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0.76,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
   baseMat.resolution.set(1280, 720);
   indexMat.resolution.set(1280, 720);
 
-  // 12 levels chained into smooth strips; every 4th is a brighter index contour.
+  // 20 levels chained into smooth strips; every 5th is a brighter index contour.
   for (let k = 0; k < LEVELS; k++) {
     const level = mn + ((k + 0.5) / LEVELS) * (mx - mn);
     const y = level * VEX;
-    const isIndex = k % 4 === 3;
+    const isIndex = k % 5 === 4;
     const col = level >= 0 ? (isIndex ? INDEX_COL : BASE_COL) : BELOW_COL;
     for (const p of chainSegments(levelSegments(H, N, step, level))) {
       if (p.length < 2) continue;
@@ -218,16 +236,16 @@ export function buildTerrain(scene) {
     }
   }
 
-  // Solid table body: elevation-tinted surface under the contours — dark
-  // teal in the lows rising to deep cyan on the highs, one draw, normal
-  // blending so it reads as matter, not light. Lines stay crisp on top.
+  // Solid table body: elevation-tinted surface under the contours — near-black
+  // in the lows rising to neutral grey on the highs, normal blending so it
+  // reads as matter, not light. Lines stay crisp on top.
   {
     const SEG = 96;
     const body = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
     const pa = body.attributes.position;
     const colors = new Float32Array(pa.count * 3);
-    const cLo = new THREE.Color(0x062027);
-    const cHi = new THREE.Color(0x1a6a80);
+    const cLo = new THREE.Color(0x0b0e10);
+    const cHi = new THREE.Color(0x3d4447);
     const tmp = new THREE.Color();
     const span = (mx - mn) || 1;
     for (let k = 0; k < pa.count; k++) {
@@ -289,9 +307,9 @@ export function buildTerrain(scene) {
   ringGeo.setPositions(ringPos);
   const ringMat = new LineMaterial({
     color: RING_COL,
-    linewidth: 2,
+    linewidth: 1.4,
     transparent: true,
-    opacity: 0.45,
+    opacity: 0.32,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     fog: false,
@@ -308,7 +326,7 @@ export function buildTerrain(scene) {
   }
   lipGeo.setPositions(lipPos);
   const lipMat = new LineMaterial({
-    color: RING_COL, linewidth: 1.5, transparent: true, opacity: 0.3,
+    color: RING_COL, linewidth: 1.0, transparent: true, opacity: 0.21,
     blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
   });
   lipMat.resolution.set(1280, 720);
@@ -322,10 +340,41 @@ export function buildTerrain(scene) {
   const tickGeo = new THREE.BufferGeometry();
   tickGeo.setAttribute('position', new THREE.Float32BufferAttribute(tickPos, 3));
   const tickMat = new THREE.LineBasicMaterial({
-    color: RING_COL, transparent: true, opacity: 0.5,
+    color: RING_COL, transparent: true, opacity: 0.35,
     blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
   });
   group.add(new THREE.LineSegments(tickGeo, tickMat));
+
+  // Playa lake: blue disc on the depression + a brighter shoreline ring.
+  const lakeY = field(LAKE_X, LAKE_Z) * VEX;
+  const lakeDisc = new THREE.Mesh(
+    new THREE.CircleGeometry(LAKE_R, 48),
+    new THREE.MeshBasicMaterial({
+      color: 0x2e6fd8, transparent: true, opacity: 0.5, depthWrite: false,
+    })
+  );
+  lakeDisc.rotation.x = -Math.PI / 2;
+  lakeDisc.position.set(LAKE_X, lakeY + 0.015, LAKE_Z);
+  lakeDisc.renderOrder = 1;
+  group.add(lakeDisc);
+  const shorePos = [];
+  for (let i = 0; i < 96; i++) {
+    const a0 = (i / 96) * Math.PI * 2, a1 = ((i + 1) / 96) * Math.PI * 2;
+    shorePos.push(
+      LAKE_X + Math.cos(a0) * LAKE_R * 1.02, lakeY + 0.02, LAKE_Z + Math.sin(a0) * LAKE_R * 1.02,
+      LAKE_X + Math.cos(a1) * LAKE_R * 1.02, lakeY + 0.02, LAKE_Z + Math.sin(a1) * LAKE_R * 1.02
+    );
+  }
+  const shoreGeo = new LineGeometry();
+  shoreGeo.setPositions(shorePos);
+  const shoreMat = new LineMaterial({
+    color: 0x7fb2ff, linewidth: 1.5, transparent: true, opacity: 0.7,
+    blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+  });
+  shoreMat.resolution.set(1280, 720);
+  const shore = new Line2(shoreGeo, shoreMat);
+  shore.renderOrder = 2;
+  group.add(shore);
 
   scene.add(group);
 
@@ -336,11 +385,12 @@ export function buildTerrain(scene) {
       indexMat.resolution.set(w, h);
       ringMat.resolution.set(w, h);
       lipMat.resolution.set(w, h);
+      shoreMat.resolution.set(w, h);
     },
     update(t = 0) {
-      baseMat.opacity = 0.8 + 0.06 * Math.sin(t * 1.2);
-      indexMat.opacity = 0.95 + 0.05 * Math.sin(t * 1.2 + 0.6);
-      ringMat.opacity = 0.45 + 0.1 * Math.sin(t * 1.2 + 1.3);
+      baseMat.opacity = 0.64 + 0.05 * Math.sin(t * 1.2);
+      indexMat.opacity = 0.76 + 0.04 * Math.sin(t * 1.2 + 0.6);
+      ringMat.opacity = 0.32 + 0.07 * Math.sin(t * 1.2 + 1.3);
     },
     dispose() {
       scene.remove(group);

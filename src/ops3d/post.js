@@ -119,9 +119,9 @@ export function createPost(renderer, scene, camera) {
     threshold: 0.42,
     bloom: 0.55,
     ca: 1.0,
-    grain: 0.008,
+    grain: 0.006,
     scan: 0.05,
-    vignette: 0.35,
+    vignette: 0.28,
     dof: 0,
     enabled: true,
   };
