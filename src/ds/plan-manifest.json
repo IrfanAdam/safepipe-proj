@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-06T06:15:10.819Z",
+  "generated": "2026-10-06T09:12:18.387Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -7,6 +7,126 @@
     "2026-10-06_003000-ops3d-theatre-style.md"
   ],
   "commits": [
+    {
+      "sha": "fcf9f94",
+      "full": "fcf9f945ee970091a12f44c38023bcdf4060086e",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): clickable overlay toggle in HUD [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "f2e6bdc",
+      "full": "f2e6bdc10c158d9a4abf06e54738d7682f44eea1",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): solid pipe walls, buried runs dashed [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "c710996",
+      "full": "c7109961201c717141a806b80c88be286fdc5b66",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): still labels, no vertical bob [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "9a17f38",
+      "full": "9a17f383da168880b34c62f6eafa7af54f5bd959",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): drop flow chevrons, moving dashes carry direction [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "6387567",
+      "full": "63875671c73529a103afc9d0f9444ac222fed705",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): organic lake+blue contours, selection survives zoom, subtle flow [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "7aba9fa",
+      "full": "7aba9fac1ee57903853a754e4d99679a015abd2d",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): feedback run — neutral terrain+lake, flow chevrons, buried drape, destinations, hover halo, sounds, overlays [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "dd72c5a",
+      "full": "dd72c5a7c64c630654d8fb05aeb6459740b13869",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): agent lanes — glass facilities, labels, red grid, draped+decluttered [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "6aaa5cc",
+      "full": "6aaa5cc1257063f2f53af78e080f41e69b68fe4c",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): ref run — luminous terrain body, zone fill, tamed bloom [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "8cad190",
+      "full": "8cad19049e011dc048e0ce5095f5dfd4c02ff77e",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): view run — kind-sized close-ups, speckle gate, ISO restraint, halo fit [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "712b219",
+      "full": "712b219dfe2f935b63d88c471d4a36ead7814046",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): fidelity loop — fault pipe kit, level declutter, caged cam, scanlines [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "36f8a00",
+      "full": "36f8a009a0fd39225798bc8661fc0d1f4dfb085e",
+      "date": "2026-10-06",
+      "subject": "fix(ops3d): terrain whispers — halved contour palette, 1.5px, 0.45 opacity [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "c4fcb61",
+      "full": "c4fcb6179e654409545fcd0dc0c05c7d9363522c",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): ref-driven detail — lattice derrick, tank rings, drop lines, speckle [plan:2026-10-06_003000-ops3d-theatre-style.md#task-9]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-9"
+    },
+    {
+      "sha": "52499eb",
+      "full": "52499eb0a3441c8cfe25ab8e697e1f7ca59cbf47",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): all-hologram pass — outline facilities, stacked topo strata, linear table [plan:2026-10-06_003000-ops3d-theatre-style.md#task-9]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-9"
+    },
+    {
+      "sha": "ca9fe88",
+      "full": "ca9fe88c650d1d83583479ad927b81278267ce6b",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): tilt-shift DoF in ISO/NEAR, sharp in TOP [plan:2026-10-06_003000-ops3d-theatre-style.md#task-6]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-6"
+    },
+    {
+      "sha": "c63b04c",
+      "full": "c63b04cb2052f76e3395d0aaced2f5e44424545e",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): realism pass — terrain, structures, beacons wired; TOP/ISO/NEAR [plan:2026-10-06_003000-ops3d-theatre-style.md#task-9]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-9"
+    },
     {
       "sha": "562c476",
       "full": "562c476b6d892d29ae2e8375282c8af808fbb668",
@@ -136,10 +256,5 @@
       "anchor": null
     }
   ],
-  "wip": [
-    "src/ops3d/twin.js",
-    "src/ops3d/beacons.js",
-    "src/ops3d/structures.js",
-    "src/ops3d/terrain.js"
-  ]
+  "wip": []
 }
