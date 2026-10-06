@@ -22,9 +22,9 @@ const LEVELS = 20; // elevation levels
 const FLAT_Y = -0.02; // grade under corridors/pads
 const AMP = 2.0; // gentle: contour layout varies at most ±2 in Y
 const CORRIDOR_HALF = 1.0; // flat half-width around each pipeline centreline
-const BASE_COL = [0x63, 0x9c, 0xb8].map((v) => v / 255);
-const BELOW_COL = [0x2c, 0x55, 0x66].map((v) => v / 255);
-const INDEX_COL = [0x9f, 0xd4, 0xe8].map((v) => v / 255);
+const BASE_COL = [0x2e, 0x48, 0x56].map((v) => v / 255);
+const BELOW_COL = [0x1c, 0x36, 0x40].map((v) => v / 255);
+const INDEX_COL = [0x46, 0x68, 0x7a].map((v) => v / 255);
 const RING_COL = 0x2fa8c7;
 const POI_COL = 0xffc46b;
 
@@ -84,7 +84,9 @@ function field(x, z) {
   const lumps = fbm(x * 0.09 + 7.3, z * 0.09 + 2.1) - 0.5;
   const swell = fbm(x * 0.035 + 1.7, z * 0.035 + 9.4) - 0.5;
   const detail = fbm(x * 0.28 + 3.1, z * 0.28 + 8.8) - 0.5;
-  const h = (lumps * 2.2 + swell * 2.0 + detail * 0.8) * AMP * 0.5;
+  // Realistic relief: gentle, subdued — terrain is quiet context, never
+  // drama. Guaranteed landforms stay small so no fantasy peaks.
+  const h = (lumps * 2.2 + swell * 2.0 + detail * 0.8) * AMP * 0.3;
   // Guaranteed landforms (noise alone can leave the ops centre flat):
   // two hills clear of the asset cluster + a rim bowl toward the map edge,
   // so dense concentric strata exist by construction, not by luck.
@@ -94,9 +96,9 @@ function field(x, z) {
     return a * Math.exp(-(dx * dx + dz * dz) / (r * r));
   };
   const land =
-    h + gauss(-8.5, 6.5, 4.5, 2.6) + gauss(9, -7.5, 5, 3.0) + gauss(1, 11, 4, 1.8);
+    h + gauss(-8.5, 6.5, 4.5, 1.1) + gauss(9, -7.5, 5, 1.3) + gauss(1, 11, 4, 0.7);
   const edge = Math.hypot(x, z);
-  const rim = smooth(9.5, 13.5, edge) * 2.4;
+  const rim = smooth(9.5, 13.5, edge) * 1.0;
   return FLAT_Y + land + rim;
 }
 
@@ -105,8 +107,12 @@ function field(x, z) {
  * ground stacks glowing curves vertically and flats rest near the floor. */
 function contourLevel(H, n, step, level, yLevel, col, pos, cols) {
   const push = (gx, gz) => {
-    pos.push(-SIZE / 2 + gx * step, yLevel, -SIZE / 2 + gz * step);
-    cols.push(col[0], col[1], col[2]);
+    const x = -SIZE / 2 + gx * step, z = -SIZE / 2 + gz * step;
+    // Mapped-circle fade: twin data lives inside the boundary ring — lines
+    // dissolve toward the periphery (additive: darker reads as fainter).
+    const f = 1 - smooth(8.0, 12.8, Math.hypot(x, z));
+    pos.push(x, yLevel, z);
+    cols.push(col[0] * f, col[1] * f, col[2] * f);
   };
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
@@ -173,9 +179,9 @@ export function buildTerrain(scene) {
   lineGeo.setColors(cols);
   const lineMat = new LineMaterial({
     vertexColors: true,
-    linewidth: 2,
+    linewidth: 1.5,
     transparent: true,
-    opacity: 0.9,
+    opacity: 0.5,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -235,7 +241,7 @@ export function buildTerrain(scene) {
       lineMat.resolution.set(w, h);
     },
     update(t = 0) {
-      lineMat.opacity = 0.82 + 0.12 * Math.sin(t * 1.2);
+      lineMat.opacity = 0.45 + 0.07 * Math.sin(t * 1.2);
       ringMat.opacity = 0.55 + 0.2 * Math.sin(t * 1.2 + 1.3);
       poiMat.size = 0.32 + 0.06 * Math.sin(t * 2.1);
     },
