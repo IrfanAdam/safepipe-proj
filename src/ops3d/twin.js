@@ -114,6 +114,7 @@ export function createTwin(container, opts = {}) {
     beacons.setDetail?.(levels.name);
     structures.setDetail?.(levels.name);
     labels.setDetail?.(levels.name);
+    terrain.setDetail?.(levels.name); // index-ring elevation numbers on drill-in
     const map = byId();
     const sel = selected ? map.get(selected) ?? null : null;
     const crit = sel?.health === 'critical' ? sel : current.find((a) => a.health === 'critical');

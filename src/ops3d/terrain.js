@@ -1,15 +1,18 @@
 /* Safepipe Ops 3D — src/ops3d/terrain.js · Permian-representative holographic topo.
  * buildTerrain(scene) → { mesh, setSize, update, dispose }
  * Representative Permian-basin floor (1 unit = 1 km): eastward dip ~1.5 m/km
- * + broad low swells ±40 m + one shallow winding dry draw ~22 m deep +
- * one playa-lake depression ~10 m deep — total relief ≈ ±60 m true.
- * No hills, no rim mountains.
- * Marching-squares 128×128 grid at 20 levels (VEX fixed 2); unordered
- * segments are chained (quantized-endpoint greedy) into continuous smooth
- * polylines per level and rendered as Line2 strips — two tiers: brighter
- * index lines every 5th level over dim base lines. Cells whose local
- * gradient is below SLOPE_MIN are skipped, so flats stay clean while
- * contours wrap the rest of the terrain.
+ * + broad low swells ±40 m + TWO gentle hills (+30/+22 m, placed in the gaps
+ * between pipe corridors so rings close around real highs) + one shallow
+ * hollow (−16 m) + one winding dry draw ~22 m deep + one playa-lake
+ * depression ~10 m deep — total relief ≈ −35…+60 m true, VEX 2.5.
+ * No rim mountains.
+ * Marching-squares 128×128 grid at 20 levels; unordered segments are
+ * chained (quantized-endpoint greedy) into continuous smooth polylines per
+ * level and rendered as Line2 strips — two tiers: brighter index lines
+ * every 5th level over dim base lines, each index ring carrying its
+ * elevation in meters so the contours read as a plotting technique, not
+ * decoration. Cells whose local gradient is below SLOPE_MIN are skipped,
+ * so flats stay clean while contours wrap the rest of the terrain.
  * Neutral bone-grey palette; one blue playa lake disc + shoreline ring.
  * No dots on terrain, ever. WebGL1-safe (no custom GLSL).
  */
@@ -22,7 +25,7 @@ const SIZE = 44; // map extent, km (1 unit = 1 km)
 const R_MAP = 20; // boundary ring radius, km
 const N = 128; // marching-squares grid cells per side
 const LEVELS = 20; // contour levels
-const VEX = 2; // vertical exaggeration, fixed
+const VEX = 2.5; // vertical exaggeration, fixed (network/gridfloor match this)
 const SLOPE_MIN = 0.0012; // skip contour cells flatter than ~1.2 m/km
 const BASE_COL = new THREE.Color(0x6a7377); // neutral bone-grey base contours
 const INDEX_COL = new THREE.Color(0x9aa3a6); // brighter every-5th index contours
@@ -53,9 +56,11 @@ function lakeWet(x, z) {
 
 /* Permian-basin representative floor field (km units). Eastward dip ~1.5 m/km,
  * broad low swells ±40 m (damped flat near the playa so it sits in a flat
- * spot), one shallow winding dry draw ~22 m deep carved along a meandering
- * centerline, one organic playa-lake depression ~10 m deep. Total relief ≈ ±60 m.
- * No hills, no rim. */
+ * spot), TWO gentle hills in the gaps between pipe corridors — H1 SE
+ * (+30 m), H2 far west (+22 m) — so index rings close around real highs,
+ * one shallow hollow (−16 m) between the two E-W trunks, one winding dry
+ * draw ~22 m deep carved along a meandering centerline, one organic
+ * playa-lake depression ~10 m deep. Total relief ≈ −35…+60 m. No rim. */
 export function field(x, z) {
   const dip = -0.0015 * x; // eastward dip: down ~1.5 m per km east
   const lakeMask = lakeWet(x, z);
@@ -63,11 +68,17 @@ export function field(x, z) {
     (0.027 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
     0.0105 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0)) *
     (1 - 0.75 * lakeMask);
+  const bump = (ax, az, sig, amp) => {
+    const dx = x - ax, dz = z - az;
+    return amp * Math.exp(-(dx * dx + dz * dz) / (2 * sig * sig));
+  };
+  const hills = bump(7, 9.5, 3.8, 0.030) + bump(-13, -1, 3.0, 0.022);
+  const hollow = bump(7, -3.5, 2.6, -0.016);
   const zc = 6 * Math.sin(x * 0.22 + 0.5) + 2 * Math.sin(x * 0.55 + 1.1);
   const dd = (z - zc) / 1.2;
   const draw = -0.0225 * Math.exp(-dd * dd); // dry draw, ~22 m deep, ~1.2 km wide
   const playa = -0.01 * lakeMask; // playa depression, ~10 m deep
-  return dip + swell + draw + playa;
+  return dip + swell + hills + hollow + draw + playa;
 }
 
 /* One marching-squares level → raw unordered segments in world coords.
@@ -173,6 +184,32 @@ function smoothPath(pts) {
   return out;
 }
 
+/* Index-ring elevation tag: small mono meter readout riding the ring so the
+ * contours read as a plotting technique (cf. Britannica contoured-peak
+ * plate: numbered rings closing around the high). */
+function elevLabel(text, x, y, z) {
+  const cv = document.createElement('canvas');
+  cv.width = 192;
+  cv.height = 48;
+  const ctx = cv.getContext('2d');
+  ctx.font = '600 30px ui-monospace, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = '#d5dadb';
+  ctx.fillText(text, 96, 26);
+  const tex = new THREE.CanvasTexture(cv);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, opacity: 1,
+    depthWrite: false, depthTest: false, fog: false,
+  }));
+  sp.scale.set(3.0, 0.75, 1); // TOP-legible from 68 km, like asset pills
+  sp.position.set(x, y, z);
+  sp.renderOrder = 5;
+  return sp;
+}
+
 /* One chained polyline → Line2 strip at its true elevation × VEX, with
  * periphery fade toward the boundary ring baked into vertex colors.
  * Inside the playa shoreline the neutral grey yields to subtle water blue. */
@@ -241,16 +278,31 @@ export function buildTerrain(scene) {
   indexMat.resolution.set(1280, 720);
 
   // 20 levels chained into smooth strips; every 5th is a brighter index contour.
+  // The two longest index rings per level carry their elevation in meters —
+  // gated to zoomed views (segment/asset): at full-map distance no meter
+  // readout stays legible without becoming a billboard, same as paper topo.
+  const labelGroup = new THREE.Group();
+  labelGroup.name = 'ops-elev-labels';
   for (let k = 0; k < LEVELS; k++) {
     const level = mn + ((k + 0.5) / LEVELS) * (mx - mn);
     const y = level * VEX;
     const isIndex = k % 5 === 4;
     const col = level >= 0 ? (isIndex ? INDEX_COL : BASE_COL) : BELOW_COL;
-    for (const p of chainSegments(levelSegments(H, N, step, level))) {
-      if (p.length < 2) continue;
-      group.add(stripObject(smoothPath(p), y, col, isIndex ? indexMat : baseMat));
+    const paths = chainSegments(levelSegments(H, N, step, level))
+      .map(smoothPath)
+      .filter((p) => p.length >= 2);
+    for (const p of paths) group.add(stripObject(p, y, col, isIndex ? indexMat : baseMat));
+    if (isIndex) {
+      const tag = `${Math.round(level * 1000)} m`;
+      const ranked = paths.filter((p) => p.length >= 10).sort((a, b) => b.length - a.length).slice(0, 2);
+      for (const p of ranked) {
+        const q = p[Math.floor(p.length / 2)];
+        labelGroup.add(elevLabel(tag, q[0], y + 0.12, q[1]));
+      }
     }
   }
+  labelGroup.visible = false; // twin.js setDetail reveals on drill-in
+  group.add(labelGroup);
 
   // Solid table body: elevation-tinted surface under the contours — near-black
   // in the lows rising to neutral grey on the highs, normal blending so it
@@ -261,7 +313,7 @@ export function buildTerrain(scene) {
     const pa = body.attributes.position;
     const colors = new Float32Array(pa.count * 3);
     const cLo = new THREE.Color(0x0b0e10);
-    const cHi = new THREE.Color(0x3d4447);
+    const cHi = new THREE.Color(0x52585c); // lifted so highs read lighter than lows
     const tmp = new THREE.Color();
     const span = (mx - mn) || 1;
     for (let k = 0; k < pa.count; k++) {
@@ -270,7 +322,7 @@ export function buildTerrain(scene) {
       const h = field(x, z);
       pa.setZ(k, h * VEX - 0.04);
       const t = (h - mn) / span;
-      tmp.copy(cLo).lerp(cHi, t * t);
+      tmp.copy(cLo).lerp(cHi, t); // linear ramp: variance must survive TOP view
       const f = 1 - smooth(12, 19.5, Math.hypot(x, z));
       colors[k * 3] = tmp.r * f;
       colors[k * 3 + 1] = tmp.g * f;
@@ -415,6 +467,9 @@ export function buildTerrain(scene) {
 
   return {
     mesh: group,
+    setDetail(name) {
+      labelGroup.visible = name !== 'network';
+    },
     setSize(w, h) {
       baseMat.resolution.set(w, h);
       indexMat.resolution.set(w, h);
