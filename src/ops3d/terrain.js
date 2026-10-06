@@ -34,7 +34,12 @@ const RING_COL = 0x2fa8c7;
 const LAKE_X = -9; // playa lake center, km (flat spot, away from center + draw)
 const LAKE_Z = 6;
 const LAKE_R = 1.3; // mean radius; shoreline modulated below, ~2.6 km across
+const DRAW_W = 0.8; // dry-draw half-width km — narrow banks bend contours into Vs
 const LAKE_BLUE = new THREE.Color(0x4d8fd1); // subtle water tint for contours
+/* Dry-draw centerline, shared by the field carve and the drainage thread. */
+function drawCenter(x) {
+  return 6 * Math.sin(x * 0.22 + 0.5) + 2 * Math.sin(x * 0.55 + 1.1);
+}
 
 const smooth = (a, b, v) => {
   const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
@@ -74,9 +79,9 @@ export function field(x, z) {
   };
   const hills = bump(7, 9.5, 3.8, 0.030) + bump(-13, -1, 3.0, 0.022);
   const hollow = bump(7, -3.5, 2.6, -0.016);
-  const zc = 6 * Math.sin(x * 0.22 + 0.5) + 2 * Math.sin(x * 0.55 + 1.1);
-  const dd = (z - zc) / 1.2;
-  const draw = -0.0225 * Math.exp(-dd * dd); // dry draw, ~22 m deep, ~1.2 km wide
+  const zc = drawCenter(x);
+  const dd = (z - zc) / DRAW_W;
+  const draw = -0.0225 * Math.exp(-dd * dd); // dry draw, ~22 m deep, steep banks
   const playa = -0.01 * lakeMask; // playa depression, ~10 m deep
   return dip + swell + hills + hollow + draw + playa;
 }
@@ -463,6 +468,44 @@ export function buildTerrain(scene) {
   shore.renderOrder = 2;
   group.add(shore);
 
+  // Drainage thread: faint blue run along the draw bottom + two short
+  // feeders — the valley-bottom water language from the topo plate. Contours
+  // kink into Vs around it via the steep-bank carve, not by hand.
+  const drainMat = new LineMaterial({
+    color: 0x6fa8dc, linewidth: 1.2, transparent: true, opacity: 0.55,
+    depthWrite: false, fog: false,
+  });
+  drainMat.resolution.set(1280, 720);
+  const drapeRun = (pts) => {
+    const runs = [[]];
+    for (const [x, z] of pts) {
+      if (Math.hypot(x, z) > 19.3) { if (runs[runs.length - 1].length) runs.push([]); continue; }
+      runs[runs.length - 1].push(x, field(x, z) * VEX + 0.025, z);
+    }
+    for (const r of runs) {
+      if (r.length < 6) continue;
+      const g = new LineGeometry();
+      g.setPositions(r);
+      const line = new Line2(g, drainMat);
+      line.renderOrder = 2;
+      group.add(line);
+    }
+  };
+  const main = [];
+  for (let x = -19; x <= 19; x += 0.4) main.push([x, drawCenter(x)]);
+  drapeRun(main);
+  const feeder = (ax, az, bx) => {
+    const pts = [];
+    const bz = drawCenter(bx);
+    for (let k = 0; k <= 12; k++) {
+      const f = k / 12;
+      pts.push([ax + (bx - ax) * f + Math.sin(f * Math.PI) * 0.8, az + (bz - az) * f]);
+    }
+    drapeRun(pts);
+  };
+  feeder(2.5, 13.5, 3.2); // off the SE hill flank
+  feeder(-6.5, -11.5, -5.4); // off the southern flats
+
   scene.add(group);
 
   return {
@@ -476,6 +519,7 @@ export function buildTerrain(scene) {
       ringMat.resolution.set(w, h);
       lipMat.resolution.set(w, h);
       shoreMat.resolution.set(w, h);
+      drainMat.resolution.set(w, h);
     },
     update(t = 0) {
       baseMat.opacity = 0.64 + 0.05 * Math.sin(t * 1.2);
