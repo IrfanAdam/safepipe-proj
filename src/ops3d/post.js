@@ -116,8 +116,8 @@ export function createPost(renderer, scene, camera) {
   if (!camera) throw new Error('createPost: camera required');
 
   const fx = {
-    threshold: 0.42,
-    bloom: 0.55,
+    threshold: 0.36,
+    bloom: 0.62, // neon-plate: contours glow on the void, body fill removed
     ca: 1.0,
     grain: 0.006,
     scan: 0.05,

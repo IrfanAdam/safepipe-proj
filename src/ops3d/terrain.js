@@ -5,8 +5,8 @@
  * between pipe corridors so rings close around real highs) + one shallow
  * hollow (−24 m) + one winding dry draw ~30 m deep + one playa-lake
  * depression ~10 m deep — total relief ≈ −40…+75 m true, VEX 3.5.
- * No rim mountains. The body carries stepped hypsometric tint + baked NW
- * hillshade so elevation reads as shading at TOP, not just lines.
+ * No rim mountains. No body fill either — contours glow on the void,
+ * neon-plate style, so no faded landmass is ever needed.
  * Marching-squares 128×128 grid at 20 levels; unordered segments are
  * chained (quantized-endpoint greedy) into continuous smooth polylines per
  * level and rendered as Line2 strips — two tiers: brighter index lines
@@ -244,6 +244,10 @@ export function buildTerrain(scene) {
   if (!scene) throw new Error('buildTerrain: scene required');
   const group = new THREE.Group();
   group.name = 'ops-terrain';
+  // Close-up restraint: at segment/asset the fault owns the view, so rings
+  // dim + pills shrink on drill-in (TOP keeps full neon).
+  let dimF = 1;
+  let pillF = 1;
 
   // Sample the Permian floor field on the grid.
   const step = SIZE / N;
@@ -259,14 +263,14 @@ export function buildTerrain(scene) {
     }
   }
 
-  // Two shared fat-line materials: dim base + brighter index, glow trimmed
-  // ~20% vs before so the neutral contours sit calm under the fault zone.
+  // Two shared fat-line materials: dim base + bright index, both additive
+  // so rings glow neon on the void.
   const baseMat = new LineMaterial({
     color: 0xffffff,
     vertexColors: true,
     linewidth: 1.2,
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.62,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -275,7 +279,7 @@ export function buildTerrain(scene) {
     vertexColors: true,
     linewidth: 2.2,
     transparent: true,
-    opacity: 0.9,
+    opacity: 1.0,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -323,65 +327,8 @@ export function buildTerrain(scene) {
   }
   group.add(summitGroup);
 
-  // Solid table body: stepped hypsometric tint + baked NW hillshade under
-  // the contours — near-black in the lows rising to mid grey on the highs,
-  // normal blending so it reads as matter, not light. Lines stay crisp on top.
-  {
-    const SEG = 96;
-    const body = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
-    const pa = body.attributes.position;
-    const colors = new Float32Array(pa.count * 3);
-    const cLo = new THREE.Color(0x090c0e);
-    const cHi = new THREE.Color(0x3a4044); // dark: contours carry the topology
-    const tmp = new THREE.Color();
-    // NW key light for the baked hillshade (matches scene key direction).
-    const LX = -0.5, LY = 0.8, LZ = -0.4;
-    const ll = Math.hypot(LX, LY, LZ);
-    const lx = LX / ll, ly = LY / ll, lz = LZ / ll;
-    const E = 0.3; // finite-difference step, km
-    const span = (mx - mn) || 1;
-    for (let k = 0; k < pa.count; k++) {
-      const x = pa.getX(k);
-      const z = -pa.getY(k); // plane Y maps to world -Z after rotation
-      const h = field(x, z);
-      pa.setZ(k, h * VEX - 0.04);
-      // Stepped hypsometric: quantize into LEVELS bands, keep 65% continuous
-      // so bands read as tint steps, not stripes.
-      const t = (h - mn) / span;
-      const stepped = (Math.floor(t * LEVELS) + 0.5) / LEVELS;
-      tmp.copy(cLo).lerp(cHi, t * 0.65 + stepped * 0.35);
-      // Baked hillshade from analytic normals: NW faces lift, SE faces drop.
-      const gx = (field(x + E, z) - field(x - E, z)) / (2 * E) * VEX;
-      const gz = (field(x, z + E) - field(x, z - E)) / (2 * E) * VEX;
-      const nl = Math.hypot(gx, 1, gz);
-      const shade = 0.35 + 0.5 * Math.max(0, (-gx * lx + ly - gz * lz) / nl);
-      const f = 1 - smooth(12, 19.5, Math.hypot(x, z));
-      colors[k * 3] = tmp.r * shade * f;
-      colors[k * 3 + 1] = tmp.g * shade * f;
-      colors[k * 3 + 2] = tmp.b * shade * f;
-    }
-    body.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    body.computeVertexNormals();
-    // Circular alpha mask: the square plane must die exactly at the ring —
-    // no dark corners peeking outside the mapped circle.
-    const mask = document.createElement('canvas');
-    mask.width = mask.height = 256;
-    const mctx = mask.getContext('2d');
-    const mg = mctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-    mg.addColorStop(0, 'rgba(255,255,255,1)');
-    mg.addColorStop(0.86, 'rgba(255,255,255,1)');
-    mg.addColorStop(0.93, 'rgba(255,255,255,0)');
-    mctx.fillStyle = mg;
-    mctx.fillRect(0, 0, 256, 256);
-    const maskTex = new THREE.CanvasTexture(mask);
-    const bodyMesh = new THREE.Mesh(body, new THREE.MeshBasicMaterial({
-      vertexColors: true, transparent: true, opacity: 0.92, fog: false,
-      alphaMap: maskTex,
-    }));
-    bodyMesh.rotation.x = -Math.PI / 2;
-    bodyMesh.renderOrder = -1;
-    group.add(bodyMesh);
-  }
+  // No body fill: contours glow on the void (neon-plate style), so no
+  // faded landmass is needed. The faint base disc below grounds the scene.
   // Faint dark base disc.
   const discGeo = new THREE.CircleGeometry(R_MAP, 64);
   const discMat = new THREE.MeshBasicMaterial({
@@ -524,6 +471,10 @@ export function buildTerrain(scene) {
     mesh: group,
     setDetail(name) {
       labelGroup.visible = true; // inline pills stay at every zoom
+      dimF = name === 'asset' ? 0.35 : name === 'segment' ? 0.55 : 1;
+      pillF = name === 'asset' ? 0.35 : name === 'segment' ? 0.6 : 1;
+      for (const sp of labelGroup.children) sp.scale.set(3.4 * pillF, 0.85 * pillF, 1);
+      for (const sp of summitGroup.children) sp.scale.set(4.2 * pillF, 1.05 * pillF, 1);
     },
     setSize(w, h) {
       baseMat.resolution.set(w, h);
@@ -533,8 +484,8 @@ export function buildTerrain(scene) {
       drainMat.resolution.set(w, h);
     },
     update(t = 0) {
-      baseMat.opacity = 0.5 + 0.05 * Math.sin(t * 1.2);
-      indexMat.opacity = 0.9 + 0.04 * Math.sin(t * 1.2 + 0.6);
+      baseMat.opacity = (0.62 + 0.05 * Math.sin(t * 1.2)) * dimF;
+      indexMat.opacity = 1.0 * dimF;
       ringMat.opacity = 0.35 + 0.03 * Math.sin(t * 1.2 + 1.3);
     },
     dispose() {
