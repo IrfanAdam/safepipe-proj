@@ -88,6 +88,9 @@ export function createTwin(container, opts = {}) {
   let selected = null;
 
   function pushHud() {
+    // Tilt-shift DoF follows the view: sharp map up top, cinematic focus
+    // band once drilled into ISO/NEAR (target always lands frame-centre).
+    post.fx.dof = levels.name === 'asset' ? 0.8 : levels.name === 'segment' ? 0.45 : 0;
     const map = byId();
     const sel = selected ? map.get(selected) ?? null : null;
     const crit = sel?.health === 'critical' ? sel : current.find((a) => a.health === 'critical');

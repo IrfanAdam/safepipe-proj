@@ -5,7 +5,9 @@
  * Chain: scene → color RT → bright-pass (½ res) → 9-tap separable blur
  * ping-pong (¼ res, H+V) → composite to screen:
  *   base + bloom·0.55, 2px radial chromatic aberration, ±0.02 film
- *   grain, 0.35 vignette. All RTs UnsignedByteType, Safari-safe GLSL1.
+ *   grain, 0.35 vignette. Tilt-shift DoF reuses the blur material on the
+ *   full scene into its own ¼-res targets when fx.dof > 0. All RTs
+ *   UnsignedByteType, Safari-safe GLSL1.
  *
  * TUNING KNOBS (live via returned `fx` object):
  *   fx.threshold (0.3) — bright-pass cutoff; red luminance is low (~0.3),
@@ -14,6 +16,9 @@
  *   fx.ca        (1.0)  — CA scale; 1.0 ≈ 2px max at frame edges, 0 = off
  *   fx.grain     (0.02) — grain amplitude (±); 0 = off
  *   fx.vignette  (0.35) — edge darkening; 0 = off
+ *   fx.dof       (0) — tilt-shift depth-of-field; focus locked to frame
+ *     centre (drill-down always centres the target), foreground/background
+ *     melt into a wide scene blur. Twin drives 0 / 0.45 / 0.8 by TOP/ISO/NEAR.
  *   fx.enabled   (true) — false = raw renderer.render (debug/perf escape hatch)
  */
 import * as THREE from 'three';
@@ -62,6 +67,8 @@ void main() {
 const COMP_FRAG = /* glsl */ `
 uniform sampler2D tDiffuse;
 uniform sampler2D tBloom;
+uniform sampler2D tDof;
+uniform float uDof;
 uniform vec2 uRes;
 uniform float uTime;
 uniform float uBloom;
@@ -83,6 +90,13 @@ void main() {
   base.b = texture2D(tDiffuse, vUv - off).b;
   vec3 bloom = texture2D(tBloom, vUv).rgb;
   vec3 col = base + bloom * uBloom;
+  // Tilt-shift DoF: focus band at frame centre (the drill-down target always
+  // lands there); top/bottom melt into the wide scene blur. uDof = 0 skips it.
+  float coc = smoothstep(0.06, 0.42, abs(vUv.y - 0.5)) * uDof;
+  if (coc > 0.001) {
+    vec3 soft = texture2D(tDof, vUv).rgb + bloom * uBloom * 0.5;
+    col = mix(col, soft, coc);
+  }
   // Vignette.
   float d = distance(vUv, vec2(0.5));
   col *= 1.0 - uVig * smoothstep(0.35, 0.75, d);
@@ -104,6 +118,7 @@ export function createPost(renderer, scene, camera) {
     ca: 1.0,
     grain: 0.02,
     vignette: 0.35,
+    dof: 0,
     enabled: true,
   };
 
@@ -116,6 +131,8 @@ export function createPost(renderer, scene, camera) {
   const rtBright = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts });
   const rtBlurA = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts });
   const rtBlurB = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts });
+  const rtDofA = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts });
+  const rtDofB = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts });
 
   const brightMat = new THREE.ShaderMaterial({
     uniforms: { tDiffuse: { value: null }, uThreshold: { value: fx.threshold } },
@@ -139,6 +156,8 @@ export function createPost(renderer, scene, camera) {
     uniforms: {
       tDiffuse: { value: null },
       tBloom: { value: null },
+      tDof: { value: null },
+      uDof: { value: 0 },
       uRes: { value: new THREE.Vector2(2, 2) },
       uTime: { value: 0 },
       uBloom: { value: fx.bloom },
@@ -178,6 +197,8 @@ export function createPost(renderer, scene, camera) {
     rtBright.setSize(bw, bh);
     rtBlurA.setSize(qw, qh);
     rtBlurB.setSize(qw, qh);
+    rtDofA.setSize(qw, qh);
+    rtDofB.setSize(qw, qh);
     compMat.uniforms.uRes.value.set(w, h);
   }
 
@@ -222,9 +243,25 @@ export function createPost(renderer, scene, camera) {
     blurMat.uniforms.uDir.value.set(0, 1);
     blit(blurMat, rtBlurB);
 
-    // 4. Composite to screen: base + bloom·0.55, CA, grain, vignette.
+    // 4. Tilt-shift DoF: wide blur of the full scene (skipped when dof = 0).
+    let dofTex = null;
+    if (fx.dof > 0.001) {
+      const spread = 2.5;
+      blurMat.uniforms.tDiffuse.value = rtScene.texture;
+      blurMat.uniforms.uTexel.value.set(spread / qw, spread / qh);
+      blurMat.uniforms.uDir.value.set(1, 0);
+      blit(blurMat, rtDofA);
+      blurMat.uniforms.tDiffuse.value = rtDofA.texture;
+      blurMat.uniforms.uDir.value.set(0, 1);
+      blit(blurMat, rtDofB);
+      dofTex = rtDofB.texture;
+    }
+
+    // 5. Composite to screen: base + bloom·0.55, CA, grain, vignette.
     compMat.uniforms.tDiffuse.value = rtScene.texture;
     compMat.uniforms.tBloom.value = rtBlurB.texture;
+    compMat.uniforms.tDof.value = dofTex;
+    compMat.uniforms.uDof.value = dofTex ? fx.dof : 0;
     compMat.uniforms.uTime.value = time;
     compMat.uniforms.uBloom.value = fx.bloom;
     compMat.uniforms.uCa.value = fx.ca;
@@ -238,6 +275,8 @@ export function createPost(renderer, scene, camera) {
     rtBright.dispose();
     rtBlurA.dispose();
     rtBlurB.dispose();
+    rtDofA.dispose();
+    rtDofB.dispose();
     fsMesh.geometry.dispose();
     brightMat.dispose();
     blurMat.dispose();
