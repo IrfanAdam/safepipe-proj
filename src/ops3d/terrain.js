@@ -584,9 +584,9 @@ export function buildTerrain(scene) {
       drainMat.resolution.set(w, h);
     },
     update(t = 0) {
-      baseMat.opacity = (0.52 + 0.05 * Math.sin(t * 1.2)) * dimF;
+      baseMat.opacity = 0.52 * dimF;
       indexMat.opacity = 0.98 * dimF;
-      ringMat.opacity = 0.35 + 0.03 * Math.sin(t * 1.2 + 1.3);
+      ringMat.opacity = 0.35;
     },
     dispose() {
       scene.remove(group);
