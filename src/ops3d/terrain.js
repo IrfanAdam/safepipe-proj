@@ -209,7 +209,7 @@ function elevLabel(text, x, y, z) {
     map: tex, transparent: true, opacity: 1,
     depthWrite: false, depthTest: false, fog: false,
   }));
-  sp.scale.set(3.4, 0.85, 1); // inline on the ring at every zoom
+  sp.scale.set(1.7, 0.425, 1); // small inline readout, never a billboard
   sp.position.set(x, y, z);
   sp.renderOrder = 5;
   return sp;
@@ -287,12 +287,18 @@ export function buildTerrain(scene) {
   indexMat.resolution.set(1280, 720);
 
   // 20 levels chained into smooth strips; every 5th is a brighter index contour.
+  // Levels are symmetric power-spaced (dense near mid-ground, open at the
+  // extremes) — logarithmic feel, so line density itself plots the terrain.
   // The two longest index rings per level carry inline elevation pills, OS
   // plate style — visible at every zoom, not just on drill-in.
   const labelGroup = new THREE.Group();
   labelGroup.name = 'ops-elev-labels';
   for (let k = 0; k < LEVELS; k++) {
-    const level = mn + ((k + 0.5) / LEVELS) * (mx - mn);
+    const t = (k + 0.5) / LEVELS;
+    const u = 2 * t - 1; // -1…1
+    // Symmetric power spacing: dense near mid-ground, open at extremes.
+    const shaped = Math.sign(u) * Math.pow(Math.abs(u), 1.5);
+    const level = (mn + mx) / 2 + shaped * ((mx - mn) / 2);
     const y = level * VEX;
     const isIndex = k % 5 === 4;
     const col = level >= 0 ? (isIndex ? INDEX_COL : BASE_COL) : BELOW_COL;
@@ -322,7 +328,7 @@ export function buildTerrain(scene) {
   for (const [sx, sz] of [[7, 9.5], [-11.5, -0.5]]) {
     const h = field(sx, sz);
     const tag = elevLabel(`+${Math.round(h * 1000)} m`, sx, h * VEX + 0.6, sz);
-    tag.scale.set(4.2, 1.05, 1); // summit proof must survive TOP distance
+    tag.scale.set(2.2, 0.55, 1); // summit proof, same small voice as rings
     summitGroup.add(tag);
   }
   group.add(summitGroup);
@@ -473,8 +479,8 @@ export function buildTerrain(scene) {
       labelGroup.visible = true; // inline pills stay at every zoom
       dimF = name === 'asset' ? 0.35 : name === 'segment' ? 0.55 : 1;
       pillF = name === 'asset' ? 0.35 : name === 'segment' ? 0.6 : 1;
-      for (const sp of labelGroup.children) sp.scale.set(3.4 * pillF, 0.85 * pillF, 1);
-      for (const sp of summitGroup.children) sp.scale.set(4.2 * pillF, 1.05 * pillF, 1);
+      for (const sp of labelGroup.children) sp.scale.set(1.7 * pillF, 0.425 * pillF, 1);
+      for (const sp of summitGroup.children) sp.scale.set(2.2 * pillF, 0.55 * pillF, 1);
     },
     setSize(w, h) {
       baseMat.resolution.set(w, h);
