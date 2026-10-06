@@ -112,7 +112,7 @@ export function createRig(canvas, opts = {}) {
     controls.update();
   }
 
-  return { camera, setPreset, flyTo, update };
+  return { camera, setPreset, flyTo, update, getTarget: () => controls.target.clone() };
 }
 
 export const presets = Object.keys(PRESETS);

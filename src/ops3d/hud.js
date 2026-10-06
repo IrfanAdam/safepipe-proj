@@ -68,7 +68,7 @@ export function buildHud(container, cbs = {}) {
   legend.appendChild(el(
     'div',
     'ops-hud__hints',
-    'DRAG ORBIT / WHEEL ZOOM / CLICK DRILL / 1-3 LEVELS / ESC UP / H HUD',
+    'DRAG ORBIT / WHEEL ZOOM / CLICK DRILL / 1-3 VIEWS / ESC UP / H HUD',
   ));
   root.appendChild(legend);
 
@@ -108,13 +108,14 @@ export function buildHud(container, cbs = {}) {
 
   const levelRow = el('div', 'ops-hud__levels');
   levelRow.setAttribute('role', 'group');
-  levelRow.setAttribute('aria-label', 'Zoom level');
-  const levelBtns = LEVELS.map((name, i) => {
-    const b = el('button', 'ops-hud__level-btn', String(i + 1));
+  levelRow.setAttribute('aria-label', 'Camera view');
+  const levelNames = { network: 'TOP', segment: 'ISO', asset: 'NEAR' };
+  const levelBtns = LEVELS.map((name) => {
+    const b = el('button', 'ops-hud__level-btn', levelNames[name]);
     b.type = 'button';
-    b.title = name.toUpperCase();
+    b.title = `${levelNames[name]} — ${name} view`;
     b.dataset.level = name;
-    b.setAttribute('aria-label', `Level ${i + 1}: ${name}`);
+    b.setAttribute('aria-label', `${levelNames[name]} view (${name})`);
     b.addEventListener('click', () => onLevel(name));
     levelRow.appendChild(b);
     return b;
@@ -220,7 +221,7 @@ export function buildHud(container, cbs = {}) {
     healthLine.textContent = `HEALTH ${rollup.nominal ?? 0}/${rollup.watch ?? 0}/${rollup.critical ?? 0}`;
 
     const level = LEVELS.includes(state.level) ? state.level : 'network';
-    levelLabel.textContent = level.toUpperCase();
+    levelLabel.textContent = `VIEW · ${levelNames[level] ?? level.toUpperCase()}`;
     for (const b of levelBtns) {
       b.classList.toggle('ops-hud__level-btn--active', b.dataset.level === level);
       b.setAttribute('aria-pressed', b.dataset.level === level ? 'true' : 'false');

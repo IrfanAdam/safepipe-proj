@@ -3,7 +3,7 @@
  * Owns canvas, ResizeObserver sizing, RAF loop, click-select + keys.
  * Scene/rig/table/network/zones/levels/hud/post are child-owned modules (frozen contracts):
  *   scene.js:        createScene(canvas) → {renderer, scene}
- *   camera.js:       createRig(canvas) → {camera, setPreset, flyTo, update}
+ *   camera.js:       createRig(canvas) → {camera, setPreset, flyTo, update, getTarget}
  *   table.js:        addTable(scene) → {update?}
  *   health-feed.js:  loadFeed() → feed[], healthRollup(feed) → {nominal,watch,critical},
  *                    getLayout() → {pipelines, facilities, sensors}
@@ -39,6 +39,12 @@ export function createTwin(container, opts = {}) {
 
   const canvas = document.createElement('canvas');
   canvas.className = 'ops-twin';
+  // Container-agnostic sizing: without this the canvas stays at the 300×150
+  // default box while the renderer buffer + raycast rect use container size
+  // (squished image, wrong pick rays). Inline so owners need no stylesheet.
+  canvas.style.display = 'block';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
   container.appendChild(canvas);
 
   const { renderer, scene } = createScene(canvas);
@@ -200,6 +206,7 @@ export function createTwin(container, opts = {}) {
 
   return {
     rollup: () => healthRollup(current),
+    debug: { camera: rig.camera, target: () => rig.getTarget() },
     setSelection(id) {
       if (id == null) {
         selected = null;

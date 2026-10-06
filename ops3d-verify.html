@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Ops 3D — click-centering verification (dev only, not built)</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0c0c; }
+  #v { position: fixed; inset: 0; }
+  #v canvas { width: 100%; height: 100%; display: block; }
+  #verdict { position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%); color: #fff; font: 20px monospace; white-space: pre; background: rgba(0,0,0,.85); padding: 8px; z-index: 50; }
+</style>
+</head>
+<body>
+<div id="v"></div>
+<pre id="verdict">RUNNING</pre>
+<script type="module">
+import * as THREE from 'three';
+import { createTwin } from './src/ops3d/twin.js';
+import { getLayout } from './src/ops3d/health-feed.js';
+
+const out = (s) => { document.getElementById('verdict').textContent = s; };
+const el = document.getElementById('v');
+const twin = createTwin(el, {});
+const { camera } = twin.debug;
+const canvas = el.querySelector('canvas');
+
+const layout = getLayout();
+const pipe = layout.pipelines.find((p) => p.assetId === 'PIPE-02');
+// Click target: 75% along the polyline (far from midpoint — the reported bug).
+const pts = pipe.points;
+const i = Math.floor((pts.length - 1) * 0.75);
+const W = new THREE.Vector3(pts[i][0], 0.06, pts[i][1]);
+
+const proj = (v) => {
+  const p = v.clone().project(camera);
+  return p;
+};
+
+// Frame-counted (not timer) sequencing: under headless SwiftShader each frame
+// takes real seconds, so wall/virtual timers fire long before frames render.
+let frames = 0;
+let clicked = false;
+const step = () => {
+  requestAnimationFrame(step);
+  frames += 1;
+  if (!clicked) out(`frame ${frames}`);
+  if (frames === 3 && !clicked) {
+    clicked = true;
+    try {
+      const r = canvas.getBoundingClientRect();
+      const p0 = proj(W);
+      const cx = r.left + (p0.x * 0.5 + 0.5) * r.width;
+      const cy = r.top + (-p0.y * 0.5 + 0.5) * r.height;
+      const opts = { clientX: cx, clientY: cy, bubbles: true };
+      canvas.dispatchEvent(new PointerEvent('pointerdown', opts));
+      canvas.dispatchEvent(new MouseEvent('click', opts));
+    } catch (err) {
+      out(`VERDICT ERROR1 ${err.message}`);
+    }
+  }
+  if (frames === 6) {
+    try {
+      const p1 = proj(W);
+      const t = twin.debug.target();
+      const off = Math.hypot(p1.x, p1.y);
+      out(`VERDICT ${off < 0.15 ? 'PASS' : 'FAIL'} ndc=[${p1.x.toFixed(3)},${p1.y.toFixed(3)}] target=[${t.x.toFixed(2)},${t.y.toFixed(2)},${t.z.toFixed(2)}] clicked=[${W.x.toFixed(2)},${W.z.toFixed(2)}]`);
+    } catch (err) {
+      out(`VERDICT ERROR2 ${err.message}`);
+    }
+  }
+};
+requestAnimationFrame(step);
+</script>
+</body>
+</html>
