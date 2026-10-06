@@ -1,0 +1,119 @@
+/* Safepipe Ops 3D — src/ops3d/levels.js · semantic zoom network → segment → asset.
+ * createLevels(rig, layout, {onChange}) → {name, setLevel, focusAsset, cycle}
+ * L0 network: plan preset (dist 40) over origin, all visible.
+ * L1 segment: sector preset (dist 16) around last target, neighbours dim (twin-owned).
+ * L2 asset: close-up (dist 6) on asset position, target y ~0.3.
+ * Reduced-motion is honoured inside rig.flyTo — no handling needed here.
+ */
+
+const ORDER = ['network', 'segment', 'asset'];
+
+// Mirror of camera.js preset angles (yaw°/pitch°/dist).
+const VIEWS = {
+  network: { yaw: 4, pitch: 82, dist: 40 },
+  segment: { yaw: 4, pitch: 25, dist: 16 },
+  asset: { yaw: 4, pitch: 25, dist: 6 },
+};
+
+const TARGET_Y = 0.3;
+const FALLBACK_ASSET = 'PIPE-02';
+
+function viewPos({ yaw, pitch, dist }, target) {
+  const y = (yaw * Math.PI) / 180;
+  const p = (pitch * Math.PI) / 180;
+  return [
+    target[0] + dist * Math.cos(p) * Math.sin(y),
+    target[1] + dist * Math.sin(p),
+    target[2] + dist * Math.cos(p) * Math.cos(y),
+  ];
+}
+
+/* Arc-length midpoint of a pipeline polyline ([[x,z]..] → [x,z]). */
+function polylineMidpoint(points) {
+  if (!points?.length) return null;
+  if (points.length === 1) return points[0].slice();
+  let total = 0;
+  const lens = [];
+  for (let i = 1; i < points.length; i++) {
+    const len = Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+    lens.push(len);
+    total += len;
+  }
+  let target = total / 2;
+  for (let i = 0; i < lens.length; i++) {
+    if (target <= lens[i] || i === lens.length - 1) {
+      const f = lens[i] === 0 ? 0 : target / lens[i];
+      return [
+        points[i][0] + (points[i + 1][0] - points[i][0]) * f,
+        points[i][1] + (points[i + 1][1] - points[i][1]) * f,
+      ];
+    }
+    target -= lens[i];
+  }
+  return points[points.length - 1].slice();
+}
+
+export function createLevels(rig, layout, opts = {}) {
+  if (!rig?.flyTo) throw new Error('createLevels: rig with flyTo required');
+  const onChange = opts.onChange ?? (() => {});
+
+  // assetId → [x, z] ground position.
+  const index = new Map();
+  for (const p of layout?.pipelines ?? []) {
+    const mid = polylineMidpoint(p.points);
+    if (mid) index.set(p.assetId, mid);
+  }
+  for (const f of layout?.facilities ?? []) {
+    if (f.position) index.set(f.assetId, [f.position[0], f.position[1]]);
+  }
+  for (const s of layout?.sensors ?? []) {
+    if (s.position) index.set(s.assetId, [s.position[0], s.position[1]]);
+  }
+
+  let current = 'network';
+  let lastTarget = [0, 0, 0];
+  let lastAssetId = null;
+
+  const resolveTarget = (assetId) => {
+    const pos = index.get(assetId);
+    if (!pos) throw new Error(`levels: unknown asset "${assetId}"`);
+    return [pos[0], TARGET_Y, pos[1]];
+  };
+
+  const go = (name, target) => {
+    const view = VIEWS[name];
+    if (!view) throw new Error(`setLevel: unknown level "${name}"`);
+    current = name;
+    lastTarget = target;
+    rig.flyTo(viewPos(view, target), target);
+    onChange(name);
+  };
+
+  return {
+    get name() {
+      return current;
+    },
+
+    setLevel(name) {
+      if (!VIEWS[name]) throw new Error(`setLevel: unknown level "${name}"`);
+      if (name === 'network') go('network', [0, 0, 0]);
+      else if (name === 'segment') go('segment', lastTarget);
+      // Asset needs a concrete anchor: last focused asset, else PIPE-02.
+      else this.focusAsset(lastAssetId ?? FALLBACK_ASSET);
+    },
+
+    focusAsset(assetId) {
+      const target = resolveTarget(assetId);
+      lastAssetId = assetId;
+      go('asset', target);
+    },
+
+    // dir > 0 descends toward asset, dir < 0 ascends toward network (ESC).
+    cycle(dir) {
+      const idx = ORDER.indexOf(current);
+      const next = Math.min(ORDER.length - 1, Math.max(0, idx + Math.sign(dir || 0)));
+      if (ORDER[next] !== current) this.setLevel(ORDER[next]);
+      return ORDER[next];
+    },
+  };
+}

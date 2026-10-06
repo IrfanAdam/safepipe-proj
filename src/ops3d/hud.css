@@ -1,0 +1,282 @@
+/* Safepipe Ops 3D — src/ops3d/hud.css · HUD overlay styling.
+ * Token-sourced: font.mono ui-monospace stack, warning #ff8c39, danger #e31919.
+ * Bone text #E6E8E8 on translucent dark panels rgba(11,12,12,.72), 1px borders.
+ * Accent discipline: amber = watch, red = critical only. No other hues.
+ */
+
+.ops-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: #e6e8e8;
+}
+
+.ops-hud--hidden {
+  display: none;
+}
+
+.ops-hud__sector,
+.ops-hud__banner,
+.ops-hud__legend,
+.ops-hud__panel {
+  position: absolute;
+  background: rgba(11, 12, 12, 0.72);
+  border: 1px solid rgba(230, 232, 232, 0.18);
+  padding: 8px 10px;
+}
+
+/* Top-left sector block */
+.ops-hud__sector {
+  top: 12px;
+  left: 12px;
+  min-width: 190px;
+}
+
+.ops-hud__sector::before,
+.ops-hud__banner::before,
+.ops-hud__legend::before,
+.ops-hud__panel::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid #e6e8e8;
+  border-left: 1px solid #e6e8e8;
+}
+
+.ops-hud__title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ops-hud__sub {
+  opacity: 0.7;
+}
+
+.ops-hud__level {
+  margin-top: 4px;
+  display: inline-block;
+  border: 1px solid rgba(230, 232, 232, 0.35);
+  padding: 0 6px;
+}
+
+.ops-hud__health {
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+/* Top-right critical banner */
+.ops-hud__banner {
+  top: 12px;
+  right: 12px;
+  border-color: #e31919;
+  color: #e6e8e8;
+}
+
+.ops-hud__banner--hidden {
+  display: none;
+}
+
+.ops-hud__banner-kind {
+  color: #e31919;
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+/* Bottom-left legend */
+.ops-hud__legend {
+  bottom: 12px;
+  left: 12px;
+  max-width: 300px;
+}
+
+.ops-hud__legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ops-hud__swatch {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  flex: none;
+}
+
+.ops-hud__swatch--dot {
+  height: 6px;
+  width: 6px;
+  border-radius: 50%;
+  background: #e6e8e8;
+  margin: 0 6px;
+}
+
+.ops-hud__swatch--box {
+  height: 8px;
+  border: 1px solid #e6e8e8;
+}
+
+.ops-hud__swatch--dash {
+  border-top: 1px dashed #ff8c39;
+}
+
+.ops-hud__hints {
+  margin-top: 6px;
+  opacity: 0.65;
+  font-size: 10px;
+}
+
+/* Right detail panel */
+.ops-hud__panel {
+  top: 64px;
+  right: 12px;
+  width: 240px;
+  pointer-events: auto;
+}
+
+.ops-hud__panel--hidden {
+  display: none;
+}
+
+.ops-hud__search,
+.ops-hud__wo,
+.ops-hud__level-btn {
+  pointer-events: auto;
+  font: inherit;
+  color: #e6e8e8;
+  background: rgba(11, 12, 12, 0.72);
+  border: 1px solid rgba(230, 232, 232, 0.35);
+}
+
+.ops-hud__search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+}
+
+.ops-hud__body {
+  margin: 8px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.ops-hud__asset-id {
+  font-size: 13px;
+  font-weight: 700;
+  width: 100%;
+}
+
+.ops-hud__meta {
+  opacity: 0.7;
+  width: 100%;
+}
+
+.ops-hud__chip {
+  border: 1px solid rgba(230, 232, 232, 0.5);
+  padding: 0 6px;
+  text-transform: uppercase;
+}
+
+.ops-hud__chip--watch {
+  border-color: #ff8c39;
+  color: #ff8c39;
+}
+
+.ops-hud__chip--critical {
+  border-color: #e31919;
+  color: #e31919;
+}
+
+.ops-hud__badge {
+  border: 1px dashed #ff8c39;
+  color: #ff8c39;
+  padding: 0 6px;
+}
+
+.ops-hud__faults,
+.ops-hud__compliance {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  width: 100%;
+}
+
+.ops-hud__fault {
+  border-left: 2px solid #e31919;
+  padding-left: 6px;
+  margin-top: 4px;
+}
+
+.ops-hud__comp {
+  border-left: 2px solid #ff8c39;
+  padding-left: 6px;
+  margin-top: 4px;
+}
+
+.ops-hud__nofaults {
+  opacity: 0.6;
+}
+
+.ops-hud__wo {
+  width: 100%;
+  padding: 5px 6px;
+  cursor: pointer;
+}
+
+.ops-hud__wo:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ops-hud__levels {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ops-hud__level-btn {
+  flex: 1;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.ops-hud__level-btn--active {
+  border-color: #ff8c39;
+  color: #ff8c39;
+}
+
+/* Bottom-right fullscreen toggle */
+.ops-hud__fs {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  pointer-events: auto;
+  font: inherit;
+  color: #e6e8e8;
+  background: rgba(11, 12, 12, 0.72);
+  border: 1px solid rgba(230, 232, 232, 0.35);
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.ops-hud__fs:hover {
+  border-color: #e6e8e8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ops-hud *,
+  .ops-hud *::before,
+  .ops-hud *::after {
+    transition: none;
+    animation: none;
+  }
+}
