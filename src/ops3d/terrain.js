@@ -31,7 +31,7 @@ const SLOPE_MIN = 0.0012; // skip contour cells flatter than ~1.2 m/km
 const BASE_COL = new THREE.Color(0x6a7377); // neutral bone-grey base contours
 const INDEX_COL = new THREE.Color(0x9aa3a6); // brighter every-5th index contours
 const BELOW_COL = new THREE.Color(0x4a5255); // below-datum deep grey
-const RING_COL = 0x2fa8c7;
+const RING_COL = 0x8f8b82; // boundary ring: neutral survey grey, never an accent
 const LAKE_X = -9; // playa lake center, km (flat spot, away from center + draw)
 const LAKE_Z = 6;
 const LAKE_R = 1.3; // mean radius; shoreline modulated below, ~2.6 km across
@@ -190,19 +190,18 @@ function smoothPath(pts) {
   return out;
 }
 
-/* Index-ring elevation tag: small mono meter readout riding the ring so the
- * contours read as a plotting technique (cf. Britannica contoured-peak
- * plate: numbered rings closing around the high). */
+/* Index-ring elevation tag: OS-plate style — meter readout on a dark pill
+ * so it sits inline on the ring and reads at every zoom. */
 function elevLabel(text, x, y, z) {
   const cv = document.createElement('canvas');
   cv.width = 192;
   cv.height = 48;
   const ctx = cv.getContext('2d');
+  ctx.fillStyle = 'rgba(16,20,24,0.9)';
+  ctx.fillRect(28, 4, 136, 40); // dark pill behind the number
   ctx.font = '600 30px ui-monospace, Menlo, monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0,0,0,0.9)';
-  ctx.shadowBlur = 6;
   ctx.fillStyle = '#d5dadb';
   ctx.fillText(text, 96, 26);
   const tex = new THREE.CanvasTexture(cv);
@@ -210,7 +209,7 @@ function elevLabel(text, x, y, z) {
     map: tex, transparent: true, opacity: 1,
     depthWrite: false, depthTest: false, fog: false,
   }));
-  sp.scale.set(3.0, 0.75, 1); // TOP-legible from 68 km, like asset pills
+  sp.scale.set(3.4, 0.85, 1); // inline on the ring at every zoom
   sp.position.set(x, y, z);
   sp.renderOrder = 5;
   return sp;
@@ -284,9 +283,8 @@ export function buildTerrain(scene) {
   indexMat.resolution.set(1280, 720);
 
   // 20 levels chained into smooth strips; every 5th is a brighter index contour.
-  // The two longest index rings per level carry their elevation in meters —
-  // gated to zoomed views (segment/asset): at full-map distance no meter
-  // readout stays legible without becoming a billboard, same as paper topo.
+  // The two longest index rings per level carry inline elevation pills, OS
+  // plate style — visible at every zoom, not just on drill-in.
   const labelGroup = new THREE.Group();
   labelGroup.name = 'ops-elev-labels';
   for (let k = 0; k < LEVELS; k++) {
@@ -300,14 +298,17 @@ export function buildTerrain(scene) {
     for (const p of paths) group.add(stripObject(p, y, col, isIndex ? indexMat : baseMat));
     if (isIndex) {
       const tag = `${Math.round(level * 1000)} m`;
-      const ranked = paths.filter((p) => p.length >= 10).sort((a, b) => b.length - a.length).slice(0, 2);
+      const ranked = paths.filter((p) => p.length >= 10).sort((a, b) => b.length - a.length).slice(0, 3);
       for (const p of ranked) {
-        const q = p[Math.floor(p.length / 2)];
+        // Spread along the ring thirds, OS-plate density. Skip tags that
+        // fall outside the mapped circle.
+        const q = p[Math.floor(p.length * (0.3 + 0.25 * ranked.indexOf(p)))];
+        if (Math.hypot(q[0], q[1]) > 19) continue;
         labelGroup.add(elevLabel(tag, q[0], y + 0.12, q[1]));
       }
     }
   }
-  labelGroup.visible = false; // twin.js setDetail reveals on drill-in
+  labelGroup.visible = true; // inline pills read at every zoom, OS-plate style
   group.add(labelGroup);
 
   // Summit tags: always-visible elevation proof at TOP — the two hill
@@ -330,8 +331,8 @@ export function buildTerrain(scene) {
     const body = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
     const pa = body.attributes.position;
     const colors = new Float32Array(pa.count * 3);
-    const cLo = new THREE.Color(0x0e1214);
-    const cHi = new THREE.Color(0x6b7377); // wide enough to survive TOP view
+    const cLo = new THREE.Color(0x090c0e);
+    const cHi = new THREE.Color(0x3a4044); // dark: contours carry the topology
     const tmp = new THREE.Color();
     // NW key light for the baked hillshade (matches scene key direction).
     const LX = -0.5, LY = 0.8, LZ = -0.4;
@@ -353,7 +354,7 @@ export function buildTerrain(scene) {
       const gx = (field(x + E, z) - field(x - E, z)) / (2 * E) * VEX;
       const gz = (field(x, z + E) - field(x, z - E)) / (2 * E) * VEX;
       const nl = Math.hypot(gx, 1, gz);
-      const shade = 0.45 + 0.55 * Math.max(0, (-gx * lx + ly - gz * lz) / nl);
+      const shade = 0.35 + 0.5 * Math.max(0, (-gx * lx + ly - gz * lz) / nl);
       const f = 1 - smooth(12, 19.5, Math.hypot(x, z));
       colors[k * 3] = tmp.r * shade * f;
       colors[k * 3 + 1] = tmp.g * shade * f;
@@ -394,8 +395,9 @@ export function buildTerrain(scene) {
   disc.position.y = -0.18;
   group.add(disc);
 
-  // Boundary ring: fat-line + survey ticks, always legible — this is the
-  // mapped 20 km circle. Ticks every 15° read as survey markers at TOP.
+  // Boundary ring: thin neutral survey line marking the mapped 20 km
+  // circle — matte, no glow, so it never competes with live data. No lip
+  // echo; ticks stay faint.
   const ringPos = [];
   for (let i = 0; i < 160; i++) {
     const a0 = (i / 160) * Math.PI * 2, a1 = ((i + 1) / 160) * Math.PI * 2;
@@ -406,30 +408,14 @@ export function buildTerrain(scene) {
   ringGeo.setPositions(ringPos);
   const ringMat = new LineMaterial({
     color: RING_COL,
-    linewidth: 1.4,
+    linewidth: 1.0,
     transparent: true,
-    opacity: 0.32,
-    blending: THREE.AdditiveBlending,
+    opacity: 0.35,
     depthWrite: false,
     fog: false,
   });
   ringMat.resolution.set(1280, 720);
   group.add(new Line2(ringGeo, ringMat));
-  // Glass-slab thickness: faint outer echo of the boundary ring.
-  const lipGeo = new LineGeometry();
-  const lipPos = [];
-  for (let i = 0; i < 160; i++) {
-    const a0 = (i / 160) * Math.PI * 2, a1 = ((i + 1) / 160) * Math.PI * 2;
-    lipPos.push(Math.cos(a0) * (R_MAP + 0.4), -0.05, Math.sin(a0) * (R_MAP + 0.4),
-      Math.cos(a1) * (R_MAP + 0.4), -0.05, Math.sin(a1) * (R_MAP + 0.4));
-  }
-  lipGeo.setPositions(lipPos);
-  const lipMat = new LineMaterial({
-    color: RING_COL, linewidth: 1.0, transparent: true, opacity: 0.21,
-    blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
-  });
-  lipMat.resolution.set(1280, 720);
-  group.add(new Line2(lipGeo, lipMat));
   const tickPos = [];
   for (let i = 0; i < 24; i++) {
     const a = (i / 24) * Math.PI * 2;
@@ -439,8 +425,8 @@ export function buildTerrain(scene) {
   const tickGeo = new THREE.BufferGeometry();
   tickGeo.setAttribute('position', new THREE.Float32BufferAttribute(tickPos, 3));
   const tickMat = new THREE.LineBasicMaterial({
-    color: RING_COL, transparent: true, opacity: 0.35,
-    blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+    color: RING_COL, transparent: true, opacity: 0.22,
+    depthWrite: false, fog: false,
   });
   group.add(new THREE.LineSegments(tickGeo, tickMat));
 
@@ -537,20 +523,19 @@ export function buildTerrain(scene) {
   return {
     mesh: group,
     setDetail(name) {
-      labelGroup.visible = name !== 'network';
+      labelGroup.visible = true; // inline pills stay at every zoom
     },
     setSize(w, h) {
       baseMat.resolution.set(w, h);
       indexMat.resolution.set(w, h);
       ringMat.resolution.set(w, h);
-      lipMat.resolution.set(w, h);
       shoreMat.resolution.set(w, h);
       drainMat.resolution.set(w, h);
     },
     update(t = 0) {
       baseMat.opacity = 0.5 + 0.05 * Math.sin(t * 1.2);
       indexMat.opacity = 0.9 + 0.04 * Math.sin(t * 1.2 + 0.6);
-      ringMat.opacity = 0.32 + 0.07 * Math.sin(t * 1.2 + 1.3);
+      ringMat.opacity = 0.35 + 0.03 * Math.sin(t * 1.2 + 1.3);
     },
     dispose() {
       scene.remove(group);
