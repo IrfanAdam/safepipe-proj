@@ -1,26 +1,41 @@
 /* Safepipe Ops 3D — src/ops3d/twin.js · container-agnostic digital-twin mount.
- * createTwin(container, {feed, onSelect}) → {setSelection, setFeed, dispose}
+ * createTwin(container, {feed, onSelect, onCreateWO}) → {setSelection, setFeed, dispose}
  * Owns canvas, ResizeObserver sizing, RAF loop, click-select + keys.
- * Scene/rig/table/network/zones are child-owned modules (frozen contracts):
+ * Scene/rig/table/network/zones/levels/hud/post are child-owned modules (frozen contracts):
  *   scene.js:        createScene(canvas) → {renderer, scene}
  *   camera.js:       createRig(canvas) → {camera, setPreset, flyTo, update}
  *   table.js:        addTable(scene) → {update?}
- *   health-feed.js:  loadFeed() → feed[], healthRollup(feed) → {nominal,watch,critical}
+ *   health-feed.js:  loadFeed() → feed[], healthRollup(feed) → {nominal,watch,critical},
+ *                    getLayout() → {pipelines, facilities, sensors}
  *   network.js:      buildNetwork(scene, feed) → {update, setSelection, setHover, pick, setSize, stats}
  *   zones.js:        buildZones(scene, feed) → {update}
+ *   levels.js:       createLevels(rig, layout, {onChange}) → {name, setLevel, focusAsset, cycle}
+ *   hud.js:          buildHud(container, {onSearch, onCreateWO, onLevel}) → {update, dispose}
+ *   post.js:         createPost(renderer, scene, camera) → {render, setSize, dispose, fx}
  */
 import * as THREE from 'three';
 import { createScene } from './scene.js';
 import { createRig } from './camera.js';
 import { addTable } from './table.js';
-import { loadFeed, healthRollup } from './health-feed.js';
+import { loadFeed, healthRollup, getLayout } from './health-feed.js';
 import { buildNetwork } from './network.js';
 import { buildZones } from './zones.js';
+import { createLevels } from './levels.js';
+import { buildHud } from './hud.js';
+import { createPost } from './post.js';
 
 export function createTwin(container, opts = {}) {
   if (!container) throw new Error('createTwin: container requires a DOM element');
+  if (!container.style.position) container.style.position = 'relative';
   let current = opts.feed ?? loadFeed();
   const onSelect = opts.onSelect ?? (() => {});
+  const onCreateWO =
+    opts.onCreateWO ??
+    // eslint-disable-next-line no-console
+    ((id) => console.log('[ops3d] create WO for', id));
+
+  const params = new URLSearchParams(window.location.search);
+  const postEnabled = params.get('post') !== '0';
 
   const canvas = document.createElement('canvas');
   canvas.className = 'ops-twin';
@@ -35,7 +50,55 @@ export function createTwin(container, opts = {}) {
   // eslint-disable-next-line no-console
   console.log('[ops3d]', network.stats);
 
+  const byId = () => new Map(current.map((a) => [a.assetId, a]));
+  const levels = createLevels(rig, getLayout(), {
+    onChange: () => pushHud(),
+  });
+  const hud = buildHud(container, {
+    onSearch: (id) => select(id, { fly: true }),
+    onCreateWO,
+    onLevel: (name) => {
+      try {
+        levels.setLevel(name);
+      } catch {
+        /* unknown level — ignore */
+      }
+      pushHud();
+    },
+  });
+  const post = createPost(renderer, scene, rig.camera);
+  if (!postEnabled) post.fx.enabled = false;
+
   let selected = null;
+
+  function pushHud() {
+    const map = byId();
+    const sel = selected ? map.get(selected) ?? null : null;
+    const crit = sel?.health === 'critical' ? sel : current.find((a) => a.health === 'critical');
+    hud.update({
+      rollup: healthRollup(current),
+      selection: sel,
+      level: levels.name,
+      banner: crit ? { kind: crit.faults[0]?.type ?? 'CRITICAL', assetId: crit.assetId } : null,
+    });
+  }
+
+  function select(id, { fly = true } = {}) {
+    if (!id || !byId().has(id)) return false;
+    selected = id;
+    network.setSelection(id);
+    if (fly) {
+      try {
+        levels.focusAsset(id);
+      } catch {
+        /* layout miss — selection still applies */
+      }
+    }
+    onSelect(id);
+    pushHud();
+    return true;
+  }
+
   const ndc = new THREE.Vector2();
   const setNdc = (e) => {
     const r = canvas.getBoundingClientRect();
@@ -56,19 +119,26 @@ export function createTwin(container, opts = {}) {
   canvas.addEventListener('click', (e) => {
     setNdc(e);
     const id = network.pick(ndc, rig.camera);
-    if (id) {
-      selected = id;
-      network.setSelection(id);
-      onSelect(id);
-    }
+    if (id) select(id, { fly: true });
   });
   const onKey = (e) => {
-    if (e.key === '1') rig.setPreset('plan');
-    else if (e.key === '2') rig.setPreset('sector');
-    else if (e.key === '3') rig.setPreset('wide');
-    else if (e.key === 'Escape' && selected) {
-      selected = null;
-      network.setSelection(null);
+    if (e.key === '1') {
+      levels.setLevel('network');
+      pushHud();
+    } else if (e.key === '2') {
+      levels.setLevel('segment');
+      pushHud();
+    } else if (e.key === '3') {
+      levels.setLevel('asset');
+      pushHud();
+    } else if (e.key === 'Escape') {
+      const atTop = levels.name === 'network';
+      levels.cycle(-1);
+      if (atTop && selected) {
+        selected = null;
+        network.setSelection(null);
+      }
+      pushHud();
     }
   };
   window.addEventListener('keydown', onKey);
@@ -79,8 +149,11 @@ export function createTwin(container, opts = {}) {
     const pr = Math.min(window.devicePixelRatio || 1, 2);
     renderer.setPixelRatio(pr);
     renderer.setSize(w, h, false);
-    network.setSize?.(Math.floor(w * pr), Math.floor(h * pr));
-    zones.setSize?.(Math.floor(w * pr), Math.floor(h * pr));
+    const bw = Math.floor(w * pr);
+    const bh = Math.floor(h * pr);
+    network.setSize?.(bw, bh);
+    zones.setSize?.(bw, bh);
+    post.setSize(bw, bh);
   };
   const ro = new ResizeObserver(size);
   ro.observe(container);
@@ -94,25 +167,43 @@ export function createTwin(container, opts = {}) {
     last = now;
     rig.update(dt, now / 1000);
     table.update?.(now / 1000);
-    renderer.render(scene, rig.camera);
+    if (post.fx.enabled) post.render(now / 1000);
+    else renderer.render(scene, rig.camera);
   };
   raf = requestAnimationFrame(tick);
+
+  pushHud();
+  // Deep link: ?asset=PIPE-07 drills straight to the asset.
+  const deep = params.get('asset');
+  if (deep) select(deep, { fly: true });
 
   return {
     rollup: () => healthRollup(current),
     setSelection(id) {
-      selected = id;
-      network.setSelection(id);
+      if (id == null) {
+        selected = null;
+        network.setSelection(null);
+        pushHud();
+        return true;
+      }
+      return select(id, { fly: true });
     },
     setFeed(feed) {
       current = feed;
       network.update(feed);
       zones.update(feed);
+      if (selected && !byId().has(selected)) {
+        selected = null;
+        network.setSelection(null);
+      }
+      pushHud();
     },
     dispose() {
       cancelAnimationFrame(raf);
       ro.disconnect();
       window.removeEventListener('keydown', onKey);
+      hud.dispose();
+      post.dispose();
       renderer.dispose();
       canvas.remove();
     },

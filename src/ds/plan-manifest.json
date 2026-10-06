@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-05T19:52:15.815Z",
+  "generated": "2026-10-06T05:42:49.007Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -7,6 +7,54 @@
     "2026-10-06_003000-ops3d-theatre-style.md"
   ],
   "commits": [
+    {
+      "sha": "b4e3654",
+      "full": "b4e36545733a0c0fa6f08ca3fbf79b5ec05d1eea",
+      "date": "2026-10-06",
+      "subject": "fix(ops3d): resolution-independent lines — fat-line boxes, full dpr, AA grid [plan:2026-10-06_003000-ops3d-theatre-style.md#task-2]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-2"
+    },
+    {
+      "sha": "ba46a39",
+      "full": "ba46a3907cf5cb968df0ce3869a5da07545750e1",
+      "date": "2026-10-06",
+      "subject": "fix(ops3d): round dot sprites, fatter pick tubes, hover target feedback [plan:2026-10-06_003000-ops3d-theatre-style.md#task-3]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-3"
+    },
+    {
+      "sha": "dfbe32d",
+      "full": "dfbe32d649ccecc3029db85074441133d0bb10e1",
+      "date": "2026-10-06",
+      "subject": "feat(gallery): mount live Ops 3D twin in Special specimen [plan:2026-10-06_003000-ops3d-theatre-style.md#task-8]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-8"
+    },
+    {
+      "sha": "802e799",
+      "full": "802e79914f27cfef88b6bf3266d22a3683e964a1",
+      "date": "2026-10-06",
+      "subject": "feat(gallery): Special category with Ops 3D slot [plan:2026-10-06_003000-ops3d-theatre-style.md#task-8]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-8"
+    },
+    {
+      "sha": "eae4303",
+      "full": "eae4303a04093748e696999857b4924151d0b916",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): table/camera/feed/dotted network/zones first pass [plan:2026-10-06_003000-ops3d-theatre-style.md#task-2] [plan:2026-10-06_003000-ops3d-theatre-style.md#task-3]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-2"
+    },
+    {
+      "sha": "8cbbd27",
+      "full": "8cbbd277aba7043176694ce833bb541186e60324",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): twin module with container-agnostic mount API + dev harness [plan:2026-10-06_003000-ops3d-theatre-style.md#task-1]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-1"
+    },
     {
       "sha": "bcbdd95",
       "full": "bcbdd95d3dad33fb629133068afac6dc475a8179",
@@ -49,7 +97,10 @@
     }
   ],
   "wip": [
-    "allery.html",
-    "src/ops3d/"
+    "src/ops3d/twin.js",
+    "src/ops3d/hud.css",
+    "src/ops3d/hud.js",
+    "src/ops3d/levels.js",
+    "src/ops3d/post.js"
   ]
 }
