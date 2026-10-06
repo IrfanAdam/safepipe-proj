@@ -100,6 +100,11 @@ export function createTwin(container, opts = {}) {
   }
 
   const ndc = new THREE.Vector2();
+  const downPos = [0, 0];
+  canvas.addEventListener('pointerdown', (e) => {
+    downPos[0] = e.clientX;
+    downPos[1] = e.clientY;
+  });
   const setNdc = (e) => {
     const r = canvas.getBoundingClientRect();
     ndc.set(
@@ -117,6 +122,9 @@ export function createTwin(container, opts = {}) {
     canvas.style.cursor = '';
   });
   canvas.addEventListener('click', (e) => {
+    // Orbit/pan drags end in a click — ignore presses that traveled so only
+    // deliberate taps drill down (otherwise every pan flies the camera).
+    if (Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]) > 6) return;
     setNdc(e);
     const id = network.pick(ndc, rig.camera);
     if (id) select(id, { fly: true });
