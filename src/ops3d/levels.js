@@ -102,8 +102,8 @@ export function createLevels(rig, layout, opts = {}) {
       else this.focusAsset(lastAssetId ?? FALLBACK_ASSET);
     },
 
-    focusAsset(assetId) {
-      const target = resolveTarget(assetId);
+    focusAsset(assetId, at = null) {
+      const target = at ?? resolveTarget(assetId);
       lastAssetId = assetId;
       go('asset', target);
     },

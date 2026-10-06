@@ -9,7 +9,7 @@
  *                    getLayout() → {pipelines, facilities, sensors}
  *   network.js:      buildNetwork(scene, feed) → {update, setSelection, setHover, pick, setSize, stats}
  *   zones.js:        buildZones(scene, feed) → {update}
- *   levels.js:       createLevels(rig, layout, {onChange}) → {name, setLevel, focusAsset, cycle}
+ *   levels.js:       createLevels(rig, layout, {onChange}) → {name, setLevel, focusAsset(id, at?), cycle}
  *   hud.js:          buildHud(container, {onSearch, onCreateWO, onLevel}) → {update, dispose}
  *   post.js:         createPost(renderer, scene, camera) → {render, setSize, dispose, fx}
  */
@@ -83,13 +83,13 @@ export function createTwin(container, opts = {}) {
     });
   }
 
-  function select(id, { fly = true } = {}) {
+  function select(id, { fly = true, at = null } = {}) {
     if (!id || !byId().has(id)) return false;
     selected = id;
     network.setSelection(id);
     if (fly) {
       try {
-        levels.focusAsset(id);
+        levels.focusAsset(id, at);
       } catch {
         /* layout miss — selection still applies */
       }
@@ -99,7 +99,19 @@ export function createTwin(container, opts = {}) {
     return true;
   }
 
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const hitPoint = new THREE.Vector3();
+  // Ground point under the cursor: drill-down centers the CLICKED point, not
+  // the asset midpoint (a fault at one end of a line would land off-frame).
+  const clickPoint = (e) => {
+    setNdc(e);
+    raycaster.setFromCamera(ndc, rig.camera);
+    if (!raycaster.ray.intersectPlane(groundPlane, hitPoint)) return null;
+    return [hitPoint.x, 0.3, hitPoint.z];
+  };
+
   const ndc = new THREE.Vector2();
+  const raycaster = new THREE.Raycaster();
   const downPos = [0, 0];
   canvas.addEventListener('pointerdown', (e) => {
     downPos[0] = e.clientX;
@@ -125,9 +137,10 @@ export function createTwin(container, opts = {}) {
     // Orbit/pan drags end in a click — ignore presses that traveled so only
     // deliberate taps drill down (otherwise every pan flies the camera).
     if (Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]) > 6) return;
+    const at = clickPoint(e);
     setNdc(e);
     const id = network.pick(ndc, rig.camera);
-    if (id) select(id, { fly: true });
+    if (id) select(id, { fly: true, at });
   });
   const onKey = (e) => {
     if (e.key === '1') {
