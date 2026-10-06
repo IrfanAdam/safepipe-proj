@@ -1,6 +1,6 @@
-/* Safepipe Ops 3D — src/ops3d/network.js · dotted-trace network layer.
- * Pipelines render as dotted THREE.Points traces (sampled polyline dots, not
- * tubes), colored by feed health: faint bone nominal, amber #ff8c39 watch,
+/* Safepipe Ops 3D — src/ops3d/network.js · solid-wall network layer.
+ * Pipelines render as continuous Line2 walls (buried stretches dashed +
+ * dimmed), colored by feed health: faint bone nominal, amber #ff8c39 watch,
  * red #e31919 critical at 1.5× dot size. Fault chainages get brighter beads;
  * the selected asset's faults get a ground ring. Facilities are wireframe
  * boxes at line junctions, colored by own health; sensors are small diamonds.
@@ -14,8 +14,7 @@
 
 import * as THREE from 'three';
 import { getLayout } from './health-feed.js';
-import { field } from './terrain.js'; // drape buried runs onto the surface
-const VEX = 3.5; // must match terrain.js vertical exaggeration
+import { field, VEX } from './terrain.js'; // drape buried runs onto the surface; VEX single-sourced
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
