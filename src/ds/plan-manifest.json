@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-06T05:42:49.007Z",
+  "generated": "2026-10-06T06:15:10.819Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -7,6 +7,46 @@
     "2026-10-06_003000-ops3d-theatre-style.md"
   ],
   "commits": [
+    {
+      "sha": "562c476",
+      "full": "562c476b6d892d29ae2e8375282c8af808fbb668",
+      "date": "2026-10-06",
+      "subject": "fix(ops3d): canvas fills container (fixes pick rays + drill target); TOP/ISO/NEAR views [plan:2026-10-06_003000-ops3d-theatre-style.md#task-7]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-7"
+    },
+    {
+      "sha": "c6f8385",
+      "full": "c6f83856a489b9e8ec37235ed6add09ac292c2ee",
+      "date": "2026-10-06",
+      "subject": "fix(ops3d): drill-down centers clicked point, not asset midpoint [plan:2026-10-06_003000-ops3d-theatre-style.md#task-7]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-7"
+    },
+    {
+      "sha": "ff3e222",
+      "full": "ff3e222796102b21311cc3968dd2379e239df408",
+      "date": "2026-10-06",
+      "subject": "fix(ops3d): ignore drag-ending clicks so pan never drills down [plan:2026-10-06_003000-ops3d-theatre-style.md#task-7]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-7"
+    },
+    {
+      "sha": "5f7e62f",
+      "full": "5f7e62f7cc7f93e127064b58a740f396d2521520",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): wire drill-down, HUD sync, deep link, fullscreen toggle; bloom threshold [plan:2026-10-06_003000-ops3d-theatre-style.md#task-7]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-7"
+    },
+    {
+      "sha": "c557479",
+      "full": "c5574795ad733b40fa9ca888a9bbae703a349c4c",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): semantic levels, DOM HUD, cheap post chain [plan:2026-10-06_003000-ops3d-theatre-style.md#task-4] [plan:2026-10-06_003000-ops3d-theatre-style.md#task-5] [plan:2026-10-06_003000-ops3d-theatre-style.md#task-6]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-4"
+    },
     {
       "sha": "b4e3654",
       "full": "b4e36545733a0c0fa6f08ca3fbf79b5ec05d1eea",
@@ -98,9 +138,8 @@
   ],
   "wip": [
     "src/ops3d/twin.js",
-    "src/ops3d/hud.css",
-    "src/ops3d/hud.js",
-    "src/ops3d/levels.js",
-    "src/ops3d/post.js"
+    "src/ops3d/beacons.js",
+    "src/ops3d/structures.js",
+    "src/ops3d/terrain.js"
   ]
 }

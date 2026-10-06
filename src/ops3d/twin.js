@@ -10,6 +10,9 @@
  *   network.js:      buildNetwork(scene, feed) → {update, setSelection, setHover, pick, setSize, stats}
  *   zones.js:        buildZones(scene, feed) → {update}
  *   levels.js:       createLevels(rig, layout, {onChange}) → {name, setLevel, focusAsset(id, at?), cycle}
+ *   terrain.js:      buildTerrain(scene) → {mesh, update, dispose}
+ *   structures.js:   buildStructures(scene, feed, layout) → {group, update, setSelection, dispose}
+ *   beacons.js:      buildBeacons(scene, feed, layout) → {update, setSelection, tick, dispose}
  *   hud.js:          buildHud(container, {onSearch, onCreateWO, onLevel}) → {update, dispose}
  *   post.js:         createPost(renderer, scene, camera) → {render, setSize, dispose, fx}
  */
@@ -21,6 +24,9 @@ import { loadFeed, healthRollup, getLayout } from './health-feed.js';
 import { buildNetwork } from './network.js';
 import { buildZones } from './zones.js';
 import { createLevels } from './levels.js';
+import { buildTerrain } from './terrain.js';
+import { buildStructures } from './structures.js';
+import { buildBeacons } from './beacons.js';
 import { buildHud } from './hud.js';
 import { createPost } from './post.js';
 
@@ -53,11 +59,15 @@ export function createTwin(container, opts = {}) {
   const table = addTable(scene);
   const network = buildNetwork(scene, current);
   const zones = buildZones(scene, current);
+  const layout = getLayout();
+  const terrain = buildTerrain(scene);
+  const structures = buildStructures(scene, current, layout);
+  const beacons = buildBeacons(scene, current, layout);
   // eslint-disable-next-line no-console
   console.log('[ops3d]', network.stats);
 
   const byId = () => new Map(current.map((a) => [a.assetId, a]));
-  const levels = createLevels(rig, getLayout(), {
+  const levels = createLevels(rig, layout, {
     onChange: () => pushHud(),
   });
   const hud = buildHud(container, {
@@ -93,6 +103,8 @@ export function createTwin(container, opts = {}) {
     if (!id || !byId().has(id)) return false;
     selected = id;
     network.setSelection(id);
+    structures.setSelection(id);
+    beacons.setSelection(id);
     if (fly) {
       try {
         levels.focusAsset(id, at);
@@ -164,6 +176,8 @@ export function createTwin(container, opts = {}) {
       if (atTop && selected) {
         selected = null;
         network.setSelection(null);
+        structures.setSelection(null);
+        beacons.setSelection(null);
       }
       pushHud();
     }
@@ -194,6 +208,8 @@ export function createTwin(container, opts = {}) {
     last = now;
     rig.update(dt, now / 1000);
     table.update?.(now / 1000);
+    terrain.update?.(now / 1000);
+    beacons.tick(now / 1000);
     if (post.fx.enabled) post.render(now / 1000);
     else renderer.render(scene, rig.camera);
   };
@@ -211,6 +227,8 @@ export function createTwin(container, opts = {}) {
       if (id == null) {
         selected = null;
         network.setSelection(null);
+        structures.setSelection(null);
+        beacons.setSelection(null);
         pushHud();
         return true;
       }
@@ -220,9 +238,13 @@ export function createTwin(container, opts = {}) {
       current = feed;
       network.update(feed);
       zones.update(feed);
+      structures.update(feed);
+      beacons.update(feed);
       if (selected && !byId().has(selected)) {
         selected = null;
         network.setSelection(null);
+        structures.setSelection(null);
+        beacons.setSelection(null);
       }
       pushHud();
     },
@@ -232,6 +254,9 @@ export function createTwin(container, opts = {}) {
       window.removeEventListener('keydown', onKey);
       hud.dispose();
       post.dispose();
+      beacons.dispose();
+      structures.dispose();
+      terrain.dispose?.();
       renderer.dispose();
       canvas.remove();
     },
