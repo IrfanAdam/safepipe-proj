@@ -1,67 +1,67 @@
-/* Safepipe Ops 3D — src/ops3d/checker.js · diamond checker parterre.
+/* Safepipe Ops 3D — src/ops3d/checker.js · static radial gradient wash.
  * buildChecker(scene) → { mesh, setSize, update, dispose, setDetail }
- * Faint 2 km-pitch diagonal diamond wash under everything, draped to the
- * terrain surface. Gives the void a scale without stealing glow from white
- * index contours. WebGL1-safe ShaderMaterial (sin/step/smoothstep only);
- * falls back to LineSegments if shaders unavailable.
+ * A single flat radial gradient wash under everything at Y=-0.06: faint
+ * grey-blue near the center fading to nothing at the rim. No grid, no
+ * diamonds, no step patterns, no time-based pulse — white index contours
+ * dominate. Canvas radial-gradient texture on a flat MeshBasicMaterial
+ * (transparent, depthWrite off). Opacity kept very low (≤ ~0.08).
  * [plan:2026-10-06_153000-ops3d-terrain-topo.md#task-6]
  */
 import * as THREE from 'three';
-import { field, VEX } from './terrain.js';
 
 const R_MAP = 20;
 const Y = -0.06;
+const PEAK_OPACITY = 0.075; // final visual weight ≤ ~0.08
+
+function makeWashTexture() {
+  const S = 512;
+  const c = document.createElement('canvas');
+  c.width = S;
+  c.height = S;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0.00, 'rgba(102,122,138,0.95)');
+  g.addColorStop(0.45, 'rgba(88,108,124,0.52)');
+  g.addColorStop(0.80, 'rgba(72,90,104,0.16)');
+  g.addColorStop(1.00, 'rgba(66,82,96,0.00)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  return tex;
+}
 
 export function buildChecker(scene) {
   if (!scene) throw new Error('buildChecker: scene required');
   let mesh = null;
   let mat = null;
   let geo = null;
+  let tex = null;
   try {
-    geo = new THREE.PlaneGeometry(44, 44, 44, 44);
-    const pos = geo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const z = -pos.getY(i);
-      pos.setXYZ(i, x, field(x, z) * VEX + Y, z);
-    }
-    pos.needsUpdate = true;
-    geo.computeVertexNormals();
-    mat = new THREE.ShaderMaterial({
-      uniforms: { uR: { value: R_MAP }, uOpacity: { value: 0.16 } },
-      vertexShader: `varying vec2 vP; void main(){ vP = vec2(position.x, position.z); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-      fragmentShader: `
-        varying vec2 vP;
-        uniform float uR; uniform float uOpacity;
-        void main(){
-          float d = length(vP);
-          float rim = smoothstep(12.0, 19.5, d);
-          vec2 q = vP * 0.5;
-          float a = step(0.0, sin(q.x + q.y) * sin(q.x - q.y));
-          float checker = mix(0.06, 0.14, a);
-          float alpha = (1.0 - rim) * checker * uOpacity * 8.0;
-          gl_FragColor = vec4(vec3(0.58, 0.64, 0.68) * alpha, alpha);
-        }`,
+    tex = makeWashTexture();
+    geo = new THREE.CircleGeometry(R_MAP, 96);
+    mat = new THREE.MeshBasicMaterial({
+      map: tex,
+      alphaMap: tex,
       transparent: true,
+      opacity: PEAK_OPACITY,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
       fog: false,
     });
     mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = Y;
   } catch {
-    // Fallback: diagonal LineSegments at same pitch/opacity.
-    const pts = [];
-    for (let v = -R_MAP; v <= R_MAP; v += 2) {
-      pts.push(v, Y, -R_MAP, v + 2 * R_MAP, Y, R_MAP);
-      pts.push(v, Y, R_MAP, v + 2 * R_MAP, Y, -R_MAP);
-    }
-    geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-    mat = new THREE.LineBasicMaterial({
-      color: 0x3a4448, transparent: true, opacity: 0.12,
-      blending: THREE.AdditiveBlending, depthWrite: false,
+    // Fallback: plain faint disc, still no pattern.
+    geo = new THREE.CircleGeometry(R_MAP, 64);
+    mat = new THREE.MeshBasicMaterial({
+      color: 0x46525c, transparent: true, opacity: PEAK_OPACITY,
+      depthWrite: false, blending: THREE.NormalBlending, fog: false,
     });
-    mesh = new THREE.LineSegments(geo, mat);
+    mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = Y;
   }
   mesh.name = 'ops-checker';
   mesh.renderOrder = 0;
@@ -70,20 +70,18 @@ export function buildChecker(scene) {
     mesh,
     setSize() {},
     setDetail(name) {
-      const o = name === 'asset' ? 0.06 : name === 'segment' ? 0.10 : 0.16;
+      const o = name === 'asset' ? 0.045 : name === 'segment' ? 0.060 : PEAK_OPACITY;
       if (mat?.uniforms?.uOpacity) mat.uniforms.uOpacity.value = o;
-      else if (mat) mat.opacity = o * 0.75;
+      else if (mat) mat.opacity = o;
     },
-    update(t = 0) {
-      if (mat?.uniforms?.uOpacity) {
-        const base = mat.uniforms.uOpacity.value;
-        mat.uniforms.uOpacity.value = base + 0.008 * Math.sin(t * 0.4);
-      }
+    update() {
+      // Static wash — intentionally no time-based modulation.
     },
     dispose() {
       scene.remove(mesh);
       geo?.dispose();
       mat?.dispose();
+      tex?.dispose();
     },
   };
 }
