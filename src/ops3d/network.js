@@ -28,36 +28,12 @@ const HEALTH_COLOR = {
   critical: 0xe31919, // fault red
 };
 const DOT_Y = 0.06;
-const BASE_DOT_SIZE = 0.16;
-const CRITICAL_GAIN = 2.8;
 const DIM_FACTOR = 0.3;
-const HOVER_GAIN = 1.25;
 const FLOW_COLOR = 0xd8a93c; // warm yellow oil-flow overlay
 const FLOW_OPACITY = 0.32;
 const FLOW_SPEED = 0.45; // slow drift along the pipe path (world units/s)
-const BURIED_DIM = 0.45; // buried runs keep ~55% brightness + dashed groups
 const BURIED_EDGE_T = 0.15; // outer 15% of each run dives underground
 const BURIED_R = 12; // any stretch past r=12 km is buried too
-
-let dotTexture = null;
-/* Soft round sprite so dots stay circular at any zoom (untextured Points
- * render as squares, which read as pixelation up close). */
-function getDotTexture() {
-  if (dotTexture) return dotTexture;
-  const s = 128;
-  const cv = document.createElement('canvas');
-  cv.width = cv.height = s;
-  const ctx = cv.getContext('2d');
-  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, 'rgba(255,255,255,1)');
-  g.addColorStop(0.35, 'rgba(255,255,255,1)');
-  g.addColorStop(0.55, 'rgba(255,255,255,0.6)');
-  g.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, s, s);
-  dotTexture = new THREE.CanvasTexture(cv);
-  return dotTexture;
-}
 
 function smooth01(x) {
   x = Math.min(Math.max(x, 0), 1);
@@ -75,16 +51,15 @@ function buryDepth(t, r) {
   return Math.min(Math.max(d, 0), 1);
 }
 
-/* Dotted trace with burial: buried runs sink slightly, dim ~40% (per-point
- * shade multiplies the health color), and drop dots in groups so the trace
- * reads dashed. Also returns the full sunk path for the flow overlay. */
+/* Solid-trace sampling with burial: runs split where depth crosses 0.5 so
+ * surface renders solid and buried renders dashed + dimmed. Also returns
+ * the full draped path for the flow overlay. */
 function sampleTrace(points, step = 0.18) {
-  const dots = [];
-  const shades = [];
+  const runs = []; // solid runs split by burial: {pts:[x,y,z…], buried}
   const flow = [];
   const total = pipeLen(points);
   let dist = 0;
-  let skip = 0;
+  let cur = null;
   for (let i = 1; i < points.length; i++) {
     const [x0, z0] = points[i - 1];
     const [x1, z1] = points[i];
@@ -100,18 +75,17 @@ function sampleTrace(points, step = 0.18) {
       // of sinking under the opaque body where they would vanish entirely.
       const surfY = field(x, z) * VEX + 0.03;
       const y = DOT_Y * (1 - depth) + surfY * depth;
-      flow.push(x, y + 0.02, z); // flow rides just above the dots
-      if (depth > 0.5) {
-        skip += 1;
-        if (skip % 4 >= 2) continue; // dashed groups underground
+      flow.push(x, y + 0.02, z); // flow rides just above the pipe wall
+      const buried = depth > 0.5;
+      if (!cur || cur.buried !== buried) {
+        cur = { pts: [], buried };
+        runs.push(cur);
       }
-      dots.push(new THREE.Vector3(x, y, z));
-      const s = 1 - BURIED_DIM * depth;
-      shades.push(s, s, s);
+      cur.pts.push(x, y, z);
     }
     dist += len;
   }
-  return { dots, shades: new Float32Array(shades), flow };
+  return { runs, flow };
 }
 
 function pipeLen(points) {
@@ -191,26 +165,30 @@ export function buildNetwork(scene, feed) {
     const item = healthById.get(pipe.assetId);
     const health = item?.health ?? 'nominal';
     const trace = sampleTrace(pipe.points);
-    const dots = trace.dots;
-    const geo = new THREE.BufferGeometry().setFromPoints(dots);
-    geo.setAttribute('color', new THREE.BufferAttribute(trace.shades, 3));
-    const mat = new THREE.PointsMaterial({
-      color: colorFor(health),
-      size: BASE_DOT_SIZE * (health === 'critical' ? CRITICAL_GAIN : 1),
-      sizeAttenuation: true,
-      map: getDotTexture(),
-      vertexColors: true, // buried runs carry a dimmer shade
-      transparent: true,
-      opacity: health === 'nominal' ? 0.4 : 1,
-      depthWrite: false,
-    });
-    const points = new THREE.Points(geo, mat);
-    points.name = pipe.assetId;
-    points.frustumCulled = false;
-    group.add(points);
-    track(pipe.assetId, mat, mat.opacity);
-    byId.get(pipe.assetId).dots = points;
-    dotTotal += dots.length;
+    // Solid pipe walls: surface runs solid, buried runs dashed + dimmed.
+    for (const run of trace.runs) {
+      if (run.pts.length < 6) continue;
+      const wallGeo = new LineGeometry();
+      wallGeo.setPositions(run.pts);
+      const wallMat = new LineMaterial({
+        color: colorFor(health),
+        linewidth: 2,
+        dashed: run.buried,
+        dashSize: 0.4,
+        gapSize: 0.3,
+        transparent: true,
+        opacity: (health === 'nominal' ? 0.5 : 1) * (run.buried ? 0.55 : 1),
+        depthWrite: false,
+      });
+      wallMat.resolution.set(1280, 720);
+      resMats.push(wallMat);
+      const wall = new Line2(wallGeo, wallMat);
+      wall.computeLineDistances();
+      wall.frustumCulled = false;
+      group.add(wall);
+      track(pipe.assetId, wallMat, wallMat.opacity);
+      dotTotal += run.pts.length / 3;
+    }
 
     // Flow overlay: subtle dashed warm-yellow line drifting along the pipe
     // path (dashOffset animated in tick) suggesting real-time movement.
@@ -394,13 +372,6 @@ export function buildNetwork(scene, feed) {
       for (const { m, base } of entry.mats) {
         m.opacity = dimmed ? base * DIM_FACTOR : base;
       }
-      if (entry.dots) {
-        const h = healthById.get(id)?.health ?? 'nominal';
-        let s = BASE_DOT_SIZE * (h === 'critical' ? CRITICAL_GAIN : 1);
-        if (selected === id) s *= 1.4;
-        else if (hovered === id) s *= HOVER_GAIN;
-        entry.dots.material.size = s * detailF;
-      }
       // Hovered boxes/diamonds swell slightly so the click target is obvious.
       const hs = hovered === id && selected !== id ? 1.15 : 1;
       for (const n of entry.nodes) n.scale.setScalar(hs);
@@ -466,7 +437,7 @@ export function buildNetwork(scene, feed) {
       detailF = name === 'asset' ? 0.25 : name === 'segment' ? 0.7 : 1;
       for (const [, entry] of byId) {
         for (const { m, base } of entry.mats) {
-          if (m.isPointsMaterial) m.opacity = base * f;
+          if (m.isPointsMaterial || m.isLineMaterial) m.opacity = base * f;
         }
       }
       for (const e of flowMats) e.m.opacity = FLOW_OPACITY * (e.assetId === selected ? 1 : f);
