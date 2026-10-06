@@ -33,7 +33,7 @@ const CRITICAL_GAIN = 2.8;
 const DIM_FACTOR = 0.3;
 const HOVER_GAIN = 1.25;
 const FLOW_COLOR = 0xd8a93c; // warm yellow oil-flow overlay
-const FLOW_OPACITY = 0.55;
+const FLOW_OPACITY = 0.32;
 const FLOW_SPEED = 0.45; // slow drift along the pipe path (world units/s)
 const BURIED_DIM = 0.45; // buried runs keep ~55% brightness + dashed groups
 const BURIED_EDGE_T = 0.15; // outer 15% of each run dives underground
@@ -230,7 +230,7 @@ export function buildNetwork(scene, feed) {
     });
     flowMat.resolution.set(1280, 720);
     resMats.push(flowMat);
-    flowMats.push(flowMat);
+    flowMats.push({ m: flowMat, assetId: pipe.assetId });
     const flowLine = new Line2(flowGeo, flowMat);
     flowLine.computeLineDistances();
     flowLine.frustumCulled = false;
@@ -280,7 +280,7 @@ export function buildNetwork(scene, feed) {
       bead.userData.assetId = pipe.assetId;
       group.add(bead);
       track(pipe.assetId, bead.material, 1);
-      beadMats.push(bead.material);
+      beadMats.push({ m: bead.material, assetId: pipe.assetId });
       beadTotal += 1;
     }
 
@@ -425,7 +425,7 @@ export function buildNetwork(scene, feed) {
   // Slow dash-offset drift on the flow overlays (direction follows the pipe
   // path from first to last point). Accepts absolute scene time.
   const tickFlow = (t = 0) => {
-    for (const m of flowMats) m.dashOffset = -t * FLOW_SPEED;
+    for (const e of flowMats) e.m.dashOffset = -t * FLOW_SPEED;
     // Chevrons surf the same clock: staggered drift along each pipe's arc
     // so direction reads even in a still (spacing) and in motion (drift).
     for (const c of chevrons) {
@@ -439,7 +439,8 @@ export function buildNetwork(scene, feed) {
       if (!c.dive) c.mesh.rotation.y = Math.atan2(q.x - p.x, q.z - p.z);
       const fade = 1 - d * 0.5;
       const dim = selected && selected !== c.assetId ? DIM_FACTOR : 1;
-      c.mesh.material.opacity = 0.6 * fade * (c.detailF ?? 1) * dim;
+      const lvl = c.assetId === selected ? 1 : (c.detailF ?? 1);
+      c.mesh.material.opacity = 0.35 * fade * lvl * dim;
     }
   };
 
@@ -483,9 +484,9 @@ export function buildNetwork(scene, feed) {
           if (m.isPointsMaterial) m.opacity = base * f;
         }
       }
-      for (const m of flowMats) m.opacity = FLOW_OPACITY * f;
+      for (const e of flowMats) e.m.opacity = FLOW_OPACITY * (e.assetId === selected ? 1 : f);
       for (const c of chevrons) c.detailF = f;
-      for (const m of beadMats) m.opacity = name === 'asset' ? 0.2 : 1;
+      for (const b of beadMats) b.m.opacity = (name === 'asset' && b.assetId !== selected) ? 0.2 : 1;
       applySelection();
     },
     setHover(id) {

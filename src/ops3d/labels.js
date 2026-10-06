@@ -188,6 +188,7 @@ export function buildLabels(scene, { layout, healthById } = {}) {
 
   let selected = null;
   let hidden = false;
+  let detailName = 'network';
   const items = []; // {id, sprite, ring, ringMat, line, lineMat, cv, tex, baseY, phase} (+ dest pills: {dest, pipe, text}, ring/line null)
 
   function anchorOf(kind, a) {
@@ -276,17 +277,23 @@ export function buildLabels(scene, { layout, healthById } = {}) {
     setSelection(id) {
       selected = id ?? null;
       for (const it of items) {
-        const sel = it.id === selected;
+        const sel = it.id === selected || (it.dest && it.pipe === selected);
         const w = it.sprite.userData.baseW * (it.k ?? 3.2) * (sel ? 1.3 : 1);
         it.sprite.scale.set(w, w * it.sprite.userData.aspect, 1);
+        if (detailName === 'asset') {
+          it.sprite.visible = sel;
+          if (it.ring) it.ring.visible = sel;
+          if (it.line) it.line.visible = sel;
+        }
       }
     },
-    /* Side panel owns NEAR at 'asset' level — hide in-scene labels there. */
+    /* NEAR keeps the SELECTED label in-scene (side panel covers the rest) —
+     * zooming in must never blank the thing you drilled into. */
     setDetail(name) {
-      hidden = name === 'asset';
-      group.visible = !hidden;
+      detailName = name;
+      group.visible = true;
       // Level-sized sprites: TOP reads from 68 km out, so labels grow 3×
-      // up there; ISO 1.5×; NEAR hides (side panel owns the asset).
+      // up there; ISO 1.5×; NEAR keeps selection only.
       const k = name === 'segment' ? 1.35 : 3.2;
       for (const it of items) {
         it.k = k;
@@ -294,7 +301,8 @@ export function buildLabels(scene, { layout, healthById } = {}) {
         // 14 pills at 3× would be a wall of noise. Destination tags bypass
         // the filter so the rim always reads at network/segment levels.
         const hot = healthOf(byId.get(it.dest ? it.pipe : it.id)) !== 'nominal';
-        const show = it.dest ? true : name === 'network' ? (hot || it.id === selected) : true;
+        const sel = it.id === selected || (it.dest && it.pipe === selected);
+        const show = name === 'asset' ? sel : it.dest ? true : name === 'network' ? (hot || sel) : true;
         it.sprite.visible = show;
         if (it.ring) it.ring.visible = show;
         if (it.line) it.line.visible = show;

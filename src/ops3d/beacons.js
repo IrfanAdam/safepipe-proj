@@ -318,19 +318,22 @@ export function buildBeacons(scene, feed, layout) {
   // cluster into blobs around the camera — hide them, fault kit stays.
   function setDetail(name) {
     const show = name !== 'asset';
-    for (const fl of flows) fl.beads.visible = show;
+    for (const fl of flows) fl.beads.visible = show || fl.pipeId === selected;
     // Marker restraint per view: TOP gets the full stack; ISO keeps the
     // pillar + kit (rings would bloom into a blob at 9 km); NEAR swaps
     // cone + washers for the tight anchor ring.
+    // The SELECTED fault keeps its full highlight at every level — drilling
+    // in must never dim the thing you drilled into.
     const seg = name === 'segment';
     for (const f of faults) {
-      f.pillar.visible = show;
+      const isSel = f.assetId === selected;
+      f.pillar.visible = show || isSel;
       if (seg) f.pillar.scale.setScalar(0.7);
       else f.pillar.scale.setScalar(1);
-      for (const r of f.rings) r.mesh.visible = show && !seg;
+      for (const r of f.rings) r.mesh.visible = (show && !seg) || isSel;
       if (f.anchor) f.anchor.visible = !show;
       // Zone fill owns TOP/ISO; at NEAR the kit + sleeve own the fault.
-      if (f.zone) { f.zone.visible = show; f.zoneRim.visible = show; }
+      if (f.zone) { f.zone.visible = show || isSel; f.zoneRim.visible = show || isSel; }
     }
   }
 

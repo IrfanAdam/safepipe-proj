@@ -30,22 +30,35 @@ const BELOW_COL = new THREE.Color(0x4a5255); // below-datum deep grey
 const RING_COL = 0x2fa8c7;
 const LAKE_X = -9; // playa lake center, km (flat spot, away from center + draw)
 const LAKE_Z = 6;
-const LAKE_R = 1.3; // ~2.6 km across
+const LAKE_R = 1.3; // mean radius; shoreline modulated below, ~2.6 km across
+const LAKE_BLUE = new THREE.Color(0x4d8fd1); // subtle water tint for contours
 
 const smooth = (a, b, v) => {
   const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
 
+/* Organic shoreline: radius modulated by low-order harmonics so the playa
+ * reads as a real water body, never a compass circle. 1 inside → 0 outside. */
+function lakeR(a) {
+  return LAKE_R * (1 + 0.28 * Math.sin(2 * a + 1.1) + 0.16 * Math.sin(3 * a + 0.4) + 0.1 * Math.sin(5 * a + 2.3));
+}
+function lakeWet(x, z) {
+  const dx = x - LAKE_X, dz = z - LAKE_Z;
+  const d = Math.hypot(dx, dz);
+  if (d < 1e-6) return 1;
+  const w = d / lakeR(Math.atan2(dz, dx)); // 1 = shoreline
+  return 1 - smooth(0.85, 1.15, w);
+}
+
 /* Permian-basin representative floor field (km units). Eastward dip ~1.5 m/km,
  * broad low swells ±40 m (damped flat near the playa so it sits in a flat
  * spot), one shallow winding dry draw ~22 m deep carved along a meandering
- * centerline, one playa-lake depression ~10 m deep. Total relief ≈ ±60 m.
+ * centerline, one organic playa-lake depression ~10 m deep. Total relief ≈ ±60 m.
  * No hills, no rim. */
 export function field(x, z) {
   const dip = -0.0015 * x; // eastward dip: down ~1.5 m per km east
-  const ldx = x - LAKE_X, ldz = z - LAKE_Z;
-  const lakeMask = Math.exp(-(ldx * ldx + ldz * ldz) / (2.5 * 2.5));
+  const lakeMask = lakeWet(x, z);
   const swell =
     (0.027 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
     0.0105 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0)) *
@@ -161,7 +174,9 @@ function smoothPath(pts) {
 }
 
 /* One chained polyline → Line2 strip at its true elevation × VEX, with
- * periphery fade toward the boundary ring baked into vertex colors. */
+ * periphery fade toward the boundary ring baked into vertex colors.
+ * Inside the playa shoreline the neutral grey yields to subtle water blue. */
+const _wc = new THREE.Color();
 function stripObject(pts, y, col, mat) {
   const pos = new Array(pts.length * 3);
   const clr = new Array(pts.length * 3);
@@ -172,9 +187,10 @@ function stripObject(pts, y, col, mat) {
     pos[i * 3] = x;
     pos[i * 3 + 1] = y;
     pos[i * 3 + 2] = z;
-    clr[i * 3] = col.r * f;
-    clr[i * 3 + 1] = col.g * f;
-    clr[i * 3 + 2] = col.b * f;
+    _wc.copy(col).lerp(LAKE_BLUE, lakeWet(x, z) * 0.85);
+    clr[i * 3] = _wc.r * f;
+    clr[i * 3 + 1] = _wc.g * f;
+    clr[i * 3 + 2] = _wc.b * f;
   }
   const g = new LineGeometry();
   g.setPositions(pos);
@@ -345,31 +361,50 @@ export function buildTerrain(scene) {
   });
   group.add(new THREE.LineSegments(tickGeo, tickMat));
 
-  // Playa lake: blue disc on the depression + a brighter shoreline ring.
+  // Playa lake: no disc — the water reads through subtle blue contour lines
+  // inside an organic shoreline ring. Faint wash only, so the body stays dark.
   const lakeY = field(LAKE_X, LAKE_Z) * VEX;
-  const lakeDisc = new THREE.Mesh(
-    new THREE.CircleGeometry(LAKE_R, 48),
-    new THREE.MeshBasicMaterial({
-      color: 0x2e6fd8, transparent: true, opacity: 0.5, depthWrite: false,
-    })
-  );
-  lakeDisc.rotation.x = -Math.PI / 2;
-  lakeDisc.position.set(LAKE_X, lakeY + 0.015, LAKE_Z);
-  lakeDisc.renderOrder = 1;
-  group.add(lakeDisc);
+  {
+    // Draped onto the depression so it never pokes through the body.
+    const wy = (x, z) => field(x, z) * VEX + 0.012;
+    const washPos = [];
+    for (let i = 0; i < 64; i++) {
+      const a0 = (i / 64) * Math.PI * 2, a1 = ((i + 1) / 64) * Math.PI * 2;
+      const r0 = lakeR(a0) * 0.92, r1 = lakeR(a1) * 0.92;
+      const x0 = LAKE_X + Math.cos(a0) * r0, z0 = LAKE_Z + Math.sin(a0) * r0;
+      const x1 = LAKE_X + Math.cos(a1) * r1, z1 = LAKE_Z + Math.sin(a1) * r1;
+      washPos.push(
+        LAKE_X, wy(LAKE_X, LAKE_Z), LAKE_Z,
+        x0, wy(x0, z0), z0,
+        x0, wy(x0, z0), z0,
+        x1, wy(x1, z1), z1,
+      );
+    }
+    const washGeo = new THREE.BufferGeometry();
+    washGeo.setAttribute('position', new THREE.Float32BufferAttribute(washPos, 3));
+    const wash = new THREE.Mesh(washGeo, new THREE.MeshBasicMaterial({
+      color: 0x1d4a73, transparent: true, opacity: 0.28, depthWrite: false,
+      side: THREE.DoubleSide,
+    }));
+    wash.renderOrder = 0;
+    group.add(wash);
+  }
   const shorePos = [];
   for (let i = 0; i < 96; i++) {
     const a0 = (i / 96) * Math.PI * 2, a1 = ((i + 1) / 96) * Math.PI * 2;
+    const r0 = lakeR(a0), r1 = lakeR(a1);
+    const sx0 = LAKE_X + Math.cos(a0) * r0, sz0 = LAKE_Z + Math.sin(a0) * r0;
+    const sx1 = LAKE_X + Math.cos(a1) * r1, sz1 = LAKE_Z + Math.sin(a1) * r1;
     shorePos.push(
-      LAKE_X + Math.cos(a0) * LAKE_R * 1.02, lakeY + 0.02, LAKE_Z + Math.sin(a0) * LAKE_R * 1.02,
-      LAKE_X + Math.cos(a1) * LAKE_R * 1.02, lakeY + 0.02, LAKE_Z + Math.sin(a1) * LAKE_R * 1.02
+      sx0, field(sx0, sz0) * VEX + 0.02, sz0,
+      sx1, field(sx1, sz1) * VEX + 0.02, sz1
     );
   }
   const shoreGeo = new LineGeometry();
   shoreGeo.setPositions(shorePos);
   const shoreMat = new LineMaterial({
-    color: 0x7fb2ff, linewidth: 1.5, transparent: true, opacity: 0.7,
-    blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+    color: 0x6fa8dc, linewidth: 1.2, transparent: true, opacity: 0.45,
+    depthWrite: false, fog: false,
   });
   shoreMat.resolution.set(1280, 720);
   const shore = new Line2(shoreGeo, shoreMat);
