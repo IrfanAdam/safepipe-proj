@@ -21,7 +21,7 @@ const HEALTH_COLOR = {
 };
 const DOT_Y = 0.06;
 const BASE_DOT_SIZE = 0.16;
-const CRITICAL_GAIN = 2.2;
+const CRITICAL_GAIN = 2.8;
 const DIM_FACTOR = 0.3;
 const HOVER_GAIN = 1.25;
 

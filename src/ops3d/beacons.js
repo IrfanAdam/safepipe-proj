@@ -130,6 +130,11 @@ export function buildBeacons(scene, feed, layout) {
   const kitWeldMat = new THREE.MeshBasicMaterial({ color: 0xcfd6d8, wireframe: true, transparent: true, opacity: 0.7 });
   // Conforming wall-loss band: partial cylinder hugging the pipe surface.
   const kitBandGeo = new THREE.CylinderGeometry(0.063, 0.063, 0.24, 12, 1, true, 0, 2.2);
+  // Fault zone fill: the ref reads DANGER as a glowing area, not a pin —
+  // warm orange disc + rim at each fault, TOP/ISO only (a 1.2 km disc
+  // would fill the NEAR frame). Cool terrain vs warm zone wins by hue.
+  const zoneGeo = new THREE.CircleGeometry(0.6, 48);
+  const zoneRimGeo = new THREE.RingGeometry(0.6, 0.64, 48);
   // Static anchor ring (thin NEAR-only outline) + unit leader + white pin.
   const anchorGeo = new THREE.RingGeometry(0.09, 0.095, 40);
   const leaderGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0)]);
@@ -154,6 +159,7 @@ export function buildBeacons(scene, feed, layout) {
       if (f.anchor) group.remove(f.anchor);
       if (f.leader) group.remove(f.leader);
       if (f.pin) group.remove(f.pin);
+      if (f.zone) { group.remove(f.zone); group.remove(f.zoneRim); }
       group.remove(...f.rings.map((r) => r.mesh));
       f.mat.dispose(); f.coreMat?.dispose(); f.kitMats?.forEach((m) => m.dispose());
       for (const r of f.rings) { r.mesh.geometry.dispose(); r.mat.dispose(); }
@@ -233,6 +239,27 @@ export function buildBeacons(scene, feed, layout) {
         const pin = new THREE.Mesh(pinGeo, pinMat);
         pin.position.set(p.x, 0.085, p.z);
         group.add(pin);
+        // Zone fill: warm glowing disc + rim around the fault ground.
+        // Rim-dominant: the boundary reads danger, the faint disc tints
+        // without burying the facilities underneath.
+        const zoneMat = new THREE.MeshBasicMaterial({
+          color: col, transparent: true, opacity: 0.13,
+          blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+        });
+        kitMats.push(zoneMat);
+        const zone = new THREE.Mesh(zoneGeo, zoneMat);
+        zone.rotation.x = -Math.PI / 2;
+        zone.position.set(p.x, 0.015, p.z);
+        group.add(zone);
+        const zoneRimMat = new THREE.MeshBasicMaterial({
+          color: col, transparent: true, opacity: 0.85,
+          blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+        });
+        kitMats.push(zoneRimMat);
+        const zoneRim = new THREE.Mesh(zoneRimGeo, zoneRimMat);
+        zoneRim.rotation.x = -Math.PI / 2;
+        zoneRim.position.set(p.x, 0.015, p.z);
+        group.add(zoneRim);
         const rings = [0, 0.5].map((phase) => {
           const rm = new THREE.MeshBasicMaterial({
             color: col, transparent: true, opacity: 0.7,
@@ -244,7 +271,7 @@ export function buildBeacons(scene, feed, layout) {
           group.add(mesh);
           return { mesh, mat: rm, phase };
         });
-        faults.push({ assetId, pillar, mat, core, coreMat, kit, kitMats, anchor, leader, pin, rings, baseOp: 0.45, crit: fault.severity === 'critical' });
+        faults.push({ assetId, pillar, mat, core, coreMat, kit, kitMats, anchor, leader, pin, zone, zoneRim, rings, baseOp: 0.45, crit: fault.severity === 'critical' });
       }
     }
   }
@@ -290,6 +317,8 @@ export function buildBeacons(scene, feed, layout) {
       else f.pillar.scale.setScalar(1);
       for (const r of f.rings) r.mesh.visible = show && !seg;
       if (f.anchor) f.anchor.visible = !show;
+      // Zone fill owns TOP/ISO; at NEAR the kit + sleeve own the fault.
+      if (f.zone) { f.zone.visible = show; f.zoneRim.visible = show; }
     }
   }
 

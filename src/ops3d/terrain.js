@@ -20,9 +20,9 @@ const R_MAP = 20; // boundary ring radius, km
 const N = 128; // marching-squares grid cells per side
 const LEVELS = 12; // contour levels
 const VEX = 2; // vertical exaggeration, fixed
-const BASE_COL = new THREE.Color(0x35606f); // dim cyan base contours
-const INDEX_COL = new THREE.Color(0x5f93a8); // brighter every-4th index contours
-const BELOW_COL = new THREE.Color(0x1e4a4e); // below-datum dim teal
+const BASE_COL = new THREE.Color(0x3f8aa5); // luminous cyan base contours
+const INDEX_COL = new THREE.Color(0x8fdcf5); // bright every-4th index contours
+const BELOW_COL = new THREE.Color(0x2a6a7e); // below-datum deep teal
 const RING_COL = 0x2fa8c7;
 
 const smooth = (a, b, v) => {
@@ -183,22 +183,23 @@ export function buildTerrain(scene) {
     }
   }
 
-  // Two shared fat-line materials: dim base (1.25px) + brighter index (2px).
+  // Two shared fat-line materials: luminous base (1.25px) + bright index (2px).
+  // Cool cyan carries the terrain so the warm fault zone wins by hue.
   const baseMat = new LineMaterial({
     color: 0xffffff,
     vertexColors: true,
-    linewidth: 1.25,
+    linewidth: 1.5,
     transparent: true,
-    opacity: 0.65,
+    opacity: 0.8,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
   const indexMat = new LineMaterial({
     color: 0xffffff,
     vertexColors: true,
-    linewidth: 2,
+    linewidth: 2.25,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.95,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
@@ -217,6 +218,39 @@ export function buildTerrain(scene) {
     }
   }
 
+  // Solid table body: elevation-tinted surface under the contours — dark
+  // teal in the lows rising to deep cyan on the highs, one draw, normal
+  // blending so it reads as matter, not light. Lines stay crisp on top.
+  {
+    const SEG = 96;
+    const body = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+    const pa = body.attributes.position;
+    const colors = new Float32Array(pa.count * 3);
+    const cLo = new THREE.Color(0x062027);
+    const cHi = new THREE.Color(0x1a6a80);
+    const tmp = new THREE.Color();
+    const span = (mx - mn) || 1;
+    for (let k = 0; k < pa.count; k++) {
+      const x = pa.getX(k);
+      const z = -pa.getY(k); // plane Y maps to world -Z after rotation
+      const h = field(x, z);
+      pa.setZ(k, h * VEX - 0.04);
+      const t = (h - mn) / span;
+      tmp.copy(cLo).lerp(cHi, t * t);
+      const f = 1 - smooth(12, 19.5, Math.hypot(x, z));
+      colors[k * 3] = tmp.r * f;
+      colors[k * 3 + 1] = tmp.g * f;
+      colors[k * 3 + 2] = tmp.b * f;
+    }
+    body.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    body.computeVertexNormals();
+    const bodyMesh = new THREE.Mesh(body, new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.92, fog: false,
+    }));
+    bodyMesh.rotation.x = -Math.PI / 2;
+    bodyMesh.renderOrder = -1;
+    group.add(bodyMesh);
+  }
   // Faint dark base disc.
   const discGeo = new THREE.CircleGeometry(R_MAP, 64);
   const discMat = new THREE.MeshBasicMaterial({
@@ -244,13 +278,28 @@ export function buildTerrain(scene) {
     color: RING_COL,
     linewidth: 2,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.45,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     fog: false,
   });
   ringMat.resolution.set(1280, 720);
   group.add(new Line2(ringGeo, ringMat));
+  // Glass-slab thickness: faint outer echo of the boundary ring.
+  const lipGeo = new LineGeometry();
+  const lipPos = [];
+  for (let i = 0; i < 160; i++) {
+    const a0 = (i / 160) * Math.PI * 2, a1 = ((i + 1) / 160) * Math.PI * 2;
+    lipPos.push(Math.cos(a0) * (R_MAP + 0.4), -0.05, Math.sin(a0) * (R_MAP + 0.4),
+      Math.cos(a1) * (R_MAP + 0.4), -0.05, Math.sin(a1) * (R_MAP + 0.4));
+  }
+  lipGeo.setPositions(lipPos);
+  const lipMat = new LineMaterial({
+    color: RING_COL, linewidth: 1.5, transparent: true, opacity: 0.3,
+    blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+  });
+  lipMat.resolution.set(1280, 720);
+  group.add(new Line2(lipGeo, lipMat));
   const tickPos = [];
   for (let i = 0; i < 24; i++) {
     const a = (i / 24) * Math.PI * 2;
@@ -273,11 +322,12 @@ export function buildTerrain(scene) {
       baseMat.resolution.set(w, h);
       indexMat.resolution.set(w, h);
       ringMat.resolution.set(w, h);
+      lipMat.resolution.set(w, h);
     },
     update(t = 0) {
-      baseMat.opacity = 0.5 + 0.06 * Math.sin(t * 1.2);
-      indexMat.opacity = 0.6 + 0.06 * Math.sin(t * 1.2 + 0.6);
-      ringMat.opacity = 0.45 + 0.15 * Math.sin(t * 1.2 + 1.3);
+      baseMat.opacity = 0.8 + 0.06 * Math.sin(t * 1.2);
+      indexMat.opacity = 0.95 + 0.05 * Math.sin(t * 1.2 + 0.6);
+      ringMat.opacity = 0.45 + 0.1 * Math.sin(t * 1.2 + 1.3);
     },
     dispose() {
       scene.remove(group);
