@@ -126,6 +126,7 @@ function gable(c, w, wallH, d, roofH, x, y, z) {
 function tank(c, x, z, r = 0.28, h = 0.5, roofH = 0.16, n = 20, m = 8) {
   const arr = [], y0 = 0.06, y1 = y0 + h;
   ringSegs(arr, x, y0, z, r, n);
+  ringSegs(arr, x, (y0 + y1) / 2, z, r, n);
   ringSegs(arr, x, y1, z, r, n);
   for (let i = 0; i < m; i++) {
     const a = (i / m) * Math.PI * 2, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
@@ -166,6 +167,73 @@ function fanCircle(c, x, y, z, r, n = 24) {
   }
   loop(c, pts);
 }
+/* Lattice derrick tower: 4 tapering legs, ring band + X-braces per level.
+ * The hero silhouette of ref rigs — dense but one static segment buffer. */
+function latticeTower(c, x, z, baseW = 0.24, h = 2.4, levels = 6, y0 = 0.06) {
+  const arr = [];
+  const wTop = baseW * 0.35;
+  const corner = (sx, sz, y) => {
+    const f = (y - y0) / h;
+    const w = baseW * (1 - f) + wTop * f;
+    return [x + (sx * w) / 2, y, z + (sz * w) / 2];
+  };
+  for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    const [ax, ay, az] = corner(sx, sz, y0);
+    const [bx, by, bz] = corner(sx, sz, y0 + h);
+    arr.push(ax, ay, az, bx, by, bz);
+  }
+  for (let l = 0; l <= levels; l++) {
+    const y = y0 + (h * l) / levels;
+    const f = l / levels;
+    const w = (baseW * (1 - f) + wTop * f) / 2;
+    rectSegs(arr, x - w, z - w, x + w, z + w, y);
+    if (l < levels) {
+      const y2 = y0 + (h * (l + 1)) / levels;
+      const f2 = (l + 1) / levels;
+      const w2 = (baseW * (1 - f2) + wTop * f2) / 2;
+    // X-brace on all 4 faces: diagonals B[f]→T[g] and B[g]→T[f].
+    const B = [[x - w, y, z - w], [x + w, y, z - w], [x + w, y, z + w], [x - w, y, z + w]];
+    const T = [[x - w2, y2, z - w2], [x + w2, y2, z - w2], [x + w2, y2, z + w2], [x - w2, y2, z + w2]];
+    for (let f = 0; f < 4; f++) {
+      const g = (f + 1) % 4;
+      arr.push(...B[f], ...T[g], ...B[g], ...T[f]);
+    }
+    }
+  }
+  segs(c, arr);
+  dot(c, x, y0 + h + 0.04, z, 0.05);
+}
+/* Drop lines: facility corners bleed vertically below datum (ref map glow). */
+function drops(c, w, d, yTop = 0.02, yBot = -1.1) {
+  const arr = [];
+  for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]])
+    vert(arr, (sx * w) / 2, yTop, yBot, (sz * d) / 2);
+  segs(c, arr, graphite);
+}
+/* Speckle fill: deterministic faint dot-dust inside a footprint (ref map). */
+const speckleMat = new THREE.PointsMaterial({
+  color: 0x5f93ad, size: 0.035, transparent: true, opacity: 0.55,
+  blending: THREE.AdditiveBlending, depthWrite: false,
+});
+function speckle(c, w, d, id, y = 0.08) {
+  let s = 7;
+  for (const ch of String(id)) s = (Math.imul(s, 31) + ch.charCodeAt(0)) | 0;
+  const rnd = () => {
+    s = (Math.imul(s, 1664525) + 1013904223) | 0;
+    return (s >>> 0) / 4294967296;
+  };
+  const n = Math.min(220, Math.floor(w * d * 30));
+  const p = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    p[i * 3] = (rnd() - 0.5) * w;
+    p[i * 3 + 1] = y + rnd() * 0.05;
+    p[i * 3 + 2] = (rnd() - 0.5) * d;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  c.owned.push(g);
+  c.group.add(new THREE.Points(g, speckleMat));
+}
 
 /* FAC-01 — gas transmission compressor station. */
 function compressor(c) {
@@ -188,8 +256,7 @@ function compressor(c) {
   fanCircle(c, -1.6, 1.18, 0.25, 0.16);
   fanCircle(c, -1.1, 1.18, 0.25, 0.16);
   box(c, 0.6, 0.45, 0.5, 1.35, 0.28, 0.25); // control building
-  wire(c, GEO.cyl, 0.1, 2.3, 0.1, 1.7, 1.2, -0.9); // vent / flare stack
-  dot(c, 1.7, 2.42, -0.9, 0.05);
+  latticeTower(c, 1.7, -0.9, 0.24, 2.4, 6); // vent / flare stack (lattice derrick)
   fence(c, 3.6, 2.2);
 }
 /* FAC-02 — valve yard: manifold grid + handwheels + fence. */
@@ -281,6 +348,8 @@ export function buildStructures(scene, feed, layout) {
     c.group.position.set(fac.position[0], 0, fac.position[1]);
     const fn = builders[fac.assetId] ?? [compressor, valveYard, tankFarm][kinds[fac.assetId] ?? 0] ?? compressor;
     fn(c);
+    drops(c, fac.size[0], fac.size[2]);
+    speckle(c, fac.size[0], fac.size[2], fac.assetId);
     c.group.userData.assetId = fac.assetId;
     group.add(c.group);
     entries.set(fac.assetId, c);
