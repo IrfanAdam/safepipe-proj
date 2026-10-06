@@ -27,6 +27,8 @@ import { createLevels } from './levels.js';
 import { buildTerrain } from './terrain.js';
 import { buildStructures } from './structures.js';
 import { buildBeacons } from './beacons.js';
+import { buildLabels } from './labels.js';
+import { buildGridFloor } from './gridfloor.js';
 import { buildHud } from './hud.js';
 import { createPost } from './post.js';
 
@@ -67,6 +69,8 @@ export function createTwin(container, opts = {}) {
   console.log('[ops3d]', network.stats);
 
   const byId = () => new Map(current.map((a) => [a.assetId, a]));
+  const gridfloor = buildGridFloor(scene);
+  const labels = buildLabels(scene, { layout, healthById: byId() });
   const levels = createLevels(rig, layout, {
     onChange: () => pushHud(),
   });
@@ -95,6 +99,7 @@ export function createTwin(container, opts = {}) {
     network.setDetail?.(levels.name);
     beacons.setDetail?.(levels.name);
     structures.setDetail?.(levels.name);
+    labels.setDetail?.(levels.name);
     const map = byId();
     const sel = selected ? map.get(selected) ?? null : null;
     const crit = sel?.health === 'critical' ? sel : current.find((a) => a.health === 'critical');
@@ -141,6 +146,7 @@ export function createTwin(container, opts = {}) {
     network.setSelection(id);
     structures.setSelection(id);
     beacons.setSelection(id);
+    labels.setSelection(id);
     if (fly) {
       try {
         levels.focusAsset(id, aim);
@@ -214,6 +220,7 @@ export function createTwin(container, opts = {}) {
         network.setSelection(null);
         structures.setSelection(null);
         beacons.setSelection(null);
+        labels.setSelection(null);
       }
       pushHud();
     }
@@ -247,6 +254,7 @@ export function createTwin(container, opts = {}) {
     table.update?.(now / 1000);
     terrain.update?.(now / 1000);
     beacons.tick(now / 1000);
+    labels.update?.(now / 1000);
     if (post.fx.enabled) post.render(now / 1000);
     else renderer.render(scene, rig.camera);
   };
@@ -275,6 +283,7 @@ export function createTwin(container, opts = {}) {
         network.setSelection(null);
         structures.setSelection(null);
         beacons.setSelection(null);
+        labels.setSelection(null);
         pushHud();
         return true;
       }
@@ -286,11 +295,13 @@ export function createTwin(container, opts = {}) {
       zones.update(feed);
       structures.update(feed);
       beacons.update(feed);
+      labels.update?.(performance.now() / 1000, feed);
       if (selected && !byId().has(selected)) {
         selected = null;
         network.setSelection(null);
         structures.setSelection(null);
         beacons.setSelection(null);
+        labels.setSelection(null);
       }
       pushHud();
     },
@@ -302,6 +313,8 @@ export function createTwin(container, opts = {}) {
       post.dispose();
       beacons.dispose();
       structures.dispose();
+      labels.dispose?.();
+      gridfloor.dispose?.();
       terrain.dispose?.();
       renderer.dispose();
       canvas.remove();

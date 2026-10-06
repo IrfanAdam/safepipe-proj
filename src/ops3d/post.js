@@ -116,10 +116,10 @@ export function createPost(renderer, scene, camera) {
   if (!camera) throw new Error('createPost: camera required');
 
   const fx = {
-    threshold: 0.55,
-    bloom: 0.45,
+    threshold: 0.42,
+    bloom: 0.55,
     ca: 1.0,
-    grain: 0.014,
+    grain: 0.008,
     scan: 0.05,
     vignette: 0.35,
     dof: 0,

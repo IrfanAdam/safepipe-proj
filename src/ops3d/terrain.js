@@ -33,7 +33,7 @@ const smooth = (a, b, v) => {
 /* Permian-basin representative floor field (km units). Eastward dip ~1.5 m/km,
  * broad low swells ±25 m, one shallow winding dry draw ~15 m deep carved
  * along a meandering centerline. Total relief ≈ ±40 m. No hills, no rim. */
-function field(x, z) {
+export function field(x, z) {
   const dip = -0.0015 * x; // eastward dip: down ~1.5 m per km east
   const swell =
     0.018 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
@@ -244,8 +244,21 @@ export function buildTerrain(scene) {
     }
     body.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     body.computeVertexNormals();
+    // Circular alpha mask: the square plane must die exactly at the ring —
+    // no dark corners peeking outside the mapped circle.
+    const mask = document.createElement('canvas');
+    mask.width = mask.height = 256;
+    const mctx = mask.getContext('2d');
+    const mg = mctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    mg.addColorStop(0, 'rgba(255,255,255,1)');
+    mg.addColorStop(0.86, 'rgba(255,255,255,1)');
+    mg.addColorStop(0.93, 'rgba(255,255,255,0)');
+    mctx.fillStyle = mg;
+    mctx.fillRect(0, 0, 256, 256);
+    const maskTex = new THREE.CanvasTexture(mask);
     const bodyMesh = new THREE.Mesh(body, new THREE.MeshBasicMaterial({
       vertexColors: true, transparent: true, opacity: 0.92, fog: false,
+      alphaMap: maskTex,
     }));
     bodyMesh.rotation.x = -Math.PI / 2;
     bodyMesh.renderOrder = -1;

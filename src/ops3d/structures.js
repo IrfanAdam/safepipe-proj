@@ -1,7 +1,9 @@
 /* Safepipe Ops 3D — src/ops3d/structures.js · outline-hologram facility assets.
  * Theatre-style see-through geometry: everything is THREE.LineSegments
  * (EdgesGeometry over shared unit geoms, or custom segment buffers) plus a
- * few glowing status dots (MeshBasicMaterial spheres). No solid masses.
+ * few glowing status dots (MeshBasicMaterial spheres) and frosted
+ * glass mass fills (MeshBasicMaterial boxes/cylinders, opacity 0.18,
+ * depthWrite false) under each facility footprint; outlines draw on top.
  * FAC-01 gas transmission compressor station (2 gabled halls, suction /
  * discharge headers on trestles, fin-fan cooler bay, control building,
  * vent stack, fence); FAC-02 valve yard (manifold grid + handwheels +
@@ -10,7 +12,8 @@
  * lines plus health-tinted joint rings.
  * Health: dim bone 0x8f9797 nominal / amber 0xff8c39 watch / red 0xe31919
  * outlines + brighter lamp dots. Selection: 1.1x scale + brighten.
- * Contract: buildStructures(scene, feed, layout?) → {group, update, setSelection, dispose}.
+ * Contract: buildStructures(scene, feed, layout?) or
+ *   buildStructures(scene, { layout, healthById }) → {group, update, setSelection, setDetail, dispose}.
  */
 import * as THREE from 'three';
 import { getLayout } from './health-feed.js';
@@ -53,26 +56,47 @@ function actx(health) {
     group: new THREE.Group(),
     outline: new THREE.LineBasicMaterial({ color: col(health), transparent: true, opacity: 0.9 }),
     lampMat: new THREE.MeshBasicMaterial({ color: lampCol(health) }),
+    massMat: new THREE.MeshBasicMaterial({
+      color: col(health), transparent: true, opacity: 0.18, depthWrite: false,
+    }),
     base: new THREE.Color(col(health)),
     lampBase: new THREE.Color(lampCol(health)),
+    massBase: new THREE.Color(col(health)),
     owned: [], // transient BufferGeometries for dispose()
     speckle: [], // dot-dust Points, hidden at NEAR (they bloom into soup)
   };
+}
+/* Frosted-glass mass fill under an outline wireframe. Solid GEO.box mesh
+ * with shared per-asset translucent material; outlines (renderOrder 2)
+ * draw on top of the fill (renderOrder 1). */
+function mass(c, geo, sx, sy, sz, x, y, z, ry = 0, rx = 0) {
+  const m = new THREE.Mesh(geo, c.massMat);
+  m.scale.set(sx, sy, sz);
+  m.position.set(x, y, z);
+  m.rotation.set(rx, ry, 0);
+  m.renderOrder = 1;
+  c.group.add(m);
+  return m;
 }
 function wire(c, geo, sx, sy, sz, x, y, z, ry = 0, rx = 0, mat = null) {
   const l = new THREE.LineSegments(edgeOf(geo), mat ?? c.outline);
   l.scale.set(sx, sy, sz);
   l.position.set(x, y, z);
   l.rotation.set(rx, ry, 0);
+  l.renderOrder = 2;
   c.group.add(l);
   return l;
 }
-const box = (c, w, h, d, x, y, z, ry = 0) => wire(c, GEO.box, w, h, d, x, y, z, ry);
+const box = (c, w, h, d, x, y, z, ry = 0) => {
+  mass(c, GEO.box, w, h, d, x, y, z, ry);
+  return wire(c, GEO.box, w, h, d, x, y, z, ry);
+};
 function segs(c, positions, mat = null) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
   c.owned.push(g);
   const l = new THREE.LineSegments(g, mat ?? c.outline);
+  l.renderOrder = 2;
   c.group.add(l);
   return l;
 }
@@ -119,6 +143,7 @@ function gable(c, w, wallH, d, roofH, x, y, z) {
   const arr = [], hx = w / 2;
   const X0 = x - hx, X1 = x + hx, Z0 = z - d / 2, Z1 = z + d / 2;
   const y1 = y + wallH, y2 = y1 + roofH;
+  mass(c, GEO.box, w, wallH, d, x, y + wallH / 2, z); // hall glass mass
   rectSegs(arr, X0, Z0, X1, Z1, y);
   rectSegs(arr, X0, Z0, X1, Z1, y1);
   for (const [cx, cz] of [[X0, Z0], [X1, Z0], [X1, Z1], [X0, Z1]]) vert(arr, cx, y, y1, cz);
@@ -130,6 +155,7 @@ function gable(c, w, wallH, d, roofH, x, y, z) {
 /* Open tank outline: bottom + top rings, verticals, roof-cone slopes + apex dot. */
 function tank(c, x, z, r = 0.28, h = 0.5, roofH = 0.16, n = 20, m = 8) {
   const arr = [], y0 = 0.06, y1 = y0 + h;
+  mass(c, GEO.cyl, r * 2, h, r * 2, x, (y0 + y1) / 2, z); // tank glass mass
   ringSegs(arr, x, y0, z, r, n);
   ringSegs(arr, x, (y0 + y1) / 2, z, r, n);
   ringSegs(arr, x, y1, z, r, n);
@@ -274,6 +300,7 @@ function valveYard(c) {
   box(c, 1.5, 0.05, 1.2, 0, 0.025, 0); // pad outline
   for (let i = 0; i < 3; i++) {
     const z = -0.3 + i * 0.3;
+    mass(c, GEO.box, 1.3, 0.12, 0.12, 0, 0.16, z); // manifold glass mass
     tube(c, -0.65, 0.16, z, 0.65, 0.16, z, 0.05);
     for (const x of [-0.3, 0.3]) {
       tube(c, x, 0.16, z, x, 0.42, z, 0.035);
@@ -334,9 +361,18 @@ function pipeRuns(group, layout, healthById, entries) {
 function paint(e, on) {
   e.outline.color.copy(e.base).lerp(WHITE, on ? 0.45 : 0);
   e.lampMat.color.copy(e.lampBase).lerp(WHITE, on ? 0.5 : 0);
+  e.massMat?.color.copy(e.massBase ?? e.base).lerp(WHITE, on ? 0.3 : 0);
 }
 
-export function buildStructures(scene, feed, layout) {
+export function buildStructures(scene, feedOrOpts, layoutArg) {
+  // Accept both legacy (scene, feed[], layout) and options (scene, {layout, healthById}) forms.
+  let feed = feedOrOpts, layout = layoutArg;
+  if (feedOrOpts && !Array.isArray(feedOrOpts) && typeof feedOrOpts === 'object') {
+    layout = feedOrOpts.layout ?? layoutArg;
+    const hb = feedOrOpts.healthById;
+    feed = hb instanceof Map ? [...hb.entries()].map(([assetId, health]) => ({ assetId, health }))
+      : Array.isArray(hb) ? hb : [];
+  }
   const lay = layout ?? getLayout();
   const healthById = new Map((feed ?? []).map((f) => [f.assetId, f.health ?? 'nominal']));
   const group = new THREE.Group();
@@ -377,6 +413,7 @@ export function buildStructures(scene, feed, layout) {
         const h = f.health ?? 'nominal';
         e.base.set(col(h));
         e.lampBase.set(lampCol(h));
+        e.massBase?.set(col(h));
         paint(e, selected === f.assetId);
       }
     },
@@ -401,6 +438,7 @@ export function buildStructures(scene, feed, layout) {
         for (const g of e.owned) g.dispose?.();
         e.outline.dispose?.();
         e.lampMat.dispose?.();
+        e.massMat?.dispose?.();
       }
       entries.clear();
     },
