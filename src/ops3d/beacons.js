@@ -79,6 +79,7 @@ export function buildBeacons(scene, feed, layout) {
   scene.add(group);
 
   let selected = null;
+  let haloBase = 1; // per-asset halo scale (pipes 1, pads 0.5, sensors 0.35)
   const flows = []; // {pipeId, pts, cum, total, beads, pos, mat, count, speed}
   let faults = []; // {assetId, mat, rings:[{mesh,mat,phase}], baseOp}
   let halo = null;
@@ -268,8 +269,9 @@ export function buildBeacons(scene, feed, layout) {
       return;
     }
     let p;
-    if (pipeById.has(selected)) p = polyPoint(pipeById.get(selected).points, 0.5);
-    else p = faultAnchor(selected);
+    // Halo scales to the asset: a 600 m disc drowns a 180 m pad.
+    if (pipeById.has(selected)) { p = polyPoint(pipeById.get(selected).points, 0.5); haloBase = 1; }
+    else { p = faultAnchor(selected); haloBase = facById.has(selected) ? 0.5 : 0.35; }
     halo.position.set(p.x, 0.04, p.z);
     halo.visible = true;
   };
@@ -278,11 +280,15 @@ export function buildBeacons(scene, feed, layout) {
   function setDetail(name) {
     const show = name !== 'asset';
     for (const fl of flows) fl.beads.visible = show;
-    // At NEAR the cone + washers bury the pipe — swap them for the tight
-    // anchor ring; the kit, floating core and leader carry the fault.
+    // Marker restraint per view: TOP gets the full stack; ISO keeps the
+    // pillar + kit (rings would bloom into a blob at 9 km); NEAR swaps
+    // cone + washers for the tight anchor ring.
+    const seg = name === 'segment';
     for (const f of faults) {
       f.pillar.visible = show;
-      for (const r of f.rings) r.mesh.visible = show;
+      if (seg) f.pillar.scale.setScalar(0.7);
+      else f.pillar.scale.setScalar(1);
+      for (const r of f.rings) r.mesh.visible = show && !seg;
       if (f.anchor) f.anchor.visible = !show;
     }
   }
@@ -336,9 +342,9 @@ export function buildBeacons(scene, feed, layout) {
         }
       }
       if (halo?.visible) {
-        const s = 1 + 0.12 * Math.sin(t * 3);
+        const s = haloBase * (1 + 0.12 * Math.sin(t * 3));
         halo.scale.setScalar(s);
-        halo.material.opacity = 0.65 + 0.25 * Math.sin(t * 3);
+        halo.material.opacity = 0.45 + 0.2 * Math.sin(t * 3);
       }
     },
     dispose() {

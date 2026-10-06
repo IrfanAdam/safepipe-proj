@@ -94,6 +94,7 @@ export function createTwin(container, opts = {}) {
     // Detail follows the view too: ghost TOP dots + hide flow beads at NEAR.
     network.setDetail?.(levels.name);
     beacons.setDetail?.(levels.name);
+    structures.setDetail?.(levels.name);
     const map = byId();
     const sel = selected ? map.get(selected) ?? null : null;
     const crit = sel?.health === 'critical' ? sel : current.find((a) => a.health === 'critical');
@@ -254,10 +255,16 @@ export function createTwin(container, opts = {}) {
   pushHud();
   // Opening frame: fly out to the full mapped circle (rig boots at the
   // close sector preset; HUD already reads TOP so the camera must match).
-  levels.setLevel('network');
+  // View param: ?view=ISO|NEAR opens drilled in (default TOP fly-out).
+  const startView = (params.get('view') || '').toLowerCase();
+  if (startView === 'iso' || startView === 'segment') levels.setLevel('segment');
+  else if (startView === 'near' || startView === 'asset') levels.setLevel('asset');
+  else levels.setLevel('network');
   // Deep link: ?asset=PIPE-07 drills straight to the asset.
   const deep = params.get('asset');
   if (deep) select(deep, { fly: true });
+  // ?asset=X&view=ISO lands on the segment view of that asset's ground.
+  if (deep && (startView === 'iso' || startView === 'segment')) levels.setLevel('segment');
 
   return {
     rollup: () => healthRollup(current),

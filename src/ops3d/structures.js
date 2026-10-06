@@ -56,6 +56,7 @@ function actx(health) {
     base: new THREE.Color(col(health)),
     lampBase: new THREE.Color(lampCol(health)),
     owned: [], // transient BufferGeometries for dispose()
+    speckle: [], // dot-dust Points, hidden at NEAR (they bloom into soup)
   };
 }
 function wire(c, geo, sx, sy, sz, x, y, z, ry = 0, rx = 0, mat = null) {
@@ -236,7 +237,9 @@ function speckle(c, w, d, id, y = 0.08) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(p, 3));
   c.owned.push(g);
-  c.group.add(new THREE.Points(g, speckleMat));
+  const pts = new THREE.Points(g, speckleMat);
+  c.speckle.push(pts);
+  c.group.add(pts);
 }
 
 /* FAC-01 — gas transmission compressor station (local dims, scaled by FAC_SCALE). */
@@ -385,6 +388,12 @@ export function buildStructures(scene, feed, layout) {
         e.group.scale.setScalar(base * (on ? 1.1 : 1));
         paint(e, on);
       }
+    },
+    // Level-driven declutter: speckle dot-dust is TOP/ISO texture; at NEAR
+    // it blooms into soup that buries the wireframes — hide it there.
+    setDetail(name) {
+      const show = name !== 'asset';
+      for (const [, e] of entries) for (const s of e.speckle ?? []) s.visible = show;
     },
     dispose() {
       scene.remove(group);

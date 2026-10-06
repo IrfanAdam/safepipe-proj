@@ -59,15 +59,22 @@ export function createLevels(rig, layout, opts = {}) {
 
   // assetId → [x, z] ground position.
   const index = new Map();
+  // assetId → kind for per-kind close-up distance (a 180 m pad needs a
+  // closer camera than a 37 km line or the hero fills 2% of frame).
+  const kinds = new Map();
+  const KIND_DIST = { pipeline: 2.2, facility: 0.45, sensor: 0.35 };
   for (const p of layout?.pipelines ?? []) {
     const mid = polylineMidpoint(p.points);
     if (mid) index.set(p.assetId, mid);
+    kinds.set(p.assetId, 'pipeline');
   }
   for (const f of layout?.facilities ?? []) {
     if (f.position) index.set(f.assetId, [f.position[0], f.position[1]]);
+    kinds.set(f.assetId, 'facility');
   }
   for (const s of layout?.sensors ?? []) {
     if (s.position) index.set(s.assetId, [s.position[0], s.position[1]]);
+    kinds.set(s.assetId, 'sensor');
   }
 
   let current = 'network';
@@ -105,7 +112,12 @@ export function createLevels(rig, layout, opts = {}) {
     focusAsset(assetId, at = null) {
       const target = at ?? resolveTarget(assetId);
       lastAssetId = assetId;
-      go('asset', target);
+      // Close-up distance follows the asset's real size.
+      const view = { ...VIEWS.asset, dist: KIND_DIST[kinds.get(assetId)] ?? VIEWS.asset.dist };
+      current = 'asset';
+      lastTarget = target;
+      rig.flyTo(viewPos(view, target), target);
+      onChange('asset');
     },
 
     // dir > 0 descends toward asset, dir < 0 ascends toward network (ESC).
