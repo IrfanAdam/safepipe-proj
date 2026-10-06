@@ -270,7 +270,7 @@ export function buildLabels(scene, { layout, healthById } = {}) {
           it.ring.scale.set(0.28 * pulse * (sel ? 1.5 : 1), 0.28 * pulse * (sel ? 1.5 : 1), 1);
           it.ringMat.opacity = (sel ? 1 : 0.8) * (0.75 + 0.25 * Math.sin(t * 2.4 + it.phase));
         }
-        it.sprite.position.y = it.baseY + 0.05 * Math.sin(t * 1.2 + it.phase);
+        it.sprite.position.y = it.baseY;
         it.sprite.material.opacity = hidden ? 0 : sel ? 1 : it.dest ? 0.9 : 0.92;
       }
     },
