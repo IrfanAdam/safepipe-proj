@@ -1,12 +1,101 @@
 {
-  "generated": "2026-10-06T09:12:18.387Z",
+  "generated": "2026-10-06T11:31:51.327Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
     "2026-10-05_150017-safepipe-prototype-screens.md",
-    "2026-10-06_003000-ops3d-theatre-style.md"
+    "2026-10-06_003000-ops3d-theatre-style.md",
+    "2026-10-06_153000-ops3d-terrain-topo.md"
   ],
   "commits": [
+    {
+      "sha": "5750284",
+      "full": "5750284e7e93319daf110e8375081b5bda3c2353",
+      "date": "2026-10-06",
+      "subject": "fix(ops3d): single-source VEX from terrain.js — drape matches surface [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "de7248d",
+      "full": "de7248d0c48fa115febde25040a2d9c95e1a0641",
+      "date": "2026-10-06",
+      "subject": "fix(ops3d): freeze contour + ring opacity — landmass pulse removed [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "33e2483",
+      "full": "33e2483782bbdce39ca1278e030821b7969e1f6b",
+      "date": "2026-10-06",
+      "subject": "fix(ops3d): checker parterre → static radial gradient wash — no grid, no pulse [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "167a614",
+      "full": "167a61489498ee9a349762b5635c36a74a37e5e3",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): legible topo — 32-level white strata + hill wash + checker parterre [plan:2026-10-06_153000-ops3d-terrain-topo.md#task-7]",
+      "plan": "2026-10-06_153000-ops3d-terrain-topo.md",
+      "anchor": "task-7"
+    },
+    {
+      "sha": "6d6e70d",
+      "full": "6d6e70d8f42e7f66f31c1ac3bafd59a7393ddcbe",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): small elevation voice, power-spaced levels [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "e0b881f",
+      "full": "e0b881fccd307b7baa6e40c6c2d0cd079673e42c",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): neon-plate void — body fill removed, drill-in restraint [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "79d7b5d",
+      "full": "79d7b5d11e1addac0cd7dc13524f255c90ef0ae7",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): matte survey ring, dark body, OS inline elevation pills [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "de514d5",
+      "full": "de514d5098708de9fe356e9a904e29d1561f430c",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): elevation reads at TOP — hypsometric hillshade, summit tags, index hierarchy [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "7e11f37",
+      "full": "7e11f3781faa009b483d38b3c1f49e37ea9c1350",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): drainage thread + steep-bank contour Vs [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "909d9f3",
+      "full": "909d9f3d7d9da8992bfe41f81c0f8d90d326b036",
+      "date": "2026-10-06",
+      "subject": "feat(ops3d): contours as technique — hills, numbered index rings, hypsometric body [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-10"
+    },
+    {
+      "sha": "9603e71",
+      "full": "9603e7131b55e30f8e14fa4a3e8e82ecf56738a6",
+      "date": "2026-10-06",
+      "subject": "feat(rail): expose Logic/DS/Pitch in More menu, sync manifest",
+      "plan": null,
+      "anchor": null
+    },
     {
       "sha": "fcf9f94",
       "full": "fcf9f945ee970091a12f44c38023bcdf4060086e",
