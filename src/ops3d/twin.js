@@ -98,6 +98,7 @@ export function createTwin(container, opts = {}) {
       }
       pushHud();
     },
+    onOverlay: () => cycleOverlay(),
   });
   const post = createPost(renderer, scene, rig.camera);
   if (!postEnabled) post.fx.enabled = false;

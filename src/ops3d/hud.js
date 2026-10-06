@@ -26,6 +26,7 @@ export function buildHud(container, cbs = {}) {
   const onSearch = cbs.onSearch ?? (() => false);
   const onCreateWO = cbs.onCreateWO ?? (() => {});
   const onLevel = cbs.onLevel ?? (() => {});
+  const onOverlay = cbs.onOverlay ?? (() => {});
 
   const knownIds = new Set();
 
@@ -72,6 +73,11 @@ export function buildHud(container, cbs = {}) {
     'ops-hud__hints',
     'DRAG ORBIT / WHEEL ZOOM / CLICK DRILL / 1-3 VIEWS / O OVERLAY / ESC UP / H HUD',
   ));
+  const ovBtn = el('button', 'ops-hud__overlay-btn', 'OVERLAY · OFF');
+  ovBtn.type = 'button';
+  ovBtn.setAttribute('aria-label', 'Cycle data overlay: off, weather, tectonic, forecast');
+  ovBtn.addEventListener('click', () => onOverlay());
+  legend.appendChild(ovBtn);
   root.appendChild(legend);
 
   // — Right detail panel (hidden unless selection) —
@@ -244,6 +250,8 @@ export function buildHud(container, cbs = {}) {
     renderSelection(state.selection ?? null);
     refreshDatalist();
     overlayLabel.textContent = `OVERLAY · ${state.overlay ? state.overlay.toUpperCase() : 'OFF'}`;
+    ovBtn.textContent = `OVERLAY · ${state.overlay ? state.overlay.toUpperCase() : 'OFF'}`;
+    ovBtn.classList.toggle('ops-hud__overlay-btn--active', !!state.overlay);
   }
 
   // Numeric 1-3 level shortcut when HUD has focus context; twin.js owns camera.
