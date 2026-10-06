@@ -17,9 +17,11 @@ import { getLayout } from './health-feed.js';
 
 const OUTLINE = { nominal: 0x8f9797, watch: 0xff8c39, critical: 0xe31919 };
 const LAMP = { nominal: 0xf4f1e8, watch: 0xffb066, critical: 0xff4545 };
-const GRAPHITE = 0x5a636b;
-const PIPE_Y = 0.35; // above-ground pipe centerline elevation
-const PIPE_R = 0.045; // thin 6-sided tube radius — reads as a line at map scale
+const GRAPHITE = 0x3f464d;
+const PIPE_Y = 0.02; // buried line centerline elevation (km world)
+const PIPE_R = 0.012; // thin 6-sided tube radius — reads as a line at map scale
+const FAC_SCALE = 0.05; // true-scale facility groups in the km world
+const SEN_SCALE = 0.015; // true-scale sensor masts in the km world
 const UP = new THREE.Vector3(0, 1, 0);
 const WHITE = new THREE.Color(0xffffff);
 
@@ -41,6 +43,8 @@ const edgeOf = (g) => {
   return e;
 };
 const graphite = new THREE.LineBasicMaterial({ color: GRAPHITE, transparent: true, opacity: 0.9 });
+// Dim bone waypoint markers: furniture, never glow-compete with faults.
+const waypointMat = new THREE.MeshBasicMaterial({ color: 0x8a857a, transparent: true, opacity: 0.7 });
 
 /* Per-asset draw context: one outline material + one lamp material shared by
  * every line/dot of the asset, so update() recolors with two assignments. */
@@ -78,8 +82,8 @@ function loop(c, pts) {
   c.group.add(l);
   return l;
 }
-function dot(c, x, y, z, r = 0.05) {
-  const m = new THREE.Mesh(GEO.sph, c.lampMat);
+function dot(c, x, y, z, r = 0.05, mat = null) {
+  const m = new THREE.Mesh(GEO.sph, mat ?? c.lampMat);
   m.scale.setScalar(r * 2);
   m.position.set(x, y, z);
   c.group.add(m);
@@ -204,7 +208,7 @@ function latticeTower(c, x, z, baseW = 0.24, h = 2.4, levels = 6, y0 = 0.06) {
   dot(c, x, y0 + h + 0.04, z, 0.05);
 }
 /* Drop lines: facility corners bleed vertically below datum (ref map glow). */
-function drops(c, w, d, yTop = 0.02, yBot = -1.1) {
+function drops(c, w, d, yTop = 0.02, yBot = -6) {
   const arr = [];
   for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]])
     vert(arr, (sx * w) / 2, yTop, yBot, (sz * d) / 2);
@@ -235,18 +239,19 @@ function speckle(c, w, d, id, y = 0.08) {
   c.group.add(new THREE.Points(g, speckleMat));
 }
 
-/* FAC-01 — gas transmission compressor station. */
+/* FAC-01 — gas transmission compressor station (local dims, scaled by FAC_SCALE). */
 function compressor(c) {
+  const HY = 0.35; // local header elevation (true-scale group interior)
   box(c, 3.6, 0.06, 2.2, 0, 0.03, 0); // pad outline
   gable(c, 1.3, 0.75, 0.9, 0.32, -0.7, 0.06, -0.55); // hall A
   gable(c, 1.3, 0.75, 0.9, 0.32, 0.7, 0.06, -0.55); // hall B
   for (const z of [0.65, 0.9]) { // suction / discharge headers
-    tube(c, -1.6, PIPE_Y, z, 1.6, PIPE_Y, z, 0.055);
-    for (let x = -1.6; x <= 1.61; x += 0.8) bent(c, x, z);
+    tube(c, -1.6, HY, z, 1.6, HY, z, 0.055);
+    for (let x = -1.6; x <= 1.61; x += 0.8) bent(c, x, z, 0.35);
   }
   for (const x of [-0.7, 0.7]) { // risers: hall front up to headers
-    tube(c, x, 0.1, 0.35, x, PIPE_Y, 0.35, 0.04);
-    tube(c, x, PIPE_Y, 0.35, x, PIPE_Y, 0.9, 0.04);
+    tube(c, x, 0.1, 0.35, x, HY, 0.35, 0.04);
+    tube(c, x, HY, 0.35, x, HY, 0.9, 0.04);
   }
   const legs = []; // fin-fan cooler bay: legs + deck + 2 fan circles
   for (const [lx, lz] of [[-1.75, 0.05], [-0.95, 0.05], [-1.75, 0.45], [-0.95, 0.45]])
@@ -258,6 +263,8 @@ function compressor(c) {
   box(c, 0.6, 0.45, 0.5, 1.35, 0.28, 0.25); // control building
   latticeTower(c, 1.7, -0.9, 0.24, 2.4, 6); // vent / flare stack (lattice derrick)
   fence(c, 3.6, 2.2);
+  drops(c, 3.6, 2.2);
+  speckle(c, 3.6, 2.2, 'FAC-01');
 }
 /* FAC-02 — valve yard: manifold grid + handwheels + fence. */
 function valveYard(c) {
@@ -275,6 +282,8 @@ function valveYard(c) {
   segs(c, pole);
   dot(c, 0.6, 0.86, -0.45, 0.05);
   fence(c, 1.5, 1.2);
+  drops(c, 1.5, 1.2);
+  speckle(c, 1.5, 1.2, 'FAC-02');
 }
 /* FAC-03 — tank farm: 3 open outline tanks + bund walls. */
 function tankFarm(c) {
@@ -288,6 +297,8 @@ function tankFarm(c) {
   box(c, 0.06, 0.25, 1.64, 0.97, 0.18, 0);
   tube(c, -0.9, 0.12, 0.62, 0.9, 0.12, 0.62, PIPE_R); // takeover line
   for (const x of [-0.55, 0, 0.55]) tube(c, x, 0.12, 0.62, x, 0.3, 0.62, 0.03);
+  drops(c, 2.0, 1.7);
+  speckle(c, 2.0, 1.7, 'FAC-03');
 }
 function sensorMast(c) {
   box(c, 0.22, 0.08, 0.22, 0, 0.04, 0); // footing outline
@@ -307,22 +318,10 @@ function pipeRuns(group, layout, healthById, entries) {
     const rings = [];
     for (const [x, z] of pts) {
       ringSegs(rings, x, PIPE_Y, z, PIPE_R * 2.1, 10);
-      dot(c, x, PIPE_Y + 0.12, z, 0.03);
+      dot(c, x, PIPE_Y + 0.12, z, 0.015, waypointMat);
     }
     segs(c, rings);
-    let total = 0; // trestle bents every ~1.4 units
-    const lens = [];
-    for (let i = 1; i < pts.length; i++) {
-      const l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-      lens.push(l); total += l;
-    }
-    const n = Math.max(2, Math.round(total / 1.4));
-    for (let k = 0; k <= n; k++) {
-      let target = (k / n) * total, s = 0;
-      while (s < lens.length - 1 && target > lens[s]) { target -= lens[s]; s++; }
-      const f = lens[s] ? target / lens[s] : 0;
-      bent(c, pts[s][0] + (pts[s + 1][0] - pts[s][0]) * f, pts[s][1] + (pts[s + 1][1] - pts[s][1]) * f);
-    }
+    // Buried lines: no trestle bents.
     c.group.userData.assetId = p.assetId;
     group.add(c.group);
     entries.set(p.assetId, c);
@@ -346,17 +345,19 @@ export function buildStructures(scene, feed, layout) {
   for (const fac of lay.facilities) {
     const c = actx(healthById.get(fac.assetId) ?? 'nominal');
     c.group.position.set(fac.position[0], 0, fac.position[1]);
+    c.group.scale.setScalar(FAC_SCALE);
+    c.group.userData.baseScale = FAC_SCALE;
     const fn = builders[fac.assetId] ?? [compressor, valveYard, tankFarm][kinds[fac.assetId] ?? 0] ?? compressor;
     fn(c);
-    drops(c, fac.size[0], fac.size[2]);
-    speckle(c, fac.size[0], fac.size[2], fac.assetId);
     c.group.userData.assetId = fac.assetId;
     group.add(c.group);
     entries.set(fac.assetId, c);
   }
   for (const sen of lay.sensors) {
     const c = actx(healthById.get(sen.assetId) ?? 'nominal');
-    c.group.position.set(sen.position[0] + 0.35, 0, sen.position[1] + 0.25);
+    c.group.position.set(sen.position[0] + 0.06, 0, sen.position[1] + 0.04);
+    c.group.scale.setScalar(SEN_SCALE);
+    c.group.userData.baseScale = SEN_SCALE;
     sensorMast(c);
     c.group.userData.assetId = sen.assetId;
     group.add(c.group);
@@ -380,7 +381,8 @@ export function buildStructures(scene, feed, layout) {
       selected = id ?? null;
       for (const [aid, e] of entries) {
         const on = selected === aid;
-        e.group.scale.setScalar(on ? 1.1 : 1);
+        const base = e.group.userData.baseScale ?? 1;
+        e.group.scale.setScalar(base * (on ? 1.1 : 1));
         paint(e, on);
       }
     },

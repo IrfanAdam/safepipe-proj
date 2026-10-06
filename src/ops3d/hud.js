@@ -35,7 +35,7 @@ export function buildHud(container, cbs = {}) {
   // — Top-left sector block —
   const sector = el('div', 'ops-hud__sector');
   sector.appendChild(el('div', 'ops-hud__title', 'PIPELINE NETWORK'));
-  sector.appendChild(el('div', 'ops-hud__sub', 'SECTOR 7G'));
+  sector.appendChild(el('div', 'ops-hud__sub', 'SECTOR 7G — PERMIAN BASIN · R 20 KM'));
   const levelLabel = el('div', 'ops-hud__level', 'NETWORK');
   sector.appendChild(levelLabel);
   const healthLine = el('div', 'ops-hud__health', 'HEALTH —/—/—');

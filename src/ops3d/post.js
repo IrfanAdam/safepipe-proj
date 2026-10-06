@@ -74,6 +74,7 @@ uniform float uTime;
 uniform float uBloom;
 uniform float uCa;
 uniform float uGrain;
+uniform float uScan;
 uniform float uVig;
 varying vec2 vUv;
 float hash(vec2 p) {
@@ -102,6 +103,8 @@ void main() {
   col *= 1.0 - uVig * smoothstep(0.35, 0.75, d);
   // Film grain (time-based hash).
   col += (hash(vUv * uRes) - 0.5) * 2.0 * uGrain;
+  // Projection scanlines: faint horizontal raster sells the hologram table.
+  col *= 1.0 - uScan * (0.5 + 0.5 * sin(vUv.y * uRes.y * 3.14159));
   gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
 }
@@ -117,6 +120,7 @@ export function createPost(renderer, scene, camera) {
     bloom: 0.7,
     ca: 1.0,
     grain: 0.02,
+    scan: 0.05,
     vignette: 0.35,
     dof: 0,
     enabled: true,
@@ -163,6 +167,7 @@ export function createPost(renderer, scene, camera) {
       uBloom: { value: fx.bloom },
       uCa: { value: fx.ca },
       uGrain: { value: fx.grain },
+      uScan: { value: fx.scan },
       uVig: { value: fx.vignette },
     },
     vertexShader: VERT,
@@ -266,6 +271,7 @@ export function createPost(renderer, scene, camera) {
     compMat.uniforms.uBloom.value = fx.bloom;
     compMat.uniforms.uCa.value = fx.ca;
     compMat.uniforms.uGrain.value = fx.grain;
+    compMat.uniforms.uScan.value = fx.scan;
     compMat.uniforms.uVig.value = fx.vignette;
     blit(compMat, null);
   }

@@ -1,8 +1,8 @@
 /* Safepipe Ops 3D — src/ops3d/levels.js · semantic zoom network → segment → asset.
  * createLevels(rig, layout, {onChange}) → {name, setLevel, focusAsset, cycle}
- * L0 network: plan preset (dist 40) over origin, all visible.
- * L1 segment: sector preset (dist 16) around last target, neighbours dim (twin-owned).
- * L2 asset: close-up (dist 6) on asset position, target y ~0.3.
+ * L0 network: plan preset (dist 55) over origin, all visible.
+ * L1 segment: sector preset (dist 9) around last target, neighbours dim (twin-owned).
+ * L2 asset: close-up (dist 0.55) on asset position, target y ~0.05.
  * Reduced-motion is honoured inside rig.flyTo — no handling needed here.
  */
 
@@ -10,12 +10,12 @@ const ORDER = ['network', 'segment', 'asset'];
 
 // Mirror of camera.js preset angles (yaw°/pitch°/dist).
 const VIEWS = {
-  network: { yaw: 4, pitch: 82, dist: 40 },
-  segment: { yaw: 4, pitch: 25, dist: 16 },
-  asset: { yaw: 4, pitch: 25, dist: 6 },
+  network: { yaw: 4, pitch: 89, dist: 68 },
+  segment: { yaw: 4, pitch: 25, dist: 9 },
+  asset: { yaw: 4, pitch: 25, dist: 2.2 },
 };
 
-const TARGET_Y = 0.3;
+const TARGET_Y = 0.05;
 const FALLBACK_ASSET = 'PIPE-02';
 
 function viewPos({ yaw, pitch, dist }, target) {

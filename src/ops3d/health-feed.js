@@ -50,26 +50,52 @@ function pointAt(points, t) {
   return points[points.length - 1].slice();
 }
 
+function polyLen(points) {
+  let total = 0;
+  for (let i = 1; i < points.length; i++)
+    total += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+  return total;
+}
+
+/* Clamp an [x,z] point inside mapped circle radius 19 (world is km). */
+function clampR19(pt) {
+  const [x, z] = pt;
+  const r = Math.hypot(x, z);
+  if (r <= 19) return [+x.toFixed(3), +z.toFixed(3)];
+  const f = 19 / r;
+  return [+(x * f).toFixed(3), +(z * f).toFixed(3)];
+}
+
 function buildLayout() {
   const rnd = mulberry32(SEED);
-  const pipelines = [];
-  const LANES = 6;
-  for (let i = 0; i < 6; i++) {
-    const pts = [];
-    const zBase = -5 + ((i + 0.5) * 10) / LANES;
-    const n = 5;
-    for (let k = 0; k < n; k++) {
-      const x = -5 + (k * 10) / (n - 1) + (k === 0 || k === n - 1 ? 0 : (rnd() - 0.5) * 1.6);
-      const z = clamp(zBase + (rnd() - 0.5) * 2.2, -5, 5);
-      pts.push([+x.toFixed(3), +z.toFixed(3)]);
-    }
-    pipelines.push({ assetId: `PIPE-0${i + 1}`, points: pts });
-  }
+  const jit = (amt) => (rnd() - 0.5) * amt;
+  const rawPipes = [
+    // PIPE-01 northern trunk, west-east with jitter
+    ['PIPE-01', [[-18, 6], [-11, 5.5], [-6, 4], [-1, 3.5], [5, 2], [11, -1], [18, -3]]],
+    // PIPE-02 southern trunk, west-east with jitter
+    ['PIPE-02', [[-18, -6], [-10, -5], [-3, -6.5], [4, -5], [11, -7], [18, -6]]],
+    // PIPE-03 northern lateral feeding the trunk
+    ['PIPE-03', [[-8, 14], [-5, 10], [-2, 7], [0, 4.5]]],
+    // PIPE-04 north-south line
+    ['PIPE-04', [[2, 16], [1.5, 10], [2, 4], [1, -2], [2, -8], [1.5, -14]]],
+    // PIPE-05 southern lateral
+    ['PIPE-05', [[-14, -12], [-8, -9], [-2, -7], [2, -6]]],
+    // PIPE-06 eastern lateral off the trunk
+    ['PIPE-06', [[11, -1], [12, 4], [12.5, 9], [12, 12]]],
+  ];
+  const pipelines = rawPipes.map(([assetId, pts]) => ({
+    assetId,
+    points: pts.map(([x, z], k) => {
+      const end = k === 0 || k === pts.length - 1;
+      const jx = end ? 0 : jit(1.2), jz = end ? 0 : jit(1.2);
+      return clampR19([x + jx, z + jz]);
+    }),
+  }));
   const byPipe = (id) => pipelines.find((p) => p.assetId === id).points;
   const facilities = [
-    { assetId: 'FAC-01', name: 'Compressor station', position: pointAt(byPipe('PIPE-01'), 0.5), size: [1.1, 0.55, 0.85] },
-    { assetId: 'FAC-02', name: 'Valve yard', position: pointAt(byPipe('PIPE-03'), 0.62), size: [0.8, 0.4, 0.65] },
-    { assetId: 'FAC-03', name: 'Metering station', position: pointAt(byPipe('PIPE-05'), 0.35), size: [0.9, 0.45, 0.7] },
+    { assetId: 'FAC-01', name: 'Compressor station', position: pointAt(byPipe('PIPE-01'), 0.5), size: [0.5, 0.25, 0.4] },
+    { assetId: 'FAC-02', name: 'Valve yard', position: pointAt(byPipe('PIPE-03'), 0.62), size: [0.3, 0.15, 0.25] },
+    { assetId: 'FAC-03', name: 'Metering station', position: pointAt(byPipe('PIPE-05'), 0.35), size: [0.35, 0.18, 0.3] },
   ];
   const sensorSpec = [
     ['SEN-01', 'PIPE-01', 0.3],
@@ -81,7 +107,7 @@ function buildLayout() {
   const sensors = sensorSpec.map(([assetId, parentId, t]) => ({
     assetId,
     parentId,
-    chainage: +((t * 8.4).toFixed(1)),
+    chainage: +(t * polyLen(byPipe(parentId))).toFixed(1),
     position: pointAt(byPipe(parentId), t).map((v) => +v.toFixed(3)),
   }));
   return { pipelines, facilities, sensors };

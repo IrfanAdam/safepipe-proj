@@ -20,8 +20,8 @@ const HEALTH_COLOR = {
   critical: 0xe31919, // fault red
 };
 const DOT_Y = 0.06;
-const BASE_DOT_SIZE = 0.085;
-const CRITICAL_GAIN = 1.5;
+const BASE_DOT_SIZE = 0.16;
+const CRITICAL_GAIN = 2.2;
 const DIM_FACTOR = 0.3;
 const HOVER_GAIN = 1.25;
 
@@ -58,6 +58,13 @@ function samplePolyline(points, step = 0.18) {
     }
   }
   return out;
+}
+
+function pipeLen(points) {
+  let total = 0;
+  for (let i = 1; i < points.length; i++)
+    total += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+  return total || 1;
 }
 
 function polyPoint(points, t) {
@@ -97,12 +104,14 @@ export function buildNetwork(scene, feed) {
 
   const byId = new Map(); // assetId → {mats:[{m,base}], dots?, setHealth}
   const proxies = [];
+  const beadMats = []; // fault beads dim independently at NEAR (kit takes over)
   const resMats = []; // resolution-dependent fat-line materials (see setSize)
   const raycaster = new THREE.Raycaster();
   let dotTotal = 0;
   let beadTotal = 0;
   let selected = null;
   let hovered = null;
+  let detailF = 1; // view-driven dot scale (TOP 1 → NEAR 0.35)
   const ringHolder = new THREE.Group();
   group.add(ringHolder);
 
@@ -131,7 +140,7 @@ export function buildNetwork(scene, feed) {
       sizeAttenuation: true,
       map: getDotTexture(),
       transparent: true,
-      opacity: health === 'nominal' ? 0.55 : 0.95,
+      opacity: health === 'nominal' ? 0.4 : 1,
       depthWrite: false,
     });
     const points = new THREE.Points(geo, mat);
@@ -142,9 +151,9 @@ export function buildNetwork(scene, feed) {
     dotTotal += dots.length;
 
     // Fault beads: brighter spheres at fault chainage fractions.
-    const beadGeo = new THREE.SphereGeometry(0.085, 12, 10);
+    const beadGeo = new THREE.SphereGeometry(0.05, 12, 10);
     for (const fault of item?.faults ?? []) {
-      const span = 8.4; // nominal line length in km (matches feed chainage scale)
+      const span = pipeLen(pipe.points); // per-pipe true length in km
       const bead = new THREE.Mesh(
         beadGeo,
         new THREE.MeshBasicMaterial({ color: colorFor(fault.severity === 'critical' ? 'critical' : health) }),
@@ -154,6 +163,7 @@ export function buildNetwork(scene, feed) {
       bead.userData.assetId = pipe.assetId;
       group.add(bead);
       track(pipe.assetId, bead.material, 1);
+      beadMats.push(bead.material);
       beadTotal += 1;
     }
 
@@ -251,7 +261,9 @@ export function buildNetwork(scene, feed) {
       child.geometry?.dispose?.();
       child.material?.dispose?.();
     }
-    if (!assetId) return;
+    // TOP-only landmark: at ISO/NEAR the anchor ring + kit own the fault —
+    // this 600 m washer would fill the frame.
+    if (!assetId || detailF < 1) return;
     const item = healthById.get(assetId);
     const pipe = pipeById.get(assetId);
     if (!item || !pipe || !item.faults?.length) return;
@@ -266,7 +278,7 @@ export function buildNetwork(scene, feed) {
           depthWrite: false,
         }),
       );
-      const p = polyPoint(pipe.points, (fault.chainage ?? 0) / 8.4);
+      const p = polyPoint(pipe.points, (fault.chainage ?? 0) / pipeLen(pipe.points));
       ring.rotation.x = -Math.PI / 2;
       ring.position.set(p.x, 0.03, p.z);
       ringHolder.add(ring);
@@ -284,7 +296,7 @@ export function buildNetwork(scene, feed) {
         let s = BASE_DOT_SIZE * (h === 'critical' ? CRITICAL_GAIN : 1);
         if (selected === id) s *= 1.4;
         else if (hovered === id) s *= HOVER_GAIN;
-        entry.dots.material.size = s;
+        entry.dots.material.size = s * detailF;
       }
       // Hovered boxes/diamonds swell slightly so the click target is obvious.
       const hs = hovered === id && selected !== id ? 1.15 : 1;
@@ -315,6 +327,19 @@ export function buildNetwork(scene, feed) {
     },
     setSize(w, h) {
       for (const m of resMats) m.resolution.set(w, h);
+    },
+    // Level-driven declutter: TOP-sized dots would read as boulders at NEAR —
+    // ghost the dotted trace down there so the physical pipe + fault kit lead.
+    setDetail(name) {
+      const f = name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
+      detailF = name === 'asset' ? 0.25 : name === 'segment' ? 0.7 : 1;
+      for (const [, entry] of byId) {
+        for (const { m, base } of entry.mats) {
+          if (m.isPointsMaterial) m.opacity = base * f;
+        }
+      }
+      for (const m of beadMats) m.opacity = name === 'asset' ? 0.2 : 1;
+      applySelection();
     },
     setHover(id) {
       const next = id ?? null;

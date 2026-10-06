@@ -91,6 +91,9 @@ export function createTwin(container, opts = {}) {
     // Tilt-shift DoF follows the view: sharp map up top, cinematic focus
     // band once drilled into ISO/NEAR (target always lands frame-centre).
     post.fx.dof = levels.name === 'asset' ? 0.8 : levels.name === 'segment' ? 0.45 : 0;
+    // Detail follows the view too: ghost TOP dots + hide flow beads at NEAR.
+    network.setDetail?.(levels.name);
+    beacons.setDetail?.(levels.name);
     const map = byId();
     const sel = selected ? map.get(selected) ?? null : null;
     const crit = sel?.health === 'critical' ? sel : current.find((a) => a.health === 'critical');
@@ -102,15 +105,44 @@ export function createTwin(container, opts = {}) {
     });
   }
 
+  // Arc-length helpers: drill-down aims at the FAULT chainage, not the
+  // asset midpoint (a fault at one end of a 37 km line must land in frame).
+  const polyLen = (pts) => {
+    let t = 0;
+    for (let i = 1; i < pts.length; i++) t += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    return t || 1;
+  };
+  const arcPoint = (pts, dist) => {
+    let t = Math.min(Math.max(dist, 0), polyLen(pts));
+    for (let i = 1; i < pts.length; i++) {
+      const l = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      if (t <= l || i === pts.length - 1) {
+        const f = l === 0 ? 0 : t / l;
+        return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f];
+      }
+      t -= l;
+    }
+    return pts[pts.length - 1].slice();
+  };
   function select(id, { fly = true, at = null } = {}) {
     if (!id || !byId().has(id)) return false;
     selected = id;
+    let aim = at;
+    if (!aim) {
+      const item = byId().get(id);
+      const ch = item?.faults?.[0]?.chainage;
+      const pipe = item?.kind === 'pipeline' && layout.pipelines.find((p) => p.assetId === id);
+      if (pipe && ch != null) {
+        const [px, pz] = arcPoint(pipe.points, ch);
+        aim = [px, 0.05, pz];
+      }
+    }
     network.setSelection(id);
     structures.setSelection(id);
     beacons.setSelection(id);
     if (fly) {
       try {
-        levels.focusAsset(id, at);
+        levels.focusAsset(id, aim);
       } catch {
         /* layout miss — selection still applies */
       }
@@ -128,7 +160,7 @@ export function createTwin(container, opts = {}) {
     setNdc(e);
     raycaster.setFromCamera(ndc, rig.camera);
     if (!raycaster.ray.intersectPlane(groundPlane, hitPoint)) return null;
-    return [hitPoint.x, 0.3, hitPoint.z];
+    return [hitPoint.x, 0.05, hitPoint.z];
   };
 
   const ndc = new THREE.Vector2();
@@ -220,6 +252,9 @@ export function createTwin(container, opts = {}) {
   raf = requestAnimationFrame(tick);
 
   pushHud();
+  // Opening frame: fly out to the full mapped circle (rig boots at the
+  // close sector preset; HUD already reads TOP so the camera must match).
+  levels.setLevel('network');
   // Deep link: ?asset=PIPE-07 drills straight to the asset.
   const deep = params.get('asset');
   if (deep) select(deep, { fly: true });

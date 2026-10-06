@@ -1,22 +1,23 @@
 /* Safepipe Ops 3D — src/ops3d/camera.js · orbit rig + presets + fly-to.
  * createRig(canvas) → {camera, setPreset, flyTo, update}
- * Presets (yaw°/pitch°/dist): sector 4/25/16 · plan 4/82/40 · wide 4/36/42.
- * flyTo eases 600ms; update(dt, t) steps the tween + damping.
+ * Presets (yaw°/pitch°/dist): sector 4/25/9 · plan 4/82/55 · wide 4/36/60.
+ * flyTo eases 600ms; update(dt, t) steps the tween + damping + camera cage
+ * (target clamped to r22 / y 0..8, camera radius clamped to 70).
  * Keys 1/2/3 are owned by twin.js — this module only exposes setPreset.
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const FOV = 40;
-const DIST_MIN = 4;
+const DIST_MIN = 0.05;
 const DIST_MAX = 140;
 const MAX_POLAR = (80 * Math.PI) / 180;
 const FLY_MS = 600;
 
 const PRESETS = {
-  sector: { yaw: 4, pitch: 25, dist: 16 },
-  plan: { yaw: 4, pitch: 82, dist: 40 },
-  wide: { yaw: 4, pitch: 36, dist: 42 },
+  sector: { yaw: 4, pitch: 25, dist: 9 },
+  plan: { yaw: 4, pitch: 89, dist: 68 },
+  wide: { yaw: 4, pitch: 36, dist: 60 },
 };
 
 const _v = () => new THREE.Vector3();
@@ -108,6 +109,20 @@ export function createRig(canvas, opts = {}) {
       camera.position.lerpVectors(tween.fromPos, tween.toPos, e);
       controls.target.lerpVectors(tween.fromTg, tween.toTg, e);
       if (k >= 1) tween = null;
+    }
+    // Camera cage: never leave the mapped circle (r20) + margin.
+    const tr = Math.hypot(controls.target.x, controls.target.z);
+    if (tr > 22) {
+      const s = 22 / tr;
+      controls.target.x *= s;
+      controls.target.z *= s;
+    }
+    controls.target.y = Math.min(8, Math.max(0, controls.target.y));
+    const cr = Math.hypot(camera.position.x, camera.position.z);
+    if (cr > 70) {
+      const s = 70 / cr;
+      camera.position.x *= s;
+      camera.position.z *= s;
     }
     controls.update();
   }
