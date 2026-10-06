@@ -160,8 +160,7 @@ export function buildNetwork(scene, feed) {
   const proxies = [];
   const beadMats = []; // fault beads dim independently at NEAR (kit takes over)
   const flowMats = []; // animated oil-flow overlays (dashOffset drift in tick)
-  const chevrons = []; // direction cones surfing the flow clock
-  const chevGeo = new THREE.ConeGeometry(0.12, 0.34, 4);
+  const chevrons = []; // dive markers riding the arc (flow dashes carry direction)
   const diveGeo = new THREE.OctahedronGeometry(0.11);
   const DIVE_COL = 0x7fa3b8; // cool steel: marks where a run dives underground
   const resMats = []; // resolution-dependent fat-line materials (see setSize)
@@ -236,18 +235,6 @@ export function buildNetwork(scene, feed) {
     flowLine.frustumCulled = false;
     group.add(flowLine);
 
-    // Flow-direction chevrons: 3 small cones per pipe riding the arc.
-    for (const t0 of [0.3, 0.55, 0.8]) {
-      const cm = new THREE.MeshBasicMaterial({
-        color: FLOW_COLOR, transparent: true, opacity: 0.6, depthWrite: false,
-      });
-      const cone = new THREE.Mesh(chevGeo, cm);
-      cone.rotation.order = 'YXZ'; // yaw after lay-flat, so tip tracks tangent
-      cone.rotation.x = Math.PI / 2; // lie along the path, tip forward
-      cone.frustumCulled = false;
-      group.add(cone);
-      chevrons.push({ mesh: cone, points: pipe.points, t0, detailF: 1, assetId: pipe.assetId });
-
     // Dive markers: steel octahedrons at the two points where the run
     // leaves the surface — the explicit "pipeline goes underground HERE".
     for (const t0 of [BURIED_EDGE_T, 1 - BURIED_EDGE_T]) {
@@ -262,7 +249,6 @@ export function buildNetwork(scene, feed) {
       dive.frustumCulled = false;
       group.add(dive);
       chevrons.push({ mesh: dive, points: pipe.points, t0, detailF: 1, assetId: pipe.assetId, dive: true });
-    }
     }
 
     // Fault beads: brighter spheres at fault chainage fractions.
@@ -426,8 +412,7 @@ export function buildNetwork(scene, feed) {
   // path from first to last point). Accepts absolute scene time.
   const tickFlow = (t = 0) => {
     for (const e of flowMats) e.m.dashOffset = -t * FLOW_SPEED;
-    // Chevrons surf the same clock: staggered drift along each pipe's arc
-    // so direction reads even in a still (spacing) and in motion (drift).
+    // Dive markers hold station on the arc (flow dashes carry direction).
     for (const c of chevrons) {
       const tt = c.dive ? c.t0 : (c.t0 + t * FLOW_SPEED * 0.06) % 1;
       const p = polyPoint(c.points, tt);
@@ -440,7 +425,7 @@ export function buildNetwork(scene, feed) {
       const fade = 1 - d * 0.5;
       const dim = selected && selected !== c.assetId ? DIM_FACTOR : 1;
       const lvl = c.assetId === selected ? 1 : (c.detailF ?? 1);
-      c.mesh.material.opacity = 0.35 * fade * lvl * dim;
+      c.mesh.material.opacity = 0.6 * fade * lvl * dim;
     }
   };
 
