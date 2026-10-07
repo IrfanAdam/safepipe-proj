@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-07T09:48:00.906Z",
+  "generated": "2026-10-07T10:14:03.723Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,14 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "fddbfe8",
+      "full": "fddbfe8b868b45da2daa99dd03b46cac7bf0fb29",
+      "date": "2026-10-07",
+      "subject": "docs(ops3d-v2): v2 plan — real data pins (SRTM DEM, Open-Meteo, USGS FDSN, OPERA InSAR, MapLibre+deck.gl, Overpass, H3, Poly Haven CC0 kit) [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-0"
+    },
     {
       "sha": "50f77be",
       "full": "50f77be9dfc48b274569e2750ae0dbcbf91aefb0",

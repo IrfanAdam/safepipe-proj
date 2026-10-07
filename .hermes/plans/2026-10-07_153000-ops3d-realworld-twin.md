@@ -34,8 +34,8 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 
 ## Architecture (one spine)
 - **Sector = hex (H3 res 7)**. Everything keys off `sectorId`: map layer, twin `feed`, WOs, crews, sim, approvals.
-- **map.html** (MapLibre + deck.gl overlay): dark vector basemap → hotspot hexes colored by worst sector health → click → `/twin.html?sector=<h3>&t=<current>` deep link, pre-selecting the worst asset in that sector.
-- **twin.html** (`createTwin(container, {feed, onSelect}) → {setSelection, setFeedAt(t), setSectors, dispose}`): same `sectorId` set; "MAP" toggle round-trips to `map.html#<h3>` and keeps selection; browser back too.
+- **map.html** (MapLibre + deck.gl overlay): **the DEFAULT landing view** — dark vector basemap with circular hotspot rings colored/divided by worst sector health (emoji POI pin fallback), sized to sector hexes → click → `/twin.html?sector=<h3>&t=<current>` full-screen twin over the map; close (X/Esc) → back to map with hex exposed; the map is a Google-Maps-style launcher, not a mode.
+- **twin.html** (`createTwin(container, {feed, onSelect}) → {setSelection, setFeedAt(t), setSectors, dispose}`): same `sectorId` set; **the twin IS the map the user sees after clicking a hotspot** — loads with `?sector=<h3>`, closes X/Esc back to map.html with hex + selection kept; no "MAP toggle"/mode language anywhere.
 - **Feed**: `feedAt(t)` unifies live+sim+history; assets carry `{assetId, sectorId, geo chainage, kind, health, faults[], sensitivity, compliance[], provenance}`; every visual consumes it; nothing reads raw sources directly.
 - **Time**: one slider t: live ↔ 30 d past ↔ sim forward 72 h. DEM/weather/seismic/wind all keyed to t; scrubbing moves infrastructure status, weather light, ground displacement, WOs, crews, sim spread together.
 - **Sim**: per-sector runner over `feedAt` — leak (plume + sensor triangulation), corrosion growth, ground shift (InSAR-style mm/yr field), storm (wind/temp risk tint) — reproducible seed, watermarked SIM in HUD.
@@ -52,29 +52,33 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 - Verify: click 3 assets → focus error <5px at NEAR; health flip nominal→critical no throw; build PASS.
 - REF GATE 0 (your first steer): confirm focus feel + palette on 2 (TOP + NEAR) captures.
 
-### Phase 1 — Real terrain: DEM, contours, volume, attention light
+### Phase 1 — Real terrain: DEM + satellite-audited landscape + volume + attention light
 **Goal:** at-a-glance: landscape → infrastructure → health → what needs me.
-- `terrainSource: 'dem'`: fetch 1° SRTM GL1 GeoTIFF (OpenTopography S3 mirror, geotiff.js in browser, no key) for the actual corner of the Permian you pin down; altitude → FK: mesh + contour engine; preserve 32-level power-spaced strips.
-- Volume floor the epic way: height fog + ground-bleed = subtle vertical atmosphere at NEAR, NOT MRT; periphery fade keeps the 20 km read.
-- Attention lock: terrain whispers at TOP (threshold drop), faults always brightest (bloom threshold won't catch white contours), flow color token distinct from watch amber `#ff8c39`, single sun direction.
-- Verify: TOP fault found in 2s; NEAR frames a pad from 550 m; contour heights match DEM altitude ±2%.
-- REF GATE 1: you pick the terrain mood (photo/map screenshot); also pin `?sector=<h3>` shape and real coord ranges.
+- **Site pinned: Fort McMurray oil sands — twin center 57.03N −111.68W (Horizon zone)** per satellite audit (`.hermes/cache/scratch/fortmcm/audit.md`, 12 frames analyzed). One 20 km circle holds every asset class at real density: Athabasca valley W/SW, benched mines NW, mature+fresh tailings ponds center, upgrader + tank farm E, second plant NE, SAGD pad field + flowlines SE.
+- `terrainSource: 'dem'`: fetch SRTM GL1 GeoTIFF (OpenTopography S3, geotiff.js, no key) for the pinned degrees tile; real ~60–70 m river-valley cut + mine benches give the volume the old build lacked; keep the 32-level power-spaced contour engine with `terrainSource: procedural` fallback only if tile fetch fails.
+- Landscape build from the audit's recipe: braided Athabasca (point bars vs cutbank), hairpin tributaries, muskeg string-pond mottling, kettle lakes, cut blocks, seismic checkerboard — all as field/texture layers keyed to the DEM, not painted-on.
+- Infrastructure seeded by the audit's density grammar (not pixel-traced): mine benches ~40 % of NW quadrant, tailings rectangles with straight dykes + real palette (pale mature / dark fresh / tan cells), SAGD pads 60–90 per 9.6 km along DLS section lines, corridors 20–60 m wide drifting to CPF.
+- Volume on the cheap: height-fog + glow sprites, no MRT; periphery fade keeps the 20 km read.
+- Attention lock: terrain whispers at TOP, faults always brightest (bloom threshold won't catch white contours), flow color token distinct from watch amber `#ff8c39`, single sun direction.
+- Verify: TOP fault found in 2 s; NEAR frames a well pad from 550 m; contour heights match DEM altitude ±2 %.
+- REF GATE 1: you pick the terrain mood (photo/map screenshot); confirm the pinned center + the audit's layout.
 
 ### Phase 2 — Assets as real, inspectable models (to the rivet)
 **Goal:** every asset/facility a defined model you can inspect to the last bolt.
-- Import real OSM features per pinned region (Overpass GeoJSON): `man_made=pipeline` trunks, compressor stations, tank farms, valve yards — real corridor geometry feeds the twin, provenance-labeled.
+- Import real OSM + audit-derived features per pinned region (Overpass GeoJSON where tagged; audit density-grammar everywhere else): `man_made=pipeline` trunks, compressor stations, tank farms, SAGD pads, CPFs, upgrader, mine/tailings complexes (full taxonomy in audit.md) — provenance-labeled (`osm|parametric|indicated`).
 - Physical kit: Poly Haven `modular_industrial_pipes_01` CC0 GLB, DRACO/KTX2, meshes→ our parametric mount (recolor via atlas, skin health accents as lamp/emissive overlays, consistent material tokens).
 - Bolt-level detail: bolt rings, flange bolts, gauge dials, handwheel skeletons as instanced geometry per asset optional LOD; continental details at NEAR only or wow detail fades in L2 inspect mode (drill-in tween reveals parts).
 - Verify: NEAR zoom holds bolts without shimmer; per-asset part count logged; provenance per asset visible in HUD.
 - REF GATE 2: you approve detail level (toy / noisy / just right).
 
-### Phase 3 — The real map: hotspots on vector basemap → twin handoff
-**Goal:** find the exact location on a real map; hotspots open the twin.
-- MapLibre GL JS map, Dark Matter vector style (free CARTO key — no friction), deck.gl overlay for hotspots sized by worst sector health.
-- H3 hexes (`h3-js`) = sectorId — same hex keys on map and twin; click → `/twin.html?sector=<id>`; ESC/back returns to `map.html#<id>`; selection always survives the trip.
-- Optional satellite toggle under same logic (Esri World Imagery raster, attribution kept).
-- Verify: map↔twin round-trip keeps selection; hotspots match feed worst-health; satellites tiles still ≤ API budget; build PASS.
-- REF GATE 3: you pick map look (Dark Matter vs satellite vs hybrid) + hotspot language (dot vs hex fill).
+### Phase 3 — Google-Maps-style launcher: circular hotspots → full-screen twin
+**Goal:** the map is the launcher — like Google Maps: circle hotspots on a real basemap, click one → the 3D twin opens full-screen on top; close → back to the map, hex exposed.
+- **Map is the DEFAULT landing view** (map-first, no mode toggle, no separate landing). map.html renders MapLibre + deck.gl over Dark Matter vector tiles (satellite raster fallback: Esri World Imagery, attribution kept).
+- **Hotspots are circular** — radial ring progressively colored/divided by sector health brief (each arc = a health state share), sized to the sector H3 hex footprint; emoji POI pin as degraded fallback if the ring shader fails.
+- Click hotspot → full-screen twin view (**twin.html?sector=<h3>**) overlaying the map — the twin IS "the map" the user now sees; no toggle language anywhere (no "MAP mode"/"mode switch").
+- Close (X button or Esc) returns to the map with the sector hex exposed + selection kept; browser back does the same round-trip in one `sectorId` chain (hex ↔ hotspot one id).
+- Verify: hotspot ring matches feed worst-health; click→twin→close keeps selection; Esc works mid-orbit; build PASS.
+- REF GATE 3: you pick map look (Dark Matter vs satellite vs hybrid) + confirm the circular hotspot ring reads right.
 
 ### Phase 4 — Time variance + simulation (the twin breathes)
 **Goal:** infrastructure that changes with time; per-sector threat sim you can trust.

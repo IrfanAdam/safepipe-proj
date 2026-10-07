@@ -638,6 +638,48 @@
      "state": "0/1"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-07",
+   "hash": "e3288208",
+   "sections": [
+    {
+     "head": "Phase 0 — Fix the foundation (the old build's bugs; unblocks everything)",
+     "hash": "937505b4",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 1 — Real terrain: DEM + satellite-audited landscape + volume + attention l",
+     "hash": "ae302e2d",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 2 — Assets as real, inspectable models (to the rivet)",
+     "hash": "63da3c72",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 3 — Google-Maps-style launcher: circular hotspots → full-screen twin",
+     "hash": "ff0bb68f",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 4 — Time variance + simulation (the twin breathes)",
+     "hash": "aa47de7f",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 5 — Operations layer: work orders, field activity, gated actions",
+     "hash": "9d22002f",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 6 — Lock + docs + perf",
+     "hash": "f40684b7",
+     "state": "0/1"
+    }
+   ]
   }
  ]
 }
