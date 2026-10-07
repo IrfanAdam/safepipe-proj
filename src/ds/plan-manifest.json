@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-07T07:53:29.735Z",
+  "generated": "2026-10-07T07:53:43.881Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -10,6 +10,14 @@
     "2026-10-07_130000-safepipe-changelog.md"
   ],
   "commits": [
+    {
+      "sha": "a7d7434",
+      "full": "a7d74345ddeb5f072080fb1602fa696420730565",
+      "date": "2026-10-07",
+      "subject": "fix(changelog): sanity pass — phantom task, hidden plan, retro links, wip parse [plan:2026-10-07_130000-safepipe-changelog.md#task-5]",
+      "plan": "2026-10-07_130000-safepipe-changelog.md",
+      "anchor": "task-5"
+    },
     {
       "sha": "485319d",
       "full": "485319d82e0a92cb66742c8f55da5da4c3c2c941",
@@ -451,9 +459,5 @@
       "anchor": null
     }
   ],
-  "wip": [
-    "scripts/plan-track.mjs",
-    "src/changelog/changelog-parse.js",
-    "src/ds/plan-retro.json"
-  ]
+  "wip": []
 }
