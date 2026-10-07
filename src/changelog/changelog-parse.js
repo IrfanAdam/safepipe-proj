@@ -22,9 +22,14 @@ export const norm = (body) => {
   if (/^- \[[ xX]\]/m.test(body)) return body;
   const parts = body.split(/^### /m);
   const head = parts.shift();
-  const items = parts.map((p) => {
+  const items = [];
+  const extra = [];
+  parts.forEach((p) => {
     const lines = p.split('\n');
     const title = lines.shift().trim();
+    // Non-task ### subsections (Risks, Notes, Verify…) are prose, not units —
+    // pass through verbatim so they never synthesize phantom open checkboxes.
+    if (!/^(Task|Step|Phase)\b/i.test(title)) { extra.push(['### ' + title, ...lines].join('\n')); return; }
     const m = title.match(/^Task\s+([\d-]+):\s*(.+)$/);
     const num = m ? m[1] : '';
     let name = m ? m[2] : title;
@@ -39,9 +44,10 @@ export const norm = (body) => {
     let flag = '';
     if (cancelled) flag = '<span class="ds-cancelled">✗ cancelled</span> — ';
     else if (done) flag = '✓ done — ';
-    return `- [${done || cancelled ? 'x' : ' '}] **${num} ${name}** ${flag}${detail}`;
+    items.push(`- [${done || cancelled ? 'x' : ' '}] **${num} ${name}** ${flag}${detail}`);
   });
   let out = head + items.join('\n');
+  if (extra.length) out += '\n' + extra.join('\n');
   if (!items.length) {
     // Task-based safepipe plans mark done in the `##` heading itself.
     const hl = head.split('\n')[0] || '';
@@ -83,8 +89,12 @@ export const split = (md) => {
     .filter((s) => SECTION.test(s.head));
   if (secs.length) return secs;
   // Fallback: `### Task`-based plans with no matching `##` sections.
+  // No `##`-in-preamble guard: the SECTION filter below already drops non-task
+  // heads, and plans reaching fallback have no `##` task sections — so `###`
+  // Task heads are genuine units even when prose `##` heads exist elsewhere
+  // (e.g. production-ready groups tasks under context/approach `##` heads).
   const parts = md.split(/^### /m);
-  if (parts.length < 2 || /^## /m.test(parts[0])) return [];
+  if (parts.length < 2) return [];
   return parts.slice(1)
     .map((p) => toSection('### ', p))
     .filter((s) => SECTION.test(s.head));

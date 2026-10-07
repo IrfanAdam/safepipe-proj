@@ -60,7 +60,20 @@
 
 ---
 
+## Task 5: Data-sanity pass ✓ done
+
+**Objective:** Triage empty, every plan visible, no phantom tasks.
+
+**Fixes (all found in review):**
+- `norm()` synthesized open checkboxes from non-task `###` subsections (`### Risks / tradeoffs` made the changelog card read 3/4) — non-task subsections now pass through verbatim; changelog plan reads 4/4.
+- `split()` fallback dropped any plan with a prose `##` before its first `###`, hiding production-ready's 10 genuine tasks — guard removed (SECTION filter already drops non-task heads); now 7 cards.
+- Tracker `TRACKED` missed `src/changelog`, page html, `scripts`, `public` — 3 trailer-carrying changelog commits + sidebar commit were invisible to the log; widened to `['src','design-system','docs','scripts','public','*.html','vite.config.js','package.json']`.
+- Added retro support to tracker + `src/ds/plan-retro.json` (7 pre-trailer commits) — 55/55 linked, triage empty.
+- Fixed `wip` parse (`slice(3)` ate a path char on short prefixes) — `slice(2).trimStart()`.
+
+**Verify:** `plan-track` 55 commits / 55 linked / 0 unlinked; `npm run build` green; known exception: `b33f7a9` (plan-tracking hygiene, touches only `.hermes`+`.gitignore`) stays outside TRACKED by design.
+
 ### Risks / tradeoffs
 - Plan markdown with fenced code blocks containing `## ` lines: handled by fence-aware `chunks()`.
-- `production-ready` plan has no `## Task` sections yet (uses `### Task` under prose `##` heads): stays hidden until it gains task sections — by design, no empty cards.
+- `production-ready` groups `### Task` under prose `##` heads: covered by the relaxed fallback (renders flat, 10 tasks) — no phase-grouping is preserved, by design.
 - Detail markdown renderer is minimal (no fenced-code highlighting): matches the reference implementation; revisit only if unreadable.

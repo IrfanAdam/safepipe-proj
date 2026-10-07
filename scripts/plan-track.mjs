@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const plansDir = join(root, '.hermes', 'plans');
 const manifestPath = join(root, 'src', 'ds', 'plan-manifest.json');
-const TRACKED = ['src/ds', 'design-system', 'src/ops3d', 'docs', 'gallery.html'];
+const TRACKED = ['src', 'design-system', 'docs', 'scripts', 'public', '*.html', 'vite.config.js', 'package.json'];
 const TAG = /\[plan:([^\]#\s]+)(?:#([^\]]+))?\]/;
 
 const git = (args) => {
@@ -34,8 +34,11 @@ if (log) {
 }
 
 const status = git(['status', '--short', '--', ...TRACKED]) || '';
+// Porcelain prefixes vary in width (` M ` staged/unstaged, renames, single-col
+// forms) — drop the status columns, never a fixed slice, so a path char can
+// never be eaten.
 const wip = status.split('\n').filter(Boolean)
-  .map((l) => l.slice(3)).filter((f) => !f.endsWith('plan-manifest.json'));
+  .map((l) => l.slice(2).trimStart()).filter((f) => !f.endsWith('plan-manifest.json'));
 
 // Shallow-clone guard: merge fresh log over previously committed manifest so
 // truncated CI clones never shrink history (dedupe by sha, fresh first).
@@ -45,6 +48,17 @@ if (existsSync(manifestPath)) {
 }
 const seen = new Set(commits.map((c) => c.sha));
 for (const c of prev.commits || []) if (!seen.has(c.sha)) { commits.push(c); seen.add(c.sha); }
+
+// Retro file: pre-trailer history (sha -> plan + anchor). Never rewrite git history.
+let retro = [];
+try { retro = JSON.parse(readFileSync(join(root, 'src', 'ds', 'plan-retro.json'), 'utf8')); } catch { /* no retro file yet */ }
+if (retro.length) {
+  const bySha = new Map(retro.map((r) => [r.sha, r]));
+  for (const c of commits) {
+    const r = !c.plan && bySha.get(c.sha);
+    if (r) { c.plan = r.plan; c.anchor = r.anchor || null; }
+  }
+}
 
 const linked = commits.filter((c) => c.plan).length;
 const next = { generated: prev.generated || new Date().toISOString(), plans, commits, wip };
