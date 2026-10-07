@@ -1,4 +1,7 @@
 node_modules/
 dist/
 .DS_Store
-.hermes/
+# Hermes: track plans so the repo clones with its history; everything else
+# under .hermes/ (cache, scratch, session state) stays local.
+.hermes/*
+!.hermes/plans/
