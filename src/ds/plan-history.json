@@ -596,6 +596,48 @@
      "state": "0/1"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-07",
+   "hash": "e597ea47",
+   "sections": [
+    {
+     "head": "Phase 0 — Fix the foundation (the old build's bugs; unblocks everything)",
+     "hash": "937505b4",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 1 — Real terrain: DEM, contours, volume, attention light",
+     "hash": "bbb3676d",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 2 — Assets as real, inspectable models (to the rivet)",
+     "hash": "dd901534",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 3 — The real map: hotspots on vector basemap → twin handoff",
+     "hash": "5c1efcbb",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 4 — Time variance + simulation (the twin breathes)",
+     "hash": "aa47de7f",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 5 — Operations layer: work orders, field activity, gated actions",
+     "hash": "9d22002f",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 6 — Lock + docs + perf",
+     "hash": "f40684b7",
+     "state": "0/1"
+    }
+   ]
   }
  ]
 }

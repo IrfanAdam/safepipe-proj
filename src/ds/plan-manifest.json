@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-07T09:37:45.488Z",
+  "generated": "2026-10-07T09:48:00.906Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,14 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "50f77be",
+      "full": "50f77be9dfc48b274569e2750ae0dbcbf91aefb0",
+      "date": "2026-10-07",
+      "subject": "docs(ops3d-v2): draft real-world twin plan — 7 phases + ref gates + audit [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-0"
+    },
     {
       "sha": "dc5ebe5",
       "full": "dc5ebe5ff3fd58b59807c24e0af9f61fbfdf6eda",
@@ -516,10 +524,5 @@
       "anchor": null
     }
   ],
-  "wip": [
-    "src/changelog/changelog-events.js",
-    "src/changelog/changelog-titles.js",
-    "src/changelog/changelog/paint-detail.js",
-    "src/changelog/changelog/paint-plan.js"
-  ]
+  "wip": []
 }
