@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-07T08:31:52.619Z",
+  "generated": "2026-10-07T09:37:45.488Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -7,9 +7,18 @@
     "2026-10-06_003000-ops3d-theatre-style.md",
     "2026-10-06_153000-ops3d-terrain-topo.md",
     "2026-10-07_120000-safepipe-production-ready.md",
-    "2026-10-07_130000-safepipe-changelog.md"
+    "2026-10-07_130000-safepipe-changelog.md",
+    "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "dc5ebe5",
+      "full": "dc5ebe5ff3fd58b59807c24e0af9f61fbfdf6eda",
+      "date": "2026-10-07",
+      "subject": "docs(ops3d): polish 003000 plan — status + shipped SHAs + iteration log [plan:2026-10-06_003000-ops3d-theatre-style.md#task-8]",
+      "plan": "2026-10-06_003000-ops3d-theatre-style.md",
+      "anchor": "task-8"
+    },
     {
       "sha": "471a4bf",
       "full": "471a4bf9cf635af186cbdc1bff34a59b54522623",
@@ -507,5 +516,10 @@
       "anchor": null
     }
   ],
-  "wip": []
+  "wip": [
+    "src/changelog/changelog-events.js",
+    "src/changelog/changelog-titles.js",
+    "src/changelog/changelog/paint-detail.js",
+    "src/changelog/changelog/paint-plan.js"
+  ]
 }

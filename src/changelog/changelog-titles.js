@@ -32,8 +32,26 @@ const cleanH1 = (h1) => String(h1 || '')
   .replace(/\s*[—–-]\s*$/, '')
   .trim();
 export const h1Of = (md) => ((md.match(/^#\s+(.+)$/m) || [])[1] || '').trim();
+// Single-line plain text for [data-tip] attributes: strip markdown
+// (**bold**, `code`, links, {#anchors}, HTML) and collapse all whitespace so
+// no raw newlines ever land inside an attribute value.
+export const oneLine = (s) => String(s || '')
+  .replace(/\{#[^}]*\}/g, ' ')
+  .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+  .replace(/<\/?[^>]+>/g, ' ')
+  .replace(/[`*_~]/g, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+// Tooltip text: first substantive clause of the section description; falls
+// back to the short head title so the tip is never an empty tiny box.
+// (descOf returns '' for norm()-collapsed `- [ ] **Title** …` checkbox bodies,
+// which previously produced empty popovers.)
+export const tipOf = (head, body, max = 100) =>
+  clip(oneLine(sentOf(descOf(body), max) || shortPhase(head)), max)
+    || clip(oneLine(shortPhase(head)), max);
 // Generalized: `Phase 2 — X`, `Task 10: X`, `Step 0 — X` → `X`.
 export const shortPhase = (h) => String(h || '')
+  .replace(/`/g, '')
   .replace(/^(Phase|Task|Step)\s+[\d–-]+\s*[—–\-:]\s*/i, '')
   .replace(/\s*\{#[^}]*\}\s*$/g, '')
   .replace(/\s*[✓✗]\s*(done|cancelled)?\s*[—–\-–]?/gi, '')

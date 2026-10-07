@@ -553,5 +553,49 @@
     }
    ]
   }
+ ],
+ "2026-10-07_153000-ops3d-realworld-twin.md": [
+  {
+   "sha": null,
+   "date": "2026-10-07",
+   "hash": "2a63949d",
+   "sections": [
+    {
+     "head": "Phase 0 — Foundations + bug kill (the unglamorous fix)",
+     "hash": "4b75fe2b",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 1 — Terrain you believe + volume + attention light",
+     "hash": "1845bff6",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 2 — Assets as real models (down to the bolt)",
+     "hash": "b141890e",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 3 — Map toggle + real-world grounding",
+     "hash": "d888ed7c",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 4 — Time variance + simulation",
+     "hash": "00a65ba3",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 5 — Operations layer: work orders, field activity, gated actions",
+     "hash": "2524f308",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 6 — Lock + docs + perf",
+     "hash": "16089eed",
+     "state": "0/1"
+    }
+   ]
+  }
  ]
 }
