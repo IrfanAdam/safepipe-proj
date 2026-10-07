@@ -29,7 +29,9 @@ form logic), `WO status` variants (`Complated=Yes/No` — note legacy typo, norm
 > Rule: every rule below cites the live node evidence (page/frame/text). If the text isn't in the live
 > file, the rule doesn't ship.
 
-## Task 1 — Fixtures (frozen contract with Plan B)
+## Task 1 — Fixtures (frozen contract with Plan B) ✓ done
+
+*Shipped in ba00e7f · src/logic/fixtures.json (12 staff, 8 WOs, 3 pipelines) + fixtures.js loader · tests/fixtures.test.js 10 pass.*
 
 **Objective:** `src/logic/fixtures.json` + loader with the exact shape Plan B codes against.
 **Files:** Create `src/logic/fixtures.json`, `src/logic/fixtures.js`.
@@ -40,7 +42,9 @@ form logic), `WO status` variants (`Complated=Yes/No` — note legacy typo, norm
 2. Assert live: each seeded string exists verbatim in the `.fig` (script, expect 100% hit).
 3. Verify: `node --test tests/fixtures.test.js` — shape + verbatim-hit tests. Expected: all pass.
 
-## Task 2 — Work-order state machine
+## Task 2 — Work-order state machine ✓ done
+
+*Shipped in ba00e7f · src/logic/workorders.js (294 lines: STATES, normalizeStatus, canTransition, woProgress, dueInDays, isOverdue, transitionWO, listWorkOrders) · tests/workorders.test.js 48 pass.*
 
 **Objective:** Status transitions + derived fields (`dueInDays`, `progress%`, overdue).
 **Files:** Create `src/logic/workorders.js`; create `tests/workorders.test.js`.
@@ -51,7 +55,9 @@ form logic), `WO status` variants (`Complated=Yes/No` — note legacy typo, norm
 2. TDD: failing test → minimal impl → pass. Cover guards, due-date math, overdue flag.
 3. Verify: `node --test tests/` all green.
 
-## Task 3 — OQ qualifications + workforce rules
+## Task 3 — OQ qualifications + workforce rules ✓ done
+
+*Shipped in ba00e7f · src/logic/qualifications.js + workforce.js (filterStaff, openWorkload, expiringOQs, oqStatus) · tests/qualifications.test.js 17 pass + workforce.test.js 15 pass.*
 
 **Objective:** Expiry computation (`Qualification expires in 1m`), workload rollups
 (`In progress 3 WOs, 32 tasks`), search/filter predicates used by the directory.
@@ -62,7 +68,9 @@ form logic), `WO status` variants (`Complated=Yes/No` — note legacy typo, norm
    `expiringOQs(staff, withinDays)`.
 3. Verify: `node --test tests/` all green.
 
-## Task 4 — Questionnaire / QC / inspection logic
+## Task 4 — Questionnaire / QC / inspection logic ✓ done
+
+*Shipped in ba00e7f · src/logic/inspections.js (FORMS 6 forms × 39 qs, answerQuestionnaire, toggleQC, validateForm) · tests/inspections.test.js 21 pass.*
 
 **Objective:** Executable versions of the legacy forms: patrol questionnaire, QC checklists
 (`Added=No→Added=Yes`), MOC inputs, evaluation scoring, mileage entries.
@@ -74,7 +82,9 @@ form logic), `WO status` variants (`Complated=Yes/No` — note legacy typo, norm
 2. Functions: `answerQuestionnaire(formId, answers)` → `{complete, score, missing[]}`; `toggleQC` transition.
 3. Verify: `node --test tests/` all green; every `FORMS` label asserted verbatim-live.
 
-## Task 5 — API freeze + publish
+## Task 5 — API freeze + publish ✓ done
+
+*Closed 2026-10-07 · src/logic/README.md frozen API table (8 signatures verified present) · node --test 111 pass/0 fail · npm run build green. Code shipped inside ba00e7f (shared Plan A/B/C commit, retro-mapped to Plan A — badges stay there; this close is docs-only, no history rewrite).*
 
 **Objective:** Final signatures Plan B integrates against; full suite green.
 **Files:** Modify `src/logic/README.md` (or create) with the frozen API table.
