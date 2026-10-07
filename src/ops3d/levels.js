@@ -6,6 +6,8 @@
  * Reduced-motion is honoured inside rig.flyTo — no handling needed here.
  */
 
+import { field, VEX } from './terrain.js';
+
 const ORDER = ['network', 'segment', 'asset'];
 
 // Mirror of camera.js preset angles (yaw°/pitch°/dist).
@@ -16,6 +18,7 @@ const VIEWS = {
 };
 
 const TARGET_Y = 0.05;
+const FOCUS_MS = 1400; // TOP→NEAR drill-down: slow enough to track, fast enough to feel instant
 const FALLBACK_ASSET = 'PIPE-02';
 
 function viewPos({ yaw, pitch, dist }, target) {
@@ -81,10 +84,12 @@ export function createLevels(rig, layout, opts = {}) {
   let lastTarget = [0, 0, 0];
   let lastAssetId = null;
 
+  // Ground height at the asset so the target sits on the terrain surface,
+  // never at datum (on a 70 m hill a y=0 aim buries the focus point).
   const resolveTarget = (assetId) => {
     const pos = index.get(assetId);
     if (!pos) throw new Error(`levels: unknown asset "${assetId}"`);
-    return [pos[0], TARGET_Y, pos[1]];
+    return [pos[0], field(pos[0], pos[1]) * VEX + TARGET_Y, pos[1]];
   };
 
   const go = (name, target) => {
@@ -116,7 +121,7 @@ export function createLevels(rig, layout, opts = {}) {
       const view = { ...VIEWS.asset, dist: KIND_DIST[kinds.get(assetId)] ?? VIEWS.asset.dist };
       current = 'asset';
       lastTarget = target;
-      rig.flyTo(viewPos(view, target), target);
+      rig.flyTo(viewPos(view, target), target, FOCUS_MS);
       onChange('asset');
     },
 

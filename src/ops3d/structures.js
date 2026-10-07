@@ -17,6 +17,7 @@
  */
 import * as THREE from 'three';
 import { getLayout } from './health-feed.js';
+import { field, VEX } from './terrain.js';
 
 const OUTLINE = { nominal: 0x8f9797, watch: 0xff8c39, critical: 0xe31919 };
 const LAMP = { nominal: 0xf4f1e8, watch: 0xffb066, critical: 0xff4545 };
@@ -86,13 +87,13 @@ function getGlowTex() {
   glowTex = new THREE.CanvasTexture(cv);
   return glowTex;
 }
+/* Frosted glass mass fill honoring the passed geometry + dims + position:
+ * boxes read as halls/tanks, cylinders as vessels — never a flat disc. */
 function mass(c, geo, sx, sy, sz, x, y, z, ry = 0, rx = 0) {
-  const r = Math.max(sx, sz) * 0.75;
-  const m = new THREE.Mesh(GEO.disc, c.massMat);
-  m.rotation.x = -Math.PI / 2;
-  m.scale.set(r, r, 1);
-  m.position.set(x, 0.02, z);
-  m.renderOrder = 1;
+  const m = new THREE.Mesh(geo, c.massMat);
+  m.scale.set(sx, sy, sz);
+  m.position.set(x, y, z);
+  m.rotation.set(rx, ry, 0);
   c.group.add(m);
   return m;
 }
@@ -401,7 +402,8 @@ export function buildStructures(scene, feedOrOpts, layoutArg) {
   const kinds = { 'FAC-01': 0, 'FAC-02': 1, 'FAC-03': 2 };
   for (const fac of lay.facilities) {
     const c = actx(healthById.get(fac.assetId) ?? 'nominal');
-    c.group.position.set(fac.position[0], 0, fac.position[1]);
+    // Ground-sit: facilities float or sink on relief when pinned to datum.
+    c.group.position.set(fac.position[0], field(fac.position[0], fac.position[1]) * VEX, fac.position[1]);
     c.group.scale.setScalar(FAC_SCALE);
     c.group.userData.baseScale = FAC_SCALE;
     const fn = builders[fac.assetId] ?? [compressor, valveYard, tankFarm][kinds[fac.assetId] ?? 0] ?? compressor;
@@ -412,7 +414,7 @@ export function buildStructures(scene, feedOrOpts, layoutArg) {
   }
   for (const sen of lay.sensors) {
     const c = actx(healthById.get(sen.assetId) ?? 'nominal');
-    c.group.position.set(sen.position[0] + 0.06, 0, sen.position[1] + 0.04);
+    c.group.position.set(sen.position[0] + 0.06, field(sen.position[0], sen.position[1]) * VEX, sen.position[1] + 0.04);
     c.group.scale.setScalar(SEN_SCALE);
     c.group.userData.baseScale = SEN_SCALE;
     sensorMast(c);

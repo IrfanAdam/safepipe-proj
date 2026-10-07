@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-07T10:21:41.535Z",
+  "generated": "2026-10-07T11:42:27.052Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,14 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "899b2a2",
+      "full": "899b2a27ccf92686e18226ba990668dabf672beb",
+      "date": "2026-10-07",
+      "subject": "docs(ops3d-v2): hide phase anchors from renderer + blank lines before task tables [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-0"
+    },
     {
       "sha": "07eb5ec",
       "full": "07eb5ec1d207500a922b18ff3ab20af6c45a66bb",
@@ -548,5 +556,16 @@
       "anchor": null
     }
   ],
-  "wip": []
+  "wip": [
+    "package.json",
+    "src/changelog/changelog-cards.css",
+    "src/ops3d/camera.js",
+    "src/ops3d/hud.css",
+    "src/ops3d/hud.js",
+    "src/ops3d/levels.js",
+    "src/ops3d/network.js",
+    "src/ops3d/sound.js",
+    "src/ops3d/structures.js",
+    "src/ops3d/twin.js"
+  ]
 }

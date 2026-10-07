@@ -1,6 +1,6 @@
 # Ops 3D v2 — Real-World Safety / Compliance / Maintenance Twin
 
-> Status: 🟡 DRAFT v2 — research-pinned, awaiting your `go` / ref steer. Nothing built yet.
+> Status: 🟢 BUILDING v2 — Phase 0 ✓ done (5/5 tasks, 114 tests green, captures verified). Phase 1 pending `go`.
 > Replaces: `2026-10-06_003000-ops3d-theatre-style.md` (all 10 tasks shipped, 40 commits) + spinout `153000` terrain-topo.
 > Server: `npm run dev` on `:5175`. Never touch `:5173`/`:5174`.
 
@@ -55,27 +55,27 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 | 4 | Define `BASE_DOT_SIZE`/`CRITICAL_GAIN` + TDD feed-shape test first | nominal→critical flip, no throw, test green |
 | 5 | Sound mute (`M` + HUD button) + lazy AudioContext on first pointerdown | pre-gesture warning gone; mute silences all |
 
-### Task 1: camera fly retune
+### Task 1: camera fly retune ✓ done
 **Objective:** kill damping mid-fly, separate duration from distance, kill orbit inertia on arrival.
 **Files:** `src/ops3d/camera.js`
 **Verify:** click 3 assets at TOP → lands <5px off at NEAR, no drift after stop.
 
-### Task 2: height-aware aim
+### Task 2: height-aware aim ✓ done
 **Objective:** raycast follows terrain field (not y=0); focus target = fault chainage, never pipe midpoint.
 **Files:** `src/ops3d/twin.js`, `src/ops3d/levels.js`
 **Verify:** click asset on a hill → target-Y equals terrain height; focus = fault point.
 
-### Task 3: single facility boxes
+### Task 3: single facility boxes ✓ done
 **Objective:** one box layer; `mass()` honors params; radio boxes wrap geometry to base ground.
 **Files:** `src/ops3d/network.js`, `src/ops3d/structures.js`
 **Verify:** zero double-drawn boxes; boxes sit on terrain, not floating.
 
-### Task 4: crash constants + TDD test
+### Task 4: crash constants + TDD test ✓ done
 **Objective:** define `BASE_DOT_SIZE`/`CRITICAL_GAIN`; write feed-shape test BEFORE the fix.
 **Files:** `src/ops3d/network.js`, `tests/ops3d-feed.test.js` (new)
 **Verify:** test red→green; health flip nominal→critical throws nothing.
 
-### Task 5: sound mute + lazy context
+### Task 5: sound mute + lazy context ✓ done
 **Objective:** HUD mute button + `M` toggle; AudioContext created on first pointerdown only.
 **Files:** `src/ops3d/sound.js`, `src/ops3d/hud.js`
 **Verify:** no pre-gesture console warning; mute kills click confirms + pulses.

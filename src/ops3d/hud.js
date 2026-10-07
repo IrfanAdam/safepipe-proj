@@ -27,6 +27,7 @@ export function buildHud(container, cbs = {}) {
   const onCreateWO = cbs.onCreateWO ?? (() => {});
   const onLevel = cbs.onLevel ?? (() => {});
   const onOverlay = cbs.onOverlay ?? (() => {});
+  const onMute = cbs.onMute ?? (() => {});
 
   const knownIds = new Set();
 
@@ -78,6 +79,11 @@ export function buildHud(container, cbs = {}) {
   ovBtn.setAttribute('aria-label', 'Cycle data overlay: off, weather, tectonic, forecast');
   ovBtn.addEventListener('click', () => onOverlay());
   legend.appendChild(ovBtn);
+  const muteBtn = el('button', 'ops-hud__mute-btn', 'SOUND · ON');
+  muteBtn.type = 'button';
+  muteBtn.setAttribute('aria-label', 'Toggle sound (M)');
+  muteBtn.addEventListener('click', () => onMute());
+  legend.appendChild(muteBtn);
   root.appendChild(legend);
 
   // — Right detail panel (hidden unless selection) —
@@ -252,6 +258,9 @@ export function buildHud(container, cbs = {}) {
     overlayLabel.textContent = `OVERLAY · ${state.overlay ? state.overlay.toUpperCase() : 'OFF'}`;
     ovBtn.textContent = `OVERLAY · ${state.overlay ? state.overlay.toUpperCase() : 'OFF'}`;
     ovBtn.classList.toggle('ops-hud__overlay-btn--active', !!state.overlay);
+    const muted = !!state.muted;
+    muteBtn.textContent = muted ? 'SOUND · OFF' : 'SOUND · ON';
+    muteBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
   }
 
   // Numeric 1-3 level shortcut when HUD has focus context; twin.js owns camera.

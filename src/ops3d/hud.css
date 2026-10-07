@@ -98,6 +98,22 @@
   color: #ffc86a;
   opacity: 1;
 }
+.ops-hud__mute-btn {
+  margin-top: 6px;
+  margin-left: 6px;
+  background: transparent;
+  border: 1px solid rgba(230, 232, 232, 0.35);
+  color: #e6e8e8;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.ops-hud__mute-btn:hover {
+  opacity: 1;
+}
 
 /* Top-right critical banner */
 .ops-hud__banner {

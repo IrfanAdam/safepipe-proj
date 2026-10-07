@@ -31,7 +31,8 @@ import { buildLabels } from './labels.js';
 import { buildGridFloor } from './gridfloor.js';
 import { buildChecker } from './checker.js';
 import { buildOverlays } from './overlays.js';
-import { ensureAudio, play } from './sound.js';
+import { ensureAudio, audioLive, play, setMuted, isMuted } from './sound.js';
+import { field, VEX } from './terrain.js';
 import { buildHud } from './hud.js';
 import { createPost } from './post.js';
 
@@ -92,6 +93,10 @@ export function createTwin(container, opts = {}) {
   const hud = buildHud(container, {
     onSearch: (id) => select(id, { fly: true }),
     onCreateWO,
+    onMute: () => {
+      setMuted(!isMuted());
+      pushHud();
+    },
     onLevel: (name) => {
       try {
         levels.setLevel(name);
@@ -126,6 +131,7 @@ export function createTwin(container, opts = {}) {
       selection: sel,
       level: levels.name,
       overlay: overlayMode,
+      muted: isMuted(),
       banner: crit ? { kind: crit.faults[0]?.type ?? 'CRITICAL', assetId: crit.assetId } : null,
     });
   }
@@ -159,7 +165,7 @@ export function createTwin(container, opts = {}) {
       const pipe = item?.kind === 'pipeline' && layout.pipelines.find((p) => p.assetId === id);
       if (pipe && ch != null) {
         const [px, pz] = arcPoint(pipe.points, ch);
-        aim = [px, 0.05, pz];
+        aim = [px, field(px, pz) * VEX + 0.05, pz];
       }
     }
     network.setSelection(id);
@@ -188,12 +194,15 @@ export function createTwin(container, opts = {}) {
     setNdc(e);
     raycaster.setFromCamera(ndc, rig.camera);
     if (!raycaster.ray.intersectPlane(groundPlane, hitPoint)) return null;
-    return [hitPoint.x, 0.05, hitPoint.z];
+    return [hitPoint.x, field(hitPoint.x, hitPoint.z) * VEX + 0.05, hitPoint.z];
   };
 
   const ndc = new THREE.Vector2();
   const raycaster = new THREE.Raycaster();
   const downPos = [0, 0];
+  // AudioContext is gesture-locked: create it on the first real pointer press,
+  // never on mousemove (pre-gesture) or at boot.
+  container.addEventListener('pointerdown', () => ensureAudio(), { once: true });
   canvas.addEventListener('pointerdown', (e) => {
     downPos[0] = e.clientX;
     downPos[1] = e.clientY;
@@ -213,10 +222,9 @@ export function createTwin(container, opts = {}) {
     beacons.setHover?.(id);
     if (id !== lastHoverSnd) {
       lastHoverSnd = id;
-      if (id) {
-        ensureAudio();
-        play('hover');
-      }
+      // Hover is not a user gesture: only play when the context already runs
+      // (creating one here logs a pre-gesture warning and stays suspended).
+      if (id && audioLive()) play('hover');
     }
   });
   canvas.addEventListener('mouseleave', () => {
@@ -235,6 +243,12 @@ export function createTwin(container, opts = {}) {
     if (id) select(id, { fly: true, at });
   });
   const onKey = (e) => {
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if (e.key === 'm' || e.key === 'M') {
+      setMuted(!isMuted());
+      pushHud();
+      return;
+    }
     if (e.key === '1') {
       levels.setLevel('network');
       pushHud();

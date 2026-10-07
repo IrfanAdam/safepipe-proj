@@ -764,6 +764,48 @@
      "state": "0/3"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-07",
+   "hash": "381d1fb3",
+   "sections": [
+    {
+     "head": "Phase 0 — Fix the foundation",
+     "hash": "a5319c68",
+     "state": "5/5"
+    },
+    {
+     "head": "Phase 1 — Real terrain",
+     "hash": "1ad33db7",
+     "state": "0/5"
+    },
+    {
+     "head": "Phase 2 — Real inspectable assets",
+     "hash": "8e9306a6",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 3 — Hotspot launcher map",
+     "hash": "693d51f0",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 4 — Time variance + sim",
+     "hash": "6b283fba",
+     "state": "0/5"
+    },
+    {
+     "head": "Phase 5 — Operations layer",
+     "hash": "240addd8",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 6 — Lock",
+     "hash": "0913dca9",
+     "state": "0/3"
+    }
+   ]
   }
  ]
 }

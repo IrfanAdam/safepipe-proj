@@ -10,7 +10,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const FOV = 40;
 const DIST_MIN = 0.05;
-const DIST_MAX = 140;
+const DIST_MAX = 70; // matches the camera cage below — zooming past it snapped back every frame
 const MAX_POLAR = (80 * Math.PI) / 180;
 const FLY_MS = 600;
 
@@ -63,6 +63,14 @@ export function createRig(canvas, opts = {}) {
   // Active fly-to tween, stepped by update(). Null when idle.
   let tween = null;
 
+  // Damping fights the tween: controls.update() applies leftover orbit
+  // deltas on top of the lerped position, so the camera drifts on arrival.
+  // While a fly is active damping stays off (deltas zero out, update only
+  // re-aims); it is restored when the fly ends or the user grabs control.
+  const setDamping = (on) => {
+    controls.enableDamping = on;
+  };
+
   function flyTo(pos, tgt = null, durMs = FLY_MS) {
     const toPos = pos.isVector3 ? pos.clone() : _v().set(...pos);
     const toTg = tgt
@@ -74,9 +82,11 @@ export function createRig(canvas, opts = {}) {
       camera.position.copy(toPos);
       controls.target.copy(toTg);
       tween = null;
+      setDamping(true);
       controls.update();
       return;
     }
+    setDamping(false);
     tween = {
       t0: performance.now(),
       dur: durMs,
@@ -86,6 +96,12 @@ export function createRig(canvas, opts = {}) {
       toTg,
     };
   }
+  // Grabbing the camera mid-fly cancels the fly — otherwise the tween keeps
+  // fighting the user's drag.
+  controls.addEventListener('start', () => {
+    tween = null;
+    setDamping(true);
+  });
 
   function setPreset(name) {
     const p = PRESETS[name];
@@ -108,7 +124,10 @@ export function createRig(canvas, opts = {}) {
       const e = easeInOutCubic(k);
       camera.position.lerpVectors(tween.fromPos, tween.toPos, e);
       controls.target.lerpVectors(tween.fromTg, tween.toTg, e);
-      if (k >= 1) tween = null;
+      if (k >= 1) {
+        tween = null;
+        setDamping(true);
+      }
     }
     // Camera cage: never leave the mapped circle (r20) + margin.
     const tr = Math.hypot(controls.target.x, controls.target.z);

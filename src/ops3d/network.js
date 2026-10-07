@@ -27,6 +27,8 @@ const HEALTH_COLOR = {
   critical: 0xe31919, // fault red
 };
 const DOT_Y = 0.06;
+export const BASE_DOT_SIZE = 0.05;
+export const CRITICAL_GAIN = 1.5; // critical renders at 1.5× dot size
 const DIM_FACTOR = 0.3;
 const FLOW_COLOR = 0xd8a93c; // warm yellow oil-flow overlay
 const FLOW_OPACITY = 0.32;
@@ -261,35 +263,18 @@ export function buildNetwork(scene, feed) {
     proxies.push(proxy);
   }
 
-  /* --- facilities: wireframe boxes + invisible pick boxes --- */
+  /* --- facilities: invisible pick boxes only. The visible facility boxes
+   * live in structures.js (single box layer) — drawing wire boxes here too
+   * rendered every facility twice. Proxies sit on the terrain surface. --- */
   for (const fac of layout.facilities) {
-    const health = healthById.get(fac.assetId)?.health ?? 'nominal';
     const [w, h, d] = fac.size;
     const [fx, fz] = fac.position;
-    // Fat lines (resolution-independent width) so box edges stay crisp close up —
-    // 1px LineSegments rasterize into staircases at glancing zoom angles.
-    const edgePos = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)).getAttribute('position');
-    const segGeo = new LineSegmentsGeometry();
-    segGeo.setPositions(Array.from(edgePos.array));
-    const edgeMat = new LineMaterial({
-      color: colorFor(health).getHex(),
-      linewidth: 2.5,
-      transparent: true,
-      opacity: 0.9,
-    });
-    edgeMat.resolution.set(1280, 720);
-    resMats.push(edgeMat);
-    const edges = new LineSegments2(segGeo, edgeMat);
-    edges.position.set(fx, h / 2 + 0.02, fz);
-    group.add(edges);
-    track(fac.assetId, edges.material, 0.9);
-    byId.get(fac.assetId).nodes.push(edges);
-
+    const gy = field(fx, fz) * VEX;
     const proxy = new THREE.Mesh(
       new THREE.BoxGeometry(w + 0.5, h + 0.5, d + 0.5),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
-    proxy.position.copy(edges.position);
+    proxy.position.set(fx, gy + h / 2 + 0.02, fz);
     proxy.userData.assetId = fac.assetId;
     proxy.userData.kind = 'facility';
     group.add(proxy);

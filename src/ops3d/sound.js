@@ -39,6 +39,11 @@ export function isMuted() {
   return muted;
 }
 
+/* True only when a context exists and is actually producing sound. */
+export function audioLive() {
+  return !!ctx && ctx.state === 'running' && !muted;
+}
+
 /* Single enveloped tone; slideTo enables two-tone sweeps. */
 function tone(freq, durMs, { type = 'sine', vol = 1, slideTo = null, delayMs = 0 } = {}) {
   const c = ensureAudio();
