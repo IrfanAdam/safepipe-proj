@@ -280,6 +280,38 @@ export function createTwin(container, opts = {}) {
 
   let raf = 0;
   let last = performance.now();
+  // Context-loss armor: when the browser kills the GL context (Safari does
+  // this once its GPU process runs dry — e.g. IOSurface exhaustion after a
+  // long dev session), rendering into it silently no-ops forever: the canvas
+  // sits black while the DOM HUD keeps working ("only overlay text"). Pause
+  // the loop, badge the container so the state is visible instead of
+  // mysterious, and resume on restore — three re-uploads on next render.
+  let glLost = false;
+  let lossNote = null;
+  const onGlLost = (e) => {
+    e.preventDefault();
+    if (glLost) return;
+    glLost = true;
+    cancelAnimationFrame(raf);
+    lossNote = document.createElement('div');
+    lossNote.textContent = '3D PAUSED · GPU CONTEXT LOST — RESTORING · RELOAD IF STUCK';
+    lossNote.style.cssText =
+      'position:absolute;top:10px;left:50%;transform:translateX(-50%);' +
+      'font:10px/1.6 ui-monospace,monospace;letter-spacing:0.12em;color:#ff8c39;' +
+      'background:rgba(10,14,18,0.92);border:1px solid rgba(255,140,57,0.4);' +
+      'border-radius:4px;padding:4px 10px;pointer-events:none;z-index:5;';
+    container.appendChild(lossNote);
+  };
+  const onGlRestored = () => {
+    if (!glLost) return;
+    glLost = false;
+    lossNote?.remove();
+    lossNote = null;
+    last = performance.now();
+    raf = requestAnimationFrame(tick);
+  };
+  canvas.addEventListener('webglcontextlost', onGlLost);
+  canvas.addEventListener('webglcontextrestored', onGlRestored);
   const tick = (now) => {
     raf = requestAnimationFrame(tick);
     const dt = Math.min((now - last) / 1000, 0.1);
@@ -353,6 +385,9 @@ export function createTwin(container, opts = {}) {
       cancelAnimationFrame(raf);
       ro.disconnect();
       window.removeEventListener('keydown', onKey);
+      canvas.removeEventListener('webglcontextlost', onGlLost);
+      canvas.removeEventListener('webglcontextrestored', onGlRestored);
+      lossNote?.remove();
       hud.dispose();
       post.dispose();
       beacons.dispose();
