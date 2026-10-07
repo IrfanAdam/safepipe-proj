@@ -111,6 +111,15 @@ export const isDone = (frac) => {
   return !!m && Number(m[2]) > 0 && Number(m[1]) === Number(m[2]);
 };
 
+// Content hash for plan-history snapshots (shared node+browser; fnv1a, sync).
+// Whitespace-collapsed so reformat-only edits still match.
+export const phash = (s) => {
+  let h = 0x811c9dc5;
+  const t = String(s).replace(/\s+/g, ' ').trim();
+  for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(16).padStart(8, '0');
+};
+
 export const buildState = (ss) => {
   let d = 0, t = 0;
   ss.forEach((s) => {

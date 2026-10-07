@@ -4,7 +4,7 @@ import { hits, commits, unlinked } from '../changelog-links.js';
 import { clip } from '../changelog-titles.js';
 import { esc } from './esc.js';
 export function paintPlan(root, ctx){
-  const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts } = ctx;
+  const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts, revOf } = ctx;
   const scrim = root.querySelector('[data-scrim]'), drawer = root.querySelector('[data-drawer]');
   if (!plan) {
     const nf = [
@@ -47,9 +47,11 @@ export function paintPlan(root, ctx){
     const endBit = endTxt ? ' ' + endTxt.trim() : '';
     const dateTxt = sd + stBit + endBit;
     const unit = p.sprints.some((s) => /^Phase\b/.test(s.head)) ? 'phases' : 'tasks';
+    const rev = revOf ? revOf(p.file) : null;
     const stateTxt = [
       [p.sprints.length, ` ${unit}`].join(''),
       frac,
+      rev ? `rev ${rev.n} · ${fmtDate(rev.last)}` : '',
     ].filter(Boolean).join(' · ');
     return [
       `<button class="ds-pick`,

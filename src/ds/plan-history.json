@@ -1,0 +1,500 @@
+{
+ "2026-10-05_150017-safepipe-domain-logic.md": [
+  {
+   "sha": "b33f7a9",
+   "date": "2026-10-07",
+   "hash": "aa458312",
+   "sections": [
+    {
+     "head": "Step 0 — Live-fig content mining setup (copy-paste)",
+     "hash": "8301e40d",
+     "state": ""
+    },
+    {
+     "head": "Task 1 — Fixtures (frozen contract with Plan B)",
+     "hash": "986e53ad",
+     "state": ""
+    },
+    {
+     "head": "Task 2 — Work-order state machine",
+     "hash": "69e780f7",
+     "state": ""
+    },
+    {
+     "head": "Task 3 — OQ qualifications + workforce rules",
+     "hash": "2790c6a2",
+     "state": ""
+    },
+    {
+     "head": "Task 4 — Questionnaire / QC / inspection logic",
+     "hash": "c16dc7bb",
+     "state": ""
+    },
+    {
+     "head": "Task 5 — API freeze + publish",
+     "hash": "38f7f36b",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": "6934f4e",
+   "date": "2026-10-07",
+   "hash": "8f5dd3f0",
+   "sections": [
+    {
+     "head": "Step 0 — Live-fig content mining setup (copy-paste)",
+     "hash": "8301e40d",
+     "state": ""
+    },
+    {
+     "head": "Task 1 — Fixtures (frozen contract with Plan B) ✓ done",
+     "hash": "7da7e0bf",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2 — Work-order state machine ✓ done",
+     "hash": "b5c15687",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3 — OQ qualifications + workforce rules ✓ done",
+     "hash": "2d6f9254",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4 — Questionnaire / QC / inspection logic ✓ done",
+     "hash": "c834b10f",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5 — API freeze + publish ✓ done",
+     "hash": "311076b4",
+     "state": "1/1"
+    }
+   ]
+  }
+ ],
+ "2026-10-05_150017-safepipe-ds-extraction.md": [
+  {
+   "sha": "b33f7a9",
+   "date": "2026-10-07",
+   "hash": "80131471",
+   "sections": [
+    {
+     "head": "Step 0 — Live-fig query setup (copy-paste, independent per agent)",
+     "hash": "8cdf9f41",
+     "state": ""
+    },
+    {
+     "head": "Task 1 — Token JSON from live fills, fonts, and styles ✓ done",
+     "hash": "efd9751d",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2 — Regenerate `tokens.css` (light, legacy-faithful) ✓ done",
+     "hash": "9135275b",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3 — Component specs from live masters (top 12 by instance count) ✓ done",
+     "hash": "a1662369",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4 — Build `src/components/` implementations + gallery proof ✓ done",
+     "hash": "f4fb8e3a",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5 — Contract publish + drift gate ✓ done",
+     "hash": "c7297004",
+     "state": "1/1"
+    }
+   ]
+  }
+ ],
+ "2026-10-05_150017-safepipe-prototype-screens.md": [
+  {
+   "sha": "b33f7a9",
+   "date": "2026-10-07",
+   "hash": "3680a565",
+   "sections": [
+    {
+     "head": "Step 0 — Live-fig setup + screen-frame locator (copy-paste)",
+     "hash": "157b534b",
+     "state": ""
+    },
+    {
+     "head": "Task 1 — Shell + routing + fixtures",
+     "hash": "4660ab80",
+     "state": ""
+    },
+    {
+     "head": "Task 2 — Operations work-order detail (`#/operations`)",
+     "hash": "54580631",
+     "state": ""
+    },
+    {
+     "head": "Task 3 — Workforce master-detail (`#/workforce`)",
+     "hash": "a739189d",
+     "state": ""
+    },
+    {
+     "head": "Task 4 — PIP fact-sheet record (`#/pip`) + Assets (`#/assets`)",
+     "hash": "44842095",
+     "state": ""
+    },
+    {
+     "head": "Task 5 — Mobile Home (`#/home`) + integration",
+     "hash": "de7fc31f",
+     "state": ""
+    }
+   ]
+  }
+ ],
+ "2026-10-06_003000-ops3d-theatre-style.md": [
+  {
+   "sha": "b33f7a9",
+   "date": "2026-10-07",
+   "hash": "49446d31",
+   "sections": [
+    {
+     "head": "Task 1: Pin three.js + twin module API",
+     "hash": "0c074813",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 2: Renderer + camera rig + table",
+     "hash": "f68f3fd4",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 3: Health feed + dotted network layer (faults glow, sensitive zones outline",
+     "hash": "1bf51fa9",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 4: Semantic zoom — network → segment → asset (the twin core)",
+     "hash": "eeb30cce",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 5: HUD in DOM (not WebGL)",
+     "hash": "365fb4d7",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 6: Post chain — bloom + CA + grain/vignette",
+     "hash": "f6661208",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 7: Drill-down + selection API (you wire it to your views)",
+     "hash": "78cb5e45",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 9: Realism pass — terrain, structures, night-vision readability (NEW)",
+     "hash": "9b59555c",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 10: True-scale 20 km pass — real place, attention hierarchy, capped camera ",
+     "hash": "a710f90e",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 8: Perf + tracker + docs",
+     "hash": "51369e22",
+     "state": "0/1"
+    }
+   ]
+  }
+ ],
+ "2026-10-06_153000-ops3d-terrain-topo.md": [
+  {
+   "sha": "b33f7a9",
+   "date": "2026-10-07",
+   "hash": "c1568a19",
+   "sections": [
+    {
+     "head": "Task 1: Pre-flight — prove the gap and lock the bar",
+     "hash": "f2377972",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 2: Terrain field v2 — guaranteed relief that survives the void ✓ done (167a",
+     "hash": "15a429d2",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Contour engine — 32-level chained strips with correct weight and glow ✓ ",
+     "hash": "f7da03fd",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Elevation language — pills, summits, datum, interval badge ✓ done (167a6",
+     "hash": "e76153ca",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Drainage & water — Vs that prove flow ✓ done (167a614)",
+     "hash": "cbfef6b7",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 6: Graticule — checker parterre + red survey grid, both subordinate ✓ done ",
+     "hash": "914216a1",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 7: Camera / fog / post — let the stacking read ✓ done (167a614)",
+     "hash": "c2f4aa93",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 8: Verification, docs, and close-out ✓ done (wrap-up commit, see log)",
+     "hash": "70a799a6",
+     "state": "7/7"
+    }
+   ]
+  },
+  {
+   "sha": "89494ec",
+   "date": "2026-10-07",
+   "hash": "707f1ed3",
+   "sections": [
+    {
+     "head": "Task 1: Pre-flight — prove the gap and lock the bar ✓ done (docs/ops3d-terrain-a",
+     "hash": "a49deaa6",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Terrain field v2 — guaranteed relief that survives the void ✓ done (167a",
+     "hash": "15a429d2",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Contour engine — 32-level chained strips with correct weight and glow ✓ ",
+     "hash": "f7da03fd",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Elevation language — pills, summits, datum, interval badge ✓ done (167a6",
+     "hash": "e76153ca",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Drainage & water — Vs that prove flow ✓ done (167a614)",
+     "hash": "cbfef6b7",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 6: Graticule — checker parterre + red survey grid, both subordinate ✓ done ",
+     "hash": "914216a1",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 7: Camera / fog / post — let the stacking read ✓ done (167a614)",
+     "hash": "c2f4aa93",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 8: Verification, docs, and close-out ✓ done (wrap-up commit, see log)",
+     "hash": "70a799a6",
+     "state": "7/7"
+    }
+   ]
+  }
+ ],
+ "2026-10-07_120000-safepipe-production-ready.md": [
+  {
+   "sha": "b33f7a9",
+   "date": "2026-10-07",
+   "hash": "6af4a93c",
+   "sections": [
+    {
+     "head": "Task 1: Add `test` script + baseline gates green",
+     "hash": "1f13b899",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 2: Unknown-route 404 (no silent fallback)",
+     "hash": "54f4ce86",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 3: Safe render-error UI (no raw error leak)",
+     "hash": "4cfebfb6",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 4: Remove shipped `console.log` spam",
+     "hash": "c38acd0c",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 5: Meta / favicon / robots / manifest hygiene",
+     "hash": "0f982f3d",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 6: Drop legacy prototype chrome (2021 date, prototype B)",
+     "hash": "244e5cee",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 7: Rail icons — real glyphs + a11y names",
+     "hash": "d9df5294",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 8: Token + responsive + a11y sweep",
+     "hash": "9eabae2f",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 9: Build entries + redirects decision lock",
+     "hash": "95419b8a",
+     "state": "0/1"
+    },
+    {
+     "head": "Task 10: Full verification + manifest sync + screenshots",
+     "hash": "418413c4",
+     "state": "0/1"
+    }
+   ]
+  }
+ ],
+ "2026-10-07_130000-safepipe-changelog.md": [
+  {
+   "sha": "e9c609b",
+   "date": "2026-10-07",
+   "hash": "2bb9d8ae",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested)",
+     "hash": "85808fee",
+     "state": ""
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language",
+     "hash": "59ac16f1",
+     "state": ""
+    },
+    {
+     "head": "Task 4: Wire + verify + close",
+     "hash": "26a6fef3",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": "59c38f3",
+   "date": "2026-10-07",
+   "hash": "d6ca358b",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "e99ebe6e",
+     "state": "1/1"
+    }
+   ]
+  },
+  {
+   "sha": "a7d7434",
+   "date": "2026-10-07",
+   "hash": "6efe0d05",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "7ba9e648",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Data-sanity pass ✓ done",
+     "hash": "087948f8",
+     "state": "1/1"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-07",
+   "hash": "783cfce3",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "7ba9e648",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Data-sanity pass ✓ done",
+     "hash": "087948f8",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
+     "hash": "0442a299",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
+     "hash": "c8e8534e",
+     "state": "1/1"
+    }
+   ]
+  }
+ ]
+}

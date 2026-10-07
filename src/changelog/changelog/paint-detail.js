@@ -30,13 +30,14 @@ import { shortPhase as short, unitLabel, provenance, descOf, clip } from '../cha
 import { isDone, state } from '../changelog-parse.js';
 import { esc } from './esc.js';
 export function paintDetail(root, ctx){
-  const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts } = ctx;
+  const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts, edited } = ctx;
   const scrim = root.querySelector('[data-scrim]'), drawer = root.querySelector('[data-drawer]');
   const sprint = sprints[si], sprintDesc = (s) => descOf(s.body);
   root.querySelector('[data-col="sprint"]').innerHTML = sprints.map((s, i) => {
     const hsS = hits(plan.file, s.body, plan.sprints.indexOf(s) === 0),
       has = hsS.length ? ' · ' + hsS.length + ' commit' + (hsS.length > 1 ? 's' : '') : '',
-      frac = state(s.body);
+      frac = state(s.body),
+      ed = edited && edited(s) ? ' · edited' : '';
     return [
       `<button class="ds-pick`,
       i === sel[1] ? ' on' : '',
@@ -48,7 +49,7 @@ export function paintDetail(root, ctx){
       `</span><b>`,
       esc(short(s.head)),
       `</b></span><small>`,
-      [frac + has].filter(Boolean).join(' · '),
+      [frac + has + ed].filter(Boolean).join(' · '),
       `</small></button>`,
     ].join('');
   }).join('') + [

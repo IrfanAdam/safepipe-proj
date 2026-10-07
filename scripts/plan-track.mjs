@@ -38,7 +38,7 @@ const status = git(['status', '--short', '--', ...TRACKED]) || '';
 // forms) — drop the status columns, never a fixed slice, so a path char can
 // never be eaten.
 const wip = status.split('\n').filter(Boolean)
-  .map((l) => l.slice(2).trimStart()).filter((f) => !f.endsWith('plan-manifest.json'));
+  .map((l) => l.slice(2).trimStart()).filter((f) => !f.endsWith('plan-manifest.json') && !f.endsWith('plan-history.json'));
 
 // Shallow-clone guard: merge fresh log over previously committed manifest so
 // truncated CI clones never shrink history (dedupe by sha, fresh first).
@@ -48,6 +48,20 @@ if (existsSync(manifestPath)) {
 }
 const seen = new Set(commits.map((c) => c.sha));
 for (const c of prev.commits || []) if (!seen.has(c.sha)) { commits.push(c); seen.add(c.sha); }
+
+// Plumbing exclusion: commits touching only generated files are tracker output,
+// not work — drop them so triage can reach empty (skill: GENERATED filter).
+const GENERATED = new Set(['src/ds/plan-manifest.json', 'src/ds/plan-history.json']);
+const filesOf = (sha) => {
+  try { return execFileSync('git', ['show', '--name-only', '--format=', sha], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean); }
+  catch { return ['unknown']; }
+};
+for (let i = commits.length - 1; i >= 0; i--) {
+  if (!commits[i].plan) {
+    const fs = filesOf(commits[i].full);
+    if (fs.length && fs.every((f) => GENERATED.has(f))) commits.splice(i, 1);
+  }
+}
 
 // Retro file: pre-trailer history (sha -> plan + anchor). Never rewrite git history.
 let retro = [];
@@ -61,6 +75,32 @@ if (retro.length) {
 }
 
 const linked = commits.filter((c) => c.plan).length;
+
+// Plan-iteration history: append a version snapshot per plan whenever its
+// content hash is unseen. Rides this hook — no convention needed beyond build.
+// History file is generated: excluded from wip like the manifest.
+const histPath = join(root, 'src', 'ds', 'plan-history.json');
+let hist = {};
+try { hist = JSON.parse(readFileSync(histPath, 'utf8')); } catch { /* start empty */ }
+const { split, state, phash } = await import('../src/changelog/changelog-parse.js');
+let histAdded = 0;
+for (const f of plans) {
+  const md = readFileSync(join(plansDir, f), 'utf8');
+  const h = phash(md);
+  hist[f] ||= [];
+  // Invariant: last entry is always the current worktree (views compare against it).
+  // Move-to-end preserves the entry's original sha/date provenance.
+  const ix = hist[f].findIndex((v) => v.hash === h);
+  if (ix === -1) {
+    hist[f].push({ sha: null, date: new Date().toISOString().slice(0, 10), hash: h,
+      sections: split(md).map((s) => ({ head: s.head.slice(0, 80), hash: phash(s.head + '\n' + s.body), state: state(s.body) })) });
+    histAdded++;
+  } else if (ix !== hist[f].length - 1) {
+    hist[f].push(...hist[f].splice(ix, 1));
+    histAdded++;
+  }
+}
+if (histAdded) writeFileSync(histPath, JSON.stringify(hist, null, 1) + '\n');
 const next = { generated: prev.generated || new Date().toISOString(), plans, commits, wip };
 const same = (a, b) => JSON.stringify({ ...a, generated: 0 }) === JSON.stringify({ ...b, generated: 0 });
 if (!existsSync(manifestPath) || !same(prev, next)) {

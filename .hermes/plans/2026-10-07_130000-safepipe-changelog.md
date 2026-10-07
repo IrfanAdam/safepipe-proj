@@ -77,3 +77,20 @@
 - Plan markdown with fenced code blocks containing `## ` lines: handled by fence-aware `chunks()`.
 - `production-ready` groups `### Task` under prose `##` heads: covered by the relaxed fallback (renders flat, 10 tasks) — no phase-grouping is preserved, by design.
 - Detail markdown renderer is minimal (no fenced-code highlighting): matches the reference implementation; revisit only if unreadable.
+
+## Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done
+
+**Objective:** Task edits (added/renamed/reworded/reordered) visible in the log with zero new habits.
+
+**Design:**
+- Tracker appends to `src/ds/plan-history.json` (`{file: [{sha, date, hash, sections:[{head, hash, state}]}]}`) whenever current plan hash is unseen — rides the existing predev/build hook, so capture needs no convention beyond building.
+- `scripts/plan-backfill.mjs` walks `git log --follow` per plan, rehashes each committed version, merges dedupe-by-hash — idempotent, rerunnable; thin today (plans tracked only since `b33f7a9`) but complete going forward.
+- Cards show `· rev <n> <last-date>`; rail rows show `· edited` when that section hash changed across versions.
+
+**Verify:** history file covers all 7 plans; rerun tracker diff-clean; backfill rerun adds 0; build green.
+
+## Task 7: Skill update (changelog-kit carries history) ✓ done
+
+**Objective:** `changelog-kit@0.2.0` documents the history contract, backfill procedure, and new pitfalls so the next project gets iteration tracking free.
+
+**Verify:** SKILL.md diff reviewed; version bumped; procedure/pitfalls/verification all mention plan-history.

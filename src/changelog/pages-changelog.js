@@ -5,9 +5,24 @@ import { commits } from './changelog-links.js';
 import { TAGS, tagsFor, planTags, parseExplicit } from './changelog-tags.js';
 import { h1Of, planSentence } from './changelog-titles.js';
 import names from '../ds/changelog-names.json';
-import { goal, split, parseMeta, anchorOf } from './changelog-parse.js';
+import history from '../ds/plan-history.json';
+import { goal, split, parseMeta, anchorOf, phash } from './changelog-parse.js';
 import { paint } from './changelog-paint.js';
 import { bindChangelogEvents } from './changelog-events.js';
+
+// Plan-iteration revisions: versions append (tracker hook + backfill), oldest first.
+const revOf = (file) => {
+  const vs = history[file] || [];
+  return vs.length > 1 ? { n: vs.length, last: vs[vs.length - 1].date } : null;
+};
+const sectionEdited = (file, s) => {
+  const vs = history[file] || [];
+  if (vs.length < 2) return false;
+  const cur = phash(s.head + '\n' + s.body);
+  const olds = vs.slice(0, -1).flatMap((v) => v.sections.filter((x) => x.head === s.head.slice(0, 80)).map((x) => x.hash));
+  if (!olds.length) return true; // head never seen before = added or renamed
+  return olds.some((h) => h !== cur);
+};
 
 const raws = import.meta.glob('../../.hermes/plans/*.md', { query: '?raw', import: 'default', eager: true });
 const entries = Object.entries(raws).sort(([a], [b]) => b.localeCompare(a));
@@ -63,7 +78,8 @@ function doPaint(root) {
   const { list, pi, plan, sprints, si } = cur();
   st.sel = [pi, si];
   paint(root, { list, pi, plan, sprints, si, active: st.active, day: st.day,
-    sel: st.sel, open: st.open, stage: st.stage, counts, plans, texts });
+    sel: st.sel, open: st.open, stage: st.stage, counts, plans, texts,
+    rev: plan ? revOf(plan.file) : null, revOf, edited: plan ? (s) => sectionEdited(plan.file, s) : () => false });
 }
 export function mount(root) {
   st.open = false; st.stage = 'list'; doPaint(root);
