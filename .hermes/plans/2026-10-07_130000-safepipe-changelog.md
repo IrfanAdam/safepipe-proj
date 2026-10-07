@@ -20,7 +20,7 @@
 
 **Verify:** `npm run plan:track` clean; names cover every file in manifest plans.
 
-## Task 2: Parse + link layers (pure, tested)
+## Task 2: Parse + link layers (pure, tested) ✓ done
 
 **Objective:** Task-heading plans render as sections with done state; every trailer-linked commit lands in exactly one section's timeline and out of triage.
 
@@ -35,7 +35,7 @@
 
 **Verify:** node assertion script — fenced `##` split, `### Task` fallback, `task-1` vs `task-10` boundary, done/cancelled marks, native checkboxes, titles. All green.
 
-## Task 3: Shell + views in safepipe visual language
+## Task 3: Shell + views in safepipe visual language ✓ done
 
 **Objective:** `changelog.html` reads as a safepipe page (pitch header idiom, `✕` close, MuseoModerno/Barlow, navy/violet accents on light).
 
@@ -48,7 +48,7 @@
 
 **Verify:** `grep -rn -E '#[0-9a-fA-F]{3,8}|rgba?\(|[0-9]+px' src/changelog/*.css` shows 0 outside `var(`.
 
-## Task 4: Wire + verify + close
+## Task 4: Wire + verify + close ✓ done
 
 **Objective:** Ships linked, filtered, documented.
 
