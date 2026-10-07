@@ -43,67 +43,233 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 
 ---
 
-### Phase 0 — Fix the foundation (the old build's bugs; unblocks everything)
-**Goal:** zoom lands exactly on the object, boxes exist once, health changes don't crash, sound has a mute & warning gone.
-- Camera: kill damping mid-fly, separate fly duration from distance (TOP→NEAR 1200–1600 ms not 600), target tracking the click (orbit intertia kill), terrain-height-aware raycast (y follow field, not y=0), fault-chainage aim (never pipe midpoint), target-Y lock to clicked terrain height.
-- Double boxes: one facility layer, `mass()` honors params; radio boxes wrapping as geometry to base ground.
-- Crash: define `BASE_DOT_SIZE`/`CRITICAL_GAIN`, TDD feed-shape test before code.
-- Sound: mute button (`M`) + `M` toggle in HUD; AudioContext lazy on first pointerdown, not mousemove.
-- Verify: click 3 assets → focus error <5px at NEAR; health flip nominal→critical no throw; build PASS.
+## Phase 0 — Fix the foundation {#phase-0}
+*Zoom lands exactly on the object, boxes exist once, health changes don't crash, sound has a mute.*
+| # | Task | Done when |
+|---|---|---|
+| 1 | Camera fly retune (damping kill, TOP→NEAR 1200–1600 ms, orbit-inertia kill) | click 3 assets → focus error <5px at NEAR |
+| 2 | Terrain-height-aware raycast + fault-chainage aim (never pipe midpoint) | aim never sinks under hills; aim = fault, not midpoint |
+| 3 | Single facility-box layer (`mass()` honors params) | boxes render once; radio boxes sit on ground |
+| 4 | Define `BASE_DOT_SIZE`/`CRITICAL_GAIN` + TDD feed-shape test first | nominal→critical flip, no throw, test green |
+| 5 | Sound mute (`M` + HUD button) + lazy AudioContext on first pointerdown | pre-gesture warning gone; mute silences all |
+
+### Task 1: camera fly retune
+**Objective:** kill damping mid-fly, separate duration from distance, kill orbit inertia on arrival.
+**Files:** `src/ops3d/camera.js`
+**Verify:** click 3 assets at TOP → lands <5px off at NEAR, no drift after stop.
+
+### Task 2: height-aware aim
+**Objective:** raycast follows terrain field (not y=0); focus target = fault chainage, never pipe midpoint.
+**Files:** `src/ops3d/twin.js`, `src/ops3d/levels.js`
+**Verify:** click asset on a hill → target-Y equals terrain height; focus = fault point.
+
+### Task 3: single facility boxes
+**Objective:** one box layer; `mass()` honors params; radio boxes wrap geometry to base ground.
+**Files:** `src/ops3d/network.js`, `src/ops3d/structures.js`
+**Verify:** zero double-drawn boxes; boxes sit on terrain, not floating.
+
+### Task 4: crash constants + TDD test
+**Objective:** define `BASE_DOT_SIZE`/`CRITICAL_GAIN`; write feed-shape test BEFORE the fix.
+**Files:** `src/ops3d/network.js`, `tests/ops3d-feed.test.js` (new)
+**Verify:** test red→green; health flip nominal→critical throws nothing.
+
+### Task 5: sound mute + lazy context
+**Objective:** HUD mute button + `M` toggle; AudioContext created on first pointerdown only.
+**Files:** `src/ops3d/sound.js`, `src/ops3d/hud.js`
+**Verify:** no pre-gesture console warning; mute kills click confirms + pulses.
+
 - REF GATE 0 (your first steer): confirm focus feel + palette on 2 (TOP + NEAR) captures.
 
-### Phase 1 — Real terrain: DEM + satellite-audited landscape + volume + attention light
-**Goal:** at-a-glance: landscape → infrastructure → health → what needs me.
-- **Site pinned: Fort McMurray oil sands — twin center 57.03N −111.68W (Horizon zone)** per satellite audit (`.hermes/cache/scratch/fortmcm/audit.md`, 12 frames analyzed). One 20 km circle holds every asset class at real density: Athabasca valley W/SW, benched mines NW, mature+fresh tailings ponds center, upgrader + tank farm E, second plant NE, SAGD pad field + flowlines SE.
-- `terrainSource: 'dem'`: fetch SRTM GL1 GeoTIFF (OpenTopography S3, geotiff.js, no key) for the pinned degrees tile; real ~60–70 m river-valley cut + mine benches give the volume the old build lacked; keep the 32-level power-spaced contour engine with `terrainSource: procedural` fallback only if tile fetch fails.
-- Landscape build from the audit's recipe: braided Athabasca (point bars vs cutbank), hairpin tributaries, muskeg string-pond mottling, kettle lakes, cut blocks, seismic checkerboard — all as field/texture layers keyed to the DEM, not painted-on.
-- Infrastructure seeded by the audit's density grammar (not pixel-traced): mine benches ~40 % of NW quadrant, tailings rectangles with straight dykes + real palette (pale mature / dark fresh / tan cells), SAGD pads 60–90 per 9.6 km along DLS section lines, corridors 20–60 m wide drifting to CPF.
-- Volume on the cheap: height-fog + glow sprites, no MRT; periphery fade keeps the 20 km read.
-- Attention lock: terrain whispers at TOP, faults always brightest (bloom threshold won't catch white contours), flow color token distinct from watch amber `#ff8c39`, single sun direction.
-- Verify: TOP fault found in 2 s; NEAR frames a well pad from 550 m; contour heights match DEM altitude ±2 %.
+## Phase 1 — Real terrain {#phase-1}
+*At-a-glance: landscape → infrastructure → health → what needs me. Site: Fort McMurray 57.03N −111.68W.*
+| # | Task | Done when |
+|---|---|---|
+| 6 | DEM loader (`terrainSource: 'dem'`, SRTM GL1 via geotiff.js range fetch) | pinned tile renders real relief; procedural fallback only on fetch fail |
+| 7 | Contour engine on DEM altitude (keep 32-level power-spaced strips) | contour heights match DEM ±2% |
+| 8 | Audit-recipe landscape layers (river/cutbank, muskeg, kettle lakes, seismic grid) | reads as Athabasca valley, not generic hills |
+| 9 | Density-grammar infra seeding (mines NW, tailings center, pads SE) | quadrant layout matches audit spot map |
+| 10 | Attention lock (terrain whispers at TOP, faults brightest, flow ≠ amber) | TOP fault found in 2s; single sun dir |
+
+### Task 6: DEM loader
+**Objective:** fetch 1° SRTM GL1 GeoTIFF (OpenTopography S3, geotiff.js in browser, no key) for the pinned tile; altitude → mesh; `terrainSource: procedural` fallback only if fetch fails.
+**Files:** `src/ops3d/terrain.js`
+**Verify:** real ~60–70 m valley cut visible; fallback path covered by test.
+
+### Task 7: contours on DEM
+**Objective:** keep 32-level power-spaced contour strips, sourced from DEM altitude not synthetic field.
+**Files:** `src/ops3d/terrain.js`
+**Verify:** contour heights match DEM altitude ±2%.
+
+### Task 8: audit-recipe landscape
+**Objective:** braided Athabasca (point bars vs cutbank), hairpin tributaries, muskeg mottling, kettle lakes, cut blocks, seismic checkerboard — field/texture layers keyed to DEM.
+**Files:** `src/ops3d/terrain.js`, `src/ops3d/overlays.js`
+**Verify:** side-by-side with audit frames reads as the same place.
+
+### Task 9: density-grammar seeding
+**Objective:** mine benches ~40% of NW quadrant, tailings rectangles with straight dykes + real palette (pale mature / dark fresh / tan cells), SAGD pads 60–90 per 9.6 km on DLS lines, corridors 20–60 m wide.
+**Files:** `src/ops3d/network.js`, `src/ops3d/structures.js`
+**Verify:** quadrant spot-check vs audit.md spot map.
+
+### Task 10: attention lock
+**Objective:** terrain whispers at TOP (threshold drop), faults always brightest (bloom won't catch white contours), flow color token distinct from watch amber `#ff8c39`, single sun direction.
+**Files:** `src/ops3d/post.js`, `src/ops3d/scene.js`, tokens
+**Verify:** TOP fault found in 2s; NEAR frames a pad from 550 m.
+
 - REF GATE 1: you pick the terrain mood (photo/map screenshot); confirm the pinned center + the audit's layout.
 
-### Phase 2 — Assets as real, inspectable models (to the rivet)
-**Goal:** every asset/facility a defined model you can inspect to the last bolt.
-- Import real OSM + audit-derived features per pinned region (Overpass GeoJSON where tagged; audit density-grammar everywhere else): `man_made=pipeline` trunks, compressor stations, tank farms, SAGD pads, CPFs, upgrader, mine/tailings complexes (full taxonomy in audit.md) — provenance-labeled (`osm|parametric|indicated`).
-- Physical kit: Poly Haven `modular_industrial_pipes_01` CC0 GLB, DRACO/KTX2, meshes→ our parametric mount (recolor via atlas, skin health accents as lamp/emissive overlays, consistent material tokens).
-- Bolt-level detail: bolt rings, flange bolts, gauge dials, handwheel skeletons as instanced geometry per asset optional LOD; continental details at NEAR only or wow detail fades in L2 inspect mode (drill-in tween reveals parts).
-- Verify: NEAR zoom holds bolts without shimmer; per-asset part count logged; provenance per asset visible in HUD.
+## Phase 2 — Real inspectable assets {#phase-2}
+*Every asset/facility a defined model you can inspect to the last bolt.*
+| # | Task | Done when |
+|---|---|---|
+| 11 | Overpass import + audit-derived features with provenance labels | corridors + pads + plants load; every asset shows `osm\|parametric\|indicated` |
+| 12 | CC0 kit mount (Poly Haven pipes GLB → parametric mount, DRACO/KTX2) | valve/flange/tee render on mounts; health lamp overlays work |
+| 13 | Bolt-level LOD (instanced bolt rings, gauges, handwheels; NEAR only) | NEAR zoom holds bolts without shimmer; part count logged |
+| 14 | HUD provenance + part readout per asset | selecting any asset shows provenance + part count |
+
+### Task 11: feature import + provenance
+**Objective:** Overpass GeoJSON where tagged (`man_made=pipeline` trunks, compressors, tank farms); audit density-grammar for SAGD pads, CPFs, upgrader, mine/tailings complexes (taxonomy in audit.md); provenance per asset.
+**Files:** `src/ops3d/network.js`, `src/ops3d/feed.js` (new if missing)
+**Verify:** import runs under Overpass budget (cached); provenance visible per asset.
+
+### Task 12: CC0 kit mount
+**Objective:** Poly Haven `modular_industrial_pipes_01` GLB local, DRACO/KTX2 loaders; meshes → parametric mount (atlas recolor, health accents as lamp/emissive overlays, material tokens).
+**Files:** `src/ops3d/structures.js`, `src/ops3d/assets/` (new)
+**Verify:** valve/flange/tee/gauge render; health change recolors lamp only.
+
+### Task 13: bolt-level LOD
+**Objective:** bolt rings, flange bolts, gauge dials, handwheel skeletons as instanced geometry; NEAR-only LOD (or L2 inspect drill-in fade).
+**Files:** `src/ops3d/structures.js`, `src/ops3d/levels.js`
+**Verify:** NEAR zoom holds bolts without shimmer; per-asset part count logged.
+
+### Task 14: HUD provenance readout
+**Objective:** asset panel shows provenance + part count + kind; "indicated" tag where synthetic.
+**Files:** `src/ops3d/hud.js`, `src/ops3d/table.js`
+**Verify:** every selectable asset shows provenance; no unlabeled synthetic.
+
 - REF GATE 2: you approve detail level (toy / noisy / just right).
 
-### Phase 3 — Google-Maps-style launcher: circular hotspots → full-screen twin
-**Goal:** the map is the launcher — like Google Maps: circle hotspots on a real basemap, click one → the 3D twin opens full-screen on top; close → back to the map, hex exposed.
-- **Map is the DEFAULT landing view** (map-first, no mode toggle, no separate landing). map.html renders MapLibre + deck.gl over Dark Matter vector tiles (satellite raster fallback: Esri World Imagery, attribution kept).
-- **Hotspots are circular** — radial ring progressively colored/divided by sector health brief (each arc = a health state share), sized to the sector H3 hex footprint; emoji POI pin as degraded fallback if the ring shader fails.
-- Click hotspot → full-screen twin view (**twin.html?sector=<h3>**) overlaying the map — the twin IS "the map" the user now sees; no toggle language anywhere (no "MAP mode"/"mode switch").
-- Close (X button or Esc) returns to the map with the sector hex exposed + selection kept; browser back does the same round-trip in one `sectorId` chain (hex ↔ hotspot one id).
-- Verify: hotspot ring matches feed worst-health; click→twin→close keeps selection; Esc works mid-orbit; build PASS.
-- REF GATE 3: you pick map look (Dark Matter vs satellite vs hybrid) + confirm the circular hotspot ring reads right.
+## Phase 3 — Hotspot launcher map {#phase-3}
+*The map is the launcher — circular hotspots on a real basemap, click → full-screen twin; close → back to map.*
+| # | Task | Done when |
+|---|---|---|
+| 15 | map.html landing (MapLibre + deck.gl, Dark Matter vector; Esri satellite fallback) | map loads keyless-ish (free CARTO key); satellite toggle works |
+| 16 | Circular hotspot rings (health-divided arcs, H3-hex sized) + POI-pin fallback | ring matches feed worst-health per sector |
+| 17 | Click → full-screen twin overlay (`twin.html?sector=<h3>`) | twin opens on map; no toggle language anywhere |
+| 18 | Close round-trip (X/Esc/browser-back keeps hex + selection) | Esc mid-orbit returns to map, selection kept |
 
-### Phase 4 — Time variance + simulation (the twin breathes)
-**Goal:** infrastructure that changes with time; per-sector threat sim you can trust.
-- `feedAt(t)`: real-fixtures history (last 30 d), live tick, and sim forward (72 h) behind one slider; dive replay of faults over time.
-- Open-Meteo: pull archive + forecast for pinned coords (rainfall, wind, temp) — weather overlays are first-class on map and twin: rain tint, wind vectors on map extra subtle, temp ember sky shift; corrosion/rain risk correlated, notего cosmetic.
-- USGS seismic: fetch last N events for region → markers on map + small tremor read on twin HUD; operational risk filter (magnitude > X nearby) gates a "check assets" pulse.
-- DISP-S1 ground motion: seeded kelvin plume/region of subsidence in twin; real InSAR series drops in later when you want it serious.
-- Per-sector sim: leak / corrosion / ground-shift / storm presets — spread + consequence over the same feed, seed reproducible, watermarked SIM.
-- Verify: scrub → infra + weather + tracks + WOs + sim move together; sim honest ("what's modeled" in HUD); build PASS.
+### Task 15: map landing
+**Objective:** MapLibre GL JS + `@deck.gl/maplibre` MapLibreOverlay on CARTO Dark Matter vector style; satellite raster (Esri World Imagery, attribution) as toggle.
+**Files:** `map.html` (new), `src/ops3d/map.js` (new)
+**Verify:** map loads; tiles within free budget; WebGL1-safe.
+
+### Task 16: hotspot rings
+**Objective:** radial ring per sector hex, arcs colored/divided by health-state share; sized to H3 footprint; emoji POI pin degraded fallback.
+**Files:** `src/ops3d/map.js`
+**Verify:** ring matches feed worst-health; fallback renders if shader fails.
+
+### Task 17: twin handoff
+**Objective:** click hotspot → `twin.html?sector=<h3>&t=<current>` full-screen over the map; twin IS the map after click.
+**Files:** `src/ops3d/map.js`, `twin.html`, `src/ops3d/twin.js`
+**Verify:** twin opens pre-selected on sector's worst asset.
+
+### Task 18: close round-trip
+**Objective:** X/Esc/browser-back → map with hex exposed + selection kept, one `sectorId` chain.
+**Files:** `src/ops3d/map.js`, `src/ops3d/twin.js`
+**Verify:** Esc mid-orbit works; back button does the same trip.
+
+- REF GATE 3: you pick map look (Dark Matter vs satellite vs hybrid) + confirm the ring reads right.
+
+## Phase 4 — Time variance + sim {#phase-4}
+*Infrastructure that changes with time; per-sector threat sim you can trust.*
+| # | Task | Done when |
+|---|---|---|
+| 19 | `feedAt(t)` + time slider (30 d history, live tick, +72 h sim) | scrub moves infra + weather + WOs + sim together |
+| 20 | Open-Meteo weather (archive + forecast → rain tint, wind vectors, temp shift) | weather overlays on map + twin; corrosion/rain risk correlated |
+| 21 | USGS seismic markers + risk-gated "check assets" pulse | M>X nearby triggers pulse; markers on map |
+| 22 | Subsidence field (seeded now, DISP-S1-shaped; real series later) | mm/yr displacement visible on twin; HUD labels it modeled |
+| 23 | Per-sector sim presets (leak/corrosion/ground-shift/storm) + SIM watermark | reproducible seed; "what's modeled" in HUD |
+
+### Task 19: feedAt + slider
+**Objective:** one `feedAt(t)` unifying fixtures-history (30 d), live tick, sim-forward (72 h); single slider; dive replay of faults.
+**Files:** `src/ops3d/health-feed.js`, `src/ops3d/hud.js`
+**Verify:** scrubbing moves infrastructure status, tracks, WOs, crews, sim spread together.
+
+### Task 20: weather
+**Objective:** Open-Meteo archive + forecast for pinned coords (rain, wind, temp); first-class overlays (rain tint, subtle wind vectors, temp sky shift); corrosion/rain risk correlated, not cosmetic.
+**Files:** `src/ops3d/weather.js` (new), `src/ops3d/map.js`, `src/ops3d/scene.js`
+**Verify:** cached fixtures work offline; live fetch keyless.
+
+### Task 21: seismic
+**Objective:** USGS FDSN last-N events for region → markers on map + tremor read in HUD; magnitude/distance filter gates "check assets" pulse.
+**Files:** `src/ops3d/weather.js` or `src/ops3d/seismic.js` (new)
+**Verify:** pulse fires only above threshold; markers match feed.
+
+### Task 22: subsidence
+**Objective:** seeded Kelvin-style subsidence region in twin (mm/yr field); HUD labels it modeled; real InSAR series drops in later.
+**Files:** `src/ops3d/terrain.js`, `src/ops3d/overlays.js`
+**Verify:** displacement visible at NEAR; honesty label present.
+
+### Task 23: sim presets
+**Objective:** leak (plume + sensor triangulation), corrosion growth, ground-shift, storm — spread + consequence over the same feed; reproducible seed; SIM watermark in HUD.
+**Files:** `src/ops3d/sim.js` (new)
+**Verify:** same seed → same outcome; watermark visible whenever sim time active.
+
 - REF GATE 4: you approve time-slider feel + sim honesty.
 
-### Phase 5 — Operations layer: work orders, field activity, gated actions
-**Goal:** safety/compliance/maintenance platform you can run, not just watch.
-- Work orders + CDL/spatial history on map + twin (markers, trails, status); field crews + activity live positions + heading + age since last ping (triangulated feed from drones/cams/sensors upstream).
-- Approval-gated actions: valve open/close, pump stop, isolate segment — request → approve → execute → audit log; permission stub; HUD confirms + suppresses scene-color use.
-- Compliance flags HUD badges, never scene color; Create WO flows from asset panel; WO list survives map↔twin trip.
-- Sonic+tactile: click confirms, approval chime, fault pulse; `M` mutes; haptics where available.
-- Verify: valve action requires approval, lands in audit log; WO markers match fixtures; sound pre/post gesture reliable.
+## Phase 5 — Operations layer {#phase-5}
+*Safety/compliance/maintenance platform you can run, not just watch.*
+| # | Task | Done when |
+|---|---|---|
+| 24 | WO fixtures + spatial markers/trails on map + twin (survive trip) | WO markers match fixtures; list survives map↔twin |
+| 25 | Field crews + activity (live pos, heading, ping age; drone/cam/sensor feed) | crews move on map; stale pings visibly age |
+| 26 | Approval-gated actions (valve/pump/isolate: request → approve → execute → audit) | valve action requires approval; lands in audit log |
+| 27 | Sonic + tactile (click confirms, approval chime, fault pulse; `M` mutes) | sounds post-gesture reliable; haptics where available |
+
+### Task 24: work orders spatial
+**Objective:** WOs + history as markers/trails/status on map + twin; Create-WO from asset panel; list survives map↔twin trip.
+**Files:** `src/ops3d/hud.js`, `src/ops3d/map.js`, `src/ops3d/table.js`
+**Verify:** WO markers match fixtures; trip keeps list + selection.
+
+### Task 25: field activity
+**Objective:** crews with live positions + heading + age-since-ping; upstream triangulated feed (drones/cams/sensors stub).
+**Files:** `src/ops3d/health-feed.js`, `src/ops3d/map.js`
+**Verify:** stale pings visibly age; heading renders.
+
+### Task 26: gated actions
+**Objective:** valve open/close, pump stop, isolate segment — request → approve → execute → audit log; permission stub; HUD confirms, never scene color.
+**Files:** `src/ops3d/actions.js` (new), `src/ops3d/hud.js`
+**Verify:** unapproved action never executes; audit log entry per execution; `POST /ops/actions` shape stubbed.
+
+### Task 27: sonic + tactile
+**Objective:** click confirms, approval chime, fault pulse; `M` mutes; haptics via navigator.vibrate where available.
+**Files:** `src/ops3d/sound.js`, `src/ops3d/hud.js`
+**Verify:** all sounds post-gesture; mute covers Phase-0 sounds too.
+
 - REF GATE 5: you approve the gate flow (too many taps / too loose).
 
-### Phase 6 — Lock + docs + perf
-**Goal:** ships clean, stays clean.
-- Pixel cap, instance budgets logged, `?post=0`, reduced-motion path, Safari WebGL1-safe GLSL.
-- Docs: tokens, knobs, sim honesty, provenance map, DEM swap guide, map key setup; captures TOP/ISO/NEAR + map.
-- `plan:track` clean; close each phase with ✓ + sha; phaes never restart silently.
+## Phase 6 — Lock {#phase-6}
+*Ships clean, stays clean.*
+| # | Task | Done when |
+|---|---|---|
+| 28 | Perf budgets (pixel cap, instance counts logged, `?post=0`, reduced-motion path) | budgets logged at boot; reduced-motion kills fly + pulse |
+| 29 | Docs + captures (tokens, knobs, sim honesty, provenance map, DEM swap, key setup) | TOP/ISO/NEAR + map captures attached |
+| 30 | Track-close (`plan:track` clean, phases marked ✓ + sha, no silent restarts) | 0 wip; every phase closed with sha |
+
+### Task 28: perf budgets
+**Objective:** pixel cap, instance budgets logged, `?post=0` path, reduced-motion path, Safari WebGL1-safe GLSL.
+**Files:** `src/ops3d/*.js`, shaders
+**Verify:** Safari holds; budgets print at boot; `?post=0` disables post chain.
+
+### Task 29: docs + captures
+**Objective:** tokens, knobs, sim honesty, provenance map, DEM swap guide, map key setup; captures TOP/ISO/NEAR + map.
+**Files:** `docs/ops-3d-v2.md` (new)
+**Verify:** fresh reader can swap DEM tile + set map key from docs alone.
+
+### Task 30: track-close
+**Objective:** `plan:track` clean; every phase closed with ✓ + sha; phases never restart silently.
+**Files:** this plan file
+**Verify:** 0 wip; all 30 tasks marked; final walkthrough signed.
+
 - REF GATE 6 (final): full walkthrough sign-off.
 
 ## Standing rules (carried over)
