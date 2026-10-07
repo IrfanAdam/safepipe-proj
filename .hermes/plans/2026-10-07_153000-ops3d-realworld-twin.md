@@ -43,8 +43,10 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 
 ---
 
-## Phase 0 — Fix the foundation {#phase-0}
+## Phase 0 — Fix the foundation
+<!-- {#phase-0} -->
 *Zoom lands exactly on the object, boxes exist once, health changes don't crash, sound has a mute.*
+
 | # | Task | Done when |
 |---|---|---|
 | 1 | Camera fly retune (damping kill, TOP→NEAR 1200–1600 ms, orbit-inertia kill) | click 3 assets → focus error <5px at NEAR |
@@ -80,8 +82,10 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 
 - REF GATE 0 (your first steer): confirm focus feel + palette on 2 (TOP + NEAR) captures.
 
-## Phase 1 — Real terrain {#phase-1}
+## Phase 1 — Real terrain
+<!-- {#phase-1} -->
 *At-a-glance: landscape → infrastructure → health → what needs me. Site: Fort McMurray 57.03N −111.68W.*
+
 | # | Task | Done when |
 |---|---|---|
 | 6 | DEM loader (`terrainSource: 'dem'`, SRTM GL1 via geotiff.js range fetch) | pinned tile renders real relief; procedural fallback only on fetch fail |
@@ -117,8 +121,10 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 
 - REF GATE 1: you pick the terrain mood (photo/map screenshot); confirm the pinned center + the audit's layout.
 
-## Phase 2 — Real inspectable assets {#phase-2}
+## Phase 2 — Real inspectable assets
+<!-- {#phase-2} -->
 *Every asset/facility a defined model you can inspect to the last bolt.*
+
 | # | Task | Done when |
 |---|---|---|
 | 11 | Overpass import + audit-derived features with provenance labels | corridors + pads + plants load; every asset shows `osm\|parametric\|indicated` |
@@ -148,8 +154,10 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 
 - REF GATE 2: you approve detail level (toy / noisy / just right).
 
-## Phase 3 — Hotspot launcher map {#phase-3}
+## Phase 3 — Hotspot launcher map
+<!-- {#phase-3} -->
 *The map is the launcher — circular hotspots on a real basemap, click → full-screen twin; close → back to map.*
+
 | # | Task | Done when |
 |---|---|---|
 | 15 | map.html landing (MapLibre + deck.gl, Dark Matter vector; Esri satellite fallback) | map loads keyless-ish (free CARTO key); satellite toggle works |
@@ -179,8 +187,10 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 
 - REF GATE 3: you pick map look (Dark Matter vs satellite vs hybrid) + confirm the ring reads right.
 
-## Phase 4 — Time variance + sim {#phase-4}
+## Phase 4 — Time variance + sim
+<!-- {#phase-4} -->
 *Infrastructure that changes with time; per-sector threat sim you can trust.*
+
 | # | Task | Done when |
 |---|---|---|
 | 19 | `feedAt(t)` + time slider (30 d history, live tick, +72 h sim) | scrub moves infra + weather + WOs + sim together |
@@ -216,8 +226,10 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 
 - REF GATE 4: you approve time-slider feel + sim honesty.
 
-## Phase 5 — Operations layer {#phase-5}
+## Phase 5 — Operations layer
+<!-- {#phase-5} -->
 *Safety/compliance/maintenance platform you can run, not just watch.*
+
 | # | Task | Done when |
 |---|---|---|
 | 24 | WO fixtures + spatial markers/trails on map + twin (survive trip) | WO markers match fixtures; list survives map↔twin |
@@ -247,8 +259,10 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 
 - REF GATE 5: you approve the gate flow (too many taps / too loose).
 
-## Phase 6 — Lock {#phase-6}
+## Phase 6 — Lock
+<!-- {#phase-6} -->
 *Ships clean, stays clean.*
+
 | # | Task | Done when |
 |---|---|---|
 | 28 | Perf budgets (pixel cap, instance counts logged, `?post=0`, reduced-motion path) | budgets logged at boot; reduced-motion kills fly + pulse |

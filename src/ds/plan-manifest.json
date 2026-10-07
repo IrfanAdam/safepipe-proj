@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-07T10:19:58.461Z",
+  "generated": "2026-10-07T10:21:41.535Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,14 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "07eb5ec",
+      "full": "07eb5ec1d207500a922b18ff3ab20af6c45a66bb",
+      "date": "2026-10-07",
+      "subject": "docs(ops3d-v2): 30 task lists across 7 phases — objective/files/verify per task [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-0"
+    },
     {
       "sha": "c1b8e2c",
       "full": "c1b8e2c761a9ac253d4042f3bf70275fdd77bf53",
