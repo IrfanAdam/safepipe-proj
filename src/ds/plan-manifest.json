@@ -1,14 +1,23 @@
 {
-  "generated": "2026-10-07T07:25:52.145Z",
+  "generated": "2026-10-07T07:40:56.553Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
     "2026-10-05_150017-safepipe-prototype-screens.md",
     "2026-10-06_003000-ops3d-theatre-style.md",
     "2026-10-06_153000-ops3d-terrain-topo.md",
-    "2026-10-07_120000-safepipe-production-ready.md"
+    "2026-10-07_120000-safepipe-production-ready.md",
+    "2026-10-07_130000-safepipe-changelog.md"
   ],
   "commits": [
+    {
+      "sha": "8d1cb49",
+      "full": "8d1cb49c01af515016db1041834fab306b4c2086",
+      "date": "2026-10-07",
+      "subject": "docs(ds): close ds-extraction — all 5 tasks done, drift gate PASS [plan:2026-10-05_150017-safepipe-ds-extraction.md#task-5]",
+      "plan": "2026-10-05_150017-safepipe-ds-extraction.md",
+      "anchor": "task-5"
+    },
     {
       "sha": "8472b8e",
       "full": "8472b8edef535dced4e14b85fa9fc7c3210a3a6d",
@@ -362,5 +371,7 @@
       "anchor": null
     }
   ],
-  "wip": []
+  "wip": [
+    "src/ds/changelog-names.json"
+  ]
 }

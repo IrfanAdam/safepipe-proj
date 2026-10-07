@@ -1,0 +1,30 @@
+{
+  "2026-10-05_150017-safepipe-domain-logic.md": {
+    "title": "Domain logic — fixtures to frozen API (Tasks 1–5)",
+    "purpose": "fixtures & rules"
+  },
+  "2026-10-05_150017-safepipe-ds-extraction.md": {
+    "title": "Design system extraction — live-fig tokens to gallery proof",
+    "purpose": "tokens & components"
+  },
+  "2026-10-05_150017-safepipe-prototype-screens.md": {
+    "title": "Prototype screens — shell, routing, operations to mobile",
+    "purpose": "app screens"
+  },
+  "2026-10-06_003000-ops3d-theatre-style.md": {
+    "title": "Network Ops 3D — cinematic twin, network to asset drill-down",
+    "purpose": "3D twin"
+  },
+  "2026-10-06_153000-ops3d-terrain-topo.md": {
+    "title": "Terrain topo — true-scale relief and legibility pass",
+    "purpose": "terrain detail"
+  },
+  "2026-10-07_120000-safepipe-production-ready.md": {
+    "title": "Production-ready polish — gates green plus visual polish",
+    "purpose": "ship prep"
+  },
+  "2026-10-07_130000-safepipe-changelog.md": {
+    "title": "Changelog — plan-linked build log in safepipe visual language",
+    "purpose": "build log"
+  }
+}
