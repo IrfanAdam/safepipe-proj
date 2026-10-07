@@ -13,6 +13,7 @@ export default defineConfig({
       logic: resolve(__dirname, 'logic.html'),
       pitch: resolve(__dirname, 'pitch.html'),
       ops3d: resolve(__dirname, 'ops3d.html'),
+      changelog: resolve(__dirname, 'changelog.html'),
     } },
   },
 });

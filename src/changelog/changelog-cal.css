@@ -1,0 +1,18 @@
+/* safepipe changelog — week-columns graph · [plan:2026-10-07_130000-safepipe-changelog.md#task-3] */
+.ds-graph{margin:0;overflow-x:auto;padding:var(--cl-4) var(--cl-4) var(--cl-12);--cl-16:calc(var(--sp-spacing-base) * 3.5);--cl-4:calc(var(--sp-spacing-base) * 0.75)}
+.ds-graph-labels{display:flex;gap:var(--cl-4);width:max-content;margin:0 0 var(--cl-2) calc(var(--cl-26) + var(--cl-4))}
+.ds-graph-row{display:flex;gap:var(--cl-4);width:max-content}
+.ds-dows{display:flex;flex-direction:column;gap:var(--cl-4);width:var(--cl-26);flex:none}
+.ds-dows span{height:var(--cl-16);display:flex;align-items:center;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
+.ds-week{display:flex;flex-direction:column;gap:var(--cl-4)}
+.ds-month{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);min-height:1.2em;margin-bottom:var(--cl-2);white-space:nowrap;overflow:visible;flex:none}
+.ds-day{width:var(--cl-16);height:var(--cl-16);border:var(--border-hairline);background:color-mix(in srgb, var(--color-ink) 7%, transparent);padding:0;border-radius:var(--radius-xs)}
+button.ds-day{cursor:pointer;background:var(--color-accent);border-color:transparent}
+button.ds-day.lv1{background:color-mix(in srgb, var(--color-accent) 30%, transparent)}
+button.ds-day.lv2{background:color-mix(in srgb, var(--color-accent) 50%, transparent)}
+button.ds-day.lv3{background:color-mix(in srgb, var(--color-accent) 75%, transparent)}
+button.ds-day.lv4{background:var(--color-accent)}
+.ds-day.on{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
+button.ds-day:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
+.ds-day.is-today{position:relative;border-color:var(--color-ink)}
+.ds-day.is-future{opacity:.6}

@@ -1,0 +1,68 @@
+/* safepipe changelog — shell + token bridge · [plan:2026-10-07_130000-safepipe-changelog.md#task-3] */
+/* Bridge: kit semantics on the left, safepipe --sp-* tokens on the right.
+   Page-local --cl-* scale derives from --sp-spacing-base via calc — no raw
+   hex/px/rgba anywhere in this feature (prod/dev order-proof). */
+:root{
+  --color-ink:var(--sp-text-primary); --color-ink-muted:var(--sp-text-muted);
+  --color-bg:var(--sp-surface-page); --color-surface:var(--sp-surface-card);
+  --color-panel:var(--sp-surface-input); --color-accent:var(--sp-violet);
+  --color-border:var(--sp-border-default);
+  --color-viewer-shade:color-mix(in srgb, var(--sp-navy) 55%, transparent);
+  --border-hairline:var(--cl-1) solid var(--color-border);
+  --z-ds-scrim:100; --z-ds-drawer:200; --z-ds-controls:300;
+  --shadow-viewer:var(--sp-elevation-2); --shadow-sm:var(--sp-elevation-1);
+  --size-ds-drawer:calc(var(--sp-spacing-base) * 220);
+  --font-mono:var(--sp-font-mono); --font-display:var(--sp-font-display);
+  --text-micro:var(--sp-text-xs); --text-h2:var(--sp-text-2xl); --text-h3:var(--sp-text-lg);
+  --text-ds-body:var(--sp-text-md);
+  --tracking-heading:-0.02em; --tracking-mono:0.08em; --tracking-label:0.14em;
+  --leading-prose:1.7; --leading-mono:1.6; --font-leading-relaxed:1.7;
+  --radius-none:0; --radius-xs:var(--sp-spacing-base); --radius-md:var(--sp-radius-md);
+  --dur-soft:0.18s; --dur-glide:0.3s; --motion-duration-sm:0.15s;
+  --ease-standard:ease; --ease-signature:cubic-bezier(0.2,0.9,0.25,1.15);
+  --motion-easing-standard:ease;
+}
+:root{
+  --cl-1:calc(var(--sp-spacing-base) / 4); --cl-2:calc(var(--sp-spacing-base) / 2);
+  --cl-3:calc(var(--sp-spacing-base) * 0.75); --cl-4:var(--sp-spacing-base);
+  --cl-5:calc(var(--sp-spacing-base) * 1.25); --cl-6:calc(var(--sp-spacing-base) * 1.5);
+  --cl-7:calc(var(--sp-spacing-base) * 1.75); --cl-8:var(--sp-spacing-sm);
+  --cl-9:calc(var(--sp-spacing-base) * 2.25); --cl-10:calc(var(--sp-spacing-base) * 2.5);
+  --cl-11:calc(var(--sp-spacing-base) * 2.75); --cl-12:var(--sp-spacing-md);
+  --cl-14:calc(var(--sp-spacing-base) * 3.5); --cl-16:var(--sp-spacing-lg);
+  --cl-18:calc(var(--sp-spacing-base) * 4.5); --cl-20:calc(var(--sp-spacing-base) * 5);
+  --cl-22:calc(var(--sp-spacing-base) * 5.5); --cl-26:calc(var(--sp-spacing-base) * 6.5);
+  --cl-28:calc(var(--sp-spacing-base) * 7); --cl-30:calc(var(--sp-spacing-base) * 7.5);
+  --cl-32:var(--sp-spacing-2xl); --cl-36:calc(var(--sp-spacing-base) * 9);
+  --cl-60:calc(var(--sp-spacing-base) * 15); --cl-90:calc(var(--sp-spacing-base) * 22.5);
+}
+/* shell (pitch idiom: light page, navy bar, muted text) */
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--color-bg);color:var(--color-ink);font-family:var(--sp-font-ui);font-size:var(--sp-text-md);line-height:1.65;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+.hbar{background:var(--color-surface);border:var(--border-hairline);border-radius:6px;box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:26px;padding:0 28px;height:72px;margin-top:20px;position:sticky;top:12px;z-index:10}
+.hbar .brand{font-family:var(--font-display);font-weight:700;font-size:19px;color:var(--sp-navy);margin-right:auto;text-decoration:none}
+.hbar .brand b{color:var(--sp-sky)}
+.hbar-right{display:flex;gap:var(--cl-14);align-items:center}
+.hbar-tag{font-size:14px;font-weight:600;color:var(--sp-text-secondary)}
+.hbar-close{display:grid;place-items:center;text-decoration:none;background:var(--sp-navy);color:#fff;border-radius:var(--sp-radius-md);width:36px;height:36px;font-size:15px}
+.ds-crumb{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin:0 0 var(--cl-12)}
+#cl-root{padding-top:var(--cl-22);padding-bottom:var(--cl-32)}
+.ds-hero h1{font-family:var(--font-display);font-weight:700;font-size:clamp(40px,6vw,68px);letter-spacing:-0.02em;line-height:1.02;color:var(--color-ink);margin:0;text-wrap:balance;overflow-wrap:break-word}
+.ds-hero.wide .lede{max-width:none}
+.ds-hr{border:none;border-top:var(--border-hairline);margin:var(--cl-14) 0}
+.ds-chips{display:flex;gap:var(--cl-8);flex-wrap:wrap;margin:0 0 var(--cl-12)}
+.ds-chip{font-family:var(--font-display);background:var(--color-surface);color:var(--color-ink-muted);border:var(--border-hairline);padding:var(--cl-8)var(--cl-12);border-radius:var(--radius-md);font-weight:600;letter-spacing:0.06em;font-size:var(--sp-text-sm);cursor:pointer}
+.ds-chip.on{background:var(--color-accent);color:var(--sp-text-inverse);border-color:var(--color-accent)}
+.ds-md{font-size:var(--text-ds-body);line-height:var(--leading-prose)}
+.ds-md h1{font-size:var(--text-h2);font-weight:700;letter-spacing:var(--tracking-heading);margin:0 0 var(--cl-8)}
+.ds-md h2{font-size:var(--text-h2);font-weight:700;letter-spacing:var(--tracking-heading);margin:var(--cl-22) 0 var(--cl-8)}
+.ds-md h3{font-size:var(--text-h3);font-weight:600;margin:var(--cl-16) 0 var(--cl-6)}
+.ds-md ul{padding-left:var(--cl-18);margin:var(--cl-8) 0}
+.ds-md li{margin-bottom:var(--cl-4)}
+.ds-md code{font-family:var(--font-mono);font-size:var(--text-micro);background:var(--color-panel);border:var(--border-hairline);padding:var(--cl-1) var(--cl-5)}
+.ds-md pre{background:var(--color-surface);border:var(--border-hairline);padding:var(--cl-10) var(--cl-12);overflow-x:auto}
+.ds-md pre code{background:none;border:none;padding:0}
+.ds-md a{color:inherit}
+.ds-note{color:var(--color-ink-muted)}
+.note{padding:8px 0 40px;font-size:13px;color:var(--sp-text-muted)}
