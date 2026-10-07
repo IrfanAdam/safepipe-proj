@@ -1,5 +1,8 @@
 # Network Ops 3D (theatre-style) Implementation Plan
 
+> Status: ✅ COMPLETE — all 10 tasks shipped, 40 commits, build green. Spinout `153000` owns terrain detail going forward.
+> Last: `471a4bf` (2026-10-07, manifest sync) · Last code: `299fe91` GPU context-loss armor · Tree: clean on `main`.
+
 > **For Hermes:** execute with `subagent-fanout` — parallel file-disjoint lanes, parent integrates.
 
 **Goal:** Build a dark cinematic digital-twin monitoring view ("Network Ops 3D") in safepipe_proj, styled on theatre-fawn.vercel.app — a real-world pipeline network + facilities rendered as dotted traces on a dark table, with health/faulty/sensitive zones highlighted so what matters is instantly visible. Zoom flows network → segment → asset/facility. Serves oil & gas compliance/safety/maintenance now; data-model stays energy-generic. Upstream triangulation (drones, ground cameras, sensors) feeds a unified asset-health input — the view consumes that feed, it doesn't ingest raw sources.
@@ -26,7 +29,7 @@
 
 ---
 
-### Task 1: Pin three.js + twin module API
+### Task 1 ✓ done — shipped 8cbbd27 · Pin three.js + twin module API
 
 **Objective:** `three` installed and the twin exposes a container-agnostic API you can mount anywhere.
 
@@ -49,7 +52,7 @@ git add package.json src/ops3d/twin.js src/ops3d/main.js
 git commit -m "feat: twin module with container-agnostic mount API"
 ```
 
-### Task 2: Renderer + camera rig + table
+### Task 2 ✓ done — shipped b4e3654 · Renderer + camera rig + table
 
 **Objective:** Dark scene, low oblique camera, satin table plane, orbit/zoom.
 
@@ -66,7 +69,7 @@ git commit -m "feat: twin module with container-agnostic mount API"
 
 **Verify:** `npm run dev -- --port 5175`, open the operations screen, table visible in the map slot, keys 1-3 move camera. Screenshot via SwiftShader if headless.
 
-### Task 3: Health feed + dotted network layer (faults glow, sensitive zones outlined)
+### Task 3 ✓ done — shipped ba46a39 · Health feed + dotted network layer (faults glow, sensitive zones outlined)
 
 **Objective:** Pipelines render as dotted traces driven by a unified health feed — faults glow, sensitive zones get outlines, nominal recedes.
 
@@ -83,7 +86,7 @@ git commit -m "feat: twin module with container-agnostic mount API"
 
 **Verify:** sample feed shows ≥1 critical segment glowing red with ring, ≥1 HCA outline hatched, nominal lines faint. `npm run build` PASS.
 
-### Task 4: Semantic zoom — network → segment → asset (the twin core)
+### Task 4 ✓ done — shipped c557479 · Semantic zoom — network → segment → asset (the twin core)
 
 **Objective:** Zooming (or clicking) descends the twin hierarchy with per-level detail; this is what makes it a twin, not a picture.
 
@@ -101,7 +104,7 @@ git commit -m "feat: twin module with container-agnostic mount API"
 
 **Verify:** scroll/click walks L0→L1→L2 and back; `?asset=` lands at L2 with component labels; reduced-motion jumps.
 
-### Task 5: HUD in DOM (not WebGL)
+### Task 5 ✓ done — shipped c557479 · HUD in DOM (not WebGL)
 
 **Objective:** Theatre-style HUD framing with zero WebGL text.
 
@@ -119,7 +122,7 @@ git commit -m "feat: twin module with container-agnostic mount API"
 
 **Verify:** HUD overlays canvas, `H` hides/shows, no layout break at 1280×720 and 1920×1080.
 
-### Task 6: Post chain — bloom + CA + grain/vignette
+### Task 6 ✓ done — shipped ca9fe88 · Post chain — bloom + CA + grain/vignette
 
 **Objective:** Cinematic finish with two passes, not their full MRT.
 
@@ -133,7 +136,7 @@ git commit -m "feat: twin module with container-agnostic mount API"
 
 **Verify:** white lines show slight red/cyan fringe at edges; `C` toggles CA; FPS ≥ 45 on integrated GPU at 1280×720.
 
-### Task 7: Drill-down + selection API (you wire it to your views)
+### Task 7 ✓ done — shipped 562c476 · Drill-down + selection API (you wire it to your views)
 
 **Objective:** Clicks drill down the twin and report selection; all view-wiring stays on your side.
 
@@ -148,19 +151,19 @@ git commit -m "feat: twin module with container-agnostic mount API"
 
 **Verify:** clicks drill L0→L2 and fire `onSelect`; `setSelection` from console updates highlight + HUD; forced WebGL-off throws catchable error.
 
-### Task 9: Realism pass — terrain, structures, night-vision readability (NEW)
+### Task 9 ✓ done — shipped c4fcb61 · Realism pass — terrain, structures, night-vision readability
 **Objective:** Kill the blocks-and-lines read — real relief, real facilities, Arkham/Crysis night-vision intuition.
 **Files (NEW, file-disjoint lanes):** `src/ops3d/terrain.js` (procedural relief + carved corridors/pads) · `src/ops3d/structures.js` (compressor, valve yard, tanks, sensor masts, trestles; emissive health lamps) · `src/ops3d/beacons.js` (trunk-lateral flow pulses, fault light-pillars + rings, selection halo). Parent wires all three in `twin.js`.
 **Verify:** close-up reads as a place (relief + facility + glowing fault), flow direction visible, fault findable in 2s. `npm run build` PASS + capture.
 **Note:** real GIS geometry plugs into the `health-feed` shape later — synthetic layout reads as real until then.
 
-### Task 10: True-scale 20 km pass — real place, attention hierarchy, capped camera (NEW)
+### Task 10 ✓ done — shipped 299fe91 (manifest 471a4bf) · True-scale 20 km pass — real place, attention hierarchy, capped camera
 **Objective:** The map is a believable 20 km-radius operating area, not a toy: 1 unit = 1 km, gentle representative Permian-basin floor (dip + swells + one dry draw, ±40 m true, VEX 2 — no fantasy peaks, no rim mountains), smooth chained contour strips (no joint-dots, no POI dots on terrain), faults glow brightest while terrain whispers, camera can't leave the mapped circle.
 **Files:** `health-feed.js` (km layout inside r=19, chainages from true lengths) · `terrain.js` (SIZE 44, R_MAP 20 ring, chained Line2 strips, dim palette, periphery fade) · `structures.js` (FAC×0.05 / SEN×0.015 true-scale groups, buried trunk runs at y 0.02, no mid-run trestles) · `network.js` (true km chainage beads via per-pipe length) · `beacons.js` (PILLAR_H 0.45, beads 0.07/0.45 op) · `levels.js` (dists 55 / 9 / 0.55, TARGET_Y 0.05) · `camera.js` (DIST_MIN 0.05, maxDistance cap + pan clamp each frame, presets 55/9/60, fog 70–220 in `scene.js`) · `hud.js` (`SECTOR 7G — PERMIAN BASIN · R 20 KM`) · `twin.js` (clickPoint y 0.05).
 **Verify:** TOP shows full circle + faint terrain; fault found in 2 s; zoom-out/pan stop at the ring; NEAR frames a 180 m pad from 550 m. Build PASS + TOP/NEAR captures + commit.
 **Note:** geometry is representative of the basin, not surveyed DEM — real GIS plugs into the feed shape later.
 
-### Task 8: Perf + tracker + docs
+### Task 8 ✓ done — shipped dfbe32d · Perf + tracker + docs
 
 **Objective:** Ships clean, tracked, documented, performant.
 
@@ -177,6 +180,39 @@ git commit -m "feat: twin module with container-agnostic mount API"
 4. Commit.
 
 ---
+
+---
+
+### Iteration log (Tasks 9–10 — the look loop, oldest → newest)
+
+| SHA | Task | Change |
+|---|---|---|
+| `c63b04c` | 9 | Realism pass — terrain, structures, beacons wired; TOP/ISO/NEAR |
+| `52499eb` | 9 | All-hologram pass — outline facilities, stacked topo strata, linear table |
+| `c4fcb61` | 9 | Ref-driven detail — lattice derrick, tank rings, drop lines, speckle |
+| `36f8a00` | 10 | Terrain whispers — halved contour palette, 1.5px, 0.45 opacity |
+| `712b219` | 10 | Fidelity loop — fault pipe kit, level declutter, caged cam, scanlines |
+| `8cad190` | 10 | View run — kind-sized close-ups, speckle gate, ISO restraint, halo fit |
+| `6aaa5cc` | 10 | Ref run — luminous terrain body, zone fill, tamed bloom |
+| `dd72c5a` | 10 | Agent lanes — glass facilities, labels, red grid, draped+decluttered |
+| `7aba9fa` | 10 | Feedback run — neutral terrain+lake, flow chevrons, buried drape, destinations, hover halo, sounds, overlays |
+| `6387567` | 10 | Organic lake+blue contours, selection survives zoom, subtle flow |
+| `9a17f38` | 10 | Drop flow chevrons, moving dashes carry direction |
+| `c710996` | 10 | Still labels, no vertical bob |
+| `f2e6bdc` | 10 | Solid pipe walls, buried runs dashed |
+| `fcf9f94` | 10 | Clickable overlay toggle in HUD |
+| `909d9f3` | 10 | Contours as technique — hills, numbered index rings, hypsometric body |
+| `7e11f37` | 10 | Drainage thread + steep-bank contour Vs |
+| `de514d5` | 10 | Elevation reads at TOP — hypsometric hillshade, summit tags, index hierarchy |
+| `79d7b5d` | 10 | Matte survey ring, dark body, OS inline elevation pills |
+| `e0b881f` | 10 | Neon-plate void — body fill removed, drill-in restraint |
+| `6d6e70d` | 10 | Small elevation voice, power-spaced levels |
+| `33e2483` | 10 | Checker parterre → static radial gradient wash — no grid, no pulse |
+| `de7248d` | 10 | Freeze contour + ring opacity — landmass pulse removed |
+| `5750284` | 10 | Single-source VEX from terrain.js — drape matches surface |
+| `299fe91` | 10 | GPU context-loss armor — pause loop, badge, auto-resume |
+
+Spinout: terrain detail continues in `2026-10-06_153000-ops3d-terrain-topo.md` (Tasks 7–8 shipped `167a614`, `8472b8e`).
 
 ### Risks / tradeoffs
 - **Bloom cost** on low-end iGPU: mitigated by half-res bloom (UnrealBloom default) + `?post=0` escape hatch.

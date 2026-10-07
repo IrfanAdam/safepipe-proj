@@ -210,6 +210,63 @@
      "state": "0/1"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-07",
+   "hash": "3d435e8d",
+   "sections": [
+    {
+     "head": "Task 1 ✓ done — shipped 8cbbd27 · Pin three.js + twin module API",
+     "hash": "ca8263ea",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2 ✓ done — shipped b4e3654 · Renderer + camera rig + table",
+     "hash": "9cc5ce1d",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3 ✓ done — shipped ba46a39 · Health feed + dotted network layer (faults glo",
+     "hash": "46c2c7f4",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4 ✓ done — shipped c557479 · Semantic zoom — network → segment → asset (the",
+     "hash": "06c4a20d",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5 ✓ done — shipped c557479 · HUD in DOM (not WebGL)",
+     "hash": "7b0673b2",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 6 ✓ done — shipped ca9fe88 · Post chain — bloom + CA + grain/vignette",
+     "hash": "1940c133",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 7 ✓ done — shipped 562c476 · Drill-down + selection API (you wire it to you",
+     "hash": "a8040cde",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 9 ✓ done — shipped c4fcb61 · Realism pass — terrain, structures, night-visi",
+     "hash": "25aa3179",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 10 ✓ done — shipped 299fe91 (manifest 471a4bf) · True-scale 20 km pass — re",
+     "hash": "22de26c3",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 8 ✓ done — shipped dfbe32d · Perf + tracker + docs",
+     "hash": "44a08d5a",
+     "state": "1/1"
+    }
+   ]
   }
  ],
  "2026-10-06_153000-ops3d-terrain-topo.md": [
