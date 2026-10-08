@@ -16,7 +16,7 @@
  * Marching-squares 160×160 grid at 32 power-spaced levels; unordered
  * segments are chained (quantized-endpoint greedy) into continuous smooth
  * polylines per level, then batched into TWO LineSegments2 meshes (base +
- * index) — two draw calls for the whole contour field. Brighter index
+ * index) — two draw calls for the whole contour field. Muted grey index
  * lines every 5th level; index rings carry inline elevation pills so the
  * contours read as a plotting technique, not decoration. Cells whose local
  * gradient is below SLOPE_MIN are skipped, so flats stay clean while
@@ -43,9 +43,9 @@ const N = 160; // marching-squares grid cells per side (128→160 for tighter hi
 const LEVELS = 32; // contour levels (20→32 so slope reads as density)
 export const VEX = 4.5; // vertical exaggeration — single source; network/gridfloor import this
 const SLOPE_MIN = 0.0028; // skip contour cells flatter than ~2.8 m/km — flats go truly clean
-const BASE_COL = new THREE.Color(0xd3d8db); // cool-grey hairline base, not bone-grey
-const INDEX_COL = new THREE.Color(0xffffff); // pure white index
-const BELOW_COL = new THREE.Color(0x8fa0a8); // below-datum muted blue-grey
+const BASE_COL = new THREE.Color(0x8b949a); // dim cool-grey hairline base — whispers under alarms
+const INDEX_COL = new THREE.Color(0x9fabb3); // cool-grey index, never white — alarms own the top luminance
+const BELOW_COL = new THREE.Color(0x7e8d95); // below-datum muted blue-grey, dimmed to match
 const RING_COL = 0x848b90; // boundary ring: neutral survey grey, never an accent
 const LAKE_X = -9; // playa lake center, km (flat spot, away from center + draw)
 const LAKE_Z = 6;
@@ -294,7 +294,7 @@ function elevLabel(text, x, y, z) {
   ctx.font = '600 30px ui-monospace, Menlo, monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#d5dadb';
+  ctx.fillStyle = '#aeb7bc';
   ctx.fillText(text, 96, 26);
   const tex = new THREE.CanvasTexture(cv);
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -317,7 +317,7 @@ function pushPath(batch, pts, y, col) {
   if (pts.length < 2) return;
   batch.paths += 1;
   batch.segs += pts.length - 1;
-  const hillBoost = y > 0.18 ? 0.35 : 0; // summits bloom toward white
+  const hillBoost = 0; // no summit whitening — peaks stay grey, alarms stay brightest
   let has = false;
   let px = 0;
   let pz = 0;
@@ -388,14 +388,14 @@ export function buildTerrain(scene) {
   }
   if (mn < -0.15 || mx > 0.16) console.warn(`[terrain] field out of expected band mn=${mn.toFixed(3)} mx=${mx.toFixed(3)} — check amplitudes`);
 
-  // Two shared fat-line materials: dim base + bright index, both additive
-  // so rings glow neon on the void. White-on-black per reference, fog off.
+  // Two shared fat-line materials: dim base + muted index, both additive
+  // so rings read on the void without owning the frame. Cool greys, fog off.
   const baseMat = new LineMaterial({
     color: 0xffffff,
     vertexColors: true,
     linewidth: 1.15,
     transparent: true,
-    opacity: 0.52,
+    opacity: 0.28,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     fog: false,
@@ -403,9 +403,9 @@ export function buildTerrain(scene) {
   const indexMat = new LineMaterial({
     color: 0xffffff,
     vertexColors: true,
-    linewidth: 2.35,
+    linewidth: 2.0,
     transparent: true,
-    opacity: 0.98,
+    opacity: 0.55,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     fog: false,
@@ -476,7 +476,7 @@ export function buildTerrain(scene) {
 
   // Summit tags: always-visible elevation proof at TOP — the two hill
   // summits carry their height so elevation reads before any drill-in.
-  // White disk under each summit gives the "bloom to white" cue.
+  // Faint grey disk under each summit marks the high point quietly.
   const summitGroup = new THREE.Group();
   summitGroup.name = 'ops-summits';
   for (const Hb of [H1, H2]) {
@@ -666,10 +666,10 @@ export function buildTerrain(scene) {
     },
     update(t = 0) {
       // Attention lock (Phase 1 Task 10): terrain whispers at TOP so faults
-      // own the frame — drill-in dims further via dimF. Bloom threshold in
-      // post.js stays at 0.36 so critical red still catches it, not white.
-      baseMat.opacity = 0.44 * dimF;
-      indexMat.opacity = 0.92 * dimF;
+      // own the frame — drill-in dims further via dimF. Contour core colors
+      // sit at cool grey (never white) so red/amber alarms lead in luminance.
+      baseMat.opacity = 0.28 * dimF;
+      indexMat.opacity = 0.55 * dimF;
       ringMat.opacity = 0.35;
     },
     dispose() {
