@@ -254,19 +254,61 @@ function chainSegments(segs) {
   return tight.concat(loose);
 }
 
-/* One light smoothing pass (endpoints preserved unless the loop is closed). */
-function smoothPath(pts) {
+/* Chaikin corner-cutting resampling (quadratic B-spline approx): each pass
+ * replaces every corner with two points at 1/4 + 3/4 along each segment, so
+ * chained marching-squares joints relax into continuous bezier-like bends.
+ * Rendering-only: y stays level×VEX and field() is untouched, so the relief
+ * gate (260–290 m) and sd gate (42–54 m) cannot move. Endpoints of open
+ * paths are preserved; closed rings iterate with wrap (detected by tip gap,
+ * not exact equality — chained tips meet within quant tolerance, ~2–5 m). */
+function chaikinOnce(pts, closed) {
+  if (closed) {
+    const ring = pts.slice(0, pts.length - 1); // drop duplicated closing tip
+    const n = ring.length;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const p = ring[i];
+      const q = ring[(i + 1) % n];
+      out.push(
+        [0.75 * p[0] + 0.25 * q[0], 0.75 * p[1] + 0.25 * q[1]],
+        [0.25 * p[0] + 0.75 * q[0], 0.25 * p[1] + 0.75 * q[1]],
+      );
+    }
+    out.push(out[0].slice()); // re-close the ring
+    return out;
+  }
+  const out = [pts[0].slice()];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p = pts[i];
+    const q = pts[i + 1];
+    out.push(
+      [0.75 * p[0] + 0.25 * q[0], 0.75 * p[1] + 0.25 * q[1]],
+      [0.25 * p[0] + 0.75 * q[0], 0.25 * p[1] + 0.75 * q[1]],
+    );
+  }
+  out.push(pts[pts.length - 1].slice());
+  return out;
+}
+
+/* Smooth one chained path: `iterations` Chaikin passes (2 base, 3 index)
+ * plus one light Laplacian relax to erase residual joint bias. Signature
+ * stays single-arg-safe: called as paths.map((p) => smoothPath(p, n)), never
+ * bare map(smoothPath) — Array.map would inject the index as `iterations`. */
+function smoothPath(pts, iterations = 2) {
   if (pts.length < 3) return pts;
   const n = pts.length;
-  const closed =
-    Math.abs(pts[0][0] - pts[n - 1][0]) < 1e-6 &&
-    Math.abs(pts[0][1] - pts[n - 1][1]) < 1e-6;
-  const out = pts.map((p) => p.slice());
-  for (let i = 0; i < n; i++) {
-    if (!closed && (i === 0 || i === n - 1)) continue;
-    const p = pts[(i - 1 + n) % n];
-    const q = pts[i];
-    const r = pts[(i + 1) % n];
+  const tipGap = Math.hypot(pts[0][0] - pts[n - 1][0], pts[0][1] - pts[n - 1][1]);
+  const closed = tipGap < 0.01; // ~10 m: chained ring tips meet within quant
+  let cur = pts.map((p) => p.slice());
+  for (let k = 0; k < iterations; k++) cur = chaikinOnce(cur, closed);
+  const m = cur.length;
+  const loop = closed;
+  const out = cur.map((p) => p.slice());
+  for (let i = 0; i < m; i++) {
+    if (!loop && (i === 0 || i === m - 1)) continue;
+    const p = cur[(i - 1 + m) % m];
+    const q = cur[i];
+    const r = cur[(i + 1) % m];
     out[i][0] = 0.25 * p[0] + 0.5 * q[0] + 0.25 * r[0];
     out[i][1] = 0.25 * p[1] + 0.5 * q[1] + 0.25 * r[1];
   }
@@ -436,8 +478,8 @@ export function buildTerrain(scene) {
     const y = level * VEX;
     const isIndex = k % 5 === 4;
     const col = level >= 0 ? (isIndex ? INDEX_COL : BASE_COL) : BELOW_COL;
-    let paths = chainSegments(levelSegments(H, N, step, level)).map(smoothPath);
-    if (isIndex) paths = paths.map(smoothPath); // second pass for index glass
+    let paths = chainSegments(levelSegments(H, N, step, level)).map((p) =>
+      smoothPath(p, isIndex ? 3 : 2)); // Chaikin resample: 2 base, 3 index glass
     paths = paths.filter((p) => p.length >= 2 && (isIndex || p.length >= 4));
     const batch = isIndex ? indexBatch : baseBatch;
     for (const p of paths) pushPath(batch, p, y, col);
