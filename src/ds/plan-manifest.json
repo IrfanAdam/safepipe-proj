@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-08T12:03:50.634Z",
+  "generated": "2026-10-08T12:31:47.666Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,46 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "973232d",
+      "full": "973232d2ea9f339ad145a0be5b3c27454096efec",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): legible label plates at TOP + soft comet flow pulses [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "815d3ad",
+      "full": "815d3ad323baf19705cb09dcec8f1d333d474bde",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): Chaikin-resample chained contours so rings bend smooth, elevations untouched [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "af7c310",
+      "full": "af7c310d37baf7d7ff9f1e870d4293a80c547cc7",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): TOP label restraint to hot/sel/hov, stroked chamfer cuts on HUD + plates [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "fef4a91",
+      "full": "fef4a911db40a97bd97a135f7bc98872821ee2dd",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): dim contour core so alarms lead at TOP — grey index/base, no summit whitening [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "8ea1931",
+      "full": "8ea1931ecc5b5fae03a87867b0bd6f3cae53d861",
+      "date": "2026-10-08",
+      "subject": "chore(ops3d): Task 8 8/10 rating, gridfloor level hookup, twin debug handle [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
     {
       "sha": "8b17385",
       "full": "8b173856b18e084a2be94aa78ace09196daf42c4",
@@ -700,8 +740,5 @@
       "anchor": null
     }
   ],
-  "wip": [
-    "src/ops3d/main.js",
-    "src/ops3d/twin.js"
-  ]
+  "wip": []
 }
