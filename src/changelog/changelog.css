@@ -11,12 +11,12 @@
   --border-hairline:var(--cl-1) solid var(--color-border);
   --z-ds-scrim:100; --z-ds-drawer:200; --z-ds-controls:300;
   --shadow-viewer:var(--sp-elevation-2); --shadow-sm:var(--sp-elevation-1);
-  --size-ds-drawer:calc(var(--sp-spacing-base) * 220);
+  --size-ds-drawer:calc(var(--sp-spacing-base) * 280);
   --font-mono:var(--sp-font-mono); --font-display:var(--sp-font-display);
   --text-micro:var(--sp-text-xs); --text-h2:var(--sp-text-2xl); --text-h3:var(--sp-text-lg);
-  --text-ds-body:var(--sp-text-md);
+  --text-ds-body:calc(var(--sp-text-md) - 1px);
   --tracking-heading:-0.02em; --tracking-mono:0.08em; --tracking-label:0.14em;
-  --leading-prose:1.7; --leading-mono:1.6; --font-leading-relaxed:1.7;
+  --leading-prose:1.6; --leading-mono:1.6; --font-leading-relaxed:1.6;
   --radius-none:0; --radius-xs:var(--sp-spacing-base); --radius-md:var(--sp-radius-md);
   --dur-soft:0.18s; --dur-glide:0.3s; --motion-duration-sm:0.15s;
   --ease-standard:ease; --ease-signature:cubic-bezier(0.2,0.9,0.25,1.15);

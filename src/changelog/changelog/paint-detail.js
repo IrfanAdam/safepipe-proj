@@ -1,23 +1,62 @@
 // safepipe changelog — rail + detail · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
 const marked = {
   parse(s){
+    let src = String(s||'')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/^\s*\{#[^}]*\}\s*$/gm, '')
+      .replace(/\{#[^}]*\}/g, ' ');
     const esc = (t)=> t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    let html = esc(String(s||''));
-    // headings
-    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-    // checkboxes
-    html = html.replace(/^- \[x\] /gim, '<li><input type="checkbox" checked disabled> ');
-    html = html.replace(/^- \[ \] /gm, '<li><input type="checkbox" disabled> ');
-    html = html.replace(/^- /gm, '<li>');
-    html = html.replace(/<li>(.*)$/gm, '<li>$1</li>');
-    html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
-    html = html.replace(/\*Shipped in [^*]*\*/g, (m)=> '<p><em>'+m.slice(1,-1)+'</em></p>');
+    // block-first: split on blank lines so <ul> never spans paragraphs and
+    // no stray </p> lands after headings (Task-1 record: Modify/Create <li>s
+    // swallowed the Verify paragraph into one <ul>).
+    const liOf = (ln) => {
+      const t = ln
+        .replace(/^- \[x\] /i, '<input type="checkbox" checked disabled> ')
+        .replace(/^- \[ \] /, '<input type="checkbox" disabled> ')
+        .replace(/^- /, '');
+      return '<li>' + t + '</li>';
+    };
+    const out = [];
+    let fence = null;
+    for (const block of esc(src).split(/\n\n+/)) {
+      if (!block.trim() || /^\s*\|/.test(block)) continue;
+      // fenced block: single block that starts with ``` — render as <pre> and skip para/list splitting
+      if (/^\s*```/.test(block)) {
+        const lines = block.split('\n');
+        const open = lines[0] || '';
+        const lang = open.replace(/^\s*```\s*/, '').trim();
+        let closeIdx = lines.length - 1;
+        while (closeIdx > 0 && !/^\s*```\s*$/.test(lines[closeIdx])) closeIdx--;
+        const code = lines.slice(1, closeIdx).join('\n');
+        if (code.trim()) {
+          const cls = lang ? ` class="language-${lang}"` : '';
+          out.push(`<pre><code${cls}>${code}</code></pre>`);
+        }
+        continue;
+      }
+      let para = [];
+      let list = [];
+      const flushP = () => {
+        const txt = para.join('\n').trim();
+        if (txt) out.push('<p>' + para.join('\n') + '</p>');
+        para = [];
+      };
+      const flushL = () => { if (list.length) { out.push('<ul>' + list.join('') + '</ul>'); list = []; } };
+      for (const ln of block.split('\n')) {
+        let m;
+        if ((m = ln.match(/^### (.+)$/))) { flushP(); flushL(); out.push('<h3>' + m[1] + '</h3>'); }
+        else if ((m = ln.match(/^## (.+)$/))) { flushP(); flushL(); out.push('<h2>' + m[1] + '</h2>'); }
+        else if ((m = ln.match(/^# (.+)$/))) { flushP(); flushL(); out.push('<h1>' + m[1] + '</h1>'); }
+        else if (/^- /.test(ln)) { flushP(); list.push(liOf(ln)); }
+        else if (ln.trim() === '') { flushP(); flushL(); }
+        else { flushL(); para.push(ln); }
+      }
+      flushP(); flushL();
+    }
+    let html = out.join('');
+    html = html.replace(/\*Shipped in [^*]*\*/g, (m)=> '<em>'+m.slice(1,-1)+'</em>');
     html = html.replace(/\*\*Tags:[^*]*\*\*/g, '');
-    html = html.replace(/\n\n+/g, '</p><p>');
-    html = html.replace(/<p><\/p>/g,'');
-    if(!html.startsWith('<')) html = '<p>'+html+'</p>';
+    if (!html) return '';
     // inline bold
     html = html.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
     html = html.replace(/\*(.+?)\*/g,'<em>$1</em>');
@@ -33,7 +72,8 @@ export function paintDetail(root, ctx){
   const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts, edited } = ctx;
   const scrim = root.querySelector('[data-scrim]'), drawer = root.querySelector('[data-drawer]');
   const sprint = sprints[si], sprintDesc = (s) => descOf(s.body);
-  root.querySelector('[data-col="sprint"]').innerHTML = sprints.map((s, i) => {
+  const railHead = `<div class="ds-rail-plan">` + esc([plan.id, plan.title || provenance(plan)].filter(Boolean).join(' · ')) + `</div>`;
+  root.querySelector('[data-col="sprint"]').innerHTML = railHead + sprints.map((s, i) => {
     const hsS = hits(plan.file, s.body, plan.sprints.indexOf(s) === 0),
       has = hsS.length ? ' · ' + hsS.length + ' commit' + (hsS.length > 1 ? 's' : '') : '',
       frac = state(s.body),

@@ -36,7 +36,8 @@ export function bindChangelogEvents(root, st, helpers) {
     const el = e.target.closest('[data-tip]'), tip = root.querySelector('.ds-cursor-tip');
     if (!tip) return;
     if (!el || !el.dataset.tip) { tip.hidden = true; return; }
-    tip.textContent = el.dataset.tip; tip.hidden = false;
+    const inner = tip.querySelector('.ds-cursor-tip__text') || tip;
+    inner.textContent = el.dataset.tip; tip.hidden = false;
     const pad = 14; let x = e.clientX + pad, y = e.clientY + pad;
     const r = tip.getBoundingClientRect();
     if (x + r.width > innerWidth - 8) x = e.clientX - r.width - pad;

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-07T11:43:00.755Z",
+  "generated": "2026-10-08T08:25:32.407Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,22 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "e9279bd",
+      "full": "e9279bd981882020f82ad9a85cb7d81c7a0bd9ae",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): real camera focus — thin-lens DoF + anchor aim [plan:2026-10-07_153000-ops3d-realworld-twin.md#task-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "task-1"
+    },
+    {
+      "sha": "b789b14",
+      "full": "b789b1433174767571154e395bf5aa074e7f22ea",
+      "date": "2026-10-07",
+      "subject": "chore(ds): track refresh — pick up 83cd61e [plan:2026-10-07_153000-ops3d-realworld-twin.md#task-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "task-1"
+    },
     {
       "sha": "83cd61e",
       "full": "83cd61efeabc9e8f8755fc4ce8c658115d3d41a7",
@@ -564,5 +580,13 @@
       "anchor": null
     }
   ],
-  "wip": []
+  "wip": [
+    "src/changelog/changelog-cards.css",
+    "src/changelog/changelog-drawer.css",
+    "src/changelog/changelog-events.js",
+    "src/changelog/changelog-titles.js",
+    "src/changelog/changelog.css",
+    "src/changelog/changelog/paint-detail.js",
+    "src/changelog/pages-changelog.js"
+  ]
 }

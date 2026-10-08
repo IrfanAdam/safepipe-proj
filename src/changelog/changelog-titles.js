@@ -46,9 +46,11 @@ export const oneLine = (s) => String(s || '')
 // back to the short head title so the tip is never an empty tiny box.
 // (descOf returns '' for norm()-collapsed `- [ ] **Title** …` checkbox bodies,
 // which previously produced empty popovers.)
-export const tipOf = (head, body, max = 100) =>
-  clip(oneLine(sentOf(descOf(body), max) || shortPhase(head)), max)
+export const tipOf = (head, body, max = 100) => {
+  const raw = clip(oneLine(sentOf(descOf(body), max) || shortPhase(head)), max)
     || clip(oneLine(shortPhase(head)), max);
+  return String(raw || '').replace(/^Objective:\s*/i, '');
+};
 // Generalized: `Phase 2 — X`, `Task 10: X`, `Step 0 — X` → `X`.
 export const shortPhase = (h) => String(h || '')
   .replace(/`/g, '')
@@ -70,13 +72,17 @@ export const planSentence = ({ h1, goal, slug },
   max) || sentOf(cleanH1(h1),
   max) || clip(cap(clean(String(slug || '').replace(/[_-]+/g, ' '))),
   max);
-export const descOf = (body) => { const text = String(body || '').replace(/^## .*$/m, '');
-  for (const b of text.split(/\n\n+/)) { const t = b.trim();
+export const descOf = (body) => {
+  let text = String(body || '').replace(/^## .*$/m, '');
+  text = text.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\{#[^}]*\}/g, ' ');
+  for (const b of text.split(/\n\n+/)) {
+    const t = b.trim();
     if (!t || /^(#|\*Tags\*?|\*Shipped|- |\* |\d\. |\||>|---)/.test(t)) continue;
     const d = t
       .replace(/^\*|\*$/g, '')
       .replace(/\[([^\]]*)\]\([^)]+\)/g, '$1')
       .replace(/[*`~]/g, '')
+      .replace(/\s+/g, ' ')
       .trim();
     if (!d || /^[-—–…\s]+$/.test(d)) continue;
     return d;
