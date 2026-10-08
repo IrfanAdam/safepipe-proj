@@ -4,8 +4,8 @@
  *
  * Chain: scene → color+depth RT → bright-pass (½ res) → 9-tap separable
  * blur ping-pong (¼ res, H+V) → composite to screen:
- *   base + bloom·0.55, 2px radial chromatic aberration, ±0.02 film
- *   grain, 0.35 vignette, thin-lens depth-of-field from the real depth
+ *   base + bloom·0.5, 2px radial chromatic aberration, ±0.006 film
+ *   grain, 0.28 vignette, thin-lens depth-of-field from the real depth
  *   buffer. All RTs UnsignedByteType, Safari-safe GLSL1.
  *
  * DoF is real optics, not a screen blur band: per-pixel circle-of-confusion
@@ -14,10 +14,10 @@
  * TUNING KNOBS (live via returned `fx` object):
  *   fx.threshold (0.3) — bright-pass cutoff; red luminance is low (~0.3),
  *     so the cutoff must sit at/below it for critical faults to bloom
- *   fx.bloom     (0.7) — bloom add strength in composite
+ *   fx.bloom     (0.5) — bloom add strength in composite
  *   fx.ca        (1.0)  — CA scale; 1.0 ≈ 2px max at frame edges, 0 = off
- *   fx.grain     (0.02) — grain amplitude (±); 0 = off
- *   fx.vignette  (0.35) — edge darkening; 0 = off
+ *   fx.grain     (0.006) — grain amplitude (±); 0 = off
+ *   fx.vignette  (0.28) — edge darkening; 0 = off
  *   fx.dof       (1) — DoF master switch (1 = on, 0 = off); twin leaves it
  *     on at every level unless the user forces it off in the camera panel
  *   fx.fstop    (5.6) — aperture: 1.4 melts the background, 16 is deep focus
@@ -166,7 +166,7 @@ export function createPost(renderer, scene, camera) {
 
   const fx = {
     threshold: 0.36,
-    bloom: 0.62, // neon-plate: contours glow on the void, body fill removed
+    bloom: 0.5, // attention lock: white no longer clips, faults stay brightest
     ca: 1.0,
     grain: 0.006,
     scan: 0.05,
@@ -311,7 +311,7 @@ export function createPost(renderer, scene, camera) {
     blurMat.uniforms.uDir.value.set(0, 1);
     blit(blurMat, rtBlurB);
 
-    // 4. Composite to screen: base + bloom·0.55, CA, grain, vignette,
+    // 4. Composite to screen: base + bloom·0.5, CA, grain, vignette,
     // thin-lens DoF from the real depth buffer.
     compMat.uniforms.tDiffuse.value = rtScene.texture;
     compMat.uniforms.tBloom.value = rtBlurB.texture;

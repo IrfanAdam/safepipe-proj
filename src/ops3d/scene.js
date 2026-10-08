@@ -26,12 +26,11 @@ export function createScene(canvas) {
   // and drown thin lines. Lit tubes keep a faint fill for form.
   const hemi = new THREE.HemisphereLight(0xcfd4d6, 0x0b0c0c, 0.5);
   scene.add(hemi);
+  // Single sun direction (Phase 1 attention lock): one key light only —
+  // a second fill direction flattened tube form and washed thin lines.
   const key = new THREE.DirectionalLight(0xffffff, 0.65);
   key.position.set(18, 26, 12);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0x9fc4d8, 0.25);
-  fill.position.set(-14, 10, -18);
-  scene.add(fill);
 
   return { renderer, scene };
 }

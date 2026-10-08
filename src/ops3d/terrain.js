@@ -1,10 +1,15 @@
-/* Safepipe Ops 3D — src/ops3d/terrain.js · Permian-representative holographic topo.
- * buildTerrain(scene) → { mesh, setSize, update, dispose }
- * Representative Permian-basin floor (1 unit = 1 km): eastward dip ~1.8 m/km
+/* Safepipe Ops 3D — src/ops3d/terrain.js · Athabasca-representative holographic topo.
+ * buildTerrain(scene) → { mesh, terrainSource, setDetail, setSize, update, dispose }
+ * Representative Athabasca-basin floor (1 unit = 1 km): eastward dip ~1.8 m/km
  * + broad low swells ±40 m + TWO hills (+72/+58 m, auto-nudged clear of
  * pipe corridors so rings close around real highs) + saddle hollow (−32 m)
- * + winding dry draw ~42 m deep + playa-lake depression ~14 m
- * — total relief ≈ −42…+88 m true, VEX 3.2.
+ * + west tributary draw ~42 m deep + playa-lake depression ~14 m
+ * + N–S Athabasca main valley ~65 m (braided floor, steep east cutbank,
+ * gentle west point-bars) + 2 kettle ponds + muskeg mottling
+ * — total relief ≈ −130…+90 m true, VEX 3.2.
+ * Altitude source is swappable (setFieldSource/sample): contours sample the
+ * active source, so the pinned SRTM DEM renders real relief when it resolves
+ * and every drape stays coherent. [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
  * No rim mountains. No body fill either — contours glow on the void,
  * neon-plate style, so no faded landmass is ever needed.
  * Marching-squares 160×160 grid at 32 power-spaced levels; unordered
@@ -69,7 +74,7 @@ function lakeWet(x, z) {
   return 1 - smooth(0.85, 1.15, w);
 }
 
-/* Permian-basin representative floor field (km units). Eastward dip ~1.8 m/km,
+/* Athabasca-basin representative floor field (km units). Eastward dip ~1.8 m/km,
  * broad low swells ±40 m (damped flat near the playa so it sits in a flat
  * spot), TWO hills in pipe-corridor gaps — H1 SE (+72 m), H2 west (+58 m,
  * auto-nudged clear of corridors in buildTerrain) — so index rings close
@@ -95,6 +100,22 @@ export function terrainSource() {
 // Sync probe for the DEM fallback path (tests + offline): same floor.
 _injectField(_procedural);
 
+/* Athabasca recipe (Phase 1 Task 8): the main valley runs N–S east of
+ * center — braided reach (wide, flat-bottomed, gentle west point-bars) with
+ * a steep east cutbank. Two kettle ponds + muskeg mottling complete the
+ * valley read. The old dry draw stays on as a west tributary creek. */
+function riverX(z) {
+  return 7.5 + 3.5 * Math.sin(z * 0.16 + 0.8) + 1.2 * Math.sin(z * 0.41 + 2.0);
+}
+function riverWet(x, z) {
+  const dx = (x - riverX(z)) / 2.2; // ~2.2 km half-width
+  return Math.exp(-dx * dx * (x > riverX(z) ? 1.6 : 0.8)); // steep cutbank E, bars W
+}
+const KETTLES = [
+  { x: -4.5, z: 11.5, r: 0.8, d: -0.008 },
+  { x: 12.5, z: -7.5, r: 0.65, d: -0.006 },
+];
+
 function _procedural(x, z) {
   const dip = -0.0018 * x; // eastward dip: down ~1.8 m per km east
   const lakeMask = lakeWet(x, z);
@@ -114,7 +135,14 @@ function _procedural(x, z) {
   const drawProf = ad < 0.4 ? 1 : Math.max(0, 1 - (ad - 0.4) / 0.6);
   const draw = -0.042 * drawProf * Math.exp(-dd * dd * 0.35); // ~42 m trough, flat bottom
   const playa = -0.014 * lakeMask; // playa depression, ~14 m deep
-  return dip + swell + hills + hollow + draw + playa;
+  const valley = -0.065 * riverWet(x, z); // Athabasca main valley, ~65 m, flat braided floor
+  let kettle = 0;
+  for (const k of KETTLES) {
+    const dx = x - k.x, dz = z - k.z;
+    kettle += k.d * Math.exp(-(dx * dx + dz * dz) / (k.r * k.r));
+  }
+  const muskeg = 0.0035 * Math.sin(x * 1.7 + 0.6) * Math.sin(z * 1.9 - 1.1) * (1 - riverWet(x, z));
+  return dip + swell + hills + hollow + draw + playa + valley + kettle + muskeg;
 }
 
 /* Hill centers — defaults sited in pipe-gap quads; buildTerrain nudges them
@@ -280,7 +308,7 @@ function pushPath(batch, pts, y, col) {
     const f = 1 - smooth(12, 19.5, Math.hypot(x, z));
     _wc.copy(col);
     if (hillBoost) _wc.lerp(_white, hillBoost);
-    _wc.lerp(LAKE_BLUE, lakeWet(x, z) * 0.65);
+    _wc.lerp(LAKE_BLUE, Math.min(1, lakeWet(x, z) + riverWet(x, z)) * 0.65);
     const r = _wc.r * f;
     const g = _wc.g * f;
     const b = _wc.b * f;
@@ -323,7 +351,7 @@ export function buildTerrain(scene) {
     }
   } catch { /* layout unavailable — defaults already clear */ }
 
-  // Sample the Permian floor field on the grid.
+  // Sample the Athabasca floor field on the grid.
   const step = SIZE / N;
   const H = new Float32Array((N + 1) * (N + 1));
   let mn = Infinity;
@@ -604,8 +632,11 @@ export function buildTerrain(scene) {
       drainMat.resolution.set(w, h);
     },
     update(t = 0) {
-      baseMat.opacity = 0.52 * dimF;
-      indexMat.opacity = 0.98 * dimF;
+      // Attention lock (Phase 1 Task 10): terrain whispers at TOP so faults
+      // own the frame — drill-in dims further via dimF. Bloom threshold in
+      // post.js stays at 0.36 so critical red still catches it, not white.
+      baseMat.opacity = 0.44 * dimF;
+      indexMat.opacity = 0.92 * dimF;
       ringMat.opacity = 0.35;
     },
     dispose() {

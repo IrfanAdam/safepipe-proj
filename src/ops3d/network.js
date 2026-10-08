@@ -4,8 +4,9 @@
  * red #e31919 critical at 1.5× dot size. Fault chainages get brighter beads;
  * the selected asset's faults get a ground ring. Facilities are wireframe
  * boxes at line junctions, colored by own health; sensors are small diamonds.
- * A subtle dashed warm-yellow flow overlay drifts along each pipe path
- * (tick/update(t) animates dashOffset). Outer runs (first/last 15% of arc
+ * A subtle dashed cyan flow overlay drifts along each pipe path
+ * (tick/update(t) animates dashOffset) — cyan, never amber, so flow
+ * direction can't read as a watch state. Outer runs (first/last 15% of arc
  * length, or radius > 12 km) render buried: sunk, dimmed ~40%, dash-grouped.
  * Picking raycasts invisible fat-tube/box proxies (never the dots).
  * Contract: buildNetwork(scene, feed) →
@@ -30,7 +31,7 @@ const DOT_Y = 0.06;
 export const BASE_DOT_SIZE = 0.05;
 export const CRITICAL_GAIN = 1.5; // critical renders at 1.5× dot size
 const DIM_FACTOR = 0.3;
-const FLOW_COLOR = 0xd8a93c; // warm yellow oil-flow overlay
+const FLOW_COLOR = 0x35c5d8; // cool cyan oil-flow overlay — never amber (watch #ff8c39)
 const FLOW_OPACITY = 0.32;
 const FLOW_SPEED = 0.45; // slow drift along the pipe path (world units/s)
 const BURIED_EDGE_T = 0.15; // outer 15% of each run dives underground
@@ -178,7 +179,7 @@ export function buildNetwork(scene, feed) {
         dashSize: 0.4,
         gapSize: 0.3,
         transparent: true,
-        opacity: (health === 'nominal' ? 0.5 : 1) * (run.buried ? 0.55 : 1),
+        opacity: (health === 'nominal' ? 0.34 : 1) * (run.buried ? 0.55 : 1),
         depthWrite: false,
       });
       wallMat.resolution.set(1280, 720);
