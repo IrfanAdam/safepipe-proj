@@ -141,6 +141,9 @@ export function buildBeacons(scene, feed, layout) {
   // would fill the NEAR frame). Cool terrain vs warm zone wins by hue.
   const zoneGeo = new THREE.CircleGeometry(0.6, 48);
   const zoneRimGeo = new THREE.RingGeometry(0.6, 0.64, 48);
+  // Fault grounding shadow: dark ellipse under the kit so the spool reads
+  // as mass on the skin, never floating in the red wash.
+  const kitShadowGeo = new THREE.CircleGeometry(0.35, 24);
   // Static anchor ring (thin NEAR-only outline) + unit leader + white pin.
   const anchorGeo = new THREE.RingGeometry(0.09, 0.095, 40);
   const leaderGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0)]);
@@ -166,6 +169,7 @@ export function buildBeacons(scene, feed, layout) {
       if (f.leader) group.remove(f.leader);
       if (f.pin) group.remove(f.pin);
       if (f.zone) { group.remove(f.zone); group.remove(f.zoneRim); }
+      if (f.kitShadow) group.remove(f.kitShadow);
       group.remove(...f.rings.map((r) => r.mesh));
       f.mat.dispose(); f.coreMat?.dispose(); f.kitMats?.forEach((m) => m.dispose());
       for (const r of f.rings) { r.mesh.geometry.dispose(); r.mat.dispose(); }
@@ -267,6 +271,14 @@ export function buildBeacons(scene, feed, layout) {
         zoneRim.rotation.x = -Math.PI / 2;
         zoneRim.position.set(p.x, gy + 0.015, p.z);
         group.add(zoneRim);
+        const kitShadowMat = new THREE.MeshBasicMaterial({
+          color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false,
+        });
+        kitMats.push(kitShadowMat);
+        const kitShadow = new THREE.Mesh(kitShadowGeo, kitShadowMat);
+        kitShadow.rotation.x = -Math.PI / 2;
+        kitShadow.position.set(p.x, gy + 0.008, p.z);
+        group.add(kitShadow);
         const rings = [0, 0.5].map((phase) => {
           const rm = new THREE.MeshBasicMaterial({
             color: col, transparent: true, opacity: 0.7,
@@ -278,7 +290,7 @@ export function buildBeacons(scene, feed, layout) {
           group.add(mesh);
           return { mesh, mat: rm, phase };
         });
-        faults.push({ assetId, pillar, mat, core, coreMat, kit, kitMats, anchor, leader, pin, zone, zoneRim, rings, baseOp: 0.45, crit: fault.severity === 'critical' });
+        faults.push({ assetId, pillar, mat, core, coreMat, kit, kitMats, anchor, leader, pin, zone, zoneRim, kitShadow, rings, baseOp: 0.45, crit: fault.severity === 'critical' });
       }
     }
   }
@@ -330,15 +342,19 @@ export function buildBeacons(scene, feed, layout) {
     // The SELECTED fault keeps its full highlight at every level — drilling
     // in must never dim the thing you drilled into.
     const seg = name === 'segment';
+    const near = name === 'asset';
     for (const f of faults) {
       const isSel = f.assetId === selected;
       f.pillar.visible = show || isSel;
-      if (seg) f.pillar.scale.setScalar(0.7);
+      if (near) f.pillar.scale.setScalar(0.55); // NEAR: slim beacon, spool owns the frame
+      else if (seg) f.pillar.scale.setScalar(0.7);
       else f.pillar.scale.setScalar(1);
       for (const r of f.rings) r.mesh.visible = (show && !seg) || isSel;
       if (f.anchor) f.anchor.visible = !show;
-      // Zone fill owns TOP/ISO; at NEAR the kit + sleeve own the fault.
-      if (f.zone) { f.zone.visible = show || isSel; f.zoneRim.visible = show || isSel; }
+      // Zone fill owns TOP/ISO; at NEAR the disc would fill the frame and
+      // swallow the spool — the kit + sleeve own the fault down there,
+      // selected or not.
+      if (f.zone) { f.zone.visible = !near && (show || isSel); f.zoneRim.visible = !near && (show || isSel); }
     }
   }
 
@@ -413,7 +429,7 @@ export function buildBeacons(scene, feed, layout) {
       scene.remove(group);
       for (const fl of flows) { fl.beads.geometry.dispose(); fl.mat.dispose(); }
       for (const f of faults) { f.mat.dispose(); for (const r of f.rings) r.mat.dispose(); }
-      pillarGeo.dispose(); coreGeo.dispose(); ringGeo.dispose(); haloGeo.dispose(); halo?.material.dispose();
+      pillarGeo.dispose(); coreGeo.dispose(); ringGeo.dispose(); kitShadowGeo.dispose(); haloGeo.dispose(); halo?.material.dispose();
       flows.length = 0; faults = [];
     },
   };

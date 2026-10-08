@@ -638,7 +638,7 @@ export function buildTerrain(scene) {
     terrainSource: _source,
     setDetail(name) {
       labelGroup.visible = true; // inline pills stay at every zoom
-      dimF = name === 'asset' ? 0.35 : name === 'segment' ? 0.55 : 1;
+      dimF = name === 'asset' ? 0.5 : name === 'segment' ? 0.6 : 1;
       pillF = name === 'asset' ? 0.35 : name === 'segment' ? 0.6 : 1;
       for (const sp of labelGroup.children) sp.scale.set(1.85 * pillF, 0.46 * pillF, 1);
       for (const sp of summitGroup.children) sp.scale.set(2.0 * pillF, 0.5 * pillF, 1);
