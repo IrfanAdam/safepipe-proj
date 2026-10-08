@@ -99,26 +99,31 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 **Objective:** fetch 1° SRTM GL1 GeoTIFF (OpenTopography S3, geotiff.js in browser, no key) for the pinned tile; altitude → mesh; `terrainSource: procedural` fallback only if fetch fails.
 **Files:** `src/ops3d/terrain.js`
 **Verify:** real ~60–70 m valley cut visible; fallback path covered by test.
+**Accuracy (ground truth: Copernicus 30 m via Open-Meteo, 25-pt grid, 44 km window @57.03N −111.68W, 2026-10-08 → relief 277 m / sd 65 m / W-wall ~130 m): rating 3/10.** SITE/tile/URL pin correct, but `loadDEM()` squeezes the whole 1° tile (~111×60 km @57N, center 57.5N −111.5W) into the 44 km site window and voids origin/resolution — real-DEM altitudes would land ~55 km off, and the 30 m relief gate passes near-flat tiles. Tracked as `it.todo` in `tests/ops3d-terrain-accuracy.test.js`. Fix = affine via image origin+resolution, window site extent, raise gate toward real ~277 m relief; then re-rate.
 
 ### Task 7: contours on DEM ✓ done
 **Objective:** keep 32-level power-spaced contour strips, sourced from DEM altitude not synthetic field.
 **Files:** `src/ops3d/terrain.js`
 **Verify:** contour heights match DEM altitude ±2%.
+**Accuracy: rating 7/10.** `levelsForRange()` math exact by construction; gate now asserts endpoints ±2% against the REAL band (252–529 m) in `tests/ops3d-terrain-accuracy.test.js`. −3 because no real DEM has ever loaded in-app, so conformance to a live-decoded band is still unexercised — re-rate after Task 6 georeferencing fix with a decoded-tile band check.
 
 ### Task 8: audit-recipe landscape ✓ done
 **Objective:** braided Athabasca (point bars vs cutbank), hairpin tributaries, muskeg mottling, kettle lakes, cut blocks, seismic checkerboard — field/texture layers keyed to DEM.
 **Files:** `src/ops3d/terrain.js`, `src/ops3d/overlays.js`
 **Verify:** side-by-side with audit frames reads as the same place.
+**Accuracy: rating 6/10** (measured 2026-10-08, `tests/ops3d-terrain-accuracy.test.js`). Valley exists with correct E–W asymmetry (W-wall avg ~90 m vs real ~130 m; every reach >40 m); relief 193 m = 70% of real 277 m; variance sd 38 m = 58% of real 65 m. Shape right, amplitude under: deepen W-wall toward ~130 m and lift plateau variance to close the gap. Kettle/muskeg/cutbank presence is qualitative (no ground-truth anchor) — excluded from the score.
 
 ### Task 9: density-grammar seeding ✓ done
 **Objective:** mine benches ~40% of NW quadrant, tailings rectangles with straight dykes + real palette (pale mature / dark fresh / tan cells), SAGD pads 60–90 per 9.6 km on DLS lines, corridors 20–60 m wide.
 **Files:** `src/ops3d/network.js`, `src/ops3d/structures.js`
 **Verify:** quadrant spot-check vs audit.md spot map.
+**Accuracy: rating 5/10.** Coverage 10/10 (every layout asset resolves a quadrant+role, `tests/ops3d-density.test.js`); positional fidelity 3/10 — quadrants are layout-relative squares, not geo-anchored to audit coordinates, so the "matches spot map" check is eyeball-only. To lift: pin quadrant corners to real lat/lon around 57.03N −111.68W and assert known real facilities fall in the right quadrant.
 
 ### Task 10: attention lock ✓ done
 **Objective:** terrain whispers at TOP (threshold drop), faults always brightest (bloom won't catch white contours), flow color token distinct from watch amber `#ff8c39`, single sun direction.
 **Files:** `src/ops3d/post.js`, `src/ops3d/scene.js`, tokens
 **Verify:** TOP fault found in 2s; NEAR frames a pad from 550 m.
+**Accuracy: rating 8/10** (perceptual, not terrain — verified in code 2026-10-08). Single sun ✓ (1× `DirectionalLight` in `scene.js`); flow cyan `0x35c5d8` vs watch amber `#ff8c39` ≈ 160° hue separation, never confusable ✓; terrain whisper opacities set (0.44/0.92) with bloom threshold 0.36 catching critical red, not white ✓. −2: the "fault found in 2s" claim has no harness — needs a scripted TOP-frame luminance-contrast check or a timed human pass at REF GATE 1.
 
 - REF GATE 1: you pick the terrain mood (photo/map screenshot); confirm the pinned center + the audit's layout.
 
