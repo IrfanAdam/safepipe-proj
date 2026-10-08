@@ -2,13 +2,15 @@
  * createPost(renderer, scene, camera) → {render, setSize, dispose, fx}
  * NO EffectComposer (lean by design). Cost: 1 extra scene render + small blurs.
  *
- * Chain: scene → color RT → bright-pass (½ res) → 9-tap separable blur
- * ping-pong (¼ res, H+V) → composite to screen:
+ * Chain: scene → color+depth RT → bright-pass (½ res) → 9-tap separable
+ * blur ping-pong (¼ res, H+V) → composite to screen:
  *   base + bloom·0.55, 2px radial chromatic aberration, ±0.02 film
- *   grain, 0.35 vignette. Tilt-shift DoF reuses the blur material on the
- *   full scene into its own ¼-res targets when fx.dof > 0. All RTs
- *   UnsignedByteType, Safari-safe GLSL1.
+ *   grain, 0.35 vignette, thin-lens depth-of-field from the real depth
+ *   buffer. All RTs UnsignedByteType, Safari-safe GLSL1.
  *
+ * DoF is real optics, not a screen blur band: per-pixel circle-of-confusion
+ * from the thin-lens formula (see lensCocPx in camera.js) with the actual
+ * scene depth, so focus lands on whatever is under the cursor/selection.
  * TUNING KNOBS (live via returned `fx` object):
  *   fx.threshold (0.3) — bright-pass cutoff; red luminance is low (~0.3),
  *     so the cutoff must sit at/below it for critical faults to bloom
@@ -16,9 +18,14 @@
  *   fx.ca        (1.0)  — CA scale; 1.0 ≈ 2px max at frame edges, 0 = off
  *   fx.grain     (0.02) — grain amplitude (±); 0 = off
  *   fx.vignette  (0.35) — edge darkening; 0 = off
- *   fx.dof       (0) — tilt-shift depth-of-field; focus locked to frame
- *     centre (drill-down always centres the target), foreground/background
- *     melt into a wide scene blur. Twin drives 0 / 0.45 / 0.8 by TOP/ISO/NEAR.
+ *   fx.dof       (1) — DoF master switch (1 = on, 0 = off); twin leaves it
+ *     on at every level unless the user forces it off in the camera panel
+ *   fx.fstop    (5.6) — aperture: 1.4 melts the background, 16 is deep focus
+ *   fx.focalMm   (32) — focal length driving the CoC term (twin also sets
+ *     the real camera FOV from it, so this is genuine zoom)
+ *   fx.focusDist (10) — focus distance in world units (1 unit = 1 m); twin
+ *     autofocuses this to the hovered/clicked point every frame
+ *   fx.maxCoc    (14) — CoC clamp in px (perf + taste guard)
  *   fx.enabled   (true) — false = raw renderer.render (debug/perf escape hatch)
  */
 import * as THREE from 'three';
@@ -67,8 +74,15 @@ void main() {
 const COMP_FRAG = /* glsl */ `
 uniform sampler2D tDiffuse;
 uniform sampler2D tBloom;
-uniform sampler2D tDof;
+uniform sampler2D tDepth;
 uniform float uDof;
+uniform float uFstop;
+uniform float uFocalMm;
+uniform float uFocusDist;
+uniform float uMaxCoc;
+uniform float uNear;
+uniform float uFar;
+uniform float uFov;
 uniform vec2 uRes;
 uniform float uTime;
 uniform float uBloom;
@@ -79,6 +93,17 @@ uniform float uVig;
 varying vec2 vUv;
 float hash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7)) + uTime * 13.0) * 43758.5453);
+}
+// Thin-lens CoC in px from real depth: f²/(N·(S−f)) · |1 − S/D|,
+// projected through screen height + fov. 1 world unit = 1 m.
+float cocPx(float depth01) {
+  float viewZ = (uNear * uFar) / ((uFar - uNear) * depth01 - uFar);
+  float subj = max(-viewZ, 0.001);
+  float f = clamp(uFocalMm, 8.0, 200.0) / 1000.0;
+  float cocM = (f * f) / (max(uFstop, 0.1) * max(uFocusDist - f, 0.000001))
+    * abs(1.0 - uFocusDist / subj);
+  float fovTan = tan(radians(uFov) * 0.5);
+  return min(cocM * (uRes.y / (2.0 * fovTan * subj)), uMaxCoc);
 }
 void main() {
   // Lateral chromatic aberration: ~2px max at frame corners when uCa = 1.
@@ -91,12 +116,28 @@ void main() {
   base.b = texture2D(tDiffuse, vUv - off).b;
   vec3 bloom = texture2D(tBloom, vUv).rgb;
   vec3 col = base + bloom * uBloom;
-  // Tilt-shift DoF: focus band at frame centre (the drill-down target always
-  // lands there); top/bottom melt into the wide scene blur. uDof = 0 skips it.
-  float coc = smoothstep(0.06, 0.42, abs(vUv.y - 0.5)) * uDof;
-  if (coc > 0.001) {
-    vec3 soft = texture2D(tDof, vUv).rgb + bloom * uBloom * 0.5;
-    col = mix(col, soft, coc);
+  // Depth-driven DoF: golden-angle spiral gather scaled by the CoC radius.
+  // Sharp exactly on the focus plane, melting with real distance each side.
+  if (uDof > 0.001) {
+    float coc = cocPx(texture2D(tDepth, vUv).x) * uDof;
+    if (coc > 0.5) {
+      vec2 px = vec2(1.0) / uRes;
+      vec3 acc = vec3(0.0);
+      float wsum = 0.0;
+      for (int i = 0; i < 12; i++) {
+        float fi = float(i);
+        float a = fi * 2.39996;
+        float r = (mod(fi, 3.0) + 1.0) / 3.0 * coc;
+        vec2 o = vec2(cos(a), sin(a)) * r * px;
+        // Cheap tent weight: centre tap dominates, ringing stays low.
+        float w = 1.0 - r / (coc + 0.001) * 0.5;
+        acc += texture2D(tDiffuse, vUv + o).rgb * w;
+        wsum += w;
+      }
+      vec3 soft = acc / wsum + bloom * uBloom * 0.5;
+      // Feather the blend over ~2px so the sharp/soft boundary never bands.
+      col = mix(col, soft, clamp((coc - 0.5) / 2.0, 0.0, 1.0));
+    }
   }
   // Vignette.
   float d = distance(vUv, vec2(0.5));
@@ -110,6 +151,14 @@ void main() {
 }
 `;
 
+// Auto aperture by semantic view: deep focus on the TOP map, fast glass
+// drilled in. Pure + unit-tested; twin.js owns the manual override.
+export function autoFstop(levelName) {
+  if (levelName === 'asset') return 1.8;
+  if (levelName === 'segment') return 2.8;
+  return 8;
+}
+
 export function createPost(renderer, scene, camera) {
   if (!renderer) throw new Error('createPost: renderer required');
   if (!scene) throw new Error('createPost: scene required');
@@ -122,9 +171,16 @@ export function createPost(renderer, scene, camera) {
     grain: 0.006,
     scan: 0.05,
     vignette: 0.28,
-    dof: 0,
+    dof: 1,
+    fstop: 5.6,
+    focalMm: 32,
+    focusDist: 10,
+    maxCoc: 14,
     enabled: true,
   };
+
+  // Auto aperture by semantic view: deep focus on the TOP map, fast glass
+  // drilled in. Pure + unit-tested; twin.js owns the manual override.
 
   const rtOpts = { type: THREE.UnsignedByteType, depthBuffer: false, stencilBuffer: false };
   const rtScene = new THREE.WebGLRenderTarget(2, 2, {
@@ -132,11 +188,13 @@ export function createPost(renderer, scene, camera) {
     depthBuffer: true,
     stencilBuffer: false,
   });
+  // Real depth for the thin-lens CoC — no extra scene pass, this just
+  // exposes the buffer rtScene already renders.
+  rtScene.depthTexture = new THREE.DepthTexture(2, 2);
+  rtScene.depthTexture.type = THREE.UnsignedIntType;
   const rtBright = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts });
   const rtBlurA = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts });
   const rtBlurB = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts });
-  const rtDofA = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts });
-  const rtDofB = new THREE.WebGLRenderTarget(1, 1, { ...rtOpts });
 
   const brightMat = new THREE.ShaderMaterial({
     uniforms: { tDiffuse: { value: null }, uThreshold: { value: fx.threshold } },
@@ -160,8 +218,15 @@ export function createPost(renderer, scene, camera) {
     uniforms: {
       tDiffuse: { value: null },
       tBloom: { value: null },
-      tDof: { value: null },
-      uDof: { value: 0 },
+      tDepth: { value: null },
+      uDof: { value: 1 },
+      uFstop: { value: fx.fstop },
+      uFocalMm: { value: fx.focalMm },
+      uFocusDist: { value: fx.focusDist },
+      uMaxCoc: { value: fx.maxCoc },
+      uNear: { value: camera.near },
+      uFar: { value: camera.far },
+      uFov: { value: camera.fov },
       uRes: { value: new THREE.Vector2(2, 2) },
       uTime: { value: 0 },
       uBloom: { value: fx.bloom },
@@ -202,8 +267,6 @@ export function createPost(renderer, scene, camera) {
     rtBright.setSize(bw, bh);
     rtBlurA.setSize(qw, qh);
     rtBlurB.setSize(qw, qh);
-    rtDofA.setSize(qw, qh);
-    rtDofB.setSize(qw, qh);
     compMat.uniforms.uRes.value.set(w, h);
   }
 
@@ -248,25 +311,19 @@ export function createPost(renderer, scene, camera) {
     blurMat.uniforms.uDir.value.set(0, 1);
     blit(blurMat, rtBlurB);
 
-    // 4. Tilt-shift DoF: wide blur of the full scene (skipped when dof = 0).
-    let dofTex = null;
-    if (fx.dof > 0.001) {
-      const spread = 2.5;
-      blurMat.uniforms.tDiffuse.value = rtScene.texture;
-      blurMat.uniforms.uTexel.value.set(spread / qw, spread / qh);
-      blurMat.uniforms.uDir.value.set(1, 0);
-      blit(blurMat, rtDofA);
-      blurMat.uniforms.tDiffuse.value = rtDofA.texture;
-      blurMat.uniforms.uDir.value.set(0, 1);
-      blit(blurMat, rtDofB);
-      dofTex = rtDofB.texture;
-    }
-
-    // 5. Composite to screen: base + bloom·0.55, CA, grain, vignette.
+    // 4. Composite to screen: base + bloom·0.55, CA, grain, vignette,
+    // thin-lens DoF from the real depth buffer.
     compMat.uniforms.tDiffuse.value = rtScene.texture;
     compMat.uniforms.tBloom.value = rtBlurB.texture;
-    compMat.uniforms.tDof.value = dofTex;
-    compMat.uniforms.uDof.value = dofTex ? fx.dof : 0;
+    compMat.uniforms.tDepth.value = rtScene.depthTexture;
+    compMat.uniforms.uDof.value = fx.dof;
+    compMat.uniforms.uFstop.value = fx.fstop;
+    compMat.uniforms.uFocalMm.value = fx.focalMm;
+    compMat.uniforms.uFocusDist.value = fx.focusDist;
+    compMat.uniforms.uMaxCoc.value = fx.maxCoc;
+    compMat.uniforms.uNear.value = camera.near;
+    compMat.uniforms.uFar.value = camera.far;
+    compMat.uniforms.uFov.value = camera.fov;
     compMat.uniforms.uTime.value = time;
     compMat.uniforms.uBloom.value = fx.bloom;
     compMat.uniforms.uCa.value = fx.ca;
@@ -281,8 +338,6 @@ export function createPost(renderer, scene, camera) {
     rtBright.dispose();
     rtBlurA.dispose();
     rtBlurB.dispose();
-    rtDofA.dispose();
-    rtDofB.dispose();
     fsMesh.geometry.dispose();
     brightMat.dispose();
     blurMat.dispose();

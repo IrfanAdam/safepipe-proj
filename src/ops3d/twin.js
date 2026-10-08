@@ -34,7 +34,7 @@ import { buildOverlays } from './overlays.js';
 import { ensureAudio, audioLive, play, setMuted, isMuted } from './sound.js';
 import { field, VEX } from './terrain.js';
 import { buildHud } from './hud.js';
-import { createPost } from './post.js';
+import { createPost, autoFstop } from './post.js';
 
 export function createTwin(container, opts = {}) {
   if (!container) throw new Error('createTwin: container requires a DOM element');
@@ -90,11 +90,88 @@ export function createTwin(container, opts = {}) {
   const levels = createLevels(rig, layout, {
     onChange: () => pushHud(),
   });
+  // Camera focus: autofocus tracks whatever is under the cursor, falling
+  // back to the click point / selection, then the orbit target. Aperture
+  // (f-stop) and focal length (mm, real zoom) are always live; the camera
+  // panel (one ⌖ icon, sliders hidden inside) holds them plus manual focus
+  // distance + the DoF switch. dof:null = auto = on at every level.
+  const focusCtl = { af: true, fstop: 5.6, focalMm: 32, focusDist: 10, dof: null, panel: false };
+  let fstopTouched = false;
+  let hoveredId = null;
+  let clickAnchor = null;
+  // Ground anchor for an asset: fault chainage on pipes (what select() aims
+  // at), stored position for facilities/sensors, orbit target as fallback.
+  const anchorFor = (id) => {
+    const item = byId().get(id);
+    if (item?.kind === 'pipeline') {
+      const pipe = layout.pipelines.find((p) => p.assetId === id);
+      const ch = item?.faults?.[0]?.chainage;
+      if (pipe && ch != null) {
+        const [px, pz] = arcPoint(pipe.points, ch);
+        return new THREE.Vector3(px, field(px, pz) * VEX + 0.05, pz);
+      }
+      if (pipe) {
+        const m = pipe.points[Math.floor(pipe.points.length / 2)];
+        return new THREE.Vector3(m[0], field(m[0], m[1]) * VEX + 0.05, m[1]);
+      }
+    } else {
+      const all = [...(layout.facilities ?? []), ...(layout.sensors ?? [])];
+      const found = all.find((a) => a.assetId === id);
+      if (found?.position) {
+        const [px, pz] = found.position;
+        return new THREE.Vector3(px, field(px, pz) * VEX + 0.05, pz);
+      }
+    }
+    return rig.getTarget();
+  };
+  const focusAnchor = () => {
+    if (focusCtl.af && hoveredId && byId().has(hoveredId)) return anchorFor(hoveredId);
+    if (clickAnchor) return clickAnchor;
+    if (selected && byId().has(selected)) return anchorFor(selected);
+    return rig.getTarget();
+  };
+  // Per-frame lens sync: AF measures camera→anchor distance; aperture follows
+  // the view until the user grabs the slider; focal always drives real FOV.
+  const syncLens = () => {
+    rig.setFocal(focusCtl.focalMm);
+    post.fx.focalMm = focusCtl.focalMm;
+    if (!fstopTouched) focusCtl.fstop = autoFstop(levels.name);
+    post.fx.fstop = focusCtl.fstop;
+    if (focusCtl.af) {
+      focusCtl.focusDist = Math.max(0.05, rig.camera.position.distanceTo(focusAnchor()));
+    }
+    post.fx.focusDist = focusCtl.focusDist;
+    post.fx.dof = focusCtl.dof ?? 1;
+  };
   const hud = buildHud(container, {
     onSearch: (id) => select(id, { fly: true }),
     onCreateWO,
     onMute: () => {
       setMuted(!isMuted());
+      pushHud();
+    },
+    onCamToggle: () => {
+      focusCtl.panel = !focusCtl.panel;
+      ensureAudio();
+      play('toggle');
+      pushHud();
+    },
+    onCamParam: (p = {}) => {
+      if (typeof p.fstop === 'number') {
+        focusCtl.fstop = Math.min(16, Math.max(1.4, p.fstop));
+        fstopTouched = true;
+      }
+      if (typeof p.focalMm === 'number') {
+        focusCtl.focalMm = Math.min(120, Math.max(18, p.focalMm));
+      }
+      if (typeof p.focusDist === 'number') {
+        focusCtl.focusDist = Math.min(120, Math.max(0.2, p.focusDist));
+        focusCtl.af = false;
+      }
+      if (typeof p.af === 'boolean') focusCtl.af = p.af;
+      if (typeof p.dof === 'boolean') focusCtl.dof = p.dof ? 1 : 0;
+      if (p.dofAuto) focusCtl.dof = null;
+      syncLens();
       pushHud();
     },
     onLevel: (name) => {
@@ -113,9 +190,7 @@ export function createTwin(container, opts = {}) {
   let selected = null;
 
   function pushHud() {
-    // Tilt-shift DoF follows the view: sharp map up top, cinematic focus
-    // band once drilled into ISO/NEAR (target always lands frame-centre).
-    post.fx.dof = levels.name === 'asset' ? 0.8 : levels.name === 'segment' ? 0.45 : 0;
+    syncLens();
     // Detail follows the view too: ghost TOP dots + hide flow beads at NEAR.
     network.setDetail?.(levels.name);
     beacons.setDetail?.(levels.name);
@@ -132,6 +207,7 @@ export function createTwin(container, opts = {}) {
       level: levels.name,
       overlay: overlayMode,
       muted: isMuted(),
+      cam: { ...focusCtl, effectiveDof: post.fx.dof },
       banner: crit ? { kind: crit.faults[0]?.type ?? 'CRITICAL', assetId: crit.assetId } : null,
     });
   }
@@ -155,19 +231,17 @@ export function createTwin(container, opts = {}) {
     }
     return pts[pts.length - 1].slice();
   };
-  function select(id, { fly = true, at = null } = {}) {
+  function select(id, { fly = true } = {}) {
     if (!id || !byId().has(id)) return false;
     selected = id;
-    let aim = at;
-    if (!aim) {
-      const item = byId().get(id);
-      const ch = item?.faults?.[0]?.chainage;
-      const pipe = item?.kind === 'pipeline' && layout.pipelines.find((p) => p.assetId === id);
-      if (pipe && ch != null) {
-        const [px, pz] = arcPoint(pipe.points, ch);
-        aim = [px, field(px, pz) * VEX + 0.05, pz];
-      }
-    }
+    // One anchor for every path: the asset anchor (fault chainage, else
+    // midpoint / position) — the same point the 1/2/3 buttons aim at, and
+    // where the beacon + halo + labels live. Aiming the raw click point
+    // instead centred bare dirt with the markers off in a corner.
+    const anchor = anchorFor(id);
+    const aim = [anchor.x, anchor.y, anchor.z];
+    // AF follows the same aim the camera flies to.
+    clickAnchor = anchor.clone();
     network.setSelection(id);
     structures.setSelection(id);
     beacons.setSelection(id);
@@ -218,6 +292,7 @@ export function createTwin(container, opts = {}) {
   canvas.addEventListener('mousemove', (e) => {
     setNdc(e);
     const id = network.pick(ndc, rig.camera);
+    hoveredId = id ?? null;
     if (network.setHover(id)) canvas.style.cursor = id ? 'pointer' : '';
     beacons.setHover?.(id);
     if (id !== lastHoverSnd) {
@@ -228,6 +303,7 @@ export function createTwin(container, opts = {}) {
     }
   });
   canvas.addEventListener('mouseleave', () => {
+    hoveredId = null;
     network.setHover(null);
     beacons.setHover?.(null);
     lastHoverSnd = null;
@@ -238,9 +314,12 @@ export function createTwin(container, opts = {}) {
     // deliberate taps drill down (otherwise every pan flies the camera).
     if (Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]) > 6) return;
     const at = clickPoint(e);
+    // AF still focuses the tapped dirt on a miss — but selection always
+    // flies to the asset anchor (see select), never the raw click point.
+    clickAnchor = at ? new THREE.Vector3(at[0], at[1], at[2]) : null;
     setNdc(e);
     const id = network.pick(ndc, rig.camera);
-    if (id) select(id, { fly: true, at });
+    if (id) select(id, { fly: true });
   });
   const onKey = (e) => {
     if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
@@ -260,11 +339,15 @@ export function createTwin(container, opts = {}) {
       pushHud();
     } else if (e.key === 'o' || e.key === 'O') {
       cycleOverlay();
+    } else if (e.key === 'f' || e.key === 'F') {
+      focusCtl.panel = !focusCtl.panel;
+      pushHud();
     } else if (e.key === 'Escape') {
       const atTop = levels.name === 'network';
       levels.cycle(-1);
       if (atTop && selected) {
         selected = null;
+        clickAnchor = null;
         network.setSelection(null);
         structures.setSelection(null);
         beacons.setSelection(null);
@@ -338,6 +421,7 @@ export function createTwin(container, opts = {}) {
     network.tick?.(now / 1000);
     overlays.update?.(now / 1000);
     labels.update?.(now / 1000);
+    syncLens();
     if (post.fx.enabled) post.render(now / 1000);
     else renderer.render(scene, rig.camera);
   };
@@ -370,6 +454,7 @@ export function createTwin(container, opts = {}) {
     setSelection(id) {
       if (id == null) {
         selected = null;
+        clickAnchor = null;
         network.setSelection(null);
         structures.setSelection(null);
         beacons.setSelection(null);

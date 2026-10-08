@@ -16,7 +16,8 @@
 <script type="module">
 import * as THREE from 'three';
 import { createTwin } from './src/ops3d/twin.js';
-import { getLayout } from './src/ops3d/health-feed.js';
+import { getLayout, loadFeed } from './src/ops3d/health-feed.js';
+import { field, VEX } from './src/ops3d/terrain.js';
 
 const out = (s) => { document.getElementById('verdict').textContent = s; };
 const el = document.getElementById('v');
@@ -24,46 +25,65 @@ const twin = createTwin(el, {});
 const { camera } = twin.debug;
 const canvas = el.querySelector('canvas');
 
+// Contract: clicking the pipe FAR from its fault (75% along, the old
+// "centres bare dirt" bug) must centre the FAULT anchor — the same point
+// the 1/2/3 buttons aim at — not the clicked dirt.
 const layout = getLayout();
+const feed = loadFeed();
 const pipe = layout.pipelines.find((p) => p.assetId === 'PIPE-02');
-// Click target: 75% along the polyline (far from midpoint — the reported bug).
+const item = feed.find((a) => a.assetId === 'PIPE-02');
+const ch = item?.faults?.[0]?.chainage ?? 0;
+const polyLen = (pts) => { let t = 0; for (let i = 1; i < pts.length; i++) t += Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]); return t || 1; };
+const arcPoint = (pts, d) => {
+  let t = Math.min(Math.max(d, 0), polyLen(pts));
+  for (let i = 1; i < pts.length; i++) {
+    const l = Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]);
+    if (t <= l || i === pts.length - 1) { const f = l === 0 ? 0 : t / l; return [pts[i-1][0]+(pts[i][0]-pts[i-1][0])*f, pts[i-1][1]+(pts[i][1]-pts[i-1][1])*f]; }
+    t -= l;
+  }
+  return pts[pts.length-1].slice();
+};
+const gy = (x, z) => field(x, z) * VEX + 0.05;
 const pts = pipe.points;
 const i = Math.floor((pts.length - 1) * 0.75);
 const W = new THREE.Vector3(pts[i][0], 0.06, pts[i][1]);
+const [fx0, fz0] = arcPoint(pipe.points, ch);
+const F = new THREE.Vector3(fx0, gy(fx0, fz0), fz0);
 
-const proj = (v) => {
-  const p = v.clone().project(camera);
-  return p;
-};
+const ndc = (v) => v.clone().project(camera);
 
-// Frame-counted (not timer) sequencing: under headless SwiftShader each frame
-// takes real seconds, so wall/virtual timers fire long before frames render.
-let frames = 0;
+// Wall-clock sequencing: under headless SwiftShader frames take real
+// seconds, so frame counts don't map to fly progress — measure after the
+// 1400ms drill-down has long settled.
+const t0 = performance.now();
 let clicked = false;
 const step = () => {
   requestAnimationFrame(step);
-  frames += 1;
-  if (!clicked) out(`frame ${frames}`);
-  if (frames === 3 && !clicked) {
+  const el2 = (performance.now() - t0) / 1000;
+  if (!clicked && el2 > 8) {
     clicked = true;
     try {
       const r = canvas.getBoundingClientRect();
-      const p0 = proj(W);
+      const p0 = ndc(W);
       const cx = r.left + (p0.x * 0.5 + 0.5) * r.width;
       const cy = r.top + (-p0.y * 0.5 + 0.5) * r.height;
       const opts = { clientX: cx, clientY: cy, bubbles: true };
       canvas.dispatchEvent(new PointerEvent('pointerdown', opts));
       canvas.dispatchEvent(new MouseEvent('click', opts));
+      out(`CLICKED pipe-75% screen=[${cx.toFixed(0)},${cy.toFixed(0)}]`);
     } catch (err) {
       out(`VERDICT ERROR1 ${err.message}`);
     }
   }
-  if (frames === 6) {
+  if (clicked && el2 > 20) {
     try {
-      const p1 = proj(W);
+      const pF = ndc(F);
       const t = twin.debug.target();
-      const off = Math.hypot(p1.x, p1.y);
-      out(`VERDICT ${off < 0.15 ? 'PASS' : 'FAIL'} ndc=[${p1.x.toFixed(3)},${p1.y.toFixed(3)}] target=[${t.x.toFixed(2)},${t.y.toFixed(2)},${t.z.toFixed(2)}] clicked=[${W.x.toFixed(2)},${W.z.toFixed(2)}]`);
+      const hud = document.querySelector('[data-testid="ops-hud"]')?.innerText ?? '';
+      const m = hud.match(/(PIPE-\d+|FAC-\d+|SEN-\d+)\n(pipeline|facility|sensor)/);
+      const off = Math.hypot(pF.x, pF.y);
+      const ok = m?.[1] === 'PIPE-02' && off < 0.15;
+      out(`VERDICT ${ok ? 'PASS' : 'FAIL'} sel=${m?.[1] ?? 'none'} faultNDC=[${pF.x.toFixed(3)},${pF.y.toFixed(3)}] target=[${t.x.toFixed(2)},${t.y.toFixed(2)},${t.z.toFixed(2)}] fault=[${F.x.toFixed(2)},${F.z.toFixed(2)}]`);
     } catch (err) {
       out(`VERDICT ERROR2 ${err.message}`);
     }

@@ -1,8 +1,12 @@
-/* Safepipe Ops 3D — src/ops3d/camera.js · orbit rig + presets + fly-to.
- * createRig(canvas) → {camera, setPreset, flyTo, update}
+/* Safepipe Ops 3D — src/ops3d/camera.js · orbit rig + presets + fly-to + lens.
+ * createRig(canvas) → {camera, setPreset, flyTo, update, getTarget, setFocal}
  * Presets (yaw°/pitch°/dist): sector 4/25/9 · plan 4/78/62 · wide 4/36/60.
  * flyTo eases 600ms; update(dt, t) steps the tween + damping + camera cage
  * (target clamped to r22 / y 0..8, camera radius clamped to 70).
+ * Lens: setFocal(mm) drives real zoom (24mm-high frame → fov); lensCocPx is
+ * the thin-lens circle-of-confusion in pixels (1 world unit = 1 m) that
+ * post.js uses for depth-driven DoF — aperture + focal + focus distance are
+ * real inputs, not a screen-space blur band.
  * Keys 1/2/3 are owned by twin.js — this module only exposes setPreset.
  */
 import * as THREE from 'three';
@@ -34,6 +38,25 @@ function presetPos({ yaw, pitch, dist }, target) {
 
 const easeInOutCubic = (k) =>
   k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
+
+// Full-frame stills convention: 24mm-high frame, fov = 2·atan(12/f).
+// Pure + unit-tested; 32mm ≈ 41°, 50mm ≈ 27°.
+export function fovForFocal(focalMm) {
+  const f = Math.max(8, Math.min(200, focalMm));
+  return (2 * Math.atan(12 / f) * 180) / Math.PI;
+}
+
+// Thin-lens circle of confusion, in pixels. f = focal length, N = f-stop,
+// S = focus distance, D = subject depth (all metres; 1 world unit = 1 m).
+// coc = f²/(N·(S−f)) · |1 − S/D|, projected via screen height + fov.
+// Zero when the subject sits exactly on the focus plane. Pure + unit-tested.
+export function lensCocPx(focalMm, fstop, focusDist, subjectDist, screenHPx, fovDeg) {
+  if (!(fstop > 0) || !(focusDist > 0) || !(subjectDist > 0) || !(screenHPx > 0)) return 0;
+  const f = Math.max(8, Math.min(200, focalMm)) / 1000;
+  const cocM = ((f * f) / (fstop * Math.max(focusDist - f, 1e-6))) * Math.abs(1 - focusDist / subjectDist);
+  const pxPerM = screenHPx / (2 * Math.tan(((fovDeg * Math.PI) / 180) / 2) * subjectDist);
+  return cocM * pxPerM;
+}
 
 export function createRig(canvas, opts = {}) {
   if (!canvas) throw new Error('createRig: canvas required');
@@ -110,6 +133,17 @@ export function createRig(canvas, opts = {}) {
     flyTo(presetPos(p, controls.target), controls.target.clone(), FLY_MS);
   }
 
+  // Real zoom: focal length in mm on a 24mm-high frame (50mm ≈ 27° fov).
+  // Orbit distances are untouched — only the projection changes.
+  function setFocal(focalMm) {
+    const fov = fovForFocal(focalMm);
+    if (Math.abs(camera.fov - fov) > 1e-3) {
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }
+    return camera.fov;
+  }
+
   function update() {
     // Keep aspect glued to the canvas; twin.js owns renderer sizing.
     const w = canvas.clientWidth || 2;
@@ -146,7 +180,7 @@ export function createRig(canvas, opts = {}) {
     controls.update();
   }
 
-  return { camera, setPreset, flyTo, update, getTarget: () => controls.target.clone() };
+  return { camera, setPreset, setFocal, flyTo, update, getTarget: () => controls.target.clone() };
 }
 
 export const presets = Object.keys(PRESETS);

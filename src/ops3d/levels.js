@@ -1,8 +1,10 @@
 /* Safepipe Ops 3D — src/ops3d/levels.js · semantic zoom network → segment → asset.
  * createLevels(rig, layout, {onChange}) → {name, setLevel, focusAsset, cycle}
- * L0 network: plan preset (dist 55) over origin, all visible.
- * L1 segment: sector preset (dist 9) around last target, neighbours dim (twin-owned).
- * L2 asset: close-up (dist 0.55) on asset position, target y ~0.05.
+ * L0 network: plan preset over the SELECTED asset (origin only when nothing
+ *   selected), at a per-kind height that just frames the object.
+ * L1 segment: sector preset around last target, neighbours dim (twin-owned).
+ * L2 asset: close-up on asset position, target y ~0.05. The focus point
+ *   always projects to exact frame centre (orbit target = asset point).
  * Reduced-motion is honoured inside rig.flyTo — no handling needed here.
  */
 
@@ -66,6 +68,10 @@ export function createLevels(rig, layout, opts = {}) {
   // closer camera than a 37 km line or the hero fills 2% of frame).
   const kinds = new Map();
   const KIND_DIST = { pipeline: 2.2, facility: 0.45, sensor: 0.35 };
+  // TOP height that just frames the object: a 37 km line needs map height,
+  // a valve yard wants rooftop height. Origin framing keeps the full circle.
+  const KIND_TOP_DIST = { pipeline: 30, facility: 6, sensor: 5 };
+  const NETWORK_DIST = 62;
   for (const p of layout?.pipelines ?? []) {
     const mid = polylineMidpoint(p.points);
     if (mid) index.set(p.assetId, mid);
@@ -92,12 +98,14 @@ export function createLevels(rig, layout, opts = {}) {
     return [pos[0], field(pos[0], pos[1]) * VEX + TARGET_Y, pos[1]];
   };
 
-  const go = (name, target) => {
+  const go = (name, target, distOverride = null, durOverride = null) => {
     const view = VIEWS[name];
     if (!view) throw new Error(`setLevel: unknown level "${name}"`);
+    const dist = distOverride ?? view.dist;
+    const pos = viewPos({ ...view, dist }, target);
     current = name;
-    lastTarget = target;
-    rig.flyTo(viewPos(view, target), target);
+    lastTarget = target.slice();
+    rig.flyTo(pos, target, durOverride ?? undefined);
     onChange(name);
   };
 
@@ -108,8 +116,16 @@ export function createLevels(rig, layout, opts = {}) {
 
     setLevel(name) {
       if (!VIEWS[name]) throw new Error(`setLevel: unknown level "${name}"`);
-      if (name === 'network') go('network', [0, 0, 0]);
-      else if (name === 'segment') go('segment', lastTarget);
+      // TOP keeps the selected object in frame at a height that just fits it;
+      // origin + full circle only when nothing is selected.
+      if (name === 'network') {
+        if (lastAssetId && index.has(lastAssetId)) {
+          const kind = kinds.get(lastAssetId);
+          go('network', lastTarget, KIND_TOP_DIST[kind] ?? NETWORK_DIST);
+        } else {
+          go('network', [0, 0, 0], NETWORK_DIST);
+        }
+      } else if (name === 'segment') go('segment', lastTarget);
       // Asset needs a concrete anchor: last focused asset, else PIPE-02.
       else this.focusAsset(lastAssetId ?? FALLBACK_ASSET);
     },
@@ -118,11 +134,8 @@ export function createLevels(rig, layout, opts = {}) {
       const target = at ?? resolveTarget(assetId);
       lastAssetId = assetId;
       // Close-up distance follows the asset's real size.
-      const view = { ...VIEWS.asset, dist: KIND_DIST[kinds.get(assetId)] ?? VIEWS.asset.dist };
-      current = 'asset';
-      lastTarget = target;
-      rig.flyTo(viewPos(view, target), target, FOCUS_MS);
-      onChange('asset');
+      const dist = KIND_DIST[kinds.get(assetId)] ?? VIEWS.asset.dist;
+      go('asset', target, dist, FOCUS_MS);
     },
 
     // dir > 0 descends toward asset, dir < 0 ascends toward network (ESC).

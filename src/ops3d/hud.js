@@ -28,6 +28,8 @@ export function buildHud(container, cbs = {}) {
   const onLevel = cbs.onLevel ?? (() => {});
   const onOverlay = cbs.onOverlay ?? (() => {});
   const onMute = cbs.onMute ?? (() => {});
+  const onCamToggle = cbs.onCamToggle ?? (() => {});
+  const onCamParam = cbs.onCamParam ?? (() => {});
 
   const knownIds = new Set();
 
@@ -72,7 +74,7 @@ export function buildHud(container, cbs = {}) {
   legend.appendChild(el(
     'div',
     'ops-hud__hints',
-    'DRAG ORBIT / WHEEL ZOOM / CLICK DRILL / 1-3 VIEWS / O OVERLAY / ESC UP / H HUD',
+    'DRAG ORBIT / WHEEL ZOOM / CLICK DRILL / 1-3 VIEWS / O OVERLAY / F CAMERA / ESC UP / H HUD',
   ));
   const ovBtn = el('button', 'ops-hud__overlay-btn', 'OVERLAY · OFF');
   ovBtn.type = 'button';
@@ -84,6 +86,72 @@ export function buildHud(container, cbs = {}) {
   muteBtn.setAttribute('aria-label', 'Toggle sound (M)');
   muteBtn.addEventListener('click', () => onMute());
   legend.appendChild(muteBtn);
+  // — One camera focus icon: opens the camera panel (aperture, focal/zoom,
+  // focus distance, AF, DoF switch). Nothing slider-like lives in the open.
+  const camBtn = el('button', 'ops-hud__cam-btn', '⌖ FOCUS');
+  camBtn.type = 'button';
+  camBtn.setAttribute('aria-label', 'Camera focus settings: aperture, zoom, focus (F)');
+  camBtn.setAttribute('aria-expanded', 'false');
+  camBtn.addEventListener('click', () => onCamToggle());
+  legend.appendChild(camBtn);
+  // Camera panel: hidden popover above the legend. Aperture f-stops follow
+  // the photo convention (1.4 wide open → 16 deep); focal length is real
+  // zoom (18 wide → 120 tele); focus distance goes manual the moment its
+  // slider moves (AF button re-engages tracking).
+  const camPanel = el('div', 'ops-hud__cam-panel ops-hud__cam-panel--hidden');
+  camPanel.setAttribute('role', 'dialog');
+  camPanel.setAttribute('aria-label', 'Camera focus settings');
+  const camTitle = el('div', 'ops-hud__cam-title', 'CAMERA · FOCUS');
+  camPanel.appendChild(camTitle);
+  const mkCamRow = (label, min, max, step, val, fmt, fn) => {
+    const row = el('div', 'ops-hud__slider-row');
+    const lab = el('span', 'ops-hud__slider-label', label);
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.className = 'ops-hud__slider';
+    input.min = String(min);
+    input.max = String(max);
+    input.step = String(step);
+    input.value = String(val);
+    input.setAttribute('aria-label', label);
+    const out = el('span', 'ops-hud__cam-val', fmt(val));
+    input.addEventListener('input', () => {
+      out.textContent = fmt(Number(input.value));
+      fn(Number(input.value));
+    });
+    row.appendChild(lab);
+    row.appendChild(input);
+    row.appendChild(out);
+    camPanel.appendChild(row);
+    return { input, out, fmt };
+  };
+  // Aperture in standard full-stop steps; focal 18–120mm; distance 0.2–120m.
+  const FSTOPS = [1.4, 1.8, 2, 2.8, 4, 5.6, 8, 11, 16];
+  const fstopFmt = (v) => `ƒ/${FSTOPS[Math.round(v)] ?? v}`;
+  const apRow = mkCamRow('APERTURE', 0, FSTOPS.length - 1, 1, 5, fstopFmt, (v) =>
+    onCamParam({ fstop: FSTOPS[Math.round(v)] }),
+  );
+  const focalRow = mkCamRow('FOCAL', 18, 120, 1, 32, (v) => `${v}mm`, (v) => onCamParam({ focalMm: v }));
+  const distRow = mkCamRow('FOCUS', 0.2, 120, 0.1, 10, (v) => `${v.toFixed(1)}m`, (v) =>
+    onCamParam({ focusDist: v }),
+  );
+  const camToggles = el('div', 'ops-hud__cam-toggles');
+  const afBtn = el('button', 'ops-hud__cam-toggle', 'AF · ON');
+  afBtn.type = 'button';
+  afBtn.setAttribute('aria-label', 'Autofocus: track hovered or clicked point');
+  afBtn.addEventListener('click', () => onCamParam({ af: !(afBtn.dataset.on === '1') }));
+  const dofBtn = el('button', 'ops-hud__cam-toggle', 'DOF · AUTO');
+  dofBtn.type = 'button';
+  dofBtn.setAttribute('aria-label', 'Depth of field: auto, on, off');
+  dofBtn.addEventListener('click', () => {
+    const cur = dofBtn.dataset.mode ?? 'auto';
+    const next = cur === 'auto' ? 'on' : cur === 'on' ? 'off' : 'auto';
+    onCamParam(next === 'auto' ? { dofAuto: true } : { dof: next === 'on' });
+  });
+  camToggles.appendChild(afBtn);
+  camToggles.appendChild(dofBtn);
+  camPanel.appendChild(camToggles);
+  legend.appendChild(camPanel);
   root.appendChild(legend);
 
   // — Right detail panel (hidden unless selection) —
@@ -261,6 +329,34 @@ export function buildHud(container, cbs = {}) {
     const muted = !!state.muted;
     muteBtn.textContent = muted ? 'SOUND · OFF' : 'SOUND · ON';
     muteBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    // Camera panel state: icon reflects AF/DOF at a glance; panel + sliders
+    // only refresh from state when the user isn't dragging them (active
+    // element check stops the readout fighting the pointer).
+    const cam = state.cam ?? { af: true, fstop: 5.6, focalMm: 32, focusDist: 10, dof: null, panel: false };
+    camBtn.textContent = cam.af ? '⌖ FOCUS · AF' : '⌖ FOCUS · MF';
+    camBtn.classList.toggle('ops-hud__cam-btn--active', !!cam.panel);
+    camBtn.setAttribute('aria-expanded', cam.panel ? 'true' : 'false');
+    camPanel.classList.toggle('ops-hud__cam-panel--hidden', !cam.panel);
+    afBtn.textContent = cam.af ? 'AF · ON' : 'AF · OFF';
+    afBtn.dataset.on = cam.af ? '1' : '0';
+    afBtn.classList.toggle('ops-hud__cam-toggle--active', !!cam.af);
+    const dofMode = cam.dof == null ? 'auto' : cam.dof ? 'on' : 'off';
+    dofBtn.textContent = `DOF · ${dofMode.toUpperCase()}`;
+    dofBtn.dataset.mode = dofMode;
+    dofBtn.classList.toggle('ops-hud__cam-toggle--active', dofMode === 'on');
+    const apIdx = FSTOPS.reduce((b, s, i) => (Math.abs(s - cam.fstop) < Math.abs(FSTOPS[b] - cam.fstop) ? i : b), 0);
+    if (document.activeElement !== apRow.input) {
+      apRow.input.value = String(apIdx);
+      apRow.out.textContent = fstopFmt(apIdx);
+    }
+    if (document.activeElement !== focalRow.input) {
+      focalRow.input.value = String(Math.round(cam.focalMm));
+      focalRow.out.textContent = `${Math.round(cam.focalMm)}mm`;
+    }
+    if (document.activeElement !== distRow.input) {
+      distRow.input.value = String(cam.focusDist);
+      distRow.out.textContent = `${Number(cam.focusDist).toFixed(1)}m`;
+    }
   }
 
   // Numeric 1-3 level shortcut when HUD has focus context; twin.js owns camera.
