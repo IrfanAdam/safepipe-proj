@@ -77,8 +77,10 @@ function makeTextSprite(assetId, health) {
 }
 
 /* Cyberpunk chamfer plate: sharp corners with the signature diagonal cut
- * top-right — never rounded. */
-function chamferPlate(ctx, x, y, w, h, cut) {
+ * top-right — never rounded. Cut is deliberately deep (~20% of the edge)
+ * so it reads at 3× TOP scale, not just in close-up. */
+function chamferPlate(ctx, x, y, w, h) {
+  const cut = Math.round(Math.min(w, h) * 0.42);
   ctx.beginPath();
   ctx.moveTo(x, y);
   ctx.lineTo(x + w - cut, y);
@@ -93,7 +95,7 @@ function drawLabel(cv, tex, assetId, health) {
   const col = colorOf(health);
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.fillStyle = 'rgba(8,12,14,0.72)';
-  chamferPlate(ctx, 2, 8, cv.width - 4, cv.height - 16, 16);
+  chamferPlate(ctx, 2, 8, cv.width - 4, cv.height - 16);
   ctx.fill();
   ctx.strokeStyle = col;
   ctx.globalAlpha = 0.85;
@@ -146,7 +148,7 @@ function drawDest(cv, tex, text, health) {
   const col = colorOf(health);
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.fillStyle = 'rgba(8,12,14,0.66)';
-  chamferPlate(ctx, 2, 12, cv.width - 4, cv.height - 24, 18);
+  chamferPlate(ctx, 2, 12, cv.width - 4, cv.height - 24);
   ctx.fill();
   ctx.strokeStyle = col;
   ctx.globalAlpha = 0.8;
@@ -316,13 +318,14 @@ export function buildLabels(scene, { layout, healthById } = {}) {
       return true;
     },
     /* NEAR keeps the SELECTED label in-scene (side panel covers the rest) —
-     * zooming in must never blank the thing you drilled into. */
+     * zooming in must never blank the thing you drilled into. NEAR sprites
+     * shrink (0.55×): at 2 m standoff a TOP-sized billboard fills the frame. */
     setDetail(name) {
       detailName = name;
       group.visible = true;
       // Level-sized sprites: TOP reads from 68 km out, so labels grow 3×
-      // up there; ISO 1.5×; NEAR keeps selection only.
-      const k = name === 'segment' ? 1.35 : 3.2;
+      // up there; ISO 1.35×; NEAR shrinks to a small tag.
+      const k = name === 'asset' ? 0.55 : name === 'segment' ? 1.35 : 3.2;
       for (const it of items) it.k = k;
       refresh();
     },

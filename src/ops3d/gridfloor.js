@@ -1,9 +1,13 @@
 /* Safepipe Ops 3D — src/ops3d/gridfloor.js · red survey grid floor.
- * buildGridFloor(scene) → { group, dispose }
+ * buildGridFloor(scene) → { group, setDetail, dispose }
  * Fine red (#7a1e1e) grid every 2 km + brighter index lines every 10 km,
- * clipped to the mapped circle (r = 20 km), laid flat at y = -0.14 just
- * above the table. Single LineSegments with vertexColors; radial fade to
- * transparent (black, additive) at the rim. Static — no animation.
+ * clipped to the mapped circle (r = 20 km), draped onto the terrain skin.
+ * Single LineSegments with vertexColors; radial fade to transparent
+ * (black, additive) at the rim. Static — no animation.
+ * DEPRECATED as a height read: terrain-following contours + elevation tags
+ * carry height now, so the grid defaults to near-invisible (TOP state) and
+ * only firms up slightly drilled-in. Twin wiring: gridfloor.setDetail?.(name)
+ * next to the checker.setDetail call in twin.js pushHud.
  */
 import * as THREE from 'three';
 import { field, VEX } from './terrain.js';
@@ -90,8 +94,15 @@ export function buildGridFloor(scene) {
   group.add(lines);
   scene.add(group);
 
+  // Deprecated height read: boot near-invisible (TOP state — contours own
+  // the relief). Drilled-in levels firm the survey reference slightly.
+  mat.opacity = 0.18;
+
   return {
     group,
+    setDetail(name) {
+      mat.opacity = name === 'asset' ? 0.55 : name === 'segment' ? 0.35 : 0.18;
+    },
     dispose() {
       scene.remove(group);
       geo.dispose();

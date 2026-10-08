@@ -149,6 +149,7 @@ export function buildNetwork(scene, feed) {
   let selected = null;
   let hovered = null;
   let detailF = 1; // view-driven dot scale (TOP 1 → NEAR 0.35)
+  let levelName = 'network'; // progressive-disclosure level (owns TOP nominal ghosting)
   const ringHolder = new THREE.Group();
   group.add(ringHolder);
 
@@ -177,7 +178,7 @@ export function buildNetwork(scene, feed) {
       wallGeo.setPositions(run.pts);
       const wallMat = new LineMaterial({
         color: colorFor(health),
-        linewidth: 2,
+        linewidth: health === 'nominal' ? 2 : 3, // alarm pipes carry visual weight at TOP
         dashed: run.buried,
         dashSize: 0.4,
         gapSize: 0.3,
@@ -383,12 +384,26 @@ export function buildNetwork(scene, feed) {
   const applySelection = () => {
     for (const [id, entry] of byId) {
       const dimmed = selected && id !== selected;
+      // Progressive disclosure: level dimming lives HERE (not in setDetail)
+      // because this runs last and would otherwise wipe it. At TOP nominal
+      // assets recede so faults/alarms lead; drilled-in levels even out.
+      const h = healthById.get(id)?.health;
+      const lvl = levelName === 'network' && h === 'nominal' ? 0.55 : 1;
+      const f = (levelName === 'asset' ? 0.12 : levelName === 'segment' ? 0.6 : 1) * lvl;
       for (const { m, base } of entry.mats) {
-        m.opacity = dimmed ? base * DIM_FACTOR : base;
+        if (m.isPointsMaterial || m.isLineMaterial) m.opacity = (dimmed ? base * DIM_FACTOR : base) * f;
+        else m.opacity = dimmed ? base * DIM_FACTOR : base * lvl;
       }
       // Hovered boxes/diamonds swell slightly so the click target is obvious.
       const hs = hovered === id && selected !== id ? 1.15 : 1;
       for (const n of entry.nodes) n.scale.setScalar(hs);
+    }
+    // NEAR fault-bead whisper lives here (not setDetail) so hover/selection
+    // passes can't wipe it: at NEAR the kit owns the fault.
+    if (levelName === 'asset') {
+      for (const b of beadMats) {
+        if (b.assetId !== selected) b.m.opacity = 0.2;
+      }
     }
     showRings(selected);
   };
@@ -449,18 +464,26 @@ export function buildNetwork(scene, feed) {
     },
     // Level-driven declutter: TOP-sized dots would read as boulders at NEAR —
     // ghost the dotted trace down there so the physical pipe + fault kit lead.
+    // Flow legibility: LineMaterial multiplies line distance by dashScale, so
+    // >1 packs MORE (smaller) dashes. TOP keeps the authored pattern almost
+    // intact (0.8) — the TOP failure was CONTRAST, not size: thin 0.32-alpha
+    // cyan washes out where it crosses blown contour blobs. So at TOP the
+    // overlay gets opacity ×1.7, +2px width, and tighter gaps so dashes join
+    // into a readable trace instead of sparse scratches.
     setDetail(name) {
-      const f = name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
+      levelName = name;
+      const dash = name === 'asset' ? 1.2 : name === 'segment' ? 1 : 0.8;
       detailF = name === 'asset' ? 0.25 : name === 'segment' ? 0.7 : 1;
-      for (const [, entry] of byId) {
-        for (const { m, base } of entry.mats) {
-          if (m.isPointsMaterial || m.isLineMaterial) m.opacity = base * f;
-        }
+      for (const e of flowMats) {
+        const lvl = e.assetId === selected ? 1 : name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
+        const boost = name === 'network' && !e.comet ? 1.7 : 1;
+        e.m.opacity = Math.min(1, e.base * lvl * boost);
+        e.m.dashScale = e.comet ? dash * 0.6 : dash;
+        e.m.linewidth = (e.comet ? 3 : 2) + (name === 'network' ? 2 : 0);
+        e.m.gapSize = e.comet ? 1.6 : name === 'network' ? 0.15 : 0.45;
       }
-      for (const e of flowMats) e.m.opacity = e.base * (e.assetId === selected ? 1 : f);
-      for (const c of chevrons) c.detailF = f;
-      for (const b of beadMats) b.m.opacity = (name === 'asset' && b.assetId !== selected) ? 0.2 : 1;
-      applySelection();
+      for (const c of chevrons) c.detailF = name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
+      applySelection(); // owns ALL byId opacity (level + selection + NEAR beads)
     },
     setHover(id) {
       const next = id ?? null;

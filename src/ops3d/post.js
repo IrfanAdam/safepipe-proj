@@ -166,8 +166,8 @@ export function createPost(renderer, scene, camera) {
   if (!camera) throw new Error('createPost: camera required');
 
   const fx = {
-    threshold: 0.36,
-    bloom: 0.4, // faults stay brightest; terrain glow sits underneath
+    threshold: 0.36, // locked by tests/ops3d-attention.test.js — see header there
+    bloom: 0.22, // restraint: contours halo instead of blobbing; fault pins still clear it
     ca: 1.0,
     grain: 0.006,
     scan: 0.05,
