@@ -1,6 +1,6 @@
 # Ops 3D v2 — Real-World Safety / Compliance / Maintenance Twin
 
-> Status: 🟢 BUILDING v2 — Phase 0 ✓ done (5/5 tasks, 114 tests green, captures verified). Phase 1 pending `go`.
+> Status: 🟢 BUILDING v2 — Phase 1 ✓ done (10/10 tasks, 132 tests green, TOP+NEAR captures verified). Phase 2 pending REF GATE 1 + `go`.
 > Replaces: `2026-10-06_003000-ops3d-theatre-style.md` (all 10 tasks shipped, 40 commits) + spinout `153000` terrain-topo.
 > Server: `npm run dev` on `:5175`. Never touch `:5173`/`:5174`.
 
@@ -83,6 +83,7 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 - REF GATE 0 (your first steer): confirm focus feel + palette on 2 (TOP + NEAR) captures.
 
 ## Phase 1 — Real terrain
+*Shipped in 97add68 + a94fd6d · Tasks 6–10 · phase-1.*
 <!-- {#phase-1} -->
 *At-a-glance: landscape → infrastructure → health → what needs me. Site: Fort McMurray 57.03N −111.68W.*
 
@@ -94,27 +95,27 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 | 9 | Density-grammar infra seeding (mines NW, tailings center, pads SE) | quadrant layout matches audit spot map |
 | 10 | Attention lock (terrain whispers at TOP, faults brightest, flow ≠ amber) | TOP fault found in 2s; single sun dir |
 
-### Task 6: DEM loader
+### Task 6: DEM loader ✓ done
 **Objective:** fetch 1° SRTM GL1 GeoTIFF (OpenTopography S3, geotiff.js in browser, no key) for the pinned tile; altitude → mesh; `terrainSource: procedural` fallback only if fetch fails.
 **Files:** `src/ops3d/terrain.js`
 **Verify:** real ~60–70 m valley cut visible; fallback path covered by test.
 
-### Task 7: contours on DEM
+### Task 7: contours on DEM ✓ done
 **Objective:** keep 32-level power-spaced contour strips, sourced from DEM altitude not synthetic field.
 **Files:** `src/ops3d/terrain.js`
 **Verify:** contour heights match DEM altitude ±2%.
 
-### Task 8: audit-recipe landscape
+### Task 8: audit-recipe landscape ✓ done
 **Objective:** braided Athabasca (point bars vs cutbank), hairpin tributaries, muskeg mottling, kettle lakes, cut blocks, seismic checkerboard — field/texture layers keyed to DEM.
 **Files:** `src/ops3d/terrain.js`, `src/ops3d/overlays.js`
 **Verify:** side-by-side with audit frames reads as the same place.
 
-### Task 9: density-grammar seeding
+### Task 9: density-grammar seeding ✓ done
 **Objective:** mine benches ~40% of NW quadrant, tailings rectangles with straight dykes + real palette (pale mature / dark fresh / tan cells), SAGD pads 60–90 per 9.6 km on DLS lines, corridors 20–60 m wide.
 **Files:** `src/ops3d/network.js`, `src/ops3d/structures.js`
 **Verify:** quadrant spot-check vs audit.md spot map.
 
-### Task 10: attention lock
+### Task 10: attention lock ✓ done
 **Objective:** terrain whispers at TOP (threshold drop), faults always brightest (bloom won't catch white contours), flow color token distinct from watch amber `#ff8c39`, single sun direction.
 **Files:** `src/ops3d/post.js`, `src/ops3d/scene.js`, tokens
 **Verify:** TOP fault found in 2s; NEAR frames a pad from 550 m.
