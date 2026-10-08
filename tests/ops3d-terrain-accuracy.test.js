@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { field } from '../src/ops3d/terrain.js';
-import { SITE, DEM_URL, levelsForRange } from '../src/ops3d/dem.js';
+import { SITE, DEM_URL, DEM_TILES, levelsForRange, geoWindowForSite } from '../src/ops3d/dem.js';
 
 /* Ops 3D terrain accuracy gates (Phase 1, Tasks 6–9).
  * Ground truth: Copernicus 30 m DEM via Open-Meteo elevation API, 5×5 grid
@@ -88,5 +88,17 @@ describe('ops3d terrain accuracy (phase 1 vs Copernicus ground truth)', () => {
     for (let i = 1; i < levels.length; i++) assert.ok(levels[i] > levels[i - 1]);
   });
 
-  it.todo('Task 6 — DEM pixel→km mapping is georeferenced (KNOWN GAP, rating 3/10): tile N57W112 spans ~111×60 km centered 57.5N −111.5W, but loadDEM() squeezes the whole raster into the 44 km window about the site and voids origin/resolution — real-DEM altitudes land ~55 km off. Fix: affine via image origin+resolution, window the site extent, re-rate.');
+  it('Task 6 — DEM mosaic covers the full site window (georeferenced, no squeeze)', () => {
+    // SRTM GL1 geometry; both pinned tiles must own part of the 44 km window
+    // with the site center landing in the north tile at the right pixels.
+    const r = 1 / 3600;
+    const nWin = geoWindowForSite([-112, 58], [r, -r], 3601, 3601);
+    const sWin = geoWindowForSite([-112, 57], [r, -r], 3601, 3601);
+    assert.deepEqual([...DEM_TILES], ['N57W112', 'N56W112']);
+    assert.ok(nWin && sWin, 'both tiles window the site');
+    const cx = (SITE.lon + 112) / r, cz = (SITE.lat - 58) / -r;
+    assert.ok(nWin.left <= cx && cx <= nWin.right && nWin.top <= cz && cz <= nWin.bottom);
+    assert.ok(nWin.right - nWin.left < 3601, 'windowed read, never whole-tile');
+    assert.equal(sWin.top, 0, 'south tile owns the south edge the north tile cannot see');
+  });
 });

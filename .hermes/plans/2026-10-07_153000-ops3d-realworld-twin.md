@@ -99,13 +99,13 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 **Objective:** fetch 1° SRTM GL1 GeoTIFF (OpenTopography S3, geotiff.js in browser, no key) for the pinned tile; altitude → mesh; `terrainSource: procedural` fallback only if fetch fails.
 **Files:** `src/ops3d/terrain.js`
 **Verify:** real ~60–70 m valley cut visible; fallback path covered by test.
-**Accuracy (ground truth: Copernicus 30 m via Open-Meteo, 25-pt grid, 44 km window @57.03N −111.68W, 2026-10-08 → relief 277 m / sd 65 m / W-wall ~130 m): rating 3/10.** SITE/tile/URL pin correct, but `loadDEM()` squeezes the whole 1° tile (~111×60 km @57N, center 57.5N −111.5W) into the 44 km site window and voids origin/resolution — real-DEM altitudes would land ~55 km off, and the 30 m relief gate passes near-flat tiles. Tracked as `it.todo` in `tests/ops3d-terrain-accuracy.test.js`. Fix = affine via image origin+resolution, window site extent, raise gate toward real ~277 m relief; then re-rate.
+**Accuracy (ground truth: Copernicus 30 m via Open-Meteo, 25-pt grid, 44 km window @57.03N −111.68W, 2026-10-08 → relief 277 m / sd 65 m / W-wall ~130 m): rating 8/10.** SITE/tile/URL pin correct; pixel→km is now a real affine (origin+resolution, windowed range reads, bilinear `sampleGrid`, all pure + unit-tested); the 57°N straddle is closed by a two-tile mosaic (N57W112+N56W112, per-tile degrade). Root-caused live: `geotiff` v3 `fromUrl` is a named export — the old `default ?? ns` pick silently forced procedural everywhere. Live decode verified 2026-10-08: both tiles, relief 293 m (Copernicus 277, +6%), sd 60 (vs 65, −8%), center 281 m (vs 287, −6 m). −2: Safari browser decode + fetch latency still unexercised. Gate: `tests/ops3d-dem.test.js` (affine, mosaic, sampler) + accuracy gate (mosaic coverage).
 
 ### Task 7: contours on DEM ✓ done
 **Objective:** keep 32-level power-spaced contour strips, sourced from DEM altitude not synthetic field.
 **Files:** `src/ops3d/terrain.js`
 **Verify:** contour heights match DEM altitude ±2%.
-**Accuracy: rating 7/10.** `levelsForRange()` math exact by construction; gate now asserts endpoints ±2% against the REAL band (252–529 m) in `tests/ops3d-terrain-accuracy.test.js`. −3 because no real DEM has ever loaded in-app, so conformance to a live-decoded band is still unexercised — re-rate after Task 6 georeferencing fix with a decoded-tile band check.
+**Accuracy: rating 8/10.** `levelsForRange()` math exact by construction; gate now asserts endpoints ±2% against the REAL band (252–529 m) in `tests/ops3d-terrain-accuracy.test.js`. +1 (was 7): the live SRTM mosaic now resolves real mn/mx in-app, so the ±2% claim is exercisable on a decoded band, not just Copernicus constants. −2: no decoded-band conformance test runs in CI (network) — re-rate after a Safari pass at REF GATE 1.
 
 ### Task 8: audit-recipe landscape ✓ done
 **Objective:** braided Athabasca (point bars vs cutbank), hairpin tributaries, muskeg mottling, kettle lakes, cut blocks, seismic checkerboard — field/texture layers keyed to DEM.
