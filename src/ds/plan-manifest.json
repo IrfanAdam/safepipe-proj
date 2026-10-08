@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-08T08:54:14.295Z",
+  "generated": "2026-10-08T10:04:07.777Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,14 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "4afe729",
+      "full": "4afe729bbd6851f8ebccc565a11809587b0990bd",
+      "date": "2026-10-08",
+      "subject": "chore(ds): track refresh — pick up phase-1 shas [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
     {
       "sha": "a94fd6d",
       "full": "a94fd6d4ce7a92aad51954826da5a6a42d9450d1",
@@ -628,5 +636,8 @@
       "anchor": null
     }
   ],
-  "wip": []
+  "wip": [
+    "src/ops3d/hud.css",
+    "src/ops3d/hud.js"
+  ]
 }

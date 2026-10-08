@@ -36,64 +36,67 @@ export function buildHud(container, cbs = {}) {
   const root = el('div', 'ops-hud');
   root.setAttribute('data-testid', 'ops-hud');
 
-  // — Top-left sector block —
+  // — Top-left sector block: identity + health only. View state lives on
+  // the detail-panel level buttons, overlay state in the ··· menu — nothing
+  // duplicated here.
   const sector = el('div', 'ops-hud__sector');
   sector.appendChild(el('div', 'ops-hud__title', 'PIPELINE NETWORK'));
   sector.appendChild(el('div', 'ops-hud__sub', 'SECTOR 7G — ATHABASCA · FORT MCMURRAY · R 20 KM'));
-  const levelLabel = el('div', 'ops-hud__level', 'NETWORK');
-  sector.appendChild(levelLabel);
   const healthLine = el('div', 'ops-hud__health', 'HEALTH —/—/—');
   sector.appendChild(healthLine);
-  const overlayLabel = el('div', 'ops-hud__overlay', 'OVERLAY · OFF');
-  sector.appendChild(overlayLabel);
-  root.appendChild(sector);
-
-  // — Top-right critical banner (hidden unless banner set) —
-  const banner = el('div', 'ops-hud__banner ops-hud__banner--hidden');
-  banner.setAttribute('role', 'alert');
+  // — Top-left column: sector block with the critical-asset banner below it.
+  // Banner is worst fault + asset only — health lives in the sector block.
+  const topleft = el('div', 'ops-hud__topleft');
+  topleft.appendChild(sector);
+  const banner = el('button', 'ops-hud__banner ops-hud__banner--hidden');
+  banner.type = 'button';
+  banner.setAttribute('aria-label', 'Go to alert asset');
+  banner.addEventListener('click', () => {
+    if (banner.dataset.assetId) onSearch(banner.dataset.assetId);
+  });
   const bannerKind = el('span', 'ops-hud__banner-kind', '');
   const bannerAsset = el('span', 'ops-hud__banner-asset', '');
   banner.appendChild(bannerKind);
   banner.appendChild(bannerAsset);
-  root.appendChild(banner);
+  topleft.appendChild(banner);
+  root.appendChild(topleft);
 
-  // — Bottom-left legend / hints —
-  const legend = el('div', 'ops-hud__legend');
+  // — Bottom-left legend: parked for now (hidden, code kept for restore).
+  const legend = el('div', 'ops-hud__legend ops-hud__legend--hidden');
   const legendItems = [
-    ['dot', 'health'],
-    ['box', 'facility'],
-    ['dash', 'sensitive'],
+    ['dot', 'health', 'PIPE GLOW = STATUS · GRAY OK / AMBER WATCH / RED CRITICAL'],
+    ['box', 'facility', 'WIREFRAME SITE · CLICK TO DRILL IN'],
+    ['dash', 'sensitive', 'DASHED GROUND ZONE · HCA / ENVIRONMENTAL'],
   ];
-  for (const [sample, label] of legendItems) {
+  for (const [sample, label, sub] of legendItems) {
     const row = el('div', 'ops-hud__legend-row');
     const sw = el('span', `ops-hud__swatch ops-hud__swatch--${sample}`);
     row.appendChild(sw);
     row.appendChild(el('span', 'ops-hud__legend-label', label));
     legend.appendChild(row);
+    legend.appendChild(el('div', 'ops-hud__legend-sub', sub));
   }
   legend.appendChild(el(
     'div',
     'ops-hud__hints',
-    'DRAG ORBIT / WHEEL ZOOM / CLICK DRILL / 1-3 VIEWS / O OVERLAY / F CAMERA / ESC UP / H HUD',
+    'DRAG ORBIT / WHEEL ZOOM / CLICK DRILL / 1-3 VIEWS / ESC UP / H HUD',
   ));
   const ovBtn = el('button', 'ops-hud__overlay-btn', 'OVERLAY · OFF');
   ovBtn.type = 'button';
   ovBtn.setAttribute('aria-label', 'Cycle data overlay: off, weather, tectonic, forecast');
   ovBtn.addEventListener('click', () => onOverlay());
-  legend.appendChild(ovBtn);
   const muteBtn = el('button', 'ops-hud__mute-btn', 'SOUND · ON');
   muteBtn.type = 'button';
   muteBtn.setAttribute('aria-label', 'Toggle sound (M)');
   muteBtn.addEventListener('click', () => onMute());
-  legend.appendChild(muteBtn);
-  // — One camera focus icon: opens the camera panel (aperture, focal/zoom,
-  // focus distance, AF, DoF switch). Nothing slider-like lives in the open.
-  const camBtn = el('button', 'ops-hud__cam-btn', '⌖ FOCUS');
+  // — Camera toggle: icon-only ◉ lens mark. Lives in the bottom-right
+  // cluster between ··· and fullscreen; sliders pop above it.
+  const camBtn = el('button', 'ops-hud__cam-btn', '◉');
   camBtn.type = 'button';
-  camBtn.setAttribute('aria-label', 'Camera focus settings: aperture, zoom, focus (F)');
+  camBtn.setAttribute('aria-label', 'Camera controls: aperture, zoom, focus (F)');
   camBtn.setAttribute('aria-expanded', 'false');
   camBtn.addEventListener('click', () => onCamToggle());
-  legend.appendChild(camBtn);
+  root.appendChild(legend);
   // Camera panel: hidden popover above the legend. Aperture f-stops follow
   // the photo convention (1.4 wide open → 16 deep); focal length is real
   // zoom (18 wide → 120 tele); focus distance goes manual the moment its
@@ -151,8 +154,51 @@ export function buildHud(container, cbs = {}) {
   camToggles.appendChild(afBtn);
   camToggles.appendChild(dofBtn);
   camPanel.appendChild(camToggles);
-  legend.appendChild(camPanel);
-  root.appendChild(legend);
+
+  // — Bottom-left help: ? button opens the shortcuts + controls overlay.
+  const help = el('div', 'ops-hud__help');
+  const helpPanel = el('div', 'ops-hud__help-panel ops-hud__help-panel--hidden');
+  helpPanel.setAttribute('role', 'dialog');
+  helpPanel.setAttribute('aria-label', 'Shortcuts and controls');
+  const helpRows = [
+    ['SHORTCUTS', ''],
+    ['DRAG', 'ORBIT'],
+    ['WHEEL', 'ZOOM'],
+    ['CLICK', 'DRILL IN'],
+    ['1 / 2 / 3', 'NETWORK / SEGMENT / ASSET VIEW'],
+    ['O', 'CYCLE OVERLAY'],
+    ['F', 'CAMERA FOCUS'],
+    ['M', 'SOUND ON·OFF'],
+    ['ESC', 'UP A LEVEL'],
+    ['H', 'HIDE HUD'],
+    ['CONTROLS', ''],
+    ['··· MENU', 'OVERLAY / SOUND'],
+    ['◉ CAMERA', 'APERTURE / FOCAL / FOCUS DIST'],
+  ];
+  for (const [key, desc] of helpRows) {
+    if (!desc) {
+      helpPanel.appendChild(el('div', 'ops-hud__help-head', key));
+    } else {
+      const row = el('div', 'ops-hud__help-row');
+      row.appendChild(el('span', 'ops-hud__help-key', key));
+      row.appendChild(el('span', 'ops-hud__help-desc', desc));
+      helpPanel.appendChild(row);
+    }
+  }
+  const helpBtn = el('button', 'ops-hud__help-btn', '?');
+  helpBtn.type = 'button';
+  helpBtn.setAttribute('aria-label', 'Shortcuts and controls');
+  helpBtn.setAttribute('aria-expanded', 'false');
+  let helpOpen = false;
+  const setHelp = (v) => {
+    helpOpen = v;
+    helpPanel.classList.toggle('ops-hud__help-panel--hidden', !v);
+    helpBtn.setAttribute('aria-expanded', v ? 'true' : 'false');
+  };
+  helpBtn.addEventListener('click', () => setHelp(!helpOpen));
+  help.appendChild(helpPanel);
+  help.appendChild(helpBtn);
+  root.appendChild(help);
 
   // — Right detail panel (hidden unless selection) —
   const panel = el('div', 'ops-hud__panel ops-hud__panel--hidden');
@@ -187,7 +233,10 @@ export function buildHud(container, cbs = {}) {
     if (id) onCreateWO(id);
   });
   panel.appendChild(woBtn);
-
+  // — VIEW presets: their own box under the asset panel, visible only
+  // while an asset is selected (keys 1-3 work any time).
+  const viewBox = el('div', 'ops-hud__viewbox ops-hud__viewbox--hidden');
+  viewBox.appendChild(el('div', 'ops-hud__viewbox-head', 'VIEW'));
   const levelRow = el('div', 'ops-hud__levels');
   levelRow.setAttribute('role', 'group');
   levelRow.setAttribute('aria-label', 'Camera view');
@@ -202,10 +251,32 @@ export function buildHud(container, cbs = {}) {
     levelRow.appendChild(b);
     return b;
   });
-  panel.appendChild(levelRow);
-  root.appendChild(panel);
+  viewBox.appendChild(levelRow);
+  // — Right column: asset panel with the VIEW box below it.
+  const rightcol = el('div', 'ops-hud__rightcol');
+  rightcol.appendChild(panel);
+  rightcol.appendChild(viewBox);
+  root.appendChild(rightcol);
 
-  // — Bottom-right fullscreen toggle (container-agnostic: user mounts anywhere) —
+  // — Bottom-right system cluster: ··· menu (overlay / sound)
+  // next to fullscreen. Menu popover opens above the buttons.
+  const sys = el('div', 'ops-hud__sys');
+  const menu = el('div', 'ops-hud__menu ops-hud__menu--hidden');
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', 'Display settings');
+  menu.appendChild(ovBtn);
+  menu.appendChild(muteBtn);
+  const moreBtn = el('button', 'ops-hud__more', '···');
+  moreBtn.type = 'button';
+  moreBtn.setAttribute('aria-label', 'Display settings: overlay, sound');
+  moreBtn.setAttribute('aria-expanded', 'false');
+  let menuOpen = false;
+  const setMenu = (v) => {
+    menuOpen = v;
+    menu.classList.toggle('ops-hud__menu--hidden', !v);
+    moreBtn.setAttribute('aria-expanded', v ? 'true' : 'false');
+  };
+  moreBtn.addEventListener('click', () => setMenu(!menuOpen));
   const fsBtn = el('button', 'ops-hud__fs', 'FULLSCREEN');
   fsBtn.type = 'button';
   fsBtn.setAttribute('aria-label', 'Toggle fullscreen');
@@ -223,7 +294,12 @@ export function buildHud(container, cbs = {}) {
     }
   });
   document.addEventListener('fullscreenchange', syncFs);
-  root.appendChild(fsBtn);
+  sys.appendChild(menu);
+  sys.appendChild(moreBtn);
+  sys.appendChild(camBtn);
+  sys.appendChild(camPanel);
+  sys.appendChild(fsBtn);
+  root.appendChild(sys);
 
   container.appendChild(root);
 
@@ -300,10 +376,11 @@ export function buildHud(container, cbs = {}) {
 
   function update(state = {}) {
     const rollup = state.rollup ?? { nominal: 0, watch: 0, critical: 0 };
-    healthLine.textContent = `HEALTH ${rollup.nominal ?? 0}/${rollup.watch ?? 0}/${rollup.critical ?? 0}`;
+    healthLine.textContent =
+      `HEALTH ${rollup.nominal ?? 0} OK · ${rollup.watch ?? 0} WATCH · ${rollup.critical ?? 0} CRITICAL`;
 
     const level = LEVELS.includes(state.level) ? state.level : 'network';
-    levelLabel.textContent = `VIEW · ${levelNames[level] ?? level.toUpperCase()}`;
+    viewBox.classList.toggle('ops-hud__viewbox--hidden', !(state.selection ?? null));
     for (const b of levelBtns) {
       b.classList.toggle('ops-hud__level-btn--active', b.dataset.level === level);
       b.setAttribute('aria-pressed', b.dataset.level === level ? 'true' : 'false');
@@ -315,15 +392,17 @@ export function buildHud(container, cbs = {}) {
       banner.classList.remove('ops-hud__banner--hidden');
       bannerKind.textContent = esc(bn.kind ?? 'critical').toUpperCase();
       bannerAsset.textContent = esc(bn.assetId);
+      banner.dataset.assetId = bn.assetId;
+      banner.setAttribute('aria-label', `Go to ${bn.assetId}`);
     } else {
       banner.classList.add('ops-hud__banner--hidden');
       bannerKind.textContent = '';
       bannerAsset.textContent = '';
+      delete banner.dataset.assetId;
     }
 
     renderSelection(state.selection ?? null);
     refreshDatalist();
-    overlayLabel.textContent = `OVERLAY · ${state.overlay ? state.overlay.toUpperCase() : 'OFF'}`;
     ovBtn.textContent = `OVERLAY · ${state.overlay ? state.overlay.toUpperCase() : 'OFF'}`;
     ovBtn.classList.toggle('ops-hud__overlay-btn--active', !!state.overlay);
     const muted = !!state.muted;
@@ -333,7 +412,8 @@ export function buildHud(container, cbs = {}) {
     // only refresh from state when the user isn't dragging them (active
     // element check stops the readout fighting the pointer).
     const cam = state.cam ?? { af: true, fstop: 5.6, focalMm: 32, focusDist: 10, dof: null, panel: false };
-    camBtn.textContent = cam.af ? '⌖ FOCUS · AF' : '⌖ FOCUS · MF';
+    camBtn.textContent = '◉';
+    camBtn.setAttribute('aria-label', `Camera controls, autofocus ${cam.af ? 'on' : 'off'} (F)`);
     camBtn.classList.toggle('ops-hud__cam-btn--active', !!cam.panel);
     camBtn.setAttribute('aria-expanded', cam.panel ? 'true' : 'false');
     camPanel.classList.toggle('ops-hud__cam-panel--hidden', !cam.panel);

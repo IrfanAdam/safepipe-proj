@@ -30,10 +30,26 @@
   padding: 8px 10px;
 }
 
-/* Top-left sector block */
-.ops-hud__sector {
+/* Top-left column: sector block with the alert banner pinned below it */
+.ops-hud__topleft {
+  position: absolute;
   top: 12px;
   left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.ops-hud__topleft .ops-hud__sector,
+.ops-hud__topleft .ops-hud__banner {
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+}
+
+.ops-hud__sector {
   min-width: 190px;
 }
 
@@ -60,22 +76,9 @@
   opacity: 0.7;
 }
 
-.ops-hud__level {
-  margin-top: 4px;
-  display: inline-block;
-  border: 1px solid rgba(230, 232, 232, 0.35);
-  padding: 0 6px;
-}
-
 .ops-hud__health {
   margin-top: 4px;
   white-space: nowrap;
-}
-
-.ops-hud__overlay {
-  margin-top: 4px;
-  white-space: nowrap;
-  opacity: 0.7;
 }
 
 .ops-hud__overlay-btn {
@@ -135,7 +138,7 @@
   color: #ffc86a;
   opacity: 1;
 }
-/* Camera popover: sits above the legend, hidden until the ⌖ icon opens it. */
+/* Camera sliders: below the detail panel, hidden until ◉ opens them. */
 .ops-hud__cam-panel {
   margin-top: 8px;
   border: 1px solid rgba(240, 162, 50, 0.45);
@@ -207,12 +210,20 @@
   cursor: pointer;
 }
 
-/* Top-right critical banner */
+/* Alert banner: under the sector block. Worst fault + asset only.
+ * A real button — click flies to the asset. */
 .ops-hud__banner {
-  top: 12px;
-  right: 12px;
   border-color: #e31919;
   color: #e6e8e8;
+  white-space: nowrap;
+  font: inherit;
+  text-align: left;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.ops-hud__banner:hover {
+  border-color: #e6e8e8;
 }
 
 .ops-hud__banner--hidden {
@@ -225,7 +236,80 @@
   margin-right: 8px;
 }
 
-/* Bottom-left legend */
+.ops-hud__banner-health {
+  margin-top: 4px;
+  opacity: 0.75;
+}
+
+/* Bottom-left legend (parked — hidden until needed again) */
+.ops-hud__legend--hidden {
+  display: none;
+}
+
+/* Bottom-left help: ? button + shortcuts/controls overlay */
+.ops-hud__help {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  pointer-events: auto;
+}
+
+.ops-hud__help-btn {
+  font: inherit;
+  color: #e6e8e8;
+  background: rgba(11, 12, 12, 0.72);
+  border: 1px solid rgba(230, 232, 232, 0.35);
+  padding: 5px 10px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.ops-hud__help-btn:hover {
+  border-color: #e6e8e8;
+}
+
+.ops-hud__help-panel {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 6px;
+  background: rgba(11, 12, 12, 0.92);
+  border: 1px solid rgba(230, 232, 232, 0.18);
+  padding: 8px 10px;
+  min-width: 250px;
+  white-space: nowrap;
+}
+
+.ops-hud__help-panel--hidden {
+  display: none;
+}
+
+.ops-hud__help-head {
+  margin: 6px 0 2px;
+  opacity: 0.55;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.ops-hud__help-head:first-child {
+  margin-top: 0;
+}
+
+.ops-hud__help-row {
+  display: flex;
+  gap: 12px;
+}
+
+.ops-hud__help-key {
+  flex: none;
+  min-width: 74px;
+}
+
+.ops-hud__help-desc {
+  opacity: 0.7;
+}
+
+/* Bottom-left legend (parked) */
 .ops-hud__legend {
   bottom: 12px;
   left: 12px;
@@ -237,6 +321,15 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Subtext under each key row: what the symbol means on the map. */
+.ops-hud__legend-sub {
+  margin: 1px 0 6px 26px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+  max-width: 240px;
 }
 
 .ops-hud__swatch {
@@ -269,9 +362,53 @@
   font-size: 10px;
 }
 
-/* Right detail panel */
+/* Right column: detail panel with the camera toggle + sliders below it. */
+.ops-hud__rightcol {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  pointer-events: none;
+}
+
+.ops-hud__rightcol .ops-hud__panel {
+  position: relative;
+  top: auto;
+  right: auto;
+  width: auto;
+}
+
+/* VIEW presets: own box under the asset panel, selection only. */
+.ops-hud__viewbox {
+  background: rgba(11, 12, 12, 0.72);
+  border: 1px solid rgba(230, 232, 232, 0.18);
+  padding: 8px 10px;
+  pointer-events: auto;
+}
+
+.ops-hud__viewbox--hidden {
+  display: none;
+}
+
+.ops-hud__viewbox-head {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: #ffc86a;
+  opacity: 0.9;
+  margin-bottom: 2px;
+}
+
+.ops-hud__viewbox .ops-hud__levels {
+  margin-top: 0;
+}
+
+/* Right detail panel: top-right corner, no gap above it. */
 .ops-hud__panel {
-  top: 64px;
+  top: 12px;
   right: 12px;
   width: 240px;
   pointer-events: auto;
@@ -379,6 +516,16 @@
   margin-top: 8px;
 }
 
+/* Camera sliders: pop above the ◉ button in the bottom-right cluster. */
+.ops-hud__sys .ops-hud__cam-panel {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 6px;
+  min-width: 240px;
+  pointer-events: auto;
+}
+
 .ops-hud__level-btn {
   flex: 1;
   padding: 4px 0;
@@ -390,22 +537,67 @@
   color: #ff8c39;
 }
 
-/* Bottom-right fullscreen toggle */
-.ops-hud__fs {
+/* Bottom-right system cluster: ··· menu + fullscreen */
+.ops-hud__sys {
   position: absolute;
   bottom: 12px;
   right: 12px;
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
   pointer-events: auto;
+}
+
+.ops-hud__fs,
+.ops-hud__more,
+.ops-hud__sys .ops-hud__cam-btn {
   font: inherit;
   color: #e6e8e8;
   background: rgba(11, 12, 12, 0.72);
   border: 1px solid rgba(230, 232, 232, 0.35);
   padding: 5px 10px;
   cursor: pointer;
+  pointer-events: auto;
+  white-space: nowrap;
 }
 
-.ops-hud__fs:hover {
+.ops-hud__fs:hover,
+.ops-hud__more:hover,
+.ops-hud__sys .ops-hud__cam-btn:hover {
   border-color: #e6e8e8;
+  opacity: 1;
+}
+
+.ops-hud__more {
+  letter-spacing: 0.2em;
+  padding: 5px 8px 5px 12px;
+}
+
+/* Menu popover: overlay / sound / focus rows above the buttons */
+.ops-hud__menu {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 6px;
+  background: rgba(11, 12, 12, 0.92);
+  border: 1px solid rgba(230, 232, 232, 0.18);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 190px;
+}
+
+.ops-hud__menu--hidden {
+  display: none;
+}
+
+.ops-hud__menu .ops-hud__overlay-btn,
+.ops-hud__menu .ops-hud__mute-btn {
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
 }
 
 @media (prefers-reduced-motion: reduce) {
