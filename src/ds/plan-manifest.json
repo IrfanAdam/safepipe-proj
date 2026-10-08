@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-08T10:04:07.777Z",
+  "generated": "2026-10-08T12:03:50.634Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,70 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "8b17385",
+      "full": "8b173856b18e084a2be94aa78ace09196daf42c4",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): TOP flow contrast, progressive disclosure, NEAR label scale, grid deprecation, bloom restraint [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "dac26cf",
+      "full": "dac26cfc9e4a96edadc4e503dfa6ca9e4b174a07",
+      "date": "2026-10-08",
+      "subject": "[plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1] fidelity pass: masked plateau swell lifts relief 243->274m sd 43->48m, neutral cool-grey palette",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "d16fcef",
+      "full": "d16fcef82d9750f7298ce5c3b9fc1c2dbe38cb87",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): NEAR fault highlight — zone disc hidden, slim beacon, kit grounding shadow [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "533e978",
+      "full": "533e978864c3f07b3a099aae6e4593bfc334149f",
+      "date": "2026-10-08",
+      "subject": "test(ops3d): attention photometry gates + geo round-trip contract; T9 6/10, T10 claim corrected [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "a08e67b",
+      "full": "a08e67bafd3ef17104b01861901569cae4b65460",
+      "date": "2026-10-08",
+      "subject": "perf(ops3d): mid-freq swell relief 243m + DEM fetch window 5s [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "82fc86d",
+      "full": "82fc86db1970ae128ed654ab96267b94bd9a8cea",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): georeferenced DEM mosaic — named-export bug, 2-tile affine decode, live-verified vs Copernicus [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "32ff9a6",
+      "full": "32ff9a653b5abafa5ae39686b4ccb328c5b5d311",
+      "date": "2026-10-08",
+      "subject": "feat(ops3d): phase-1 iteration — drape, restraint, chamfer, DoF, comet flow, Task 8 7/10 [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "116f51e",
+      "full": "116f51ec9750b03743e82ff5ce07a31d810fa0a1",
+      "date": "2026-10-08",
+      "subject": "feat(ops3d): HUD declutter — trimmed top-left, ··· menu, clickable banner, ? help, split camera/VIEW [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
     {
       "sha": "4afe729",
       "full": "4afe729bbd6851f8ebccc565a11809587b0990bd",
@@ -637,7 +701,7 @@
     }
   ],
   "wip": [
-    "src/ops3d/hud.css",
-    "src/ops3d/hud.js"
+    "src/ops3d/main.js",
+    "src/ops3d/twin.js"
   ]
 }

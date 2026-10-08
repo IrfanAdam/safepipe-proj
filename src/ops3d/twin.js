@@ -199,6 +199,7 @@ export function createTwin(container, opts = {}) {
     structures.setDetail?.(levels.name);
     labels.setDetail?.(levels.name);
     terrain.setDetail?.(levels.name); // index-ring elevation numbers on drill-in
+    gridfloor.setDetail?.(levels.name); // flat grid fades at TOP where contours own the read
     checker.setDetail?.(levels.name);
     const map = byId();
     const sel = selected ? map.get(selected) ?? null : null;
@@ -471,7 +472,7 @@ export function createTwin(container, opts = {}) {
 
   const api = {
     rollup: () => healthRollup(current),
-    debug: { camera: rig.camera, target: () => rig.getTarget() },
+    debug: { camera: rig.camera, scene, target: () => rig.getTarget() },
     setSelection(id) {
       if (id == null) {
         selected = null;

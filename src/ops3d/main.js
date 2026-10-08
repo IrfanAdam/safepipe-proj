@@ -5,7 +5,7 @@ import { createTwin } from './twin.js';
 
 const el = document.getElementById('ops3d-dev');
 if (!el) throw new Error('ops3d dev harness: #ops3d-dev missing');
-createTwin(el, {
+window.__twin = createTwin(el, {
   // eslint-disable-next-line no-console
   onSelect: (id) => console.log('[ops3d] select', id),
 });
