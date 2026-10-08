@@ -4,9 +4,10 @@
  * red #e31919 critical at 1.5× dot size. Fault chainages get brighter beads;
  * the selected asset's faults get a ground ring. Facilities are wireframe
  * boxes at line junctions, colored by own health; sensors are small diamonds.
- * A subtle dashed cyan flow overlay drifts along each pipe path
- * (tick/update(t) animates dashOffset) — cyan, never amber, so flow
- * direction can't read as a watch state. Outer runs (first/last 15% of arc
+ * Soft comet pulses ride each pipe path (tick/update(t) advances sprite
+ * phase along the arc) — cyan, never amber, so flow direction can't read
+ * as a watch state. Each pulse fades in/out over its life (tapered alpha
+ * head-to-tail), never a hard-tipped dash. Outer runs (first/last 15% of arc
  * length, or radius > 12 km) render buried: sunk, dimmed ~40%, dash-grouped.
  * Picking raycasts invisible fat-tube/box proxies (never the dots).
  * Contract: buildNetwork(scene, feed) →
@@ -31,16 +32,41 @@ const DOT_Y = 0.06;
 export const BASE_DOT_SIZE = 0.05;
 export const CRITICAL_GAIN = 1.5; // critical renders at 1.5× dot size
 const DIM_FACTOR = 0.3;
-const FLOW_COLOR = 0x35c5d8; // cool cyan oil-flow overlay — never amber (watch #ff8c39)
-const FLOW_OPACITY = 0.32;
-const COMET_OPACITY = 0.55; // comet pulses read brighter than the base drift
-const FLOW_SPEED = 0.45; // slow drift along the pipe path (world units/s)
+const FLOW_COLOR = 0x35c5d8; // cool cyan oil-flow pulses — never amber (watch #ff8c39)
+const PULSE_OPACITY = 0.6; // pulse peak alpha (envelope tapers it to 0 at both ends)
+const PULSE_SPEED = 1.6; // pulse travel along the pipe path (world units/s)
+const PULSES_PER_PIPE = 3; // evenly phased pulses per pipe — direction reads, density stays calm
 const BURIED_EDGE_T = 0.15; // outer 15% of each run dives underground
 const BURIED_R = 12; // any stretch past r=12 km is buried too
 
 function smooth01(x) {
   x = Math.min(Math.max(x, 0), 1);
   return x * x * (3 - 2 * x);
+}
+
+/* Soft radial dot shared by all flow pulses: hot core falling smoothly to
+ * transparent — the pulse sprite itself has no edge, so flow can never
+ * show a hard tip. Procedural DataTexture (no document/canvas) so the
+ * network layer stays importable in Node tests. */
+let pulseTex = null;
+function getPulseTexture() {
+  if (pulseTex) return pulseTex;
+  const s = 64;
+  const data = new Uint8Array(s * s * 4);
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      const dx = (x + 0.5) / s - 0.5, dy = (y + 0.5) / s - 0.5;
+      const r = Math.hypot(dx, dy) * 2; // 0 center → ~1 at edge
+      const a = Math.pow(Math.max(0, 1 - r), 2); // smooth falloff, exactly 0 at the rim
+      const i = (y * s + x) * 4;
+      data[i] = data[i + 1] = data[i + 2] = 255;
+      data[i + 3] = Math.round(a * 255);
+    }
+  }
+  pulseTex = new THREE.DataTexture(data, s, s);
+  pulseTex.colorSpace = THREE.SRGBColorSpace;
+  pulseTex.needsUpdate = true;
+  return pulseTex;
 }
 
 /* Burial depth 0 (surface) → 1 (buried) at arc fraction t with radius r:
@@ -138,8 +164,8 @@ export function buildNetwork(scene, feed) {
   const byId = new Map(); // assetId → {mats:[{m,base}], dots?, setHealth}
   const proxies = [];
   const beadMats = []; // fault beads dim independently at NEAR (kit takes over)
-  const flowMats = []; // animated oil-flow overlays (dashOffset drift in tick)
-  const chevrons = []; // dive markers riding the arc (flow dashes carry direction)
+  const pulses = []; // soft comet flow pulses (sprite phase advanced in tick)
+  const chevrons = []; // dive markers riding the arc (pulses carry direction)
   const diveGeo = new THREE.OctahedronGeometry(0.11);
   const DIVE_COL = 0x7fa3b8; // cool steel: marks where a run dives underground
   const resMats = []; // resolution-dependent fat-line materials (see setSize)
@@ -196,52 +222,51 @@ export function buildNetwork(scene, feed) {
       dotTotal += run.pts.length / 3;
     }
 
-    // Flow overlay: cool cyan drift along the pipe path (dashOffset animated
-    // in tick) + a fast comet layer — short bright pulses that overtake the
-    // base drift so flow reads as live movement, never a static dash.
-    const flowGeo = new LineGeometry();
-    flowGeo.setPositions(trace.flow);
-    const flowMat = new LineMaterial({
-      color: FLOW_COLOR,
-      linewidth: 2,
-      dashed: true,
-      dashSize: 0.6,
-      gapSize: 0.45,
-      dashOffset: 0,
-      transparent: true,
-      opacity: FLOW_OPACITY,
-      depthWrite: false,
-    });
-    flowMat.resolution.set(1280, 720);
-    resMats.push(flowMat);
-    flowMats.push({ m: flowMat, assetId: pipe.assetId, speed: FLOW_SPEED, base: FLOW_OPACITY });
-    const flowLine = new Line2(flowGeo, flowMat);
-    flowLine.computeLineDistances();
-    flowLine.frustumCulled = false;
-    group.add(flowLine);
-
-    // Comet layer: short bright pulses on the same path, ~2.5× faster than
-    // the base drift — the overtake sells live flow; health tints both.
-    const cometGeo = new LineGeometry();
-    cometGeo.setPositions(trace.flow);
-    const cometMat = new LineMaterial({
-      color: FLOW_COLOR,
-      linewidth: 3,
-      dashed: true,
-      dashSize: 0.12,
-      gapSize: 1.6,
-      dashOffset: 0,
-      transparent: true,
-      opacity: COMET_OPACITY,
-      depthWrite: false,
-    });
-    cometMat.resolution.set(1280, 720);
-    resMats.push(cometMat);
-    flowMats.push({ m: cometMat, assetId: pipe.assetId, speed: FLOW_SPEED * 2.5, base: COMET_OPACITY, comet: true });
-    const cometLine = new Line2(cometGeo, cometMat);
-    cometLine.computeLineDistances();
-    cometLine.frustumCulled = false;
-    group.add(cometLine);
+    /* Soft comet flow: radial-gradient sprites ride the draped pipe path.
+     * No dashes anywhere in the flow layer — each pulse's alpha tapers to 0
+     * at both ends of its life (fade in over the first ~18%, out over the
+     * last ~45%), so there are never hard tips. Additive blending keeps the
+     * cyan whisper-thin over bright contours at TOP. */
+    const flowPts = trace.flow;
+    const flowCum = [0];
+    for (let i = 3; i < flowPts.length; i += 3) {
+      flowCum.push(flowCum[flowCum.length - 1] + Math.hypot(
+        flowPts[i] - flowPts[i - 3], flowPts[i + 1] - flowPts[i - 2], flowPts[i + 2] - flowPts[i - 1]));
+    }
+    const flowLen = flowCum[flowCum.length - 1] || 1;
+    const flowAt = (t, out) => {
+      const d = ((t % 1) + 1) % 1 * flowLen;
+      let lo = 0, hi = flowCum.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (flowCum[mid] < d) lo = mid + 1; else hi = mid;
+      }
+      const i1 = Math.max(1, lo), i0 = i1 - 1;
+      const seg = flowCum[i1] - flowCum[i0] || 1;
+      const f = Math.min(Math.max((d - flowCum[i0]) / seg, 0), 1);
+      out.set(
+        flowPts[i0 * 3] + (flowPts[i1 * 3] - flowPts[i0 * 3]) * f,
+        flowPts[i0 * 3 + 1] + (flowPts[i1 * 3 + 1] - flowPts[i0 * 3 + 1]) * f + 0.03,
+        flowPts[i0 * 3 + 2] + (flowPts[i1 * 3 + 2] - flowPts[i0 * 3 + 2]) * f);
+      return out;
+    };
+    const entry = { assetId: pipe.assetId, sprites: [], cum: flowCum, len: flowLen, at: flowAt, tmp: new THREE.Vector3(), lvl: 1, boost: 1 };
+    for (let k = 0; k < PULSES_PER_PIPE; k++) {
+      const mat = new THREE.SpriteMaterial({
+        map: getPulseTexture(),
+        color: FLOW_COLOR,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const sp = new THREE.Sprite(mat);
+      sp.scale.setScalar(0.55);
+      sp.frustumCulled = false;
+      group.add(sp);
+      entry.sprites.push({ sp, mat, off: k / PULSES_PER_PIPE });
+    }
+    pulses.push(entry);
 
     // Dive markers: steel octahedrons at the two points where the run
     // leaves the surface — the explicit "pipeline goes underground HERE".
@@ -408,16 +433,25 @@ export function buildNetwork(scene, feed) {
     showRings(selected);
   };
 
-  // Base drift + comet overtake per layer speed; comets breathe so the
-  // pulses feel alive rather than mechanical. Accepts absolute scene time.
+  // Comet pulses ride the arc: phase advances with scene time, alpha
+  // follows a fade-in/out envelope (tapered head-to-tail, zero at both
+  // ends) so pulses breathe in and out with no hard tips. Accepts
+  // absolute scene time.
   const tickFlow = (t = 0) => {
-    for (const e of flowMats) {
-      e.m.dashOffset = -t * e.speed;
-      if (e.comet) e.m.opacity = e.base * (0.8 + 0.2 * Math.sin(t * 2.2));
+    for (const e of pulses) {
+      const dim = selected && selected !== e.assetId ? DIM_FACTOR : 1;
+      const lvl = e.assetId === selected ? 1 : e.lvl ?? 1;
+      for (const s of e.sprites) {
+        const phase = ((t * PULSE_SPEED) / e.len + s.off) % 1;
+        const env = smooth01(phase / 0.18) * (1 - smooth01((phase - 0.55) / 0.45));
+        e.at(phase, e.tmp);
+        s.sp.position.copy(e.tmp);
+        s.mat.opacity = PULSE_OPACITY * env * lvl * dim * e.boost;
+      }
     }
-    // Dive markers hold station on the arc (flow dashes carry direction).
+    // Dive markers hold station on the arc (pulses carry direction).
     for (const c of chevrons) {
-      const tt = c.dive ? c.t0 : (c.t0 + t * FLOW_SPEED * 0.06) % 1;
+      const tt = c.dive ? c.t0 : (c.t0 + t * PULSE_SPEED * 0.02) % 1;
       const p = polyPoint(c.points, tt);
       const q = polyPoint(c.points, Math.min(tt + 0.01, 1));
       const d = buryDepth(tt, Math.hypot(p.x, p.z));
@@ -464,23 +498,17 @@ export function buildNetwork(scene, feed) {
     },
     // Level-driven declutter: TOP-sized dots would read as boulders at NEAR —
     // ghost the dotted trace down there so the physical pipe + fault kit lead.
-    // Flow legibility: LineMaterial multiplies line distance by dashScale, so
-    // >1 packs MORE (smaller) dashes. TOP keeps the authored pattern almost
-    // intact (0.8) — the TOP failure was CONTRAST, not size: thin 0.32-alpha
-    // cyan washes out where it crosses blown contour blobs. So at TOP the
-    // overlay gets opacity ×1.7, +2px width, and tighter gaps so dashes join
-    // into a readable trace instead of sparse scratches.
+    // Flow legibility: pulses grow + brighten at TOP (the earlier TOP failure
+    // was CONTRAST — thin cyan washing out over blown contour blobs), shrink
+    // to a whisper drilled-in. No dashes anywhere in the flow layer.
     setDetail(name) {
       levelName = name;
-      const dash = name === 'asset' ? 1.2 : name === 'segment' ? 1 : 0.8;
       detailF = name === 'asset' ? 0.25 : name === 'segment' ? 0.7 : 1;
-      for (const e of flowMats) {
-        const lvl = e.assetId === selected ? 1 : name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
-        const boost = name === 'network' && !e.comet ? 1.7 : 1;
-        e.m.opacity = Math.min(1, e.base * lvl * boost);
-        e.m.dashScale = e.comet ? dash * 0.6 : dash;
-        e.m.linewidth = (e.comet ? 3 : 2) + (name === 'network' ? 2 : 0);
-        e.m.gapSize = e.comet ? 1.6 : name === 'network' ? 0.15 : 0.45;
+      for (const e of pulses) {
+        e.lvl = e.assetId === selected ? 1 : name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
+        e.boost = name === 'network' ? 1.5 : 1; // TOP legibility peak ≈0.9, still under alarm bloom
+        const s = (name === 'network' ? 1.8 : name === 'segment' ? 0.7 : 0.45);
+        for (const p of e.sprites) p.sp.scale.setScalar(0.55 * s);
       }
       for (const c of chevrons) c.detailF = name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
       applySelection(); // owns ALL byId opacity (level + selection + NEAR beads)

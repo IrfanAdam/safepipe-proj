@@ -67,9 +67,15 @@ function makeTextSprite(assetId, health) {
   tex.colorSpace = THREE.SRGBColorSpace;
   const mat = new THREE.SpriteMaterial({
     map: tex, sizeAttenuation: true, transparent: true,
-    opacity: 0.92, depthWrite: false,
+    opacity: 0.96, depthWrite: false,
+    // Plates always overdraw the contour field: at TOP the bright index
+    // lines used to poke straight through the semi-transparent backplate
+    // and read as smudges. depthTest off + renderOrder puts the dark
+    // plate over the lines (contours dim under labels by construction).
+    depthTest: false,
   });
   const sp = new THREE.Sprite(mat);
+  sp.renderOrder = 10;
   sp.scale.set(0.9, 0.9 * (96 / 384), 1);
   sp.userData.baseW = 0.9;
   sp.userData.aspect = 96 / 384;
@@ -77,11 +83,38 @@ function makeTextSprite(assetId, health) {
   return sp;
 }
 
-/* Cyberpunk chamfer plate: sharp corners with the signature diagonal cut
- * top-right — never rounded. Cut is half the plate height so the diagonal
- * survives the ~3× TOP downsample as a multi-pixel face, and the stroke
- * traces the cut itself (unlike CSS clip-path, canvas strokes the path). */
+/* Plate backplate style — locked by tests/ops3d-attention.test.js.
+ * Near-black, near-opaque: the fill must hold ≥4.5:1 contrast against the
+ * brightest contour grey (#9fabb3) so plates read at TOP, while staying far
+ * below alarm luminance so faults still lead. */
+export const PLATE_STYLE = {
+  fill: [3, 5, 7],
+  alphaAsset: 0.92,
+  alphaDest: 0.88,
+  haloAlpha: 0.9,
+  depthTest: false,
+};
+const plateFill = (a) =>
+  `rgba(${PLATE_STYLE.fill[0]},${PLATE_STYLE.fill[1]},${PLATE_STYLE.fill[2]},${a})`;
+
+/* Dark halo separating the plate from bright contours: a wide near-black
+ * stroke under the thin health-colored stroke, so the colored edge never
+ * sits directly on a white line. */
+function strokePlateEdge(ctx, col, alpha) {
+  ctx.globalAlpha = PLATE_STYLE.haloAlpha;
+  ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+  ctx.lineWidth = 7;
+  ctx.stroke();
+  ctx.strokeStyle = col;
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
 function chamferPlate(ctx, x, y, w, h) {
+  /* Cyberpunk chamfer plate: sharp corners with the signature diagonal cut
+   * top-right — never rounded. Cut is half the plate height so the diagonal
+   * survives the ~3× TOP downsample as a multi-pixel face. */
   const cut = Math.round(Math.min(w, h) * 0.5);
   ctx.beginPath();
   ctx.moveTo(x, y);
@@ -96,22 +129,21 @@ function drawLabel(cv, tex, assetId, health) {
   const ctx = cv.getContext('2d');
   const col = colorOf(health);
   ctx.clearRect(0, 0, cv.width, cv.height);
-  ctx.fillStyle = 'rgba(8,12,14,0.72)';
+  ctx.fillStyle = plateFill(PLATE_STYLE.alphaAsset);
   chamferPlate(ctx, 2, 8, cv.width - 4, cv.height - 16);
   ctx.fill();
-  ctx.strokeStyle = col;
-  ctx.globalAlpha = 0.85;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+  strokePlateEdge(ctx, col, 0.85);
   ctx.fillStyle = col;
   ctx.beginPath();
   ctx.arc(36, cv.height / 2, 11, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#d8d5cc';
+  ctx.fillStyle = '#f4f1e9';
   ctx.font = '600 28px ui-monospace, Menlo, monospace';
   ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur = 6;
   ctx.fillText(`${assetId} · ${health.toUpperCase()}`, 62, cv.height / 2 + 1);
+  ctx.shadowBlur = 0;
   tex.needsUpdate = true;
 }
 
@@ -135,9 +167,12 @@ function makeDestSprite(text, health) {
   tex.colorSpace = THREE.SRGBColorSpace;
   const mat = new THREE.SpriteMaterial({
     map: tex, sizeAttenuation: true, transparent: true,
-    opacity: 0.9, depthWrite: false,
+    opacity: 0.94, depthWrite: false,
+    // Same contour overdraw as asset plates (see makeTextSprite).
+    depthTest: false,
   });
   const sp = new THREE.Sprite(mat);
+  sp.renderOrder = 10;
   sp.scale.set(0.62, 0.62 * (96 / 512), 1);
   sp.userData.baseW = 0.62;
   sp.userData.aspect = 96 / 512;
@@ -149,14 +184,10 @@ function drawDest(cv, tex, text, health) {
   const ctx = cv.getContext('2d');
   const col = colorOf(health);
   ctx.clearRect(0, 0, cv.width, cv.height);
-  ctx.fillStyle = 'rgba(8,12,14,0.66)';
+  ctx.fillStyle = plateFill(PLATE_STYLE.alphaDest);
   chamferPlate(ctx, 2, 12, cv.width - 4, cv.height - 24);
   ctx.fill();
-  ctx.strokeStyle = col;
-  ctx.globalAlpha = 0.8;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+  strokePlateEdge(ctx, col, 0.8);
   ctx.font = '600 30px ui-monospace, Menlo, monospace';
   ctx.textBaseline = 'middle';
   const tw = ctx.measureText(text).width;
@@ -167,8 +198,11 @@ function drawDest(cv, tex, text, health) {
   ctx.beginPath();
   ctx.arc(x + r, cv.height / 2, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#f2efe8';
+  ctx.fillStyle = '#f4f1e9';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur = 6;
   ctx.fillText(text, x + r * 2 + gap, cv.height / 2 + 1);
+  ctx.shadowBlur = 0;
   tex.needsUpdate = true;
 }
 
@@ -307,7 +341,7 @@ export function buildLabels(scene, { layout, healthById } = {}) {
           it.ringMat.opacity = (sel ? 1 : 0.65) * (0.75 + 0.25 * Math.sin(t * 2.4 + it.phase));
         }
         it.sprite.position.y = it.baseY;
-        it.sprite.material.opacity = hidden ? 0 : sel ? 1 : it.dest ? 0.9 : 0.92;
+        it.sprite.material.opacity = hidden ? 0 : sel ? 1 : it.dest ? 0.94 : 0.96;
       }
     },
     setSelection(id) {
