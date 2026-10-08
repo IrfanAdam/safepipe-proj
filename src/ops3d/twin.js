@@ -25,7 +25,7 @@ import { buildNetwork } from './network.js';
 import { buildZones } from './zones.js';
 import { createLevels } from './levels.js';
 import { buildTerrain } from './terrain.js';
-import { setFieldSource } from './terrain.js';
+import { setFieldSource, terrainSource } from './terrain.js';
 import { loadDEM } from './dem.js';
 import { buildStructures } from './structures.js';
 import { buildBeacons } from './beacons.js';
@@ -458,18 +458,45 @@ export function createTwin(container, opts = {}) {
   if (deep && (startView === 'iso' || startView === 'segment')) levels.setLevel('segment');
 
   // Phase 1 Task 6: real-relief upgrade. The first paint is always the
-  // procedural fallback (fast, offline-safe); when the pinned SRTM tile
-  // resolves, the field source swaps and the twin remounts so EVERY drape
-  // (contours, pipes, structures, anchors) follows the same altitude.
-  // Without the geotiff dep this is a silent no-op (fallback covered by test).
+  // procedural fallback (fast, offline-safe); when the pinned SRTM mosaic
+  // resolves — cache-first (ms on repeat visits) or S3 range fetch (tens
+  // of seconds cold on slow links, each stage budgeted at 30 s) — the
+  // field source swaps and the twin remounts so EVERY drape (contours,
+  // pipes, structures, anchors) follows the same altitude. The remount
+  // restores the exact camera + selection, so a late swap never yanks the
+  // view (deep-link ?asset/?view/?overlay re-apply from the URL on their
+  // own). Without the geotiff dep this is a silent no-op (fallback
+  // covered by test). Stale guard: skip if the container detached or
+  // another mount already swapped to DEM.
   if (!opts._dem) {
-    loadDEM({ fetchTimeoutMs: 5000 }).then((r) => {
+    loadDEM({ fetchTimeoutMs: 30000 }).then((r) => {
       if (!r || r.terrainSource !== 'dem') return;
+      try {
+        if (!container.isConnected || terrainSource() === 'dem') return;
+      } catch {
+        return;
+      }
       setFieldSource(r.sample, 'dem');
+      // eslint-disable-next-line no-console
+      console.info(
+        `[ops3d] DEM live swap-in: relief ${(r.meta.reliefKm * 1000).toFixed(0)} m, ` +
+        `tiles ${(r.meta.tiles ?? []).join('+')}, ` +
+        `cache ${(r.meta.fromCache ?? []).join(',') || 'cold-fetch'}, ` +
+        `wall ${((r.meta.wallMs ?? 0) / 1000).toFixed(1)}s`,
+      );
       const keep = selected;
+      let keepPos = null, keepTgt = null;
+      try {
+        keepPos = api.debug.camera.position.clone();
+        keepTgt = api.debug.target();
+      } catch {
+        /* view restore is best-effort */
+      }
       try { api.dispose(); } catch { /* already torn down */ }
+      if (!container.isConnected) return;
       const fresh = createTwin(container, { ...opts, _dem: true });
       Object.assign(api, fresh);
+      if (keepPos && keepTgt) api.setView?.(keepPos, keepTgt);
       if (keep) api.setSelection?.(keep);
     });
   }
@@ -477,6 +504,16 @@ export function createTwin(container, opts = {}) {
   const api = {
     rollup: () => healthRollup(current),
     debug: { camera: rig.camera, scene, target: () => rig.getTarget() },
+    // DEM staged swap-in restores the exact pre-swap viewpoint (dur 0 =
+    // instant copy, no visible flight). Internal seam, not a camera feature.
+    setView(pos, tgt) {
+      try {
+        rig.flyTo(pos, tgt ?? rig.getTarget(), 0);
+      } catch {
+        /* best-effort */
+      }
+      return true;
+    },
     setSelection(id) {
       if (id == null) {
         selected = null;

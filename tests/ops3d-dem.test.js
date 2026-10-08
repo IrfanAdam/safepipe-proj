@@ -1,6 +1,6 @@
-import { describe, it } from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { SITE, DEM_TILES, levelsForRange, loadDEM, sampleProcedural, geoWindowForSite, sampleGrid } from '../src/ops3d/dem.js';
+import { SITE, DEM_TILES, levelsForRange, loadDEM, sampleProcedural, geoWindowForSite, sampleGrid, demCacheKey, DEM_CACHE_VERSION, _cacheMemSeed, _cacheMemClear } from '../src/ops3d/dem.js';
 
 describe('ops3d DEM seam (phase 1)', () => {
   it('SITE pin is Fort McMurray', () => {
@@ -37,6 +37,55 @@ describe('ops3d DEM seam (phase 1)', () => {
 
   it('mosaic pins both straddling tiles', () => {
     assert.deepEqual([...DEM_TILES], ['N57W112', 'N56W112']);
+  });
+});
+
+describe('ops3d DEM tile cache (staged swap-in)', () => {
+  afterEach(() => _cacheMemClear());
+
+  it('cache keys are versioned per tile', () => {
+    assert.equal(demCacheKey('N57W112'), `srtm-dem:v${DEM_CACHE_VERSION}:N57W112`);
+    assert.notEqual(demCacheKey('N57W112'), demCacheKey('N56W112'));
+  });
+
+  // Synthetic mosaic over the real site pixels: W→E gradient 250→393 m so
+  // the 5-point relief probe (>80 m) passes from cache with zero network.
+  const seedMosaic = () => {
+    const res = [1 / 3600, -1 / 3600];
+    const mk = (origin, win) => {
+      const ww = win.right - win.left, hh = win.bottom - win.top;
+      const data = new Int16Array(ww * hh);
+      for (let z = 0; z < hh; z++) for (let x = 0; x < ww; x++) data[z * ww + x] = Math.round(250 + 0.15 * x);
+      const [, dy] = res;
+      return {
+        origin, res, win, data, ww, hh, noData: -32768,
+        latTop: origin[1] + win.top * dy, latBot: origin[1] + win.bottom * dy,
+        lonLeft: origin[0], dx: res[0],
+      };
+    };
+    _cacheMemSeed('N57W112', mk([-112, 58], { left: 677, top: 3233, right: 1628, bottom: 3601 }));
+    _cacheMemSeed('N56W112', mk([-112, 57], { left: 677, top: 0, right: 1628, bottom: 152 }));
+  };
+
+  it('memory-cached mosaic resolves dem with no network', async () => {
+    seedMosaic();
+    const t0 = Date.now();
+    // Tight budget: cache hits never fetch, so this only passes when the
+    // network is never touched (a fetch-first regression fails here).
+    const r = await loadDEM({ fetchTimeoutMs: 4000 });
+    assert.equal(r.terrainSource, 'dem');
+    assert.deepEqual(r.meta.tiles, ['N57W112', 'N56W112']);
+    assert.equal(r.meta.fromCache.length, 2);
+    assert.ok(r.meta.reliefKm > 0.08, `relief ${r.meta.reliefKm}`);
+    assert.ok(Math.abs(r.sample(0, 0) - 0.321) < 0.01, `center ${r.sample(0, 0)}`);
+    assert.ok(Math.abs(r.sample(8, 0) - r.sample(-8, 0) - 0.142) < 0.01, 'W→E gradient');
+    assert.ok(Date.now() - t0 < 4000, 'cache path, no fetch wait');
+  });
+
+  it('corrupt cached payload is evicted, never sampled', async () => {
+    _cacheMemSeed('__override__', { ww: 4, hh: 4, data: new Int16Array([1, 2, 3]) }); // length 3 ≠ 16
+    const r = await loadDEM({ url: 'https://127.0.0.1:9/nope.tif', fetchTimeoutMs: 200 });
+    assert.equal(r.terrainSource, 'procedural');
   });
 });
 
