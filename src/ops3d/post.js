@@ -4,19 +4,22 @@
  *
  * Chain: scene → color+depth RT → bright-pass (½ res) → 9-tap separable
  * blur ping-pong (¼ res, H+V) → composite to screen:
- *   base + bloom·0.5, 2px radial chromatic aberration, ±0.006 film
- *   grain, 0.28 vignette, thin-lens depth-of-field from the real depth
+ *   base + bloom·0.08 (desaturated halo), 2px radial chromatic aberration,
+ *   ±0.001 film grain, 0.28 vignette, thin-lens depth-of-field from the
  *   buffer. All RTs UnsignedByteType, Safari-safe GLSL1.
  *
  * DoF is real optics, not a screen blur band: per-pixel circle-of-confusion
  * from the thin-lens formula (see lensCocPx in camera.js) with the actual
  * scene depth, so focus lands on whatever is under the cursor/selection.
  * TUNING KNOBS (live via returned `fx` object):
- *   fx.threshold (0.3) — bright-pass cutoff; red luminance is low (~0.3),
- *     so the cutoff must sit at/below it for critical faults to bloom
- *   fx.bloom     (0.5) — bloom add strength in composite
+ *   fx.threshold (0.44) — bright-pass cutoff; gated by
+ *     tests/ops3d-attention.test.js to (critical-red 0.335, lamp-red 0.488):
+ *     terrain base rides under, lamp red + white pins still clear it
+ *   fx.bloom     (0.08) — bloom add strength in composite
+ *   fx.bloomSat  (0.25) — halo saturation; 0 = monochrome halo, 1 = raw hue.
+ *     Kept low so dense contours glow grey, never white-hot color
  *   fx.ca        (1.0)  — CA scale; 1.0 ≈ 2px max at frame edges, 0 = off
- *   fx.grain     (0.006) — grain amplitude (±); 0 = off
+ *   fx.grain     (0.001) — grain amplitude (±); near-off, 0 = off
  *   fx.vignette  (0.28) — edge darkening; 0 = off
  *   fx.dof       (1) — DoF master switch (1 = on, 0 = off); twin leaves it
  *     on at every level unless the user forces it off in the camera panel
@@ -86,6 +89,7 @@ uniform float uFov;
 uniform vec2 uRes;
 uniform float uTime;
 uniform float uBloom;
+uniform float uBloomSat;
 uniform float uCa;
 uniform float uGrain;
 uniform float uScan;
@@ -115,6 +119,10 @@ void main() {
   base.g = texture2D(tDiffuse, vUv).g;
   base.b = texture2D(tDiffuse, vUv - off).b;
   vec3 bloom = texture2D(tBloom, vUv).rgb;
+  // Desaturated halo: dense contours glow grey instead of white-hot color.
+  // Alarm cores keep their hue in the base layer; the halo never shouts.
+  float haloL = dot(bloom, vec3(0.299, 0.587, 0.114));
+  bloom = mix(vec3(haloL), bloom, uBloomSat);
   vec3 col = base + bloom * uBloom;
   // Depth-driven DoF: golden-angle spiral gather scaled by the CoC radius.
   // Sharp exactly on the focus plane, melting with real distance each side.
@@ -166,10 +174,11 @@ export function createPost(renderer, scene, camera) {
   if (!camera) throw new Error('createPost: camera required');
 
   const fx = {
-    threshold: 0.36, // locked by tests/ops3d-attention.test.js — see header there
-    bloom: 0.22, // restraint: contours halo instead of blobbing; fault pins still clear it
+    threshold: 0.44, // gated by tests/ops3d-attention.test.js: (0.335, 0.488)
+    bloom: 0.08, // hard restraint: dense contours keep variance; fault pins still clear it
+    bloomSat: 0.25, // halo saturation: mostly grey, whisper of hue
     ca: 1.0,
-    grain: 0.006,
+    grain: 0.001, // near-off: void stays clean
     scan: 0.05,
     vignette: 0.28,
     dof: 1,
@@ -231,6 +240,7 @@ export function createPost(renderer, scene, camera) {
       uRes: { value: new THREE.Vector2(2, 2) },
       uTime: { value: 0 },
       uBloom: { value: fx.bloom },
+      uBloomSat: { value: fx.bloomSat },
       uCa: { value: fx.ca },
       uGrain: { value: fx.grain },
       uScan: { value: fx.scan },
@@ -292,7 +302,8 @@ export function createPost(renderer, scene, camera) {
     renderer.setRenderTarget(rtScene);
     renderer.render(scene, camera);
 
-    // 2. Bright-pass at half res (threshold ~0.55: only amber/red/bright dots).
+    // 2. Bright-pass at half res (cutoff 0.44: terrain base rides under,
+    // only lamp-red / white pins / bright index clear it).
     brightMat.uniforms.tDiffuse.value = rtScene.texture;
     brightMat.uniforms.uThreshold.value = fx.threshold;
     blit(brightMat, rtBright);
@@ -312,7 +323,7 @@ export function createPost(renderer, scene, camera) {
     blurMat.uniforms.uDir.value.set(0, 1);
     blit(blurMat, rtBlurB);
 
-    // 4. Composite to screen: base + bloom·0.5, CA, grain, vignette,
+    // 4. Composite to screen: base + desaturated bloom·0.08, CA, grain,
     // thin-lens DoF from the real depth buffer.
     compMat.uniforms.tDiffuse.value = rtScene.texture;
     compMat.uniforms.tBloom.value = rtBlurB.texture;
@@ -327,6 +338,7 @@ export function createPost(renderer, scene, camera) {
     compMat.uniforms.uFov.value = camera.fov;
     compMat.uniforms.uTime.value = time;
     compMat.uniforms.uBloom.value = fx.bloom;
+    compMat.uniforms.uBloomSat.value = fx.bloomSat;
     compMat.uniforms.uCa.value = fx.ca;
     compMat.uniforms.uGrain.value = fx.grain;
     compMat.uniforms.uScan.value = fx.scan;
