@@ -25,6 +25,8 @@ import { buildNetwork } from './network.js';
 import { buildZones } from './zones.js';
 import { createLevels } from './levels.js';
 import { buildTerrain } from './terrain.js';
+import { setFieldSource } from './terrain.js';
+import { loadDEM } from './dem.js';
 import { buildStructures } from './structures.js';
 import { buildBeacons } from './beacons.js';
 import { buildLabels } from './labels.js';
@@ -448,7 +450,24 @@ export function createTwin(container, opts = {}) {
   // ?asset=X&view=ISO lands on the segment view of that asset's ground.
   if (deep && (startView === 'iso' || startView === 'segment')) levels.setLevel('segment');
 
-  return {
+  // Phase 1 Task 6: real-relief upgrade. The first paint is always the
+  // procedural fallback (fast, offline-safe); when the pinned SRTM tile
+  // resolves, the field source swaps and the twin remounts so EVERY drape
+  // (contours, pipes, structures, anchors) follows the same altitude.
+  // Without the geotiff dep this is a silent no-op (fallback covered by test).
+  if (!opts._dem) {
+    loadDEM({ fetchTimeoutMs: 1500 }).then((r) => {
+      if (!r || r.terrainSource !== 'dem') return;
+      setFieldSource(r.sample, 'dem');
+      const keep = selected;
+      try { api.dispose(); } catch { /* already torn down */ }
+      const fresh = createTwin(container, { ...opts, _dem: true });
+      Object.assign(api, fresh);
+      if (keep) api.setSelection?.(keep);
+    });
+  }
+
+  const api = {
     rollup: () => healthRollup(current),
     debug: { camera: rig.camera, target: () => rig.getTarget() },
     setSelection(id) {
@@ -500,4 +519,5 @@ export function createTwin(container, opts = {}) {
       canvas.remove();
     },
   };
+  return api;
 }

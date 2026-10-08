@@ -25,6 +25,7 @@ import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { getLayout } from './health-feed.js';
+import { levelsForRange, _injectField } from './dem.js';
 
 function await_import_layout() {
   try { return { getLayout }; } catch { return {}; }
@@ -76,6 +77,25 @@ function lakeWet(x, z) {
  * deep with flat-bottom trough, one organic playa-lake depression ~14 m.
  * Total relief ≈ −42…+88 m true. No rim. */
 export function field(x, z) {
+  return _active(x, z);
+}
+
+/* Swappable altitude source (Phase 1 Task 6 seam): every drape in the twin
+ * (contours, pipes, structures, anchors) calls field(), so one swap moves
+ * the whole scene coherently. Default is the procedural floor below. */
+let _active = _procedural;
+let _source = 'procedural';
+export function setFieldSource(fn, source = 'dem') {
+  _active = fn;
+  _source = source;
+}
+export function terrainSource() {
+  return _source;
+}
+// Sync probe for the DEM fallback path (tests + offline): same floor.
+_injectField(_procedural);
+
+function _procedural(x, z) {
   const dip = -0.0018 * x; // eastward dip: down ~1.8 m per km east
   const lakeMask = lakeWet(x, z);
   const swell =
@@ -358,12 +378,11 @@ export function buildTerrain(scene) {
   // the whole terrain, pixel-identical output.
   const baseBatch = { pos: [], clr: [], paths: 0, segs: 0 };
   const indexBatch = { pos: [], clr: [], paths: 0, segs: 0 };
+  // Task 7: levels come from the shared DEM helper — same power shaping,
+  // sourced from whatever altitude the sampler resolved (DEM or fallback).
+  const contourLevels = levelsForRange(mn, mx, LEVELS);
   for (let k = 0; k < LEVELS; k++) {
-    const t = (k + 0.5) / LEVELS;
-    const u = 2 * t - 1; // -1…1
-    // Symmetric power spacing: dense near mid-ground, open at extremes.
-    const shaped = Math.sign(u) * Math.pow(Math.abs(u), 1.35);
-    const level = (mn + mx) / 2 + shaped * ((mx - mn) / 2);
+    const level = contourLevels[k];
     const y = level * VEX;
     const isIndex = k % 5 === 4;
     const col = level >= 0 ? (isIndex ? INDEX_COL : BASE_COL) : BELOW_COL;
@@ -569,6 +588,7 @@ export function buildTerrain(scene) {
 
   return {
     mesh: group,
+    terrainSource: _source,
     setDetail(name) {
       labelGroup.visible = true; // inline pills stay at every zoom
       dimF = name === 'asset' ? 0.35 : name === 'segment' ? 0.55 : 1;
