@@ -32,7 +32,15 @@
 
 /* Cyberpunk signature: diagonal-cut top-right corner on every box.
  * Sharp everywhere else — no rounded corners in this HUD. The cut sits
- * opposite the ::before corner tick (top-left), so they never collide. */
+ * opposite the ::before corner tick (top-left), so they never collide.
+ * NOTE: clip-path slices the 1px border open along the diagonal, leaving
+ * a borderless gap that reads as a broken corner at full-frame scale —
+ * so every cut gets its own stroke via ::after (a 2px bar centered on the
+ * cut: the outer pixel clips away, the inner pixel survives as the edge).
+ * --edge carries the stroke tint: signal hues where the border has one,
+ * legible bone elsewhere. --cut is the notch depth (16px boxes / 10px
+ * chips — deep enough to survive at a glance, shallow enough to keep
+ * the silhouette rectangular). */
 .ops-hud__sector,
 .ops-hud__banner,
 .ops-hud__legend,
@@ -41,7 +49,9 @@
 .ops-hud__cam-panel,
 .ops-hud__menu,
 .ops-hud__help-panel {
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  --cut: 16px;
+  --edge: rgba(230, 232, 232, 0.5);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
 }
 .ops-hud__overlay-btn,
 .ops-hud__mute-btn,
@@ -55,7 +65,42 @@
 .ops-hud__help-btn,
 .ops-hud__chip,
 .ops-hud__badge {
-  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
+  --cut: 10px;
+  --edge: rgba(230, 232, 232, 0.5);
+  clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
+}
+/* The cut-edge stroke: 2px bar rotated 45° (top edge runs into the right
+ * edge down-right), centered on the cut so clipping leaves a crisp 1px.
+ * Inputs (search) keep the notch only — no pseudos render on inputs. */
+.ops-hud__sector::after,
+.ops-hud__banner::after,
+.ops-hud__legend::after,
+.ops-hud__panel::after,
+.ops-hud__viewbox::after,
+.ops-hud__cam-panel::after,
+.ops-hud__menu::after,
+.ops-hud__help-panel::after,
+.ops-hud__overlay-btn::after,
+.ops-hud__mute-btn::after,
+.ops-hud__cam-btn::after,
+.ops-hud__cam-toggle::after,
+.ops-hud__wo::after,
+.ops-hud__level-btn::after,
+.ops-hud__fs::after,
+.ops-hud__more::after,
+.ops-hud__help-btn::after,
+.ops-hud__chip::after,
+.ops-hud__badge::after {
+  content: "";
+  position: absolute;
+  top: calc(var(--cut) / 2 - 1px);
+  right: calc(var(--cut) * -0.21);
+  width: calc(var(--cut) * 1.42);
+  height: 2px;
+  background: var(--edge);
+  transform: rotate(45deg);
+  transform-origin: center;
+  pointer-events: none;
 }
 
 /* Top-left column: sector block with the alert banner pinned below it */
@@ -126,6 +171,7 @@
 }
 .ops-hud__overlay-btn--active {
   border-color: #f0a232;
+  --edge: #f0a232;
   color: #ffc86a;
   opacity: 1;
 }
@@ -163,6 +209,7 @@
 }
 .ops-hud__cam-btn--active {
   border-color: #f0a232;
+  --edge: #f0a232;
   color: #ffc86a;
   opacity: 1;
 }
@@ -170,6 +217,7 @@
 .ops-hud__cam-panel {
   margin-top: 8px;
   border: 1px solid rgba(240, 162, 50, 0.45);
+  --edge: #f0a232;
   background: rgba(10, 14, 18, 0.94);
   padding: 8px 10px 10px;
   min-width: 240px;
@@ -241,6 +289,7 @@
  * A real button — click flies to the asset. */
 .ops-hud__banner {
   border-color: #e31919;
+  --edge: #e31919;
   color: #e6e8e8;
   white-space: nowrap;
   font: inherit;
@@ -251,6 +300,7 @@
 
 .ops-hud__banner:hover {
   border-color: #e6e8e8;
+  --edge: #e6e8e8;
 }
 
 .ops-hud__banner--hidden {
@@ -481,6 +531,8 @@
 }
 
 .ops-hud__chip {
+  display: inline-block;
+  position: relative;
   border: 1px solid rgba(230, 232, 232, 0.5);
   padding: 0 6px;
   text-transform: uppercase;
@@ -488,16 +540,20 @@
 
 .ops-hud__chip--watch {
   border-color: #ff8c39;
+  --edge: #ff8c39;
   color: #ff8c39;
 }
 
 .ops-hud__chip--critical {
   border-color: #e31919;
+  --edge: #e31919;
   color: #e31919;
 }
 
 .ops-hud__badge {
+  position: relative;
   border: 1px dashed #ff8c39;
+  --edge: #ff8c39;
   color: #ff8c39;
   padding: 0 6px;
 }
@@ -561,6 +617,7 @@
 
 .ops-hud__level-btn--active {
   border-color: #ff8c39;
+  --edge: #ff8c39;
   color: #ff8c39;
 }
 
@@ -625,6 +682,19 @@
   width: 100%;
   box-sizing: border-box;
   text-align: left;
+}
+
+/* Positioned anchors for the ::after cut-edge stroke (harmless elsewhere). */
+.ops-hud__overlay-btn,
+.ops-hud__mute-btn,
+.ops-hud__cam-btn,
+.ops-hud__cam-toggle,
+.ops-hud__wo,
+.ops-hud__level-btn,
+.ops-hud__fs,
+.ops-hud__more,
+.ops-hud__help-btn {
+  position: relative;
 }
 
 @media (prefers-reduced-motion: reduce) {

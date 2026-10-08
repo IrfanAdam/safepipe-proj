@@ -2,7 +2,8 @@
  * One canvas-sprite per asset (assetId + health word), a small glowing ring
  * sprite on the ground, and a thin vertical leader line joining them.
  * Plus a small destination pill per pipeline at its rim exit point naming
- * where the line heads (always visible at network/segment levels).
+ * where the line heads (hot/selected/hovered only at network level — the
+ * hot ones double as rim landmarks; full set in-field).
  * Contract: buildLabels(scene, {layout, healthById}) →
  *   {group, update(t), setSelection(id), setDetail(name), dispose}.
  * healthById is a Map (assetId → feed item or health string); arrays accepted.
@@ -77,10 +78,11 @@ function makeTextSprite(assetId, health) {
 }
 
 /* Cyberpunk chamfer plate: sharp corners with the signature diagonal cut
- * top-right — never rounded. Cut is deliberately deep (~20% of the edge)
- * so it reads at 3× TOP scale, not just in close-up. */
+ * top-right — never rounded. Cut is half the plate height so the diagonal
+ * survives the ~3× TOP downsample as a multi-pixel face, and the stroke
+ * traces the cut itself (unlike CSS clip-path, canvas strokes the path). */
 function chamferPlate(ctx, x, y, w, h) {
-  const cut = Math.round(Math.min(w, h) * 0.42);
+  const cut = Math.round(Math.min(w, h) * 0.5);
   ctx.beginPath();
   ctx.moveTo(x, y);
   ctx.lineTo(x + w - cut, y);
@@ -99,7 +101,7 @@ function drawLabel(cv, tex, assetId, health) {
   ctx.fill();
   ctx.strokeStyle = col;
   ctx.globalAlpha = 0.85;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3;
   ctx.stroke();
   ctx.globalAlpha = 1;
   ctx.fillStyle = col;
@@ -107,7 +109,7 @@ function drawLabel(cv, tex, assetId, health) {
   ctx.arc(36, cv.height / 2, 11, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#d8d5cc';
-  ctx.font = '600 34px ui-monospace, Menlo, monospace';
+  ctx.font = '600 28px ui-monospace, Menlo, monospace';
   ctx.textBaseline = 'middle';
   ctx.fillText(`${assetId} · ${health.toUpperCase()}`, 62, cv.height / 2 + 1);
   tex.needsUpdate = true;
@@ -152,7 +154,7 @@ function drawDest(cv, tex, text, health) {
   ctx.fill();
   ctx.strokeStyle = col;
   ctx.globalAlpha = 0.8;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3;
   ctx.stroke();
   ctx.globalAlpha = 1;
   ctx.font = '600 30px ui-monospace, Menlo, monospace';
@@ -227,9 +229,10 @@ export function buildLabels(scene, { layout, healthById } = {}) {
     const lg = new THREE.BufferGeometry().setFromPoints(
       [new THREE.Vector3(x, RING_Y, z), new THREE.Vector3(x, y - 0.12, z)]);
     const lineMat = new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.45 });
-    group.add(new THREE.Line(lg, lineMat));
+    const line = new THREE.Line(lg, lineMat);
+    group.add(line);
     items.push({
-      id, sprite, ring, ringMat, lineMat, lineGeo: lg,
+      id, sprite, ring, ringMat, line, lineMat, lineGeo: lg,
       cv: sprite.material.map.image, tex: sprite.material.map,
       baseY: y, phase: Math.random() * Math.PI * 2,
     });
@@ -256,17 +259,18 @@ export function buildLabels(scene, { layout, healthById } = {}) {
   for (const f of L.facilities ?? []) addLabel(f.assetId, f.position[0], f.position[1]);
   for (const s of L.sensors ?? []) addLabel(s.assetId, s.position[0], s.position[1], 0.8);
 
-  /* Label restraint: TOP shows rim destination pills + attention (faulted)
-   * + selection + hover only — a wall of pills for every asset is noise.
-   * In-field (segment/asset drill-in) every label reads. Asset level keeps
-   * the selected label in-scene (side panel covers the rest). */
+  /* Label restraint: at TOP (network) ONLY hot (faulted) + selected +
+   * hovered labels read — asset plates and rim destination pills alike.
+   * A hot pipe's dest pill doubles as its rim landmark, so nothing extra
+   * stays on. In-field (segment) every label reads; asset level keeps
+   * the selected/hovered label in-scene (side panel covers the rest). */
   function refresh() {
     const inField = detailName !== 'network';
     for (const it of items) {
       const sel = it.id === selected || (it.dest && it.pipe === selected);
       const hov = it.id === hovered || (it.dest && it.pipe === hovered);
       const hot = healthOf(byId.get(it.dest ? it.pipe : it.id)) !== 'nominal';
-      const show = detailName === 'asset' ? (sel || hov) : it.dest ? true : inField ? true : (hot || sel || hov);
+      const show = detailName === 'asset' ? (sel || hov) : inField ? true : (hot || sel || hov);
       it.sprite.visible = show;
       if (it.ring) it.ring.visible = show;
       if (it.line) it.line.visible = show;
