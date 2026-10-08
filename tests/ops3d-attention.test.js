@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 /* Ops 3D attention-lock photometry (Phase 1, Task 10).
  * Locks the TRUE bloom relationships instead of the old shorthand claim.
- * Bright-pass: smoothstep(threshold=0.36, +0.25) on Rec.601 luminance.
+ * Bright-pass: smoothstep(threshold=0.44, +0.25) on Rec.601 luminance.
  * Measured here in sRGB 0..1 (matches the shader's UnsignedByte pipeline):
  *   critical red  #e31919 → L≈0.335  (BELOW threshold: the red body does NOT
  *     self-bloom — its white-hot pin, lamp dots and pulse carry it)
@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
  * would kill fault bloom while leaving terrain glowing — this gate forbids it.
  * [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
  */
-const THRESHOLD = 0.36; // post.js fx.threshold — keep in sync by hand
+const THRESHOLD = 0.44; // post.js fx.threshold — keep in sync by hand
 const FLOW = 0x35c5d8; // network.js FLOW_COLOR (cool cyan)
 const AMBER = 0xff8c39; // watch amber — flow must never read as watch
 

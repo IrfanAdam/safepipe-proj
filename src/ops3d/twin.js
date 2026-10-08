@@ -40,7 +40,10 @@ import { createPost, autoFstop } from './post.js';
 
 export function createTwin(container, opts = {}) {
   if (!container) throw new Error('createTwin: container requires a DOM element');
-  if (!container.style.position) container.style.position = 'relative';
+  // Only take positioning when the COMPUTED style is static: an inline
+  // 'relative' would override the harness stylesheet (fixed inset:0) and
+  // shrink-wrap the canvas to its intrinsic ratio (letterbox bar).
+  if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
   let current = opts.feed ?? loadFeed();
   const onSelect = opts.onSelect ?? (() => {});
   const onCreateWO =
@@ -212,6 +215,7 @@ export function createTwin(container, opts = {}) {
       muted: isMuted(),
       cam: { ...focusCtl, effectiveDof: post.fx.dof },
       banner: crit ? { kind: crit.faults[0]?.type ?? 'CRITICAL', assetId: crit.assetId } : null,
+      heading: rig.camera ? (Math.atan2(rig.camera.position.x, rig.camera.position.z) * 180) / Math.PI : undefined,
     });
   }
 
