@@ -66,11 +66,11 @@ const SHORE_COL = 0x848b90; // shoreline ring: neutral survey grey, never an acc
 const DRAIN_COL = 0x848b90; // dry-draw threads: neutral grey — the draw is dry, not water
 /* Elevation-ranked contour glow (user rubric): the highest-elevation
  * contour level glows most, glow decreasing downslope — brightness × width
- * scaled by level rank. Subtle and CAPPED so red/amber alarms keep the
- * luminance lead (attention test gates: threshold 0.44, plate contrast). */
-const ELEV_GLOW_MIN = 0.85; // lowest-level brightness multiplier (recedes)
-const ELEV_GLOW_MAX = 1.12; // summit brightness multiplier — capped, never near white
-const SUMMIT_WIDTH = 2.4; // top-rank linewidth (base 1.15, index 2.0)
+ * scaled by level rank. Now stronger so volume reads on pixels, still
+ * CAPPED below alarm luminance (attention test gates: threshold 0.44). */
+const ELEV_GLOW_MIN = 0.72; // lowland recedes
+const ELEV_GLOW_MAX = 1.32; // summit brighter but caps below white
+const SUMMIT_WIDTH = 2.7; // top-rank visibly wider
 const SUMMIT_TOP_K = 4; // top K levels form the wider summit batch
 const WATER_MASK = 0.55; // contour segments wetter than this are water — skipped, fills own it
 const rankGlow = (k) => ELEV_GLOW_MIN + (ELEV_GLOW_MAX - ELEV_GLOW_MIN) * smooth(0, 1, k / (LEVELS - 1));
@@ -769,6 +769,32 @@ export function buildTerrain(scene) {
     lake.renderOrder = 0;
     group.add(lake);
   }
+  // Lake isobaths: blue pseudo-contours inside water (bathymetry waves).
+  // Same organic shoreline shape, scaled inward — 3 rings at 68/42/22%,
+  // flat at lake surface, blue only (no land grey). Reads as waves, not slab.
+  {
+    const isoScales = [0.68, 0.42, 0.22];
+    const isoOpacities = [0.22, 0.16, 0.11]; // outer strongest, inner faintest
+    const cy = lakeY + 0.016; // just above fill, avoids z-fight but stays flat
+    for (let k = 0; k < isoScales.length; k++) {
+      const s = isoScales[k];
+      const pts = [];
+      for (let i = 0; i < 64; i++) {
+        const a0 = (i / 64) * Math.PI * 2, a1 = ((i + 1) / 64) * Math.PI * 2;
+        const r0 = lakeR(a0) * s, r1 = lakeR(a1) * s;
+        pts.push(
+          LAKE_X + Math.cos(a0) * r0, cy, LAKE_Z + Math.sin(a0) * r0,
+          LAKE_X + Math.cos(a1) * r1, cy, LAKE_Z + Math.sin(a1) * r1,
+        );
+      }
+      const ig = new LineGeometry(); ig.setPositions(pts);
+      const im = new LineMaterial({ color: WATER_COL, linewidth: 1.1, transparent: true, opacity: isoOpacities[k], depthWrite: false, fog: false });
+      im.resolution.set(1280, 720);
+      const iso = new LineSegments2(ig, im);
+      iso.renderOrder = 1;
+      group.add(iso);
+    }
+  }
   const shorePos = [];
   for (let i = 0; i < 96; i++) {
     const a0 = (i / 96) * Math.PI * 2, a1 = ((i + 1) / 96) * Math.PI * 2;
@@ -865,6 +891,32 @@ export function buildTerrain(scene) {
     }));
     ribbon.renderOrder = 0;
     group.add(ribbon);
+  }
+  // River isobaths: subtle blue wave lines inside the Athabasca ribbon
+  // — same WATER_COL, 2 offset centerlines with gentle sinuosity, so water
+  // reads as flow, not flat slab. Flat at river surface, 70% ribbon width.
+  {
+    const offs = [-0.18, 0.18];
+    const WAVE_AMP = 0.07; // km lateral wiggle
+    for (let oi = 0; oi < offs.length; oi++) {
+      const off = offs[oi];
+      const pts = [];
+      for (let z = -19; z < 19; z += 0.3) {
+        const z2 = z + 0.3;
+        if (z2 > 19) break;
+        const cx = riverX(z) + off + Math.sin(z * 1.1 + oi * 2.1) * WAVE_AMP;
+        const cx2 = riverX(z2) + off + Math.sin(z2 * 1.1 + oi * 2.1) * WAVE_AMP;
+        if (Math.hypot(cx, z) > 19.3 && Math.hypot(cx2, z2) > 19.3) continue;
+        const y = (field(cx, z) * VEX + field(cx2, z2) * VEX) / 2 + 0.017;
+        const y2 = y;
+        pts.push(cx, y, z, cx2, y2, z2);
+      }
+      if (pts.length < 6) continue;
+      const wg = new LineGeometry(); wg.setPositions(pts);
+      const wm = new LineMaterial({ color: WATER_COL, linewidth: 1.05, transparent: true, opacity: 0.26, depthWrite: false, fog: false });
+      wm.resolution.set(1280, 720);
+      const wl = new LineSegments2(wg, wm); wl.renderOrder = 1; group.add(wl);
+    }
   }
 
   scene.add(group);

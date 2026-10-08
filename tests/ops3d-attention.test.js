@@ -202,11 +202,11 @@ describe('ops3d traveling flow-line envelope (emerge/fade, never hard)', () => {
     }
   });
 
-  it('flow-line peak stays under pulses and alarms (never alarming)', async () => {
+  it('flow-line peak stays under alarms (prominent but never alarming)', async () => {
     const src = await loadNetworkSrc();
     const m = src.match(/const FLOW_LINE_OPACITY = ([\d.]+)/);
     assert.ok(m, 'FLOW_LINE_OPACITY must be a literal const');
-    assert.ok(parseFloat(m[1]) <= 0.35, `line peak ${m[1]} must stay ≤0.35 (pulses peak ~0.9 TOP)`);
+    assert.ok(parseFloat(m[1]) <= 0.65, `line peak ${m[1]} must stay ≤0.65 (prominent flow, pipeline walls whisper)`);
   });
 });
 
@@ -236,14 +236,14 @@ describe('ops3d elevation-ranked contour glow (capped, alarms lead)', () => {
     ]) assert.ok(src.includes(needle), `terrain.js must contain \`${needle}\``);
   });
 
-  it('glow is capped: summit brightness ≤1.15, summit width ≤2.4', async () => {
+  it('glow is capped: summit brightness ≤1.35, summit width ≤2.8', async () => {
     const src = await loadTerrainSrc();
     const gm = src.match(/const ELEV_GLOW_MAX = ([\d.]+)/);
     assert.ok(gm, 'ELEV_GLOW_MAX must be a literal const');
-    assert.ok(parseFloat(gm[1]) <= 1.15, `summit glow ${gm[1]} capped at 1.15 (never near white)`);
+    assert.ok(parseFloat(gm[1]) <= 1.35, `summit glow ${gm[1]} capped at 1.35 (volume reads, still below white)`);
     const wm = src.match(/const SUMMIT_WIDTH = ([\d.]+)/);
     assert.ok(wm, 'SUMMIT_WIDTH must be a literal const');
-    assert.ok(parseFloat(wm[1]) <= 2.4, `summit width ${wm[1]} capped at 2.4`);
+    assert.ok(parseFloat(wm[1]) <= 2.8, `summit width ${wm[1]} capped at 2.8`);
   });
 
   it('whisper opacities hold (terrain never outshines faults)', async () => {
@@ -256,14 +256,14 @@ describe('ops3d elevation-ranked contour glow (capped, alarms lead)', () => {
   });
 
   it('rubric math holds: brightest at summit, fading downslope', () => {
-    const MIN = 0.85, MAX = 1.12, LEVELS = 32;
+    const MIN = 0.72, MAX = 1.32, LEVELS = 32;
     const smooth = (a, b, v) => {
       const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
       return t * t * (3 - 2 * t);
     };
     const rankGlow = (k) => MIN + (MAX - MIN) * smooth(0, 1, k / (LEVELS - 1));
     assert.ok(rankGlow(LEVELS - 1) > rankGlow(0), 'summit glows most');
-    assert.ok(rankGlow(0) < 1 && rankGlow(LEVELS - 1) <= 1.15, 'capped both ends');
+    assert.ok(rankGlow(0) < 1 && rankGlow(LEVELS - 1) <= 1.35, 'capped both ends');
     for (let k = 1; k < LEVELS; k++) assert.ok(rankGlow(k) >= rankGlow(k - 1), `monotone at k=${k}`);
   });
 });
@@ -304,6 +304,9 @@ describe('ops3d land-water edges + flat blue water fills', () => {
     assert.ok(src.includes('SHORE_COL = 0x848b90'), 'shoreline stays neutral grey');
     assert.ok(src.includes('DRAIN_COL = 0x848b90'), 'dry-draw stays neutral grey');
     const fills = (src.match(/color: WATER_COL/g) || []).length;
-    assert.equal(fills, 2, `WATER_COL must feed exactly 2 fills (lake + ribbon), found ${fills}`);
+    // 2 fills (lake + ribbon) + isobaths/wave lines all use WATER_COL — count ≥2
+    assert.ok(fills >= 2, `WATER_COL must feed at least 2 fills (lake + ribbon) plus wave lines, found ${fills}`);
+    // ensure no contour blue leaks
+    assert.ok(!src.includes('BASE_COL = 0x5f'), 'base contours stay grey, not blue');
   });
 });

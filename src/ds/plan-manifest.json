@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-08T12:31:47.666Z",
+  "generated": "2026-10-08T13:31:26.991Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,78 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "53099eb",
+      "full": "53099ebf599bb9f6bc92821c315098ccfd07c64f",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): live-DEM staged swap-in — parallel tiles, tile cache, view-preserving remount [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "cf2a505",
+      "full": "cf2a50591dcaaa634f3d865e50a2fb1d88d5eb2c",
+      "date": "2026-10-08",
+      "subject": "feat(ops3d): hatched infrastructure type markers + legend, drop subterranean bleeders [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "f177209",
+      "full": "f177209a2534705c13111455f6726f2b12c9aa3c",
+      "date": "2026-10-08",
+      "subject": "feat(ops3d): traveling flow-line envelope, elevation-ranked contour glow, shore glow, flat water fills [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "25a3e18",
+      "full": "25a3e18d9f2b9ff868221c171b4acd6d59a32faa",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): letterbox positioning, live compass heading, threshold mirror 0.44 [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "c83ad79",
+      "full": "c83ad798da13c6be851693c11a03d4da815377bb",
+      "date": "2026-10-08",
+      "subject": "feat(ops3d): HUD orientation/scale furniture — compass, scale bar, coords, UTC clock [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "08097ad",
+      "full": "08097adedcb67c4c04e35eed91f6660b8bf9b397",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): volumetric terrain — baked hillshade contours + draped neutral fill, blue reserved for water [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "3ff0b16",
+      "full": "3ff0b167f292272ccdcecb8e94b98bd5d400ff2a",
+      "date": "2026-10-08",
+      "subject": "fix(ops3d): hard bloom restraint + desat halo + near-off grain [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "2b95ca3",
+      "full": "2b95ca3828a99ff795d2f2919b729c3138a0b70e",
+      "date": "2026-10-08",
+      "subject": "chore(ds): plan-history snapshot [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "22f3f8e",
+      "full": "22f3f8efd3210827e7a6a6b2f3693a5df419cc41",
+      "date": "2026-10-08",
+      "subject": "chore(ds): manifest refresh [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
     {
       "sha": "973232d",
       "full": "973232d2ea9f339ad145a0be5b3c27454096efec",
@@ -740,5 +812,10 @@
       "anchor": null
     }
   ],
-  "wip": []
+  "wip": [
+    "src/ops3d/hud.js",
+    "src/ops3d/network.js",
+    "src/ops3d/terrain.js",
+    "src/ops3d/twin.js"
+  ]
 }

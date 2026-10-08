@@ -87,7 +87,8 @@ export function buildHud(container, cbs = {}) {
 
   // — Bottom-left legend: hatch-type key. Markers denote TYPE (positions
   // are schematic until Phase-2 Overpass); buried runs stay dashed lines.
-  const legend = el('div', 'ops-hud__legend');
+  // Hidden behind ▣ icon (like ?), not always-on.
+  const legend = el('div', 'ops-hud__legend ops-hud__legend--hidden');
   const legendItems = [
     ['hatch-compressor', 'COMPRESSOR', 'HATCHED RECT · 45° DENSE'],
     ['hatch-valve', 'VALVE', 'HATCHED CIRCLE · 135° FINE'],
@@ -113,6 +114,23 @@ export function buildHud(container, cbs = {}) {
     'ops-hud__hints',
     'DRAG ORBIT / WHEEL ZOOM / CLICK DRILL / 1-3 VIEWS / ESC UP / H HUD',
   ));
+  // Legend toggle button — sits next to ? at bottom-left, same style
+  const legendBtnWrap = el('div', 'ops-hud__help');
+  legendBtnWrap.style.left = '42px';
+  const legendBtn = el('button', 'ops-hud__help-btn', '▣');
+  legendBtn.type = 'button';
+  legendBtn.setAttribute('aria-label', 'Legend: infrastructure hatch types');
+  legendBtn.setAttribute('aria-expanded', 'false');
+  let legendOpen = false;
+  const setLegend = (v) => {
+    legendOpen = v;
+    legend.classList.toggle('ops-hud__legend--hidden', !v);
+    legendBtn.setAttribute('aria-expanded', v ? 'true' : 'false');
+  };
+  legendBtn.addEventListener('click', () => setLegend(!legendOpen));
+  legendBtnWrap.appendChild(legendBtn);
+  root.appendChild(legend);
+  root.appendChild(legendBtnWrap);
   const ovBtn = el('button', 'ops-hud__overlay-btn', 'OVERLAY · OFF');
   ovBtn.type = 'button';
   ovBtn.setAttribute('aria-label', 'Cycle data overlay: off, weather, tectonic, forecast');
@@ -128,7 +146,7 @@ export function buildHud(container, cbs = {}) {
   camBtn.setAttribute('aria-label', 'Camera controls: aperture, zoom, focus (F)');
   camBtn.setAttribute('aria-expanded', 'false');
   camBtn.addEventListener('click', () => onCamToggle());
-  root.appendChild(legend);
+  // legend already mounted via legendWrap — do not append bare legend
   // Camera panel: hidden popover above the legend. Aperture f-stops follow
   // the photo convention (1.4 wide open → 16 deep); focal length is real
   // zoom (18 wide → 120 tele); focus distance goes manual the moment its
@@ -447,10 +465,23 @@ export function buildHud(container, cbs = {}) {
       `HEALTH ${rollup.nominal ?? 0} OK · ${rollup.watch ?? 0} WATCH · ${rollup.critical ?? 0} CRITICAL`;
 
     const level = LEVELS.includes(state.level) ? state.level : 'network';
-    // Scale bar follows the view level; clock refreshes with every update.
-    const sc = scaleForLevel(level);
+    // Scale bar: dynamic if twin provides scaleKm (meters-per-pixel derived from camera),
+    // else per-level fallback. Label carries ≈ and bar width scales with km.
+    let sc;
+    if (typeof state.scaleKm === 'number' && Number.isFinite(state.scaleKm) && state.scaleKm > 0) {
+      const nice = [0.5, 1, 2, 5, 10, 20];
+      let pick = nice[0];
+      for (const n of nice) { if (n <= state.scaleKm * 1.1) pick = n; }
+      sc = { km: pick, label: `${pick} KM` };
+      const barPx = Math.max(40, Math.min(160, 60 * (pick / state.scaleKm) * 1.6));
+      scaleBar.style.width = `${Math.round(barPx)}px`;
+      scaleBar.firstElementChild.style.flex = '1';
+    } else {
+      sc = scaleForLevel(level);
+      scaleBar.style.width = '';
+    }
     scaleLabel.textContent = `≈ ${sc.label}`;
-    scalebar.setAttribute('aria-label', `Approximate scale at ${level} view: ${sc.label}`);
+    scalebar.setAttribute('aria-label', `Approximate scale at ${level} view: ${sc.label} — 1:1 km, dynamic with zoom`);
     clock.textContent = formatClockUTC(new Date());
     if (typeof state.heading === 'number' && Number.isFinite(state.heading)) {
       needle.style.transform = `rotate(${state.heading}deg)`;

@@ -91,10 +91,11 @@ describe('ops3d surface-only rule (no unexplained underground)', () => {
 });
 
 describe('ops3d hatch legend (HUD)', () => {
-  it('hud.js shows a visible hatch→type key with the schematic note', () => {
+  it('hud.js shows a hatch→type key (now behind ▣ icon, hidden by default) with the schematic note', () => {
     const h = src('src/ops3d/hud.js');
-    assert.ok(!h.includes("ops-hud__legend ops-hud__legend--hidden"),
-      'legend is no longer parked hidden');
+    assert.ok(h.includes('ops-hud__legend'), 'legend present');
+    assert.ok(h.includes('ops-hud__legend--hidden'), 'legend hidden by default behind icon (like ?)');
+    assert.ok(h.includes('▣') && h.includes('legendBtn'), 'legend toggle button exists');
     for (const row of ['hatch-compressor', 'hatch-valve', 'hatch-terminal', 'hatch-wellhead']) {
       assert.ok(h.includes(row), `legend keys ${row}`);
     }

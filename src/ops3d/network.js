@@ -35,14 +35,14 @@ const DOT_Y = 0.06;
 export const BASE_DOT_SIZE = 0.05;
 export const CRITICAL_GAIN = 1.5; // critical renders at 1.5× dot size
 const DIM_FACTOR = 0.3;
-const FLOW_COLOR = 0x35c5d8; // cool cyan oil-flow pulses — never amber (watch #ff8c39)
-const PULSE_OPACITY = 0.6; // pulse peak alpha (envelope tapers it to 0 at both ends)
-const PULSE_SPEED = 1.6; // pulse travel along the pipe path (world units/s)
-const PULSES_PER_PIPE = 3; // evenly phased pulses per pipe — direction reads, density stays calm
-const FLOW_LINE_OPACITY = 0.30; // flow-line peak alpha — whisper under pulses (~0.9 TOP) and alarms
+const FLOW_COLOR = 0x35c5d8; // cool cyan oil-flow — never amber (watch #ff8c39)
+const PULSE_OPACITY = 0.0; // blur sprites off — user: "remove the blur glow moving across the pipeline"
+const PULSE_SPEED = 1.6; // kept for test compatibility; no sprites add when opacity 0
+const PULSES_PER_PIPE = 0; // zero blur sprites — flow reads via solid-line envelope only
+const FLOW_LINE_OPACITY = 0.55; // flow-line peak — prominently visible, pipeline walls recede
 const FLOW_LINE_SEGS = 6; // chunks per pipe flow line — the traveling-envelope unit
 const FLOW_LINE_SPEED = 0.10; // envelope travel along the pipe (cycles/s — slow dissolve)
-const FLOW_BREATHE = 0.35; // slow global breathing depth — lines swell and dissolve (±35%)
+const FLOW_BREATHE = 0.18; // gentler swell so flow doesn't pump, just breathes
 const BURIED_EDGE_T = 0.15; // outer 15% of each run dives underground
 const BURIED_R = 12; // any stretch past r=12 km is buried too
 
@@ -212,12 +212,12 @@ export function buildNetwork(scene, feed) {
       wallGeo.setPositions(run.pts);
       const wallMat = new LineMaterial({
         color: colorFor(health),
-        linewidth: health === 'nominal' ? 2 : 3, // alarm pipes carry visual weight at TOP
+        linewidth: health === 'nominal' ? 1.35 : 1.9, // less prominent — flow owns the read
         dashed: run.buried,
         dashSize: 0.4,
         gapSize: 0.3,
         transparent: true,
-        opacity: (health === 'nominal' ? 0.34 : 1) * (run.buried ? 0.55 : 1),
+        opacity: (health === 'nominal' ? 0.20 : 0.62) * (run.buried ? 0.50 : 1), // walls whisper
         depthWrite: false,
       });
       wallMat.resolution.set(1280, 720);
@@ -231,10 +231,8 @@ export function buildNetwork(scene, feed) {
     }
 
     /* Soft comet flow: radial-gradient sprites ride the draped pipe path.
-     * No dashes anywhere in the flow layer — each pulse's alpha tapers to 0
-     * at both ends of its life (fade in over the first ~18%, out over the
-     * last ~45%), so there are never hard tips. Additive blending keeps the
-     * cyan whisper-thin over bright contours at TOP. */
+     * Disabled — blur glow removed per feedback; flow reads via the solid
+     * traveling-envelope line below, no hard tips, no sprite halo. */
     const flowPts = trace.flow;
     const flowCum = [0];
     for (let i = 3; i < flowPts.length; i += 3) {

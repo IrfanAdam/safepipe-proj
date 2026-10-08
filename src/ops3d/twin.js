@@ -207,6 +207,18 @@ export function createTwin(container, opts = {}) {
     const map = byId();
     const sel = selected ? map.get(selected) ?? null : null;
     const crit = sel?.health === 'critical' ? sel : current.find((a) => a.health === 'critical');
+    // Dynamic scale: ground km visible per ~120px bar, derived from camera frustum.
+    let scaleKm;
+    try {
+      const dist = rig.camera.position.distanceTo(rig.getTarget());
+      const vFov = (rig.camera.fov ?? 50) * Math.PI / 180;
+      const h = 2 * dist * Math.tan(vFov / 2);
+      const aspect = container.clientWidth / Math.max(1, container.clientHeight);
+      const w = h * aspect;
+      const pxPerKm = container.clientWidth / w;
+      scaleKm = 120 / pxPerKm; // km that 120px bar represents
+      if (!Number.isFinite(scaleKm) || scaleKm <= 0) scaleKm = undefined;
+    } catch { scaleKm = undefined; }
     hud.update({
       rollup: healthRollup(current),
       selection: sel,
@@ -216,6 +228,7 @@ export function createTwin(container, opts = {}) {
       cam: { ...focusCtl, effectiveDof: post.fx.dof },
       banner: crit ? { kind: crit.faults[0]?.type ?? 'CRITICAL', assetId: crit.assetId } : null,
       heading: rig.camera ? (Math.atan2(rig.camera.position.x, rig.camera.position.z) * 180) / Math.PI : undefined,
+      scaleKm,
     });
   }
 
