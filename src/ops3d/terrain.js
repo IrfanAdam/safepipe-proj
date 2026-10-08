@@ -4,9 +4,9 @@
  * + broad low swells ±40 m + TWO hills (+72/+58 m, auto-nudged clear of
  * pipe corridors so rings close around real highs) + saddle hollow (−32 m)
  * + west tributary draw ~42 m deep + playa-lake depression ~14 m
- * + N–S Athabasca main valley ~65 m (braided floor, steep east cutbank,
+ * + N–S Athabasca main valley ~85 m (braided floor, steep east cutbank,
  * gentle west point-bars) + 2 kettle ponds + muskeg mottling
- * — total relief ≈ −130…+90 m true, VEX 3.2.
+ * — total relief ≈ −130…+100 m true, VEX 4.5.
  * Altitude source is swappable (setFieldSource/sample): contours sample the
  * active source, so the pinned SRTM DEM renders real relief when it resolves
  * and every drape stays coherent. [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
@@ -40,7 +40,7 @@ const SIZE = 44; // map extent, km (1 unit = 1 km)
 const R_MAP = 20; // boundary ring radius, km
 const N = 160; // marching-squares grid cells per side (128→160 for tighter high rings)
 const LEVELS = 32; // contour levels (20→32 so slope reads as density)
-export const VEX = 3.2; // vertical exaggeration — single source; network/gridfloor import this
+export const VEX = 4.5; // vertical exaggeration — single source; network/gridfloor import this
 const SLOPE_MIN = 0.0028; // skip contour cells flatter than ~2.8 m/km — flats go truly clean
 const BASE_COL = new THREE.Color(0xdde3e6); // near-white hairline base, not bone-grey
 const INDEX_COL = new THREE.Color(0xffffff); // pure white index
@@ -120,8 +120,8 @@ function _procedural(x, z) {
   const dip = -0.0018 * x; // eastward dip: down ~1.8 m per km east
   const lakeMask = lakeWet(x, z);
   const swell =
-    (0.035 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
-    0.018 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0)) *
+    (0.042 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
+    0.022 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0)) *
     (1 - 0.82 * lakeMask);
   const bump = (ax, az, sig, amp) => {
     const dx = x - ax, dz = z - az;
@@ -135,7 +135,7 @@ function _procedural(x, z) {
   const drawProf = ad < 0.4 ? 1 : Math.max(0, 1 - (ad - 0.4) / 0.6);
   const draw = -0.042 * drawProf * Math.exp(-dd * dd * 0.35); // ~42 m trough, flat bottom
   const playa = -0.014 * lakeMask; // playa depression, ~14 m deep
-  const valley = -0.065 * riverWet(x, z); // Athabasca main valley, ~65 m, flat braided floor
+  const valley = -0.085 * riverWet(x, z); // Athabasca main valley, ~85 m, flat braided floor
   let kettle = 0;
   for (const k of KETTLES) {
     const dx = x - k.x, dz = z - k.z;
@@ -260,15 +260,24 @@ function smoothPath(pts) {
   return out;
 }
 
-/* Index-ring elevation tag: OS-plate style — meter readout on a dark pill
- * so it sits inline on the ring and reads at every zoom. */
+/* Index-ring elevation tag: OS-plate style — meter readout on a dark plate
+ * with the cyberpunk chamfer (cut top-right corner), so it sits inline on
+ * the ring and reads at every zoom. */
 function elevLabel(text, x, y, z) {
   const cv = document.createElement('canvas');
   cv.width = 192;
   cv.height = 48;
   const ctx = cv.getContext('2d');
+  const CUT = 14;
   ctx.fillStyle = 'rgba(16,20,24,0.9)';
-  ctx.fillRect(28, 4, 136, 40); // dark pill behind the number
+  ctx.beginPath();
+  ctx.moveTo(28, 4);
+  ctx.lineTo(164 - CUT, 4);
+  ctx.lineTo(164, 4 + CUT);
+  ctx.lineTo(164, 44);
+  ctx.lineTo(28, 44);
+  ctx.closePath();
+  ctx.fill(); // dark chamfered plate behind the number
   ctx.font = '600 30px ui-monospace, Menlo, monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -463,13 +472,22 @@ export function buildTerrain(scene) {
     const y = h * VEX;
     const disk = new THREE.Mesh(
       new THREE.CircleGeometry(0.55, 24),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false })
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08, depthWrite: false })
     );
     disk.rotation.x = -Math.PI / 2;
     disk.position.set(sx, y + 0.04, sz);
     group.add(disk);
     const tag = elevLabel(`▲ ${Math.round(h * 1000)} m`, sx, y + 0.62, sz);
     tag.scale.set(2.0, 0.5, 1);
+    summitGroup.add(tag);
+  }
+  // Valley-floor proof: the low landmark gets the same treatment as the
+  // summits, so the full relief span reads before any drill-in.
+  {
+    const vz = 6, vx = riverX(vz);
+    const vh = field(vx, vz);
+    const tag = elevLabel(`▼ ${Math.round(vh * 1000)} m · VALLEY`, vx, vh * VEX + 0.55, vz);
+    tag.scale.set(2.6, 0.5, 1);
     summitGroup.add(tag);
   }
   group.add(summitGroup);

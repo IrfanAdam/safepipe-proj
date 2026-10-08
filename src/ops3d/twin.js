@@ -297,6 +297,7 @@ export function createTwin(container, opts = {}) {
     hoveredId = id ?? null;
     if (network.setHover(id)) canvas.style.cursor = id ? 'pointer' : '';
     beacons.setHover?.(id);
+    labels.setHover?.(id);
     if (id !== lastHoverSnd) {
       lastHoverSnd = id;
       // Hover is not a user gesture: only play when the context already runs
@@ -308,6 +309,7 @@ export function createTwin(container, opts = {}) {
     hoveredId = null;
     network.setHover(null);
     beacons.setHover?.(null);
+    labels.setHover?.(null);
     lastHoverSnd = null;
     canvas.style.cursor = '';
   });
@@ -398,7 +400,7 @@ export function createTwin(container, opts = {}) {
       'position:absolute;top:10px;left:50%;transform:translateX(-50%);' +
       'font:10px/1.6 ui-monospace,monospace;letter-spacing:0.12em;color:#ff8c39;' +
       'background:rgba(10,14,18,0.92);border:1px solid rgba(255,140,57,0.4);' +
-      'border-radius:4px;padding:4px 10px;pointer-events:none;z-index:5;';
+      'padding:4px 10px;pointer-events:none;z-index:5;';
     container.appendChild(lossNote);
   };
   const onGlRestored = () => {

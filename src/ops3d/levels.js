@@ -16,7 +16,7 @@ const ORDER = ['network', 'segment', 'asset'];
 const VIEWS = {
   network: { yaw: 4, pitch: 78, dist: 62 },
   segment: { yaw: 4, pitch: 25, dist: 9 },
-  asset: { yaw: 4, pitch: 25, dist: 2.2 },
+  asset: { yaw: 4, pitch: 25, dist: 3.0 },
 };
 
 const TARGET_Y = 0.05;
@@ -66,8 +66,9 @@ export function createLevels(rig, layout, opts = {}) {
   const index = new Map();
   // assetId → kind for per-kind close-up distance (a 180 m pad needs a
   // closer camera than a 37 km line or the hero fills 2% of frame).
+  // Restrained: NEAR holds off so blips never rasterize into soup.
   const kinds = new Map();
-  const KIND_DIST = { pipeline: 2.2, facility: 0.45, sensor: 0.35 };
+  const KIND_DIST = { pipeline: 3.0, facility: 0.9, sensor: 0.7 };
   // TOP height that just frames the object: a 37 km line needs map height,
   // a valve yard wants rooftop height. Origin framing keeps the full circle.
   const KIND_TOP_DIST = { pipeline: 30, facility: 6, sensor: 5 };

@@ -9,9 +9,12 @@
 
 import * as THREE from 'three';
 import { getLayout } from './health-feed.js';
+import { field, VEX } from './terrain.js'; // beads ride the terrain skin, never flat datum
 
 const FLOW_COLOR = { nominal: 0x8f9797, watch: 0xff8c39, critical: 0xff2a2a };
-const BEAD_SIZE = 0.07;
+const BEAD_SIZE = 0.05; // small + dim: furniture, never glow-compete with faults
+const BEAD_Y = 0.09;
+const skinY = (x, z, lift) => Math.max(lift, field(x, z) * VEX + lift);
 const PILLAR_H = 0.3;
 
 /* True polyline length in km — bead position = chainage / trueLength. */
@@ -25,13 +28,13 @@ function trueLen(points) {
 let glowTex = null;
 function getGlowTexture() {
   if (glowTex) return glowTex;
-  const s = 64;
+  const s = 128; // 128px soft dot — 64px rasterized into squares on zoom-in
   const cv = document.createElement('canvas');
   cv.width = cv.height = s;
   const ctx = cv.getContext('2d');
   const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, 'rgba(255,255,255,1)');
-  g.addColorStop(0.4, 'rgba(255,255,255,0.7)');
+  g.addColorStop(0, 'rgba(255,255,255,0.9)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.45)');
   g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
@@ -98,7 +101,8 @@ export function buildBeacons(scene, feed, layout) {
         const n = Math.max(4, Math.round(Math.hypot(x1 - x0, z1 - z0) / 0.12));
         for (let k = i === 1 ? 0 : 1; k <= n; k++) {
           const f = k / n;
-          dense.push(new THREE.Vector3(x0 + (x1 - x0) * f, 0.09, z0 + (z1 - z0) * f));
+          const bx = x0 + (x1 - x0) * f, bz = z0 + (z1 - z0) * f;
+          dense.push(new THREE.Vector3(bx, skinY(bx, bz, BEAD_Y), bz));
         }
       }
       const cum = [0];
@@ -110,7 +114,7 @@ export function buildBeacons(scene, feed, layout) {
       geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
       const mat = new THREE.PointsMaterial({
         color: colorFor(health), size: BEAD_SIZE, sizeAttenuation: true,
-        map: getGlowTexture(), transparent: true, opacity: health === 'nominal' ? 0.3 : 0.5,
+        map: getGlowTexture(), transparent: true, opacity: health === 'nominal' ? 0.22 : 0.4,
         blending: THREE.AdditiveBlending, depthWrite: false,
       });
       const beads = new THREE.Points(geo, mat);
@@ -183,12 +187,13 @@ export function buildBeacons(scene, feed, layout) {
         } else p = faultAnchor(assetId);
         if (!p) continue;
         const col = sevColor(fault, item.health);
+        const gy = field(p.x, p.z) * VEX; // fault kit ground-sits on the skin
         const mat = new THREE.MeshBasicMaterial({
           color: col, transparent: true, opacity: 0.55,
           blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
         });
         const pillar = new THREE.Mesh(pillarGeo, mat);
-        pillar.position.set(p.x, PILLAR_H / 2, p.z);
+        pillar.position.set(p.x, gy + PILLAR_H / 2, p.z);
         group.add(pillar);
         // Holographic pipe segment at the fault: wireframe wall + 7 weld
         // rings, the middle 3 burning fault-red (corrosion patch).
@@ -214,14 +219,14 @@ export function buildBeacons(scene, feed, layout) {
           kitMats.push(sleeveMat);
           seg.add(new THREE.Mesh(kitBandGeo, sleeveMat));
           kit.add(seg);
-          kit.position.set(p.x, 0.02, p.z);
+          kit.position.set(p.x, gy + 0.02, p.z);
           group.add(kit);
         }
         // Hot core floats above the fault on a leader line — holograms mark,
         // they don't bury. Tight anchor ring replaces the washers at NEAR.
         const coreMat = new THREE.MeshBasicMaterial({ color: col });
         const core = new THREE.Mesh(coreGeo, coreMat);
-        core.position.set(p.x, 0.22, p.z);
+        core.position.set(p.x, gy + 0.22, p.z);
         group.add(core);
         const anchorMat = new THREE.MeshBasicMaterial({
           color: col, transparent: true, opacity: 0.25,
@@ -230,37 +235,37 @@ export function buildBeacons(scene, feed, layout) {
         kitMats.push(anchorMat);
         const anchor = new THREE.Mesh(anchorGeo, anchorMat);
         anchor.rotation.x = -Math.PI / 2;
-        anchor.position.set(p.x, 0.03, p.z);
+        anchor.position.set(p.x, gy + 0.03, p.z);
         anchor.visible = false;
         group.add(anchor);
         const leader = new THREE.Line(leaderGeo, pinMat);
         leader.scale.y = 0.135;
-        leader.position.set(p.x, 0.085, p.z);
+        leader.position.set(p.x, gy + 0.085, p.z);
         group.add(leader);
         // White pin snaps the leader foot into the top of the sleeve.
         const pin = new THREE.Mesh(pinGeo, pinMat);
-        pin.position.set(p.x, 0.085, p.z);
+        pin.position.set(p.x, gy + 0.085, p.z);
         group.add(pin);
         // Zone fill: warm glowing disc + rim around the fault ground.
         // Rim-dominant: the boundary reads danger, the faint disc tints
         // without burying the facilities underneath.
         const zoneMat = new THREE.MeshBasicMaterial({
-          color: col, transparent: true, opacity: 0.13,
+          color: col, transparent: true, opacity: 0.08,
           blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
         });
         kitMats.push(zoneMat);
         const zone = new THREE.Mesh(zoneGeo, zoneMat);
         zone.rotation.x = -Math.PI / 2;
-        zone.position.set(p.x, 0.015, p.z);
+        zone.position.set(p.x, gy + 0.015, p.z);
         group.add(zone);
         const zoneRimMat = new THREE.MeshBasicMaterial({
-          color: col, transparent: true, opacity: 0.85,
+          color: col, transparent: true, opacity: 0.7,
           blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
         });
         kitMats.push(zoneRimMat);
         const zoneRim = new THREE.Mesh(zoneRimGeo, zoneRimMat);
         zoneRim.rotation.x = -Math.PI / 2;
-        zoneRim.position.set(p.x, 0.015, p.z);
+        zoneRim.position.set(p.x, gy + 0.015, p.z);
         group.add(zoneRim);
         const rings = [0, 0.5].map((phase) => {
           const rm = new THREE.MeshBasicMaterial({
@@ -269,7 +274,7 @@ export function buildBeacons(scene, feed, layout) {
           });
           const mesh = new THREE.Mesh(ringGeo, rm);
           mesh.rotation.x = -Math.PI / 2;
-          mesh.position.set(p.x, 0.03, p.z);
+          mesh.position.set(p.x, gy + 0.03, p.z);
           group.add(mesh);
           return { mesh, mat: rm, phase };
         });
@@ -301,7 +306,7 @@ export function buildBeacons(scene, feed, layout) {
     // Halo scales to the asset: a 600 m disc drowns a 180 m pad.
     if (pipeById.has(selected)) { p = polyPoint(pipeById.get(selected).points, 0.5); haloBase = 1; }
     else { p = faultAnchor(selected); haloBase = facById.has(selected) ? 0.5 : 0.35; }
-    halo.position.set(p.x, 0.04, p.z);
+ halo.position.set(p.x, field(p.x, p.z) * VEX + 0.04, p.z);
     halo.material.color.set(0xbfefff);
     halo.visible = true;
   };
@@ -348,7 +353,7 @@ export function buildBeacons(scene, feed, layout) {
       for (const fl of flows) {
         const h = healthById.get(fl.pipeId)?.health ?? 'nominal';
         fl.mat.color.copy(colorFor(h));
-        fl.mat.opacity = h === 'nominal' ? 0.3 : 0.5;
+        fl.mat.opacity = h === 'nominal' ? 0.22 : 0.4;
       }
       buildFaults();
       placeHalo();
@@ -365,7 +370,7 @@ export function buildBeacons(scene, feed, layout) {
       if (!a) { placeHalo(); return; }
       const h = healthById.get(hovered)?.health ?? 'nominal';
       haloBase = a.base;
-      halo.position.set(a.p.x, 0.04, a.p.z);
+      halo.position.set(a.p.x, field(a.p.x, a.p.z) * VEX + 0.04, a.p.z);
       halo.material.color.set(HOVER_COL[h] ?? HOVER_COL.nominal);
       halo.visible = true;
     },
@@ -381,7 +386,7 @@ export function buildBeacons(scene, feed, layout) {
           const f = (target - fl.cum[lo]) / seg;
           const a = fl.pts[lo], c = fl.pts[Math.min(lo + 1, fl.pts.length - 1)];
           fl.pos[b * 3] = a.x + (c.x - a.x) * f;
-          fl.pos[b * 3 + 1] = a.y;
+          fl.pos[b * 3 + 1] = a.y + (c.y - a.y) * f;
           fl.pos[b * 3 + 2] = a.z + (c.z - a.z) * f;
         }
         fl.beads.geometry.attributes.position.needsUpdate = true;

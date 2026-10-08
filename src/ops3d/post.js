@@ -151,12 +151,13 @@ void main() {
 }
 `;
 
-// Auto aperture by semantic view: deep focus on the TOP map, fast glass
-// drilled in. Pure + unit-tested; twin.js owns the manual override.
+// Auto aperture by semantic view: readable DoF at every level — TOP keeps
+// near-deep focus so the map stays legible, drilled-in levels open up so
+// the focus plane visibly melts the background. Pure + unit-tested.
 export function autoFstop(levelName) {
-  if (levelName === 'asset') return 1.8;
-  if (levelName === 'segment') return 2.8;
-  return 8;
+  if (levelName === 'asset') return 1.4;
+  if (levelName === 'segment') return 2.2;
+  return 6.5;
 }
 
 export function createPost(renderer, scene, camera) {
@@ -166,7 +167,7 @@ export function createPost(renderer, scene, camera) {
 
   const fx = {
     threshold: 0.36,
-    bloom: 0.5, // attention lock: white no longer clips, faults stay brightest
+    bloom: 0.4, // faults stay brightest; terrain glow sits underneath
     ca: 1.0,
     grain: 0.006,
     scan: 0.05,
@@ -175,7 +176,7 @@ export function createPost(renderer, scene, camera) {
     fstop: 5.6,
     focalMm: 32,
     focusDist: 10,
-    maxCoc: 14,
+    maxCoc: 18, // wider blur span so drilled-in DoF is unmistakable
     enabled: true,
   };
 

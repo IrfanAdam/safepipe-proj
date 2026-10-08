@@ -33,6 +33,7 @@ export const CRITICAL_GAIN = 1.5; // critical renders at 1.5× dot size
 const DIM_FACTOR = 0.3;
 const FLOW_COLOR = 0x35c5d8; // cool cyan oil-flow overlay — never amber (watch #ff8c39)
 const FLOW_OPACITY = 0.32;
+const COMET_OPACITY = 0.55; // comet pulses read brighter than the base drift
 const FLOW_SPEED = 0.45; // slow drift along the pipe path (world units/s)
 const BURIED_EDGE_T = 0.15; // outer 15% of each run dives underground
 const BURIED_R = 12; // any stretch past r=12 km is buried too
@@ -73,10 +74,12 @@ function sampleTrace(points, step = 0.18) {
       const z = z0 + (z1 - z0) * f;
       const t = total === 0 ? 0 : (dist + len * f) / total;
       const depth = buryDepth(t, Math.hypot(x, z));
-      // Buried runs drape onto the terrain surface (x-ray plan view) instead
-      // of sinking under the opaque body where they would vanish entirely.
+      // Drape: every run hugs the terrain surface (x-ray plan view) instead
+      // of floating at flat datum where hills would swallow it. Surface runs
+      // ride just above the skin; buried dives keep their smooth ramp under.
       const surfY = field(x, z) * VEX + 0.03;
-      const y = DOT_Y * (1 - depth) + surfY * depth;
+      const skinY = Math.max(DOT_Y, surfY);
+      const y = skinY * (1 - depth) + surfY * depth;
       flow.push(x, y + 0.02, z); // flow rides just above the pipe wall
       const buried = depth > 0.5;
       if (!cur || cur.buried !== buried) {
@@ -192,8 +195,9 @@ export function buildNetwork(scene, feed) {
       dotTotal += run.pts.length / 3;
     }
 
-    // Flow overlay: subtle dashed warm-yellow line drifting along the pipe
-    // path (dashOffset animated in tick) suggesting real-time movement.
+    // Flow overlay: cool cyan drift along the pipe path (dashOffset animated
+    // in tick) + a fast comet layer — short bright pulses that overtake the
+    // base drift so flow reads as live movement, never a static dash.
     const flowGeo = new LineGeometry();
     flowGeo.setPositions(trace.flow);
     const flowMat = new LineMaterial({
@@ -209,11 +213,34 @@ export function buildNetwork(scene, feed) {
     });
     flowMat.resolution.set(1280, 720);
     resMats.push(flowMat);
-    flowMats.push({ m: flowMat, assetId: pipe.assetId });
+    flowMats.push({ m: flowMat, assetId: pipe.assetId, speed: FLOW_SPEED, base: FLOW_OPACITY });
     const flowLine = new Line2(flowGeo, flowMat);
     flowLine.computeLineDistances();
     flowLine.frustumCulled = false;
     group.add(flowLine);
+
+    // Comet layer: short bright pulses on the same path, ~2.5× faster than
+    // the base drift — the overtake sells live flow; health tints both.
+    const cometGeo = new LineGeometry();
+    cometGeo.setPositions(trace.flow);
+    const cometMat = new LineMaterial({
+      color: FLOW_COLOR,
+      linewidth: 3,
+      dashed: true,
+      dashSize: 0.12,
+      gapSize: 1.6,
+      dashOffset: 0,
+      transparent: true,
+      opacity: COMET_OPACITY,
+      depthWrite: false,
+    });
+    cometMat.resolution.set(1280, 720);
+    resMats.push(cometMat);
+    flowMats.push({ m: cometMat, assetId: pipe.assetId, speed: FLOW_SPEED * 2.5, base: COMET_OPACITY, comet: true });
+    const cometLine = new Line2(cometGeo, cometMat);
+    cometLine.computeLineDistances();
+    cometLine.frustumCulled = false;
+    group.add(cometLine);
 
     // Dive markers: steel octahedrons at the two points where the run
     // leaves the surface — the explicit "pipeline goes underground HERE".
@@ -221,10 +248,11 @@ export function buildNetwork(scene, feed) {
       const dp = polyPoint(pipe.points, t0);
       const dq = polyPoint(pipe.points, Math.min(t0 + 0.01, 1));
       const dm = new THREE.MeshBasicMaterial({
-        color: DIVE_COL, transparent: true, opacity: 0.7, depthWrite: false,
+        color: DIVE_COL, transparent: true, opacity: 0.55, depthWrite: false,
       });
       const dive = new THREE.Mesh(diveGeo, dm);
-      dive.position.set(dp.x, DOT_Y + 0.1, dp.z);
+      dive.position.set(dp.x, Math.max(DOT_Y + 0.1, field(dp.x, dp.z) * VEX + 0.1), dp.z);
+      dive.scale.setScalar(0.8);
       dive.rotation.y = Math.atan2(dq.x - dp.x, dq.z - dp.z);
       dive.frustumCulled = false;
       group.add(dive);
@@ -242,7 +270,8 @@ export function buildNetwork(scene, feed) {
       );
       bead.position.copy(polyPoint(pipe.points, ft));
       const bd = buryDepth(ft, Math.hypot(bead.position.x, bead.position.z));
-      bead.position.y = (DOT_Y + 0.04) * (1 - bd) + (field(bead.position.x, bead.position.z) * VEX + 0.07) * bd;
+      const bSurf = field(bead.position.x, bead.position.z) * VEX + 0.07;
+      bead.position.y = Math.max(DOT_Y + 0.04, bSurf) * (1 - bd) + bSurf * bd;
       bead.userData.assetId = pipe.assetId;
       group.add(bead);
       track(pipe.assetId, bead.material, 1);
@@ -283,17 +312,17 @@ export function buildNetwork(scene, feed) {
   }
 
   /* --- sensors: small diamonds + invisible pick spheres --- */
-  const diamondGeo = new THREE.OctahedronGeometry(0.09);
+  const diamondGeo = new THREE.OctahedronGeometry(0.07); // restrained: blips whisper
   for (const sen of layout.sensors) {
     const health = healthById.get(sen.assetId)?.health ?? 'nominal';
     const mesh = new THREE.Mesh(
       diamondGeo,
       new THREE.MeshBasicMaterial({ color: colorFor(health) }),
     );
-    mesh.position.set(sen.position[0], 0.16, sen.position[1]);
+    mesh.position.set(sen.position[0], field(sen.position[0], sen.position[1]) * VEX + 0.16, sen.position[1]);
     mesh.userData.assetId = sen.assetId;
     group.add(mesh);
-    track(sen.assetId, mesh.material, health === 'nominal' ? 0.7 : 1);
+    track(sen.assetId, mesh.material, health === 'nominal' ? 0.55 : 0.9);
     byId.get(sen.assetId).nodes.push(mesh);
 
     const proxy = new THREE.Mesh(
@@ -364,10 +393,13 @@ export function buildNetwork(scene, feed) {
     showRings(selected);
   };
 
-  // Slow dash-offset drift on the flow overlays (direction follows the pipe
-  // path from first to last point). Accepts absolute scene time.
+  // Base drift + comet overtake per layer speed; comets breathe so the
+  // pulses feel alive rather than mechanical. Accepts absolute scene time.
   const tickFlow = (t = 0) => {
-    for (const e of flowMats) e.m.dashOffset = -t * FLOW_SPEED;
+    for (const e of flowMats) {
+      e.m.dashOffset = -t * e.speed;
+      if (e.comet) e.m.opacity = e.base * (0.8 + 0.2 * Math.sin(t * 2.2));
+    }
     // Dive markers hold station on the arc (flow dashes carry direction).
     for (const c of chevrons) {
       const tt = c.dive ? c.t0 : (c.t0 + t * FLOW_SPEED * 0.06) % 1;
@@ -425,7 +457,7 @@ export function buildNetwork(scene, feed) {
           if (m.isPointsMaterial || m.isLineMaterial) m.opacity = base * f;
         }
       }
-      for (const e of flowMats) e.m.opacity = FLOW_OPACITY * (e.assetId === selected ? 1 : f);
+      for (const e of flowMats) e.m.opacity = e.base * (e.assetId === selected ? 1 : f);
       for (const c of chevrons) c.detailF = f;
       for (const b of beadMats) b.m.opacity = (name === 'asset' && b.assetId !== selected) ? 0.2 : 1;
       applySelection();

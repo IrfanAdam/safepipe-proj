@@ -30,6 +30,34 @@
   padding: 8px 10px;
 }
 
+/* Cyberpunk signature: diagonal-cut top-right corner on every box.
+ * Sharp everywhere else — no rounded corners in this HUD. The cut sits
+ * opposite the ::before corner tick (top-left), so they never collide. */
+.ops-hud__sector,
+.ops-hud__banner,
+.ops-hud__legend,
+.ops-hud__panel,
+.ops-hud__viewbox,
+.ops-hud__cam-panel,
+.ops-hud__menu,
+.ops-hud__help-panel {
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+.ops-hud__overlay-btn,
+.ops-hud__mute-btn,
+.ops-hud__cam-btn,
+.ops-hud__cam-toggle,
+.ops-hud__search,
+.ops-hud__wo,
+.ops-hud__level-btn,
+.ops-hud__fs,
+.ops-hud__more,
+.ops-hud__help-btn,
+.ops-hud__chip,
+.ops-hud__badge {
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%);
+}
+
 /* Top-left column: sector block with the alert banner pinned below it */
 .ops-hud__topleft {
   position: absolute;
@@ -143,7 +171,6 @@
   margin-top: 8px;
   border: 1px solid rgba(240, 162, 50, 0.45);
   background: rgba(10, 14, 18, 0.94);
-  border-radius: 4px;
   padding: 8px 10px 10px;
   min-width: 240px;
 }

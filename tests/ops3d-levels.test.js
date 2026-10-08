@@ -29,7 +29,7 @@ describe('levels framing', () => {
     lv.focusAsset('FAC-01');
     const f = last(rig);
     assert.ok(Math.hypot(f.tgt[0] - 5, f.tgt[2] - 5) < 1e-6, `target on asset, got ${f.tgt}`);
-    assert.ok(Math.abs(dist(f.pos, f.tgt) - 0.45) < 1e-6, `facility close-up dist, got ${dist(f.pos, f.tgt)}`);
+    assert.ok(Math.abs(dist(f.pos, f.tgt) - 0.9) < 1e-6, `facility close-up dist, got ${dist(f.pos, f.tgt)}`);
   });
 
   it('flown orbit target is the asset point itself (exact frame centre)', () => {
@@ -72,7 +72,7 @@ describe('levels framing', () => {
     lv.setLevel('asset');
     const f = last(rig);
     assert.deepEqual([f.tgt[0], f.tgt[2]], [0, 0]);
-    assert.ok(Math.abs(dist(f.pos, f.tgt) - 2.2) < 1e-6);
+    assert.ok(Math.abs(dist(f.pos, f.tgt) - 3.0) < 1e-6);
   });
 
   it('TOP distance fits the asset kind (line needs height, box does not)', () => {
@@ -90,9 +90,9 @@ describe('levels framing', () => {
 
 describe('lens', () => {
   it('auto aperture is deep up top, fast glass drilled in', () => {
-    assert.equal(autoFstop('network'), 8);
-    assert.equal(autoFstop('segment'), 2.8);
-    assert.equal(autoFstop('asset'), 1.8);
+    assert.equal(autoFstop('network'), 6.5);
+    assert.equal(autoFstop('segment'), 2.2);
+    assert.equal(autoFstop('asset'), 1.4);
   });
 
   it('focal length maps to real FOV (24mm-high frame)', () => {

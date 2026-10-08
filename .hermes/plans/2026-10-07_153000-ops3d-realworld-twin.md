@@ -111,7 +111,7 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 **Objective:** braided Athabasca (point bars vs cutbank), hairpin tributaries, muskeg mottling, kettle lakes, cut blocks, seismic checkerboard — field/texture layers keyed to DEM.
 **Files:** `src/ops3d/terrain.js`, `src/ops3d/overlays.js`
 **Verify:** side-by-side with audit frames reads as the same place.
-**Accuracy: rating 6/10** (measured 2026-10-08, `tests/ops3d-terrain-accuracy.test.js`). Valley exists with correct E–W asymmetry (W-wall avg ~90 m vs real ~130 m; every reach >40 m); relief 193 m = 70% of real 277 m; variance sd 38 m = 58% of real 65 m. Shape right, amplitude under: deepen W-wall toward ~130 m and lift plateau variance to close the gap. Kettle/muskeg/cutbank presence is qualitative (no ground-truth anchor) — excluded from the score.
+**Accuracy: rating 7/10** (measured 2026-10-08, `tests/ops3d-terrain-accuracy.test.js`; lifted 6→7 in the Phase 1 iteration). Valley exists with correct E–W asymmetry (W-wall avg ~116 m vs real ~130 m; every reach >70 m); relief 227 m = 82% of real 277 m; variance sd 42 m = 65% of real 65 m. VEX 4.5 makes the variance visible from ISO; summit + valley-floor tags bracket the span. Remaining gap is amplitude (plateau variance), not shape. Kettle/muskeg/cutbank presence is qualitative (no ground-truth anchor) — excluded from the score.
 
 ### Task 9: density-grammar seeding ✓ done
 **Objective:** mine benches ~40% of NW quadrant, tailings rectangles with straight dykes + real palette (pale mature / dark fresh / tan cells), SAGD pads 60–90 per 9.6 km on DLS lines, corridors 20–60 m wide.
@@ -126,6 +126,18 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 **Accuracy: rating 8/10** (perceptual, not terrain — verified in code 2026-10-08). Single sun ✓ (1× `DirectionalLight` in `scene.js`); flow cyan `0x35c5d8` vs watch amber `#ff8c39` ≈ 160° hue separation, never confusable ✓; terrain whisper opacities set (0.44/0.92) with bloom threshold 0.36 catching critical red, not white ✓. −2: the "fault found in 2s" claim has no harness — needs a scripted TOP-frame luminance-contrast check or a timed human pass at REF GATE 1.
 
 - REF GATE 1: you pick the terrain mood (photo/map screenshot); confirm the pinned center + the audit's layout.
+
+## Phase 1 iteration — feedback pass ✓ done (2026-10-08)
+Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 25-pt grid). Ratings moved: Task 8 6→7.
+- Blips: bead/diamond/speckle sizes + opacities down, glow textures 128px soft (no more zoom raster squares), speckle mapped round. NEAR holds off: orbit min 0.05→0.5, close-ups pipeline 2.2→3.0 / facility 0.45→0.9 / sensor 0.35→0.7.
+- Terrain glow: mass fills 0.30→0.12 + softer texture, summit disks 0.18→0.08, fault zone 0.13→0.08, bloom 0.5→0.4 — faults still brightest (threshold 0.36 untouched).
+- Relief readable: VEX 3.2→4.5 (every drape coherent, single-sourced), valley −65→−85 m, valley-floor tag joins the summit tags so the span reads at TOP.
+- Connections sit on the world: pipe walls, flow, beads, dive markers, fault kit, halos, sensors, structure pipe runs all drape onto `field×VEX` — nothing floats at flat datum or slices through hills anymore. True facility geo-match stays a Phase 2 Overpass job (documented, not faked).
+- Volume: dark grounding shadow under each footprint + ground-sit everywhere; holograms read as mass on the skin.
+- Labels: TOP shows dest pills + faulted + selected + hovered only; full set in-field (segment/asset). All plates chamfered, zero rounded corners — same cut on elev pills, HUD boxes, buttons, chips.
+- DoF: auto apertures 8/2.8/1.8 → 6.5/2.2/1.4, maxCoc 14→18 — drilled-in background melt is unmistakable, TOP stays legible.
+- Flow: comet layer (short bright pulses, 2.5× base speed, breathing opacity) over the cyan drift.
+- Verify: 138 tests green (+1 tracked todo for the Task 6 georeferencing fix), build clean.
 
 ## Phase 2 — Real inspectable assets
 <!-- {#phase-2} -->

@@ -76,13 +76,24 @@ function makeTextSprite(assetId, health) {
   return sp;
 }
 
+/* Cyberpunk chamfer plate: sharp corners with the signature diagonal cut
+ * top-right — never rounded. */
+function chamferPlate(ctx, x, y, w, h, cut) {
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + w - cut, y);
+  ctx.lineTo(x + w, y + cut);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.closePath();
+}
+
 function drawLabel(cv, tex, assetId, health) {
   const ctx = cv.getContext('2d');
   const col = colorOf(health);
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.fillStyle = 'rgba(8,12,14,0.72)';
-  ctx.beginPath();
-  ctx.roundRect(2, 8, cv.width - 4, cv.height - 16, 14);
+  chamferPlate(ctx, 2, 8, cv.width - 4, cv.height - 16, 16);
   ctx.fill();
   ctx.strokeStyle = col;
   ctx.globalAlpha = 0.85;
@@ -135,8 +146,7 @@ function drawDest(cv, tex, text, health) {
   const col = colorOf(health);
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.fillStyle = 'rgba(8,12,14,0.66)';
-  ctx.beginPath();
-  ctx.roundRect(2, 12, cv.width - 4, cv.height - 24, 16);
+  chamferPlate(ctx, 2, 12, cv.width - 4, cv.height - 24, 18);
   ctx.fill();
   ctx.strokeStyle = col;
   ctx.globalAlpha = 0.8;
@@ -187,6 +197,7 @@ export function buildLabels(scene, { layout, healthById } = {}) {
   scene.add(group);
 
   let selected = null;
+  let hovered = null; // hover lights the label without selecting
   let hidden = false;
   let detailName = 'network';
   const items = []; // {id, sprite, ring, ringMat, line, lineMat, cv, tex, baseY, phase} (+ dest pills: {dest, pipe, text}, ring/line null)
@@ -243,6 +254,25 @@ export function buildLabels(scene, { layout, healthById } = {}) {
   for (const f of L.facilities ?? []) addLabel(f.assetId, f.position[0], f.position[1]);
   for (const s of L.sensors ?? []) addLabel(s.assetId, s.position[0], s.position[1], 0.8);
 
+  /* Label restraint: TOP shows rim destination pills + attention (faulted)
+   * + selection + hover only — a wall of pills for every asset is noise.
+   * In-field (segment/asset drill-in) every label reads. Asset level keeps
+   * the selected label in-scene (side panel covers the rest). */
+  function refresh() {
+    const inField = detailName !== 'network';
+    for (const it of items) {
+      const sel = it.id === selected || (it.dest && it.pipe === selected);
+      const hov = it.id === hovered || (it.dest && it.pipe === hovered);
+      const hot = healthOf(byId.get(it.dest ? it.pipe : it.id)) !== 'nominal';
+      const show = detailName === 'asset' ? (sel || hov) : it.dest ? true : inField ? true : (hot || sel || hov);
+      it.sprite.visible = show;
+      if (it.ring) it.ring.visible = show;
+      if (it.line) it.line.visible = show;
+      const w = it.sprite.userData.baseW * (it.k ?? 3.2) * (sel ? 1.3 : 1);
+      it.sprite.scale.set(w, w * it.sprite.userData.aspect, 1);
+    }
+  }
+
   function repaint(id, health) {
     const it = items.find((i) => i.id === id);
     if (!it) return;
@@ -266,9 +296,9 @@ export function buildLabels(scene, { layout, healthById } = {}) {
       for (const it of items) {
         const sel = it.id === selected;
         if (it.ring) {
-          const pulse = 1 + 0.18 * Math.sin(t * 2.4 + it.phase);
+          const pulse = 1 + 0.12 * Math.sin(t * 2.4 + it.phase);
           it.ring.scale.set(0.28 * pulse * (sel ? 1.5 : 1), 0.28 * pulse * (sel ? 1.5 : 1), 1);
-          it.ringMat.opacity = (sel ? 1 : 0.8) * (0.75 + 0.25 * Math.sin(t * 2.4 + it.phase));
+          it.ringMat.opacity = (sel ? 1 : 0.65) * (0.75 + 0.25 * Math.sin(t * 2.4 + it.phase));
         }
         it.sprite.position.y = it.baseY;
         it.sprite.material.opacity = hidden ? 0 : sel ? 1 : it.dest ? 0.9 : 0.92;
@@ -276,16 +306,14 @@ export function buildLabels(scene, { layout, healthById } = {}) {
     },
     setSelection(id) {
       selected = id ?? null;
-      for (const it of items) {
-        const sel = it.id === selected || (it.dest && it.pipe === selected);
-        const w = it.sprite.userData.baseW * (it.k ?? 3.2) * (sel ? 1.3 : 1);
-        it.sprite.scale.set(w, w * it.sprite.userData.aspect, 1);
-        if (detailName === 'asset') {
-          it.sprite.visible = sel;
-          if (it.ring) it.ring.visible = sel;
-          if (it.line) it.line.visible = sel;
-        }
-      }
+      refresh();
+    },
+    setHover(id) {
+      const next = id ?? null;
+      if (next === hovered) return false;
+      hovered = next;
+      refresh();
+      return true;
     },
     /* NEAR keeps the SELECTED label in-scene (side panel covers the rest) —
      * zooming in must never blank the thing you drilled into. */
@@ -295,19 +323,8 @@ export function buildLabels(scene, { layout, healthById } = {}) {
       // Level-sized sprites: TOP reads from 68 km out, so labels grow 3×
       // up there; ISO 1.5×; NEAR keeps selection only.
       const k = name === 'segment' ? 1.35 : 3.2;
-      for (const it of items) {
-        it.k = k;
-        // TOP declutter: only attention + selection carry labels up there —
-        // 14 pills at 3× would be a wall of noise. Destination tags bypass
-        // the filter so the rim always reads at network/segment levels.
-        const hot = healthOf(byId.get(it.dest ? it.pipe : it.id)) !== 'nominal';
-        const sel = it.id === selected || (it.dest && it.pipe === selected);
-        const show = name === 'asset' ? sel : it.dest ? true : name === 'network' ? (hot || sel) : true;
-        it.sprite.visible = show;
-        if (it.ring) it.ring.visible = show;
-        if (it.line) it.line.visible = show;
-        it.sprite.scale.set(it.sprite.userData.baseW * k, it.sprite.userData.baseW * k * it.sprite.userData.aspect, 1);
-      }
+      for (const it of items) it.k = k;
+      refresh();
     },
     dispose() {
       scene.remove(group);

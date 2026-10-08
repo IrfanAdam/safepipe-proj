@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const FOV = 40;
-const DIST_MIN = 0.05;
+const DIST_MIN = 0.5; // near cage: zooming onto the skin rasterizes every blip — hold off
 const DIST_MAX = 70; // matches the camera cage below — zooming past it snapped back every frame
 const MAX_POLAR = (80 * Math.PI) / 180;
 const FLY_MS = 600;

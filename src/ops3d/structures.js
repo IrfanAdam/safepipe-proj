@@ -59,7 +59,7 @@ function actx(health) {
     outline: new THREE.LineBasicMaterial({ color: col(health), transparent: true, opacity: 0.9 }),
     lampMat: new THREE.MeshBasicMaterial({ color: lampCol(health) }),
     massMat: new THREE.MeshBasicMaterial({
-      map: getGlowTex(), color: col(health), transparent: true, opacity: 0.3,
+      map: getGlowTex(), color: col(health), transparent: true, opacity: 0.12,
       blending: THREE.AdditiveBlending, depthWrite: false,
     }),
     base: new THREE.Color(col(health)),
@@ -79,8 +79,8 @@ function getGlowTex() {
   cv.width = cv.height = 128;
   const ctx = cv.getContext('2d');
   const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
-  g.addColorStop(0, 'rgba(255,255,255,0.85)');
-  g.addColorStop(0.5, 'rgba(255,255,255,0.28)');
+  g.addColorStop(0, 'rgba(255,255,255,0.55)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.16)');
   g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 128, 128);
@@ -261,8 +261,10 @@ function drops(c, w, d, yTop = 0.02, yBot = -6) {
   segs(c, arr, graphite);
 }
 /* Speckle fill: deterministic faint dot-dust inside a footprint (ref map). */
+/* Soft round dots (mapped, never squares) + restrained size/opacity so the
+ * dust reads as texture at TOP and never soups over wireframes on zoom. */
 const speckleMat = new THREE.PointsMaterial({
-  color: 0x5f93ad, size: 0.035, transparent: true, opacity: 0.55,
+  color: 0x5f93ad, size: 0.028, map: getGlowTex(), transparent: true, opacity: 0.4,
   blending: THREE.AdditiveBlending, depthWrite: false,
 });
 function speckle(c, w, d, id, y = 0.08) {
@@ -357,17 +359,20 @@ function sensorMast(c) {
   box(c, 0.24, 0.14, 0.18, 0, 1.12, 0); // head outline
   dot(c, 0, 1.3, 0, 0.06);
 }
-/* Pipe runs: graphite thin-tube outlines + health joint rings + waypoint dots. */
+/* Pipe runs: graphite thin-tube outlines + health joint rings + waypoint dots.
+ * Draped per-vertex onto the skin so buried lines follow the relief instead
+ * of slicing through hills at flat datum. */
 function pipeRuns(group, layout, healthById, entries) {
   for (const p of layout.pipelines) {
     const c = actx(healthById.get(p.assetId) ?? 'nominal');
     const pts = p.points;
+    const gy = (x, z) => field(x, z) * VEX + 0.02;
     for (let i = 1; i < pts.length; i++)
-      tube(c, pts[i - 1][0], PIPE_Y, pts[i - 1][1], pts[i][0], PIPE_Y, pts[i][1], PIPE_R, graphite);
+      tube(c, pts[i - 1][0], gy(pts[i - 1][0], pts[i - 1][1]), pts[i - 1][1], pts[i][0], gy(pts[i][0], pts[i][1]), pts[i][1], PIPE_R, graphite);
     const rings = [];
     for (const [x, z] of pts) {
-      ringSegs(rings, x, PIPE_Y, z, PIPE_R * 2.1, 10);
-      dot(c, x, PIPE_Y + 0.12, z, 0.015, waypointMat);
+      ringSegs(rings, x, gy(x, z), z, PIPE_R * 2.1, 10);
+      dot(c, x, gy(x, z) + 0.12, z, 0.015, waypointMat);
     }
     segs(c, rings);
     // Buried lines: no trestle bents.
@@ -408,6 +413,22 @@ export function buildStructures(scene, feedOrOpts, layoutArg) {
     c.group.userData.baseScale = FAC_SCALE;
     const fn = builders[fac.assetId] ?? [compressor, valveYard, tankFarm][kinds[fac.assetId] ?? 0] ?? compressor;
     fn(c);
+    // Grounding shadow: a soft dark ellipse under the footprint so the
+    // hologram reads as mass sitting ON the skin (volume cue), not a decal.
+    // Dark, never glow — the additive mass fills stay whisper-quiet.
+    {
+      const [fw, , fd] = fac.size ?? [3.6, 0.5, 2.2];
+      const sh = new THREE.Mesh(
+        GEO.disc,
+        new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.42, depthWrite: false }),
+      );
+      c.owned.push(sh.material);
+      sh.scale.set(fw * 1.05, fd * 1.05, 1);
+      sh.rotation.x = -Math.PI / 2;
+      sh.position.y = 0.015;
+      sh.renderOrder = 0;
+      c.group.add(sh);
+    }
     c.group.userData.assetId = fac.assetId;
     group.add(c.group);
     entries.set(fac.assetId, c);
