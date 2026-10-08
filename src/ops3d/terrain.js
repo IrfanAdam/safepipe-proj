@@ -11,8 +11,12 @@
  * Altitude source is swappable (setFieldSource/sample): contours sample the
  * active source, so the pinned SRTM DEM renders real relief when it resolves
  * and every drape stays coherent. [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
- * No rim mountains. No body fill either — contours glow on the void,
- * neon-plate style, so no faded landmass is ever needed.
+ * Volumetric read (topo-pass): contours carry baked NW-sun hillshade in
+ * their vertex colors + a dark draped ground fill (neutral-grey elevation
+ * tint × hillshade) rides just under the lines, so the basin reads as land
+ * from TOP and ISO. Rendering-only — field() untouched, relief/sd gates
+ * cannot move. Blue is reserved for real water ONLY (playa-lake wash +
+ * main-stem river thread); every contour/shore/drain line is neutral grey.
  * Marching-squares 160×160 grid at 32 power-spaced levels; unordered
  * segments are chained (quantized-endpoint greedy) into continuous smooth
  * polylines per level, then batched into TWO LineSegments2 meshes (base +
@@ -21,8 +25,9 @@
  * contours read as a plotting technique, not decoration. Cells whose local
  * gradient is below SLOPE_MIN are skipped, so flats stay clean while
  * contours wrap the rest of the terrain.
- * Desaturated cool-grey palette; one muted slate shoreline ring. No dots on
- * terrain, ever. WebGL1-safe (no custom GLSL).
+ * Desaturated neutral-grey palette, WebGL1-safe (no custom GLSL). Blue is
+ * reserved for real water bodies only (playa wash + river thread, both
+ * flat surface fills/threads, never contour lines).
  */
 import * as THREE from 'three';
 import { Line2 } from 'three/addons/lines/Line2.js';
@@ -51,7 +56,12 @@ const LAKE_X = -9; // playa lake center, km (flat spot, away from center + draw)
 const LAKE_Z = 6;
 const LAKE_R = 1.3; // mean radius; shoreline modulated below, ~2.6 km across
 const DRAW_W = 0.65; // dry-draw half-width km — narrower banks bend contours into sharp Vs
-const LAKE_BLUE = new THREE.Color(0x7e929d); // desaturated slate tint for contours over water
+/* Water blue — the ONLY blue on the terrain, reserved for real water bodies
+ * (playa-lake wash fill + main-stem river thread). Everything linear
+ * (contours, shore ring, dry-draw threads) is neutral grey. */
+const WATER_COL = 0x5f7d89; // muted slate-blue, dimmer than any alarm
+const SHORE_COL = 0x848b90; // shoreline ring: neutral survey grey, never an accent
+const DRAIN_COL = 0x848b90; // dry-draw threads: neutral grey — the draw is dry, not water
 /* Dry-draw centerline, shared by the field carve and the drainage thread. */
 function drawCenter(x) {
   return 6 * Math.sin(x * 0.22 + 0.5) + 2 * Math.sin(x * 0.55 + 1.1);
@@ -349,17 +359,33 @@ function elevLabel(text, x, y, z) {
   return sp;
 }
 
+/* Baked hillshade (rendering-only, field() untouched): single NW sun, so
+ * contours + ground fill get a sunlit/shadowed read without any shader.
+ * The shade grid is derived from the sampled H grid (central differences,
+ * VEX-applied normals) — zero extra field() calls — and sampled bilinearly
+ * per vertex. shadeToBright keeps the swing subtle (0.74–1.05) so greys
+ * stay grey and alarms keep the luminance lead. */
+const SUN = new THREE.Vector3(-0.52, 0.78, -0.34).normalize(); // NW sun, ~51° alt
+const _sn = new THREE.Vector3();
+let _shadeAt = () => 0.5; // replaced per buildTerrain from the live H grid
+const shadeToBright = (t) => 0.74 + 0.31 * Math.min(1, Math.max(0, t));
+
+/* Fill-grid sampler (same bilinear read over H): the draped ground fill
+ * rides true altitude without extra field() calls. */
+let _heightAt = (x, z) => field(x, z);
+let _fillLo = -0.16, _fillHi = 0.12;
+
 /* Filter/accumulate: every chained polyline contributes its (prev → cur)
  * segment pairs to a tier batch at true elevation × VEX, with periphery
- * fade toward the boundary ring baked into vertex colors. Inside the playa
- * shoreline the neutral grey yields to subtle water blue. */
+ * fade toward the boundary ring baked into vertex colors. Contour lines
+ * are neutral grey everywhere — including over water — with baked
+ * hillshade brightness doing the volumetric work. */
 const _wc = new THREE.Color();
 const _white = new THREE.Color(0xffffff);
 function pushPath(batch, pts, y, col) {
   if (pts.length < 2) return;
   batch.paths += 1;
   batch.segs += pts.length - 1;
-  const hillBoost = 0; // no summit whitening — peaks stay grey, alarms stay brightest
   let has = false;
   let px = 0;
   let pz = 0;
@@ -370,9 +396,7 @@ function pushPath(batch, pts, y, col) {
     const x = pts[i][0];
     const z = pts[i][1];
     const f = 1 - smooth(12, 19.5, Math.hypot(x, z));
-    _wc.copy(col);
-    if (hillBoost) _wc.lerp(_white, hillBoost);
-    _wc.lerp(LAKE_BLUE, Math.min(1, lakeWet(x, z) + riverWet(x, z)) * 0.65);
+    _wc.copy(col).multiplyScalar(shadeToBright(_shadeAt(x, z)));
     const r = _wc.r * f;
     const g = _wc.g * f;
     const b = _wc.b * f;
@@ -429,6 +453,33 @@ export function buildTerrain(scene) {
     }
   }
   if (mn < -0.15 || mx > 0.16) console.warn(`[terrain] field out of expected band mn=${mn.toFixed(3)} mx=${mx.toFixed(3)} — check amplitudes`);
+
+  // Baked hillshade grid: VEX-applied normals from H, dotted with the
+  // single NW sun → 0..1 (shadowed..sunlit). Contours + fill sample this
+  // bilinearly; field() is never touched so the relief/sd gates hold.
+  const SG = new Float32Array((N + 1) * (N + 1));
+  for (let j = 0; j <= N; j++) {
+    for (let i = 0; i <= N; i++) {
+      const xm = H[j * (N + 1) + Math.max(i - 1, 0)];
+      const xp = H[j * (N + 1) + Math.min(i + 1, N)];
+      const zm = H[Math.max(j - 1, 0) * (N + 1) + i];
+      const zp = H[Math.min(j + 1, N) * (N + 1) + i];
+      _sn.set(-((xp - xm) / (2 * step)) * VEX, 1, -((zp - zm) / (2 * step)) * VEX).normalize();
+      SG[j * (N + 1) + i] = (_sn.dot(SUN) + 1) / 2;
+    }
+  }
+  const bilin = (G, x, z) => {
+    const gx = Math.min(N, Math.max(0, (x + SIZE / 2) / step));
+    const gz = Math.min(N, Math.max(0, (z + SIZE / 2) / step));
+    const i0 = Math.min(N - 1, Math.floor(gx)), j0 = Math.min(N - 1, Math.floor(gz));
+    const fx = gx - i0, fz = gz - j0;
+    const a = G[j0 * (N + 1) + i0], b = G[j0 * (N + 1) + i0 + 1];
+    const c = G[(j0 + 1) * (N + 1) + i0], d = G[(j0 + 1) * (N + 1) + i0 + 1];
+    return a * (1 - fx) * (1 - fz) + b * fx * (1 - fz) + c * (1 - fx) * fz + d * fx * fz;
+  };
+  _shadeAt = (x, z) => bilin(SG, x, z);
+  _heightAt = (x, z) => bilin(H, x, z);
+  _fillLo = mn; _fillHi = mx;
 
   // Two shared fat-line materials: dim base + muted index, both additive
   // so rings read on the void without owning the frame. Cool greys, fog off.
@@ -547,20 +598,61 @@ export function buildTerrain(scene) {
   }
   group.add(summitGroup);
 
-  // No body fill: contours glow on the void (neon-plate style), so no
-  // faded landmass is needed. The faint base disc below grounds the scene.
-  // Faint dark base disc.
-  const discGeo = new THREE.CircleGeometry(R_MAP, 64);
-  const discMat = new THREE.MeshBasicMaterial({
-    color: 0x02080c,
-    transparent: true,
-    opacity: 0.55,
-    depthWrite: false,
-  });
-  const disc = new THREE.Mesh(discGeo, discMat);
-  disc.rotation.x = -Math.PI / 2;
-  disc.position.y = -0.18;
-  group.add(disc);
+  // Draped ground fill: polar mesh (center fan + 56 rings × 160 sectors)
+  // riding true altitude just under the contour lines. Vertex colors =
+  // neutral-grey elevation tint × baked NW-sun hillshade, kept near-black
+  // so the land reads as a body without ever outshining alarms. The rim
+  // fades darker into the boundary ring. Rendering-only.
+  {
+    const SECT = 160, RINGS = 56;
+    const LO = new THREE.Color(0x0e1113); // valley-floor near-black, neutral
+    const HI = new THREE.Color(0x2b2d2e); // high-ground dark grey — neutral, never near white
+    const pos = [0, 0, 0];
+    const clr = [0, 0, 0];
+    const idx = [];
+    const tmpC = new THREE.Color();
+    const fillVert = (x, z) => {
+      const h = _heightAt(x, z);
+      const te = Math.min(1, Math.max(0, (h - _fillLo) / Math.max(1e-6, _fillHi - _fillLo)));
+      const rim = 1 - 0.55 * smooth(18.5, 20, Math.hypot(x, z));
+      tmpC.copy(LO).lerp(HI, te).multiplyScalar((0.60 + 0.40 * _shadeAt(x, z)) * rim);
+      pos.push(x, h * VEX - 0.02, z);
+      clr.push(tmpC.r, tmpC.g, tmpC.b);
+      return pos.length / 3 - 1;
+    };
+    // center vertex (average height, mid shade) then ring verts
+    {
+      const h = _heightAt(0, 0);
+      tmpC.copy(LO).lerp(HI, 0.5).multiplyScalar(0.60 + 0.40 * _shadeAt(0, 0));
+      pos[1] = h * VEX - 0.02;
+      clr[0] = tmpC.r; clr[1] = tmpC.g; clr[2] = tmpC.b;
+    }
+    for (let k = 1; k <= RINGS; k++) {
+      const r = (k / RINGS) * R_MAP;
+      for (let s = 0; s < SECT; s++) {
+        const a = (s / SECT) * Math.PI * 2;
+        fillVert(Math.cos(a) * r, Math.sin(a) * r);
+      }
+    }
+    for (let s = 0; s < SECT; s++) idx.push(0, 1 + s, 1 + ((s + 1) % SECT));
+    for (let k = 0; k < RINGS - 1; k++) {
+      const r0 = 1 + k * SECT, r1 = 1 + (k + 1) * SECT;
+      for (let s = 0; s < SECT; s++) {
+        const s1 = (s + 1) % SECT;
+        idx.push(r0 + s, r1 + s, r1 + s1, r0 + s, r1 + s1, r0 + s1);
+      }
+    }
+    const fillGeo = new THREE.BufferGeometry();
+    fillGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    fillGeo.setAttribute('color', new THREE.Float32BufferAttribute(clr, 3));
+    fillGeo.setIndex(idx);
+    const fill = new THREE.Mesh(fillGeo, new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.92,
+      depthWrite: false, fog: false, side: THREE.DoubleSide,
+    }));
+    fill.renderOrder = -1; // land first, contours + water draw over it
+    group.add(fill);
+  }
 
   // Boundary ring: thin neutral survey line marking the mapped 20 km
   // circle — matte, no glow, so it never competes with live data. No lip
@@ -597,8 +689,9 @@ export function buildTerrain(scene) {
   });
   group.add(new THREE.LineSegments(tickGeo, tickMat));
 
-  // Playa lake: no disc — the water reads through subtle blue contour lines
-  // inside an organic shoreline ring. Faint wash only, so the body stays dark.
+  // Playa lake: the wash fill is the single blue water body on the map
+  // (WATER_COL, faint) — it IS standing water. Its shoreline ring is
+  // neutral grey: rings are survey lines, never water.
   const lakeY = field(LAKE_X, LAKE_Z) * VEX;
   {
     // Draped onto the depression so it never pokes through the body.
@@ -619,7 +712,7 @@ export function buildTerrain(scene) {
     const washGeo = new THREE.BufferGeometry();
     washGeo.setAttribute('position', new THREE.Float32BufferAttribute(washPos, 3));
     const wash = new THREE.Mesh(washGeo, new THREE.MeshBasicMaterial({
-      color: 0x223038, transparent: true, opacity: 0.20, depthWrite: false,
+      color: WATER_COL, transparent: true, opacity: 0.20, depthWrite: false,
       side: THREE.DoubleSide,
     }));
     wash.renderOrder = 0;
@@ -639,7 +732,7 @@ export function buildTerrain(scene) {
   const shoreGeo = new LineGeometry();
   shoreGeo.setPositions(shorePos);
   const shoreMat = new LineMaterial({
-    color: 0x8299a5, linewidth: 1.05, transparent: true, opacity: 0.40,
+    color: SHORE_COL, linewidth: 1.05, transparent: true, opacity: 0.40,
     depthWrite: false, fog: false,
   });
   shoreMat.resolution.set(1280, 720);
@@ -647,15 +740,21 @@ export function buildTerrain(scene) {
   shore.renderOrder = 2;
   group.add(shore);
 
-  // Drainage thread: faint blue run along the draw bottom + two short
-  // feeders — the valley-bottom water language from the topo plate. Contours
-  // kink into Vs around it via the steep-bank carve, not by hand.
+  // Drainage threads: the west draw is DRY, so its thread + feeders run
+  // neutral grey (a dry creek is land, not water). Kinks in the contours
+  // come from the steep-bank carve, not by hand. The main-stem Athabasca
+  // is real flowing water, so it alone keeps a faint WATER_COL thread.
   const drainMat = new LineMaterial({
-    color: 0x8299a5, linewidth: 1.05, transparent: true, opacity: 0.42,
+    color: DRAIN_COL, linewidth: 1.05, transparent: true, opacity: 0.42,
     depthWrite: false, fog: false,
   });
   drainMat.resolution.set(1280, 720);
-  const drapeRun = (pts) => {
+  const riverMat = new LineMaterial({
+    color: WATER_COL, linewidth: 1.2, transparent: true, opacity: 0.38,
+    depthWrite: false, fog: false,
+  });
+  riverMat.resolution.set(1280, 720);
+  const drapeRun = (pts, mat = drainMat) => {
     const runs = [[]];
     for (const [x, z] of pts) {
       if (Math.hypot(x, z) > 19.3) { if (runs[runs.length - 1].length) runs.push([]); continue; }
@@ -665,7 +764,7 @@ export function buildTerrain(scene) {
       if (r.length < 6) continue;
       const g = new LineGeometry();
       g.setPositions(r);
-      const line = new Line2(g, drainMat);
+      const line = new Line2(g, mat);
       line.renderOrder = 2;
       group.add(line);
     }
@@ -684,6 +783,10 @@ export function buildTerrain(scene) {
   };
   feeder(2.5, 13.5, 3.2); // off the SE hill flank
   feeder(-6.5, -11.5, -5.4); // off the southern flats
+  // Main-stem Athabasca: the one flowing-water thread on the map.
+  const stem = [];
+  for (let z = -19; z <= 19; z += 0.4) stem.push([riverX(z), z]);
+  drapeRun(stem, riverMat);
 
   scene.add(group);
 
@@ -705,6 +808,7 @@ export function buildTerrain(scene) {
       ringMat.resolution.set(w, h);
       shoreMat.resolution.set(w, h);
       drainMat.resolution.set(w, h);
+      riverMat.resolution.set(w, h);
     },
     update(t = 0) {
       // Attention lock (Phase 1 Task 10): terrain whispers at TOP so faults
