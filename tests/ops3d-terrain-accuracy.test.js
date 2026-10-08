@@ -46,17 +46,17 @@ function valleyWallW(z) {
 }
 
 describe('ops3d terrain accuracy (phase 1 vs Copernicus ground truth)', () => {
-  it('Task 8 — relief is 75–90% of real 277 m (now ~243 m, gap: under by ~12%)', () => {
+  it('Task 8 — relief is ~99% of real 277 m (now ~274 m, gap: under by ~1%)', () => {
     const s = gridStats();
-    assert.ok(s.reliefM > 200 && s.reliefM < 260, `relief ${s.reliefM.toFixed(0)} m (real ${REAL.reliefM} m)`);
+    assert.ok(s.reliefM > 255 && s.reliefM < 290, `relief ${s.reliefM.toFixed(0)} m (real ${REAL.reliefM} m)`);
   });
 
-  it('Task 8 — terrain variance sd is 55–75% of real 65 m (now ~43 m)', () => {
+  it('Task 8 — terrain variance sd is ~74% of real 65 m (now ~48 m)', () => {
     const s = gridStats();
-    assert.ok(s.sdM > 36 && s.sdM < 50, `sd ${s.sdM.toFixed(1)} m (real ${REAL.sdM} m)`);
+    assert.ok(s.sdM > 42 && s.sdM < 54, `sd ${s.sdM.toFixed(1)} m (real ${REAL.sdM} m)`);
   });
 
-  it('Task 8 — west valley wall averages ~89% of real ~130 m cut', () => {
+  it('Task 8 — west valley wall averages ~87% of real ~130 m cut', () => {
     const walls = [0, 5, -5].map(valleyWallW);
     const avg = walls.reduce((a, v) => a + v, 0) / walls.length;
     assert.ok(avg > 95 && avg < 135, `avg W-wall ${avg.toFixed(1)} m (real ~${REAL.valleyWallWm} m)`);

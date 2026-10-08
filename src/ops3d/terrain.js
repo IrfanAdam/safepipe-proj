@@ -1,12 +1,13 @@
 /* Safepipe Ops 3D — src/ops3d/terrain.js · Athabasca-representative holographic topo.
  * buildTerrain(scene) → { mesh, terrainSource, setDetail, setSize, update, dispose }
- * Representative Athabasca-basin floor (1 unit = 1 km): eastward dip ~1.8 m/km
- * + broad low swells ±40 m + TWO hills (+72/+58 m, auto-nudged clear of
+ * Representative Athabasca-basin floor (1 unit = 1 km): eastward dip ~2.2 m/km
+ * + broad low swells ±46 m + TWO hills (+80/+64 m, auto-nudged clear of
  * pipe corridors so rings close around real highs) + saddle hollow (−32 m)
  * + west tributary draw ~42 m deep + playa-lake depression ~14 m
  * + N–S Athabasca main valley ~85 m (braided floor, steep east cutbank,
  * gentle west point-bars) + 2 kettle ponds + muskeg mottling
- * — total relief ≈ −130…+100 m true, VEX 4.5.
+ * + masked plateau variance (mid/high-frequency swell, valley+lake masked)
+ * — total relief ≈ −160…+115 m true, VEX 4.5.
  * Altitude source is swappable (setFieldSource/sample): contours sample the
  * active source, so the pinned SRTM DEM renders real relief when it resolves
  * and every drape stays coherent. [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
@@ -20,7 +21,7 @@
  * contours read as a plotting technique, not decoration. Cells whose local
  * gradient is below SLOPE_MIN are skipped, so flats stay clean while
  * contours wrap the rest of the terrain.
- * Near-white palette; one blue playa lake shoreline ring. No dots on
+ * Desaturated cool-grey palette; one muted slate shoreline ring. No dots on
  * terrain, ever. WebGL1-safe (no custom GLSL).
  */
 import * as THREE from 'three';
@@ -42,15 +43,15 @@ const N = 160; // marching-squares grid cells per side (128→160 for tighter hi
 const LEVELS = 32; // contour levels (20→32 so slope reads as density)
 export const VEX = 4.5; // vertical exaggeration — single source; network/gridfloor import this
 const SLOPE_MIN = 0.0028; // skip contour cells flatter than ~2.8 m/km — flats go truly clean
-const BASE_COL = new THREE.Color(0xdde3e6); // near-white hairline base, not bone-grey
+const BASE_COL = new THREE.Color(0xd3d8db); // cool-grey hairline base, not bone-grey
 const INDEX_COL = new THREE.Color(0xffffff); // pure white index
 const BELOW_COL = new THREE.Color(0x8fa0a8); // below-datum muted blue-grey
-const RING_COL = 0x8f8b82; // boundary ring: neutral survey grey, never an accent
+const RING_COL = 0x848b90; // boundary ring: neutral survey grey, never an accent
 const LAKE_X = -9; // playa lake center, km (flat spot, away from center + draw)
 const LAKE_Z = 6;
 const LAKE_R = 1.3; // mean radius; shoreline modulated below, ~2.6 km across
 const DRAW_W = 0.65; // dry-draw half-width km — narrower banks bend contours into sharp Vs
-const LAKE_BLUE = new THREE.Color(0x4d8fd1); // subtle water tint for contours
+const LAKE_BLUE = new THREE.Color(0x7e929d); // desaturated slate tint for contours over water
 /* Dry-draw centerline, shared by the field carve and the drainage thread. */
 function drawCenter(x) {
   return 6 * Math.sin(x * 0.22 + 0.5) + 2 * Math.sin(x * 0.55 + 1.1);
@@ -74,13 +75,15 @@ function lakeWet(x, z) {
   return 1 - smooth(0.85, 1.15, w);
 }
 
-/* Athabasca-basin representative floor field (km units). Eastward dip ~1.8 m/km,
- * broad low swells ±40 m (damped flat near the playa so it sits in a flat
- * spot), TWO hills in pipe-corridor gaps — H1 SE (+72 m), H2 west (+58 m,
+/* Athabasca-basin representative floor field (km units). Eastward dip ~2.2 m/km,
+ * broad low swells ±46 m (damped flat near the playa so it sits in a flat
+ * spot), TWO hills in pipe-corridor gaps — H1 SE (+80 m), H2 west (+64 m,
  * auto-nudged clear of corridors in buildTerrain) — so index rings close
  * around real highs, one saddle hollow (−32 m), one winding dry draw ~42 m
- * deep with flat-bottom trough, one organic playa-lake depression ~14 m.
- * Total relief ≈ −42…+88 m true. No rim. */
+ * deep with flat-bottom trough, one organic playa-lake depression ~14 m,
+ * plus masked plateau variance (mid/high-frequency swell ×2.2 km–500 m
+ * wavelengths, kept off the valley floor + lake so the river course and
+ * walls stay stable). Grid-measured relief ≈ 274 m, sd ≈ 48 m. No rim. */
 export function field(x, z) {
   return _active(x, z);
 }
@@ -117,18 +120,18 @@ const KETTLES = [
 ];
 
 function _procedural(x, z) {
-  const dip = -0.0018 * x; // eastward dip: down ~1.8 m per km east
+  const dip = -0.0022 * x; // eastward dip: down ~2.2 m per km east
   const lakeMask = lakeWet(x, z);
   const swell =
-    (0.042 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
-    0.022 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0) +
+    (0.046 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
+    0.024 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0) +
     0.010 * Math.sin(x * 0.63 + 2.1) * Math.sin(z * 0.71 - 0.7)) *
     (1 - 0.82 * lakeMask);
   const bump = (ax, az, sig, amp) => {
     const dx = x - ax, dz = z - az;
     return amp * Math.exp(-(dx * dx + dz * dz) / (2 * sig * sig));
   };
-  const hills = bump(H1.x, H1.z, 3.4, 0.072) + bump(H2.x, H2.z, 2.9, 0.058);
+  const hills = bump(H1.x, H1.z, 3.4, 0.080) + bump(H2.x, H2.z, 2.9, 0.064);
   const hollow = bump(7, -3.5, 2.8, -0.032);
   const zc = drawCenter(x);
   const dd = (z - zc) / DRAW_W;
@@ -136,14 +139,23 @@ function _procedural(x, z) {
   const drawProf = ad < 0.4 ? 1 : Math.max(0, 1 - (ad - 0.4) / 0.6);
   const draw = -0.042 * drawProf * Math.exp(-dd * dd * 0.35); // ~42 m trough, flat bottom
   const playa = -0.014 * lakeMask; // playa depression, ~14 m deep
-  const valley = -0.085 * riverWet(x, z); // Athabasca main valley, ~85 m, flat braided floor
+  const rw = riverWet(x, z);
+  const valley = -0.085 * rw; // Athabasca main valley, ~85 m, flat braided floor
   let kettle = 0;
   for (const k of KETTLES) {
     const dx = x - k.x, dz = z - k.z;
     kettle += k.d * Math.exp(-(dx * dx + dz * dz) / (k.r * k.r));
   }
-  const muskeg = 0.0035 * Math.sin(x * 1.7 + 0.6) * Math.sin(z * 1.9 - 1.1) * (1 - riverWet(x, z));
-  return dip + swell + hills + hollow + draw + playa + valley + kettle + muskeg;
+  // Plateau variance: mid/high-frequency swell that lifts relief + sd toward
+  // the Copernicus band. Masked off the valley floor + lake, so the river
+  // course, wall depths, and playa flat are untouched.
+  const plat = (1 - rw) * (1 - 0.85 * lakeMask);
+  const platvar = plat * (
+    0.012 * Math.sin(x * 0.52 + 0.9) * Math.cos(z * 0.49 + 0.2) +
+    0.008 * Math.sin(x * 1.08 + 2.2) * Math.sin(z * 0.92 + 0.5) +
+    0.004 * Math.sin(x * 1.95 + 1.0) * Math.sin(z * 2.05 + 0.3));
+  const muskeg = 0.0045 * Math.sin(x * 1.7 + 0.6) * Math.sin(z * 1.9 - 1.1) * (1 - rw);
+  return dip + swell + hills + hollow + draw + playa + valley + kettle + muskeg + platvar;
 }
 
 /* Hill centers — defaults sited in pipe-gap quads; buildTerrain nudges them
@@ -269,7 +281,7 @@ function elevLabel(text, x, y, z) {
   cv.width = 192;
   cv.height = 48;
   const ctx = cv.getContext('2d');
-  const CUT = 14;
+  const CUT = 20; // deep enough to read at 3× TOP scale
   ctx.fillStyle = 'rgba(16,20,24,0.9)';
   ctx.beginPath();
   ctx.moveTo(28, 4);
@@ -565,7 +577,7 @@ export function buildTerrain(scene) {
     const washGeo = new THREE.BufferGeometry();
     washGeo.setAttribute('position', new THREE.Float32BufferAttribute(washPos, 3));
     const wash = new THREE.Mesh(washGeo, new THREE.MeshBasicMaterial({
-      color: 0x1d4a73, transparent: true, opacity: 0.20, depthWrite: false,
+      color: 0x223038, transparent: true, opacity: 0.20, depthWrite: false,
       side: THREE.DoubleSide,
     }));
     wash.renderOrder = 0;
@@ -585,7 +597,7 @@ export function buildTerrain(scene) {
   const shoreGeo = new LineGeometry();
   shoreGeo.setPositions(shorePos);
   const shoreMat = new LineMaterial({
-    color: 0x6fa8dc, linewidth: 1.05, transparent: true, opacity: 0.40,
+    color: 0x8299a5, linewidth: 1.05, transparent: true, opacity: 0.40,
     depthWrite: false, fog: false,
   });
   shoreMat.resolution.set(1280, 720);
@@ -597,7 +609,7 @@ export function buildTerrain(scene) {
   // feeders — the valley-bottom water language from the topo plate. Contours
   // kink into Vs around it via the steep-bank carve, not by hand.
   const drainMat = new LineMaterial({
-    color: 0x6fa8dc, linewidth: 1.05, transparent: true, opacity: 0.42,
+    color: 0x8299a5, linewidth: 1.05, transparent: true, opacity: 0.42,
     depthWrite: false, fog: false,
   });
   drainMat.resolution.set(1280, 720);
@@ -637,8 +649,10 @@ export function buildTerrain(scene) {
     mesh: group,
     terrainSource: _source,
     setDetail(name) {
-      labelGroup.visible = true; // inline pills stay at every zoom
-      dimF = name === 'asset' ? 0.5 : name === 'segment' ? 0.6 : 1;
+      // Inline contour pills are illegible micro-tags at TOP (6–8 px) — they
+      // add noise, not data. Landmark summit/valley tags stay at every zoom.
+      labelGroup.visible = name !== 'network';
+      dimF = name === 'network' ? 0.8 : name === 'asset' ? 0.5 : name === 'segment' ? 0.6 : 1;
       pillF = name === 'asset' ? 0.35 : name === 'segment' ? 0.6 : 1;
       for (const sp of labelGroup.children) sp.scale.set(1.85 * pillF, 0.46 * pillF, 1);
       for (const sp of summitGroup.children) sp.scale.set(2.0 * pillF, 0.5 * pillF, 1);
