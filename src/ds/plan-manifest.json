@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-08T08:31:11.079Z",
+  "generated": "2026-10-08T08:38:17.979Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,14 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "f09fa2e",
+      "full": "f09fa2e8632cc0919dc2c0722271b6215101ad01",
+      "date": "2026-10-08",
+      "subject": "fix(ds): retro re-points mis-cited anchors — task-1 matches no section, phase-0 badges [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-0"
+    },
     {
       "sha": "5a4c621",
       "full": "5a4c62169a9e21773124d07891ab795669e50e88",
@@ -597,7 +605,7 @@
     }
   ],
   "wip": [
-    "scripts/plan-track.mjs",
-    "src/ds/plan-retro.json"
+    "src/ops3d/levels.js",
+    "src/ops3d/sound.js"
   ]
 }

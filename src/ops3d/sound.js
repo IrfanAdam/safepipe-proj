@@ -1,5 +1,5 @@
 /* Safepipe Ops 3D — src/ops3d/sound.js · tiny WebAudio feedback synth.
- * Oscillators only, no assets. Master gain 0.08.
+ * Oscillators only, no assets. Master gain 0.15.
  * Contract: ensureAudio() (call-safe, resumes on gesture),
  *   play(name) with 'select' | 'hover' | 'alert' | 'toggle',
  *   setMuted(b) + isMuted(). Hover is caller-throttled.
@@ -9,7 +9,7 @@ let ctx = null;
 let master = null;
 let muted = false;
 
-const MASTER_GAIN = 0.08;
+const MASTER_GAIN = 0.15;
 
 function ac() {
   if (typeof window === 'undefined') return null;

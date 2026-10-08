@@ -126,8 +126,10 @@ export function createLevels(rig, layout, opts = {}) {
           go('network', [0, 0, 0], NETWORK_DIST);
         }
       } else if (name === 'segment') go('segment', lastTarget);
-      // Asset needs a concrete anchor: last focused asset, else PIPE-02.
-      else this.focusAsset(lastAssetId ?? FALLBACK_ASSET);
+      // Asset needs a concrete anchor: last focused asset, else dolly into
+      // the current target in place (never teleport to a fallback model).
+      else if (lastAssetId) this.focusAsset(lastAssetId);
+      else go('asset', lastTarget);
     },
 
     focusAsset(assetId, at = null) {

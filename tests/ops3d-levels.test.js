@@ -66,6 +66,15 @@ describe('levels framing', () => {
     assert.ok(Math.abs(dist(f.pos, f.tgt) - 62) < 1e-6);
   });
 
+  it('asset level with no selection dollies in place (never jumps to a fallback model)', () => {
+    const rig = mockRig();
+    const lv = createLevels(rig, layout, {});
+    lv.setLevel('asset');
+    const f = last(rig);
+    assert.deepEqual([f.tgt[0], f.tgt[2]], [0, 0]);
+    assert.ok(Math.abs(dist(f.pos, f.tgt) - 2.2) < 1e-6);
+  });
+
   it('TOP distance fits the asset kind (line needs height, box does not)', () => {
     const rig = mockRig();
     const lv = createLevels(rig, layout, {});
