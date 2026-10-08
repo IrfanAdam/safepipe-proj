@@ -85,12 +85,15 @@ export function buildHud(container, cbs = {}) {
   topleft.appendChild(banner);
   root.appendChild(topleft);
 
-  // — Bottom-left legend: parked for now (hidden, code kept for restore).
-  const legend = el('div', 'ops-hud__legend ops-hud__legend--hidden');
+  // — Bottom-left legend: hatch-type key. Markers denote TYPE (positions
+  // are schematic until Phase-2 Overpass); buried runs stay dashed lines.
+  const legend = el('div', 'ops-hud__legend');
   const legendItems = [
-    ['dot', 'health', 'PIPE GLOW = STATUS · GRAY OK / AMBER WATCH / RED CRITICAL'],
-    ['box', 'facility', 'WIREFRAME SITE · CLICK TO DRILL IN'],
-    ['dash', 'sensitive', 'DASHED GROUND ZONE · HCA / ENVIRONMENTAL'],
+    ['hatch-compressor', 'COMPRESSOR', 'HATCHED RECT · 45° DENSE'],
+    ['hatch-valve', 'VALVE', 'HATCHED CIRCLE · 135° FINE'],
+    ['hatch-terminal', 'TERMINAL', 'HATCHED RECT · 30° SPARSE'],
+    ['hatch-wellhead', 'WELLHEAD · SENSOR', 'HATCHED CIRCLE · 60°'],
+    ['dash', 'BURIED LINE', 'DASHED · STAYS BURIED BY DESIGN'],
   ];
   for (const [sample, label, sub] of legendItems) {
     const row = el('div', 'ops-hud__legend-row');
@@ -100,6 +103,11 @@ export function buildHud(container, cbs = {}) {
     legend.appendChild(row);
     legend.appendChild(el('div', 'ops-hud__legend-sub', sub));
   }
+  legend.appendChild(el(
+    'div',
+    'ops-hud__hints',
+    'MARKERS DENOTE TYPE · POSITIONS SCHEMATIC (PHASE-2 OVERPASS)',
+  ));
   legend.appendChild(el(
     'div',
     'ops-hud__hints',

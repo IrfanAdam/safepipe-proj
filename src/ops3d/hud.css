@@ -322,7 +322,7 @@
   opacity: 0.75;
 }
 
-/* Bottom-left legend (parked — hidden until needed again) */
+/* Bottom-left legend visibility flag (hatch-type key is shown by default) */
 .ops-hud__legend--hidden {
   display: none;
 }
@@ -390,9 +390,9 @@
   opacity: 0.7;
 }
 
-/* Bottom-left legend (parked) */
+/* Bottom-left legend (hatch-type key) — sits above the ? button. */
 .ops-hud__legend {
-  bottom: 12px;
+  bottom: 56px;
   left: 12px;
   max-width: 300px;
   pointer-events: auto;
@@ -435,6 +435,33 @@
 
 .ops-hud__swatch--dash {
   border-top: 1px dashed #ff8c39;
+}
+
+/* Hatch-type swatches: diagonal-line fills mirroring the in-scene markers
+ * (see markers.js) — one angle/density per type, circle vs chamfered rect.
+ * Bone only: health hues never appear in the key. */
+.ops-hud__swatch--hatch-compressor,
+.ops-hud__swatch--hatch-valve,
+.ops-hud__swatch--hatch-terminal,
+.ops-hud__swatch--hatch-wellhead {
+  height: 14px;
+  width: 20px;
+  border: 1px solid rgba(230, 232, 232, 0.9);
+  background-color: rgba(11, 12, 12, 0.9);
+}
+.ops-hud__swatch--hatch-compressor {
+  background-image: repeating-linear-gradient(45deg, rgba(230,232,232,0.9) 0 1px, transparent 1px 4px);
+}
+.ops-hud__swatch--hatch-valve {
+  border-radius: 50%;
+  background-image: repeating-linear-gradient(135deg, rgba(230,232,232,0.9) 0 1px, transparent 1px 3px);
+}
+.ops-hud__swatch--hatch-terminal {
+  background-image: repeating-linear-gradient(30deg, rgba(230,232,232,0.9) 0 1px, transparent 1px 6px);
+}
+.ops-hud__swatch--hatch-wellhead {
+  border-radius: 50%;
+  background-image: repeating-linear-gradient(60deg, rgba(230,232,232,0.9) 0 1px, transparent 1px 5px);
 }
 
 .ops-hud__hints {

@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { getLayout } from './health-feed.js';
 import { field, VEX } from './terrain.js';
+import { HATCH_SIGNATURES, HATCH_PITCH_WORLD, paintHatch } from './markers.js';
 
 const OUTLINE = { nominal: 0x8f9797, watch: 0xff8c39, critical: 0xe31919 };
 const LAMP = { nominal: 0xf4f1e8, watch: 0xffb066, critical: 0xff4545 };
@@ -253,13 +254,47 @@ function latticeTower(c, x, z, baseW = 0.24, h = 2.4, levels = 6, y0 = 0.06) {
   segs(c, arr);
   dot(c, x, y0 + h + 0.04, z, 0.05);
 }
-/* Drop lines: facility corners bleed vertically below datum (ref map glow). */
-function drops(c, w, d, yTop = 0.02, yBot = -6) {
-  const arr = [];
-  for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]])
-    vert(arr, (sx * w) / 2, yTop, yBot, (sz * d) / 2);
-  segs(c, arr, graphite);
+/* Hatched type marker: diagonal-line fill inside a chamfered circle/rect,
+ * laid flat on the skin as the site pad the wireframes sit on. WORLD-scale
+ * (added to the top group, never inside a true-scale asset group) — one
+ * (shape, angle, spacing) signature per infrastructure type (see markers.js)
+ * so type reads at TOP without color; the neutral bone hatch never competes
+ * with health alarms. Schematic positions: the marker denotes TYPE, not a
+ * surveyed site. */
+const HATCH_PX = 256;
+function hatchMarkerAt(parent, owned, x, z, wWorld, dWorld, type, lift = 0.02) {
+  const sig = HATCH_SIGNATURES[type];
+  if (!sig) return null;
+  // World-pitch spacing: constant km between lines whatever the pad size,
+  // clamped so tiny pads keep ≥4 lines and giant pads stay sane.
+  const spacing = Math.min(64, Math.max(12, (HATCH_PITCH_WORLD / Math.max(wWorld, 0.001)) * HATCH_PX));
+  const sized = { ...sig, spacing };
+  const cv = document.createElement('canvas');
+  if (sig.shape === 'circle') { cv.width = cv.height = HATCH_PX; }
+  else {
+    // Same px-per-world-unit on both axes so hatch density is uniform.
+    cv.width = HATCH_PX;
+    cv.height = Math.min(512, Math.max(64, Math.round(HATCH_PX * (dWorld / Math.max(wWorld, 0.001)))));
+  }
+  paintHatch(cv.getContext('2d'), cv.width, cv.height, sized);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.6, depthWrite: false });
+  owned.push(tex, mat);
+  const geo = new THREE.PlaneGeometry(wWorld, dWorld);
+  owned.push(geo);
+  const m = new THREE.Mesh(geo, mat);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, field(x, z) * VEX + lift, z); // ground-sits on the skin
+  m.renderOrder = 1;
+  parent.add(m);
+  return m;
 }
+/* Site-pad sizes (world km): roomy enough to read at TOP, tight enough to
+ * own the frame at NEAR — the pad, not the equipment, carries the type. */
+const PAD_BOOST = 6;
+const padSize = (lw, ld, s) => [lw * s * PAD_BOOST, ld * s * PAD_BOOST];
 /* Speckle fill: deterministic faint dot-dust inside a footprint (ref map). */
 /* Soft round dots (mapped, never squares) + restrained size/opacity so the
  * dust reads as texture at TOP and never soups over wireframes on zoom. */
@@ -313,7 +348,6 @@ function compressor(c) {
   box(c, 0.6, 0.45, 0.5, 1.35, 0.28, 0.25); // control building
   latticeTower(c, 1.7, -0.9, 0.24, 2.4, 6); // vent / flare stack (lattice derrick)
   fence(c, 3.6, 2.2);
-  drops(c, 3.6, 2.2);
   speckle(c, 3.6, 2.2, 'FAC-01');
 }
 /* FAC-02 — valve yard: manifold grid + handwheels + fence. */
@@ -333,7 +367,6 @@ function valveYard(c) {
   segs(c, pole);
   dot(c, 0.6, 0.86, -0.45, 0.05);
   fence(c, 1.5, 1.2);
-  drops(c, 1.5, 1.2);
   speckle(c, 1.5, 1.2, 'FAC-02');
 }
 /* FAC-03 — tank farm: 3 open outline tanks + bund walls. */
@@ -348,7 +381,6 @@ function tankFarm(c) {
   box(c, 0.06, 0.25, 1.64, 0.97, 0.18, 0);
   tube(c, -0.9, 0.12, 0.62, 0.9, 0.12, 0.62, PIPE_R); // takeover line
   for (const x of [-0.55, 0, 0.55]) tube(c, x, 0.12, 0.62, x, 0.3, 0.62, 0.03);
-  drops(c, 2.0, 1.7);
   speckle(c, 2.0, 1.7, 'FAC-03');
 }
 function sensorMast(c) {
@@ -405,6 +437,13 @@ export function buildStructures(scene, feedOrOpts, layoutArg) {
   const entries = new Map(); // assetId → actx (facilities, sensors, pipelines)
   const builders = { 'FAC-01': compressor, 'FAC-02': valveYard, 'FAC-03': tankFarm };
   const kinds = { 'FAC-01': 0, 'FAC-02': 1, 'FAC-03': 2 };
+  // Site-pad signatures: [marker type, local footprint w × d]. The pad is
+  // world-scale ground furniture carrying the TYPE; equipment stays true-scale.
+  const FAC_PAD = {
+    'FAC-01': ['compressor', 3.6, 2.2],
+    'FAC-02': ['valve', 1.5, 1.5],
+    'FAC-03': ['terminal', 2.0, 1.7],
+  };
   for (const fac of lay.facilities) {
     const c = actx(healthById.get(fac.assetId) ?? 'nominal');
     // Ground-sit: facilities float or sink on relief when pinned to datum.
@@ -432,6 +471,10 @@ export function buildStructures(scene, feedOrOpts, layoutArg) {
     c.group.userData.assetId = fac.assetId;
     group.add(c.group);
     entries.set(fac.assetId, c);
+    // Hatched site pad: world-scale, ground-sitting, disposed with the asset.
+    const [padType, padW, padD] = FAC_PAD[fac.assetId] ?? ['compressor', 3.6, 2.2];
+    const [pw, pd] = padSize(padW, padD, FAC_SCALE);
+    hatchMarkerAt(group, c.owned, fac.position[0], fac.position[1], pw, pd, padType);
   }
   for (const sen of lay.sensors) {
     const c = actx(healthById.get(sen.assetId) ?? 'nominal');
@@ -442,6 +485,7 @@ export function buildStructures(scene, feedOrOpts, layoutArg) {
     c.group.userData.assetId = sen.assetId;
     group.add(c.group);
     entries.set(sen.assetId, c);
+    hatchMarkerAt(group, c.owned, sen.position[0], sen.position[1], 0.45, 0.45, 'wellhead');
   }
   pipeRuns(group, lay, healthById, entries);
   let selected = null;
