@@ -48,7 +48,9 @@
 .ops-hud__viewbox,
 .ops-hud__cam-panel,
 .ops-hud__menu,
-.ops-hud__help-panel {
+.ops-hud__help-panel,
+.ops-hud__compass,
+.ops-hud__scalebar {
   --cut: 16px;
   --edge: rgba(230, 232, 232, 0.5);
   clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
@@ -80,6 +82,8 @@
 .ops-hud__cam-panel::after,
 .ops-hud__menu::after,
 .ops-hud__help-panel::after,
+.ops-hud__compass::after,
+.ops-hud__scalebar::after,
 .ops-hud__overlay-btn::after,
 .ops-hud__mute-btn::after,
 .ops-hud__cam-btn::after,
@@ -695,6 +699,110 @@
 .ops-hud__more,
 .ops-hud__help-btn {
   position: relative;
+}
+
+/* Orientation + scale furniture: compass top-center, scale bar
+ * bottom-center — clear of all four corner clusters. Same chamfer cut +
+ * edge-stroke as every other box, chip-scale 10px cut (both boxes are
+ * small; 16px would eat the silhouette). Dim by design: the HUD root is
+ * click-through (pointer-events:none) so there is no hover to brighten
+ * into without stealing orbit drags. Bone only — amber/red are
+ * health-only hues, never orientation furniture. */
+.ops-hud__compass,
+.ops-hud__scalebar {
+  --cut: 10px;
+  position: absolute;
+  background: rgba(11, 12, 12, 0.72);
+  border: 1px solid rgba(230, 232, 232, 0.18);
+  padding: 6px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.ops-hud__compass {
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ops-hud__compass-n {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+/* Pure-CSS needle: bone triangle north, dim triangle south. Vector-drawn
+ * (clip-path), so it stays crisp at 2x with no raster asset. */
+.ops-hud__needle {
+  width: 14px;
+  height: 22px;
+  position: relative;
+}
+
+.ops-hud__needle-up {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 11px;
+  background: #e6e8e8;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.ops-hud__needle-dn {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 14px;
+  height: 11px;
+  background: rgba(230, 232, 232, 0.35);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.ops-hud__scalebar {
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ops-hud__scalebar-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  opacity: 0.75;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-hud__scalebar-bar {
+  display: flex;
+  width: 120px;
+  height: 5px;
+  border: 1px solid rgba(230, 232, 232, 0.6);
+}
+
+.ops-hud__scalebar-seg {
+  flex: 1;
+}
+
+.ops-hud__scalebar-seg--fill {
+  background: rgba(230, 232, 232, 0.75);
+}
+
+/* Site coords + clock: dim rows inside the sector block, no new box. */
+.ops-hud__coords,
+.ops-hud__clock {
+  opacity: 0.65;
+  white-space: nowrap;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.ops-hud__clock {
+  font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-reduced-motion: reduce) {

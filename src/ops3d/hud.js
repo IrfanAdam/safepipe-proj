@@ -10,6 +10,25 @@ import './hud.css';
 const LEVELS = ['network', 'segment', 'asset'];
 const LEVEL_NUM = { 1: 'network', 2: 'segment', 3: 'asset' };
 
+/* Orientation/scale furniture — pure, unit-tested.
+ * World is km (terrain SIZE 44 km, mapped circle R≈20): the bar is a
+ * per-level representative scale, not a surveyed measure — wheel zoom
+ * moves true scale inside a level, so the label carries ≈. */
+export const SITE_COORDS = { lat: 57.03, lon: -111.68 };
+export const SITE_COORDS_LABEL = '57.03°N 111.68°W';
+export const SCALE_FOR_LEVEL = {
+  network: { km: 20, label: '20 KM' },
+  segment: { km: 5, label: '5 KM' },
+  asset: { km: 1, label: '1 KM' },
+};
+export function scaleForLevel(level) {
+  return SCALE_FOR_LEVEL[level] ?? SCALE_FOR_LEVEL.network;
+}
+export function formatClockUTC(d = new Date()) {
+  const iso = d.toISOString();
+  return `${iso.slice(0, 10)} · ${iso.slice(11, 19)} UTC`;
+}
+
 function el(tag, cls, text) {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -44,6 +63,11 @@ export function buildHud(container, cbs = {}) {
   sector.appendChild(el('div', 'ops-hud__sub', 'SECTOR 7G — ATHABASCA · FORT MCMURRAY · R 20 KM'));
   const healthLine = el('div', 'ops-hud__health', 'HEALTH —/—/—');
   sector.appendChild(healthLine);
+  // Site anchor + live clock: dim rows in the sector block, no new box.
+  sector.appendChild(el('div', 'ops-hud__coords', `${SITE_COORDS_LABEL} · SITE CENTER`));
+  const clock = el('div', 'ops-hud__clock', formatClockUTC(new Date()));
+  clock.setAttribute('data-testid', 'ops-hud-clock');
+  sector.appendChild(clock);
   // — Top-left column: sector block with the critical-asset banner below it.
   // Banner is worst fault + asset only — health lives in the sector block.
   const topleft = el('div', 'ops-hud__topleft');
@@ -199,6 +223,41 @@ export function buildHud(container, cbs = {}) {
   help.appendChild(helpPanel);
   help.appendChild(helpBtn);
   root.appendChild(help);
+
+  // — Orientation furniture: compass top-center, scale bar bottom-center.
+  // Both clear of the four corner clusters. Static north-up: the default
+  // camera yaw is ≈north-up, and update() accepts an optional
+  // state.heading (deg clockwise) to rotate the needle once twin.js passes
+  // live camera azimuth. Pure CSS needle — vector-crisp, no raster.
+  const compass = el('div', 'ops-hud__compass');
+  compass.setAttribute('data-testid', 'ops-hud-compass');
+  compass.setAttribute('aria-label', 'North arrow — up is grid north');
+  compass.appendChild(el('div', 'ops-hud__compass-n', 'N'));
+  const needle = el('div', 'ops-hud__needle');
+  needle.setAttribute('data-testid', 'ops-hud-needle');
+  needle.appendChild(el('div', 'ops-hud__needle-up'));
+  needle.appendChild(el('div', 'ops-hud__needle-dn'));
+  compass.appendChild(needle);
+  root.appendChild(compass);
+
+  const scalebar = el('div', 'ops-hud__scalebar');
+  scalebar.setAttribute('data-testid', 'ops-hud-scale');
+  const scaleLabel = el('div', 'ops-hud__scalebar-label', `≈ ${scaleForLevel('network').label}`);
+  scaleLabel.setAttribute('data-testid', 'ops-hud-scale-label');
+  const scaleBar = el('div', 'ops-hud__scalebar-bar');
+  scaleBar.setAttribute('aria-hidden', 'true');
+  scaleBar.appendChild(el('div', 'ops-hud__scalebar-seg ops-hud__scalebar-seg--fill'));
+  scaleBar.appendChild(el('div', 'ops-hud__scalebar-seg'));
+  scalebar.appendChild(scaleLabel);
+  scalebar.appendChild(scaleBar);
+  root.appendChild(scalebar);
+
+  // Live clock: refresh on every update + 1 s tick; cleared on dispose.
+  const clockTick = () => {
+    clock.textContent = formatClockUTC(new Date());
+  };
+  const clockTimer = setInterval(clockTick, 1000);
+  if (typeof clockTimer === 'object' && clockTimer.unref) clockTimer.unref();
 
   // — Right detail panel (hidden unless selection) —
   const panel = el('div', 'ops-hud__panel ops-hud__panel--hidden');
@@ -380,6 +439,14 @@ export function buildHud(container, cbs = {}) {
       `HEALTH ${rollup.nominal ?? 0} OK · ${rollup.watch ?? 0} WATCH · ${rollup.critical ?? 0} CRITICAL`;
 
     const level = LEVELS.includes(state.level) ? state.level : 'network';
+    // Scale bar follows the view level; clock refreshes with every update.
+    const sc = scaleForLevel(level);
+    scaleLabel.textContent = `≈ ${sc.label}`;
+    scalebar.setAttribute('aria-label', `Approximate scale at ${level} view: ${sc.label}`);
+    clock.textContent = formatClockUTC(new Date());
+    if (typeof state.heading === 'number' && Number.isFinite(state.heading)) {
+      needle.style.transform = `rotate(${state.heading}deg)`;
+    }
     viewBox.classList.toggle('ops-hud__viewbox--hidden', !(state.selection ?? null));
     for (const b of levelBtns) {
       b.classList.toggle('ops-hud__level-btn--active', b.dataset.level === level);
@@ -450,6 +517,7 @@ export function buildHud(container, cbs = {}) {
   return {
     update,
     dispose() {
+      clearInterval(clockTimer);
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keydown', onLevelKey);
       document.removeEventListener('fullscreenchange', syncFs);
