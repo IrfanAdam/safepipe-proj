@@ -121,7 +121,8 @@ function _procedural(x, z) {
   const lakeMask = lakeWet(x, z);
   const swell =
     (0.042 * Math.sin(x * 0.16 + 1.2) * Math.cos(z * 0.13 - 0.6) +
-    0.022 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0)) *
+    0.022 * Math.sin(x * 0.31 - 0.4) * Math.sin(z * 0.27 + 2.0) +
+    0.010 * Math.sin(x * 0.63 + 2.1) * Math.sin(z * 0.71 - 0.7)) *
     (1 - 0.82 * lakeMask);
   const bump = (ax, az, sig, amp) => {
     const dx = x - ax, dz = z - az;

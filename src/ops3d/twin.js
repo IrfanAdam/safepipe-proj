@@ -458,7 +458,7 @@ export function createTwin(container, opts = {}) {
   // (contours, pipes, structures, anchors) follows the same altitude.
   // Without the geotiff dep this is a silent no-op (fallback covered by test).
   if (!opts._dem) {
-    loadDEM({ fetchTimeoutMs: 1500 }).then((r) => {
+    loadDEM({ fetchTimeoutMs: 5000 }).then((r) => {
       if (!r || r.terrainSource !== 'dem') return;
       setFieldSource(r.sample, 'dem');
       const keep = selected;

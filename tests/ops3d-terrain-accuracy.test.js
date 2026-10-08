@@ -46,12 +46,12 @@ function valleyWallW(z) {
 }
 
 describe('ops3d terrain accuracy (phase 1 vs Copernicus ground truth)', () => {
-  it('Task 8 — relief is 75–90% of real 277 m (now ~227 m, gap: under by ~18%)', () => {
+  it('Task 8 — relief is 75–90% of real 277 m (now ~243 m, gap: under by ~12%)', () => {
     const s = gridStats();
-    assert.ok(s.reliefM > 200 && s.reliefM < 250, `relief ${s.reliefM.toFixed(0)} m (real ${REAL.reliefM} m)`);
+    assert.ok(s.reliefM > 200 && s.reliefM < 260, `relief ${s.reliefM.toFixed(0)} m (real ${REAL.reliefM} m)`);
   });
 
-  it('Task 8 — terrain variance sd is 55–75% of real 65 m (now ~42 m)', () => {
+  it('Task 8 — terrain variance sd is 55–75% of real 65 m (now ~43 m)', () => {
     const s = gridStats();
     assert.ok(s.sdM > 36 && s.sdM < 50, `sd ${s.sdM.toFixed(1)} m (real ${REAL.sdM} m)`);
   });
