@@ -117,13 +117,13 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 **Objective:** mine benches ~40% of NW quadrant, tailings rectangles with straight dykes + real palette (pale mature / dark fresh / tan cells), SAGD pads 60–90 per 9.6 km on DLS lines, corridors 20–60 m wide.
 **Files:** `src/ops3d/network.js`, `src/ops3d/structures.js`
 **Verify:** quadrant spot-check vs audit.md spot map.
-**Accuracy: rating 5/10.** Coverage 10/10 (every layout asset resolves a quadrant+role, `tests/ops3d-density.test.js`); positional fidelity 3/10 — quadrants are layout-relative squares, not geo-anchored to audit coordinates, so the "matches spot map" check is eyeball-only. To lift: pin quadrant corners to real lat/lon around 57.03N −111.68W and assert known real facilities fall in the right quadrant.
+**Accuracy: rating 6/10** (was 5). Coverage 10/10 (every layout asset resolves a quadrant+role, `tests/ops3d-density.test.js`); +1: the Phase 2 Overpass contract now exists in code — `localToLonLat`/`lonLatToLocal` round-trip <1 m, `geoQuadrant` agrees with `quadrantOf` on every tested point, and every layout asset geo-locates inside the site window (gated). Positional fidelity of the representative layout itself is still eyeball-only — the import, not more scaffolding, lifts this further.
 
 ### Task 10: attention lock ✓ done
 **Objective:** terrain whispers at TOP (threshold drop), faults always brightest (bloom won't catch white contours), flow color token distinct from watch amber `#ff8c39`, single sun direction.
 **Files:** `src/ops3d/post.js`, `src/ops3d/scene.js`, tokens
 **Verify:** TOP fault found in 2s; NEAR frames a pad from 550 m.
-**Accuracy: rating 8/10** (perceptual, not terrain — verified in code 2026-10-08). Single sun ✓ (1× `DirectionalLight` in `scene.js`); flow cyan `0x35c5d8` vs watch amber `#ff8c39` ≈ 160° hue separation, never confusable ✓; terrain whisper opacities set (0.44/0.92) with bloom threshold 0.36 catching critical red, not white ✓. −2: the "fault found in 2s" claim has no harness — needs a scripted TOP-frame luminance-contrast check or a timed human pass at REF GATE 1.
+**Accuracy: rating 8/10** (perceptual, not terrain — verified in code + photometry gates 2026-10-08, `tests/ops3d-attention.test.js`). Single sun ✓ (1× `DirectionalLight` in `scene.js`); flow cyan `0x35c5d8` vs watch amber `#ff8c39` ≈ 160° hue separation, never confusable ✓ (gated >90°); terrain whisper opacities set (0.44/0.92) with bloom threshold 0.36 ✓. Correction to the old claim: critical-red body (L≈0.335) does NOT self-bloom — faults win by white-hot pins + lamp dots (L≈0.488, gated to clear the threshold) + pulse against the evenly glowing map; the gate forbids raising the threshold above lamp-red. −2: the "fault found in 2s" claim has no harness — needs a scripted TOP-frame luminance-contrast check or a timed human pass at REF GATE 1.
 
 - REF GATE 1: you pick the terrain mood (photo/map screenshot); confirm the pinned center + the audit's layout.
 

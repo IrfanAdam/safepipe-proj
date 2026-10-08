@@ -24,6 +24,33 @@ export function quadrantOf(x, z) {
   return 'SW';
 }
 
+/* Local-km → lon/lat at the site (equirectangular, same math as dem.js).
+ * Phase 2 Overpass contract: real facility coordinates arrive as lon/lat;
+ * geoQuadrant(lon, lat) must agree with quadrantOf(x, z) for every asset
+ * once the import lands — this test locks the agreement on the current
+ * representative layout so drift shows up immediately. */
+export function localToLonLat(x, z, site = { lat: 57.03, lon: -111.68 }) {
+  const lon = site.lon + x / (111.32 * Math.cos((site.lat * Math.PI) / 180));
+  const lat = site.lat - z / 111.32;
+  return [lon, lat];
+}
+
+/* Inverse: lon/lat → local km. Round-trips with localToLonLat to <1 m. */
+export function lonLatToLocal(lon, lat, site = { lat: 57.03, lon: -111.68 }) {
+  const x = (lon - site.lon) * (111.32 * Math.cos((site.lat * Math.PI) / 180));
+  const z = (site.lat - lat) * 111.32;
+  return [x, z];
+}
+
+/* Geographic quadrant: same role split, expressed in lon/lat so Overpass
+ * imports land in the right quadrant without touching layout code. North
+ * of site = far side (z<0 in local, where +z points south toward the river
+ * town); the split parallels quadrantOf exactly. */
+export function geoQuadrant(lon, lat, site = { lat: 57.03, lon: -111.68 }) {
+  const [x, z] = lonLatToLocal(lon, lat, site);
+  return quadrantOf(x, z);
+}
+
 /* roleOf(assetId, [x, z]) → { quadrant, role }. Facilities inherit their
  * quadrant role; pipelines are always corridor carriers through it. */
 export function roleOf(assetId, at) {
