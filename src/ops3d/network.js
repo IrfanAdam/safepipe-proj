@@ -5,9 +5,12 @@
  * the selected asset's faults get a ground ring. Facilities are wireframe
  * boxes at line junctions, colored by own health; sensors are small diamonds.
  * Soft comet pulses ride each pipe path (tick/update(t) advances sprite
- * phase along the arc) — cyan, never amber, so flow direction can't read
- * as a watch state. Each pulse fades in/out over its life (tapered alpha
- * head-to-tail), never a hard-tipped dash. Outer runs (first/last 15% of arc
+  * phase along the arc) — cyan, never amber, so flow direction can't read
+  * as a watch state. Each pulse fades in/out over its life (tapered alpha
+  * head-to-tail), never a hard-tipped dash. A solid cyan flow LINE runs the
+  * same path under the pulses: split into FLOW_LINE_SEGS chunks whose alpha
+  * follows a slow traveling envelope + global breathing, so lines gently
+  * emerge and dissolve along the pipe instead of sitting hard. Outer runs (first/last 15% of arc
  * length, or radius > 12 km) render buried: sunk, dimmed ~40%, dash-grouped.
  * Picking raycasts invisible fat-tube/box proxies (never the dots).
  * Contract: buildNetwork(scene, feed) →
@@ -36,6 +39,10 @@ const FLOW_COLOR = 0x35c5d8; // cool cyan oil-flow pulses — never amber (watch
 const PULSE_OPACITY = 0.6; // pulse peak alpha (envelope tapers it to 0 at both ends)
 const PULSE_SPEED = 1.6; // pulse travel along the pipe path (world units/s)
 const PULSES_PER_PIPE = 3; // evenly phased pulses per pipe — direction reads, density stays calm
+const FLOW_LINE_OPACITY = 0.30; // flow-line peak alpha — whisper under pulses (~0.9 TOP) and alarms
+const FLOW_LINE_SEGS = 6; // chunks per pipe flow line — the traveling-envelope unit
+const FLOW_LINE_SPEED = 0.10; // envelope travel along the pipe (cycles/s — slow dissolve)
+const FLOW_BREATHE = 0.35; // slow global breathing depth — lines swell and dissolve (±35%)
 const BURIED_EDGE_T = 0.15; // outer 15% of each run dives underground
 const BURIED_R = 12; // any stretch past r=12 km is buried too
 
@@ -165,6 +172,7 @@ export function buildNetwork(scene, feed) {
   const proxies = [];
   const beadMats = []; // fault beads dim independently at NEAR (kit takes over)
   const pulses = []; // soft comet flow pulses (sprite phase advanced in tick)
+  const flowLines = []; // solid flow-line chunks (traveling soft-fade envelope in tick)
   const chevrons = []; // dive markers riding the arc (pulses carry direction)
   const diveGeo = new THREE.OctahedronGeometry(0.11);
   const DIVE_COL = 0x7fa3b8; // cool steel: marks where a run dives underground
@@ -267,6 +275,41 @@ export function buildNetwork(scene, feed) {
       entry.sprites.push({ sp, mat, off: k / PULSES_PER_PIPE });
     }
     pulses.push(entry);
+
+    /* Solid flow line under the pulses: the same draped path as one Line2
+     * per chunk (FLOW_LINE_SEGS chunks/pipe), each with its own material so
+     * tick can sweep a soft-fade envelope along the pipe — chunks emerge and
+     * dissolve in sequence instead of sitting hard. Solid + additive, never
+     * dashed (dashes survive only on buried pipe walls). */
+    {
+      const nPts = flowPts.length / 3;
+      const pipePhase = pulses.length / Math.max(1, layout.pipelines.length);
+      const per = Math.max(1, Math.ceil((nPts - 1) / FLOW_LINE_SEGS));
+      for (let c0 = 0; c0 < nPts - 1; c0 += per) {
+        const c1 = Math.min(nPts - 1, c0 + per);
+        const chunk = [];
+        for (let j = c0; j <= c1; j++) chunk.push(flowPts[j * 3], flowPts[j * 3 + 1], flowPts[j * 3 + 2]);
+        if (chunk.length < 6) continue;
+        const fg = new LineGeometry();
+        fg.setPositions(chunk);
+        const fm = new LineMaterial({
+          color: FLOW_COLOR,
+          linewidth: 2,
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          fog: false,
+        });
+        fm.resolution.set(1280, 720);
+        resMats.push(fm);
+        const fl = new Line2(fg, fm);
+        fl.computeLineDistances();
+        fl.frustumCulled = false;
+        group.add(fl);
+        flowLines.push({ mat: fm, order: c0 / Math.max(1, nPts - 1), pipePhase, assetId: pipe.assetId, lvl: 1, boost: 1 });
+      }
+    }
 
     // Dive markers: steel octahedrons at the two points where the run
     // leaves the surface — the explicit "pipeline goes underground HERE".
@@ -435,9 +478,19 @@ export function buildNetwork(scene, feed) {
 
   // Comet pulses ride the arc: phase advances with scene time, alpha
   // follows a fade-in/out envelope (tapered head-to-tail, zero at both
-  // ends) so pulses breathe in and out with no hard tips. Accepts
-  // absolute scene time.
+  // ends) so pulses breathe in and out with no hard tips. Flow-line chunks
+  // sweep the same trick spatially: a slow envelope travels along the pipe
+  // (phase = time travel + along-pipe order + per-pipe offset) under a
+  // global breathing swell, so lines emerge and dissolve instead of sitting
+  // hard. Accepts absolute scene time.
   const tickFlow = (t = 0) => {
+    const breathe = 1 - FLOW_BREATHE * (0.5 + 0.5 * Math.sin(t * 0.6)); // slow swell/dissolve
+    for (const f of flowLines) {
+      const ph = (((t * FLOW_LINE_SPEED + f.pipePhase + f.order) % 1) + 1) % 1;
+      const env = smooth01(ph / 0.25) * (1 - smooth01((ph - 0.5) / 0.5));
+      const dim = selected && selected !== f.assetId ? DIM_FACTOR : 1;
+      f.mat.opacity = FLOW_LINE_OPACITY * env * breathe * (f.lvl ?? 1) * (f.boost ?? 1) * dim;
+    }
     for (const e of pulses) {
       const dim = selected && selected !== e.assetId ? DIM_FACTOR : 1;
       const lvl = e.assetId === selected ? 1 : e.lvl ?? 1;
@@ -509,6 +562,10 @@ export function buildNetwork(scene, feed) {
         e.boost = name === 'network' ? 1.5 : 1; // TOP legibility peak ≈0.9, still under alarm bloom
         const s = (name === 'network' ? 1.8 : name === 'segment' ? 0.7 : 0.45);
         for (const p of e.sprites) p.sp.scale.setScalar(0.55 * s);
+      }
+      for (const f of flowLines) {
+        f.lvl = f.assetId === selected ? 1 : name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
+        f.boost = name === 'network' ? 1.3 : 1; // TOP line peak ≈0.39 — present, never alarming
       }
       for (const c of chevrons) c.detailF = name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
       applySelection(); // owns ALL byId opacity (level + selection + NEAR beads)

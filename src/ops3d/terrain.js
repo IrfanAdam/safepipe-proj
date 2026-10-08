@@ -15,19 +15,21 @@
  * their vertex colors + a dark draped ground fill (neutral-grey elevation
  * tint × hillshade) rides just under the lines, so the basin reads as land
  * from TOP and ISO. Rendering-only — field() untouched, relief/sd gates
- * cannot move. Blue is reserved for real water ONLY (playa-lake wash +
- * main-stem river thread); every contour/shore/drain line is neutral grey.
+ * cannot move. Blue is reserved for real water ONLY (playa-lake flat fill +
+ * main-stem river ribbon); every contour/shore/drain line is neutral grey.
  * Marching-squares 160×160 grid at 32 power-spaced levels; unordered
  * segments are chained (quantized-endpoint greedy) into continuous smooth
- * polylines per level, then batched into TWO LineSegments2 meshes (base +
- * index) — two draw calls for the whole contour field. Muted grey index
- * lines every 5th level; index rings carry inline elevation pills so the
+ * polylines per level, then batched into THREE LineSegments2 meshes (base +
+ * index + summit) — three draw calls for the whole contour field. Muted grey index
+ * lines every 5th level; the top-rank levels render wider + brighter
+ * (elevation-ranked glow, capped); index rings carry inline elevation pills so the
  * contours read as a plotting technique, not decoration. Cells whose local
  * gradient is below SLOPE_MIN are skipped, so flats stay clean while
- * contours wrap the rest of the terrain.
+ * contours wrap the rest of the terrain. Segments inside water (playa lake,
+ * river core) are skipped — water renders as flat blue fills, never hatches.
  * Desaturated neutral-grey palette, WebGL1-safe (no custom GLSL). Blue is
- * reserved for real water bodies only (playa wash + river thread, both
- * flat surface fills/threads, never contour lines).
+ * reserved for real water bodies only (playa-lake flat fill + main-stem
+ * river ribbon, both flat surface fills, never contour/thread lines).
  */
 import * as THREE from 'three';
 import { Line2 } from 'three/addons/lines/Line2.js';
@@ -62,6 +64,31 @@ const DRAW_W = 0.65; // dry-draw half-width km — narrower banks bend contours 
 const WATER_COL = 0x5f7d89; // muted slate-blue, dimmer than any alarm
 const SHORE_COL = 0x848b90; // shoreline ring: neutral survey grey, never an accent
 const DRAIN_COL = 0x848b90; // dry-draw threads: neutral grey — the draw is dry, not water
+/* Elevation-ranked contour glow (user rubric): the highest-elevation
+ * contour level glows most, glow decreasing downslope — brightness × width
+ * scaled by level rank. Subtle and CAPPED so red/amber alarms keep the
+ * luminance lead (attention test gates: threshold 0.44, plate contrast). */
+const ELEV_GLOW_MIN = 0.85; // lowest-level brightness multiplier (recedes)
+const ELEV_GLOW_MAX = 1.12; // summit brightness multiplier — capped, never near white
+const SUMMIT_WIDTH = 2.4; // top-rank linewidth (base 1.15, index 2.0)
+const SUMMIT_TOP_K = 4; // top K levels form the wider summit batch
+const WATER_MASK = 0.55; // contour segments wetter than this are water — skipped, fills own it
+const rankGlow = (k) => ELEV_GLOW_MIN + (ELEV_GLOW_MAX - ELEV_GLOW_MIN) * smooth(0, 1, k / (LEVELS - 1));
+/* Water wetness 0..1 at a world point: playa-lake interior + river-thread
+ * core. Contours use it as a mask (wet segments skipped — water renders as
+ * flat fills, never line hatch); land edges near it get the shoreline glow. */
+function waterWet(x, z) {
+  const lake = lakeWet(x, z);
+  const dxr = (x - riverX(z)) / 0.7; // visible-water core half-width, km
+  return Math.max(lake, Math.exp(-dxr * dxr));
+}
+/* Land-water edge: contour/land vertices touching a water body (playa lake
+ * or river thread) get the rubric TOP-rank glow — same treatment as the
+ * summit, so shorelines read as bright edges without any blue lines. */
+function shoreTouch(x, z) {
+  if (lakeWet(x, z) > 0.02) return true;
+  return Math.abs(x - riverX(z)) < 1.2;
+}
 /* Dry-draw centerline, shared by the field carve and the drainage thread. */
 function drawCenter(x) {
   return 6 * Math.sin(x * 0.22 + 0.5) + 2 * Math.sin(x * 0.55 + 1.1);
@@ -378,34 +405,44 @@ let _fillLo = -0.16, _fillHi = 0.12;
 /* Filter/accumulate: every chained polyline contributes its (prev → cur)
  * segment pairs to a tier batch at true elevation × VEX, with periphery
  * fade toward the boundary ring baked into vertex colors. Contour lines
- * are neutral grey everywhere — including over water — with baked
- * hillshade brightness doing the volumetric work. */
+ * are neutral grey everywhere on LAND — segments inside water (playa lake,
+ * river core) are skipped so water reads as flat fills, never line hatch.
+ * Vertex brightness = level-rank glow × baked hillshade; land vertices
+ * touching water get the rubric top-rank glow (bright shoreline edges). */
 const _wc = new THREE.Color();
 const _white = new THREE.Color(0xffffff);
-function pushPath(batch, pts, y, col) {
+function pushPath(batch, pts, y, col, glow = 1) {
   if (pts.length < 2) return;
   batch.paths += 1;
-  batch.segs += pts.length - 1;
   let has = false;
   let px = 0;
   let pz = 0;
+  let pwet = 0;
   let pr = 0;
   let pg = 0;
   let pb = 0;
   for (let i = 0; i < pts.length; i++) {
     const x = pts[i][0];
     const z = pts[i][1];
+    const wet = waterWet(x, z);
+    if (has && pwet > WATER_MASK && wet > WATER_MASK) {
+      has = false; // both ends inside water — drop the segment, fills own it
+      continue;
+    }
     const f = 1 - smooth(12, 19.5, Math.hypot(x, z));
-    _wc.copy(col).multiplyScalar(shadeToBright(_shadeAt(x, z)));
+    const gl = Math.max(glow, shoreTouch(x, z) ? ELEV_GLOW_MAX : 0);
+    _wc.copy(col).multiplyScalar(gl * shadeToBright(_shadeAt(x, z)));
     const r = _wc.r * f;
     const g = _wc.g * f;
     const b = _wc.b * f;
     if (has) {
       batch.pos.push(px, y, pz, x, y, z);
       batch.clr.push(pr, pg, pb, r, g, b);
+      batch.segs += 1;
     }
     px = x;
     pz = z;
+    pwet = wet;
     pr = r;
     pg = g;
     pb = b;
@@ -503,8 +540,21 @@ export function buildTerrain(scene) {
     depthWrite: false,
     fog: false,
   });
+  // Summit batch: the top-rank levels render wider (SUMMIT_WIDTH) at the
+  // capped summit glow — elevation reads as emphasis, never as alarm.
+  const summitMat = new LineMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    linewidth: SUMMIT_WIDTH,
+    transparent: true,
+    opacity: 0.55,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    fog: false,
+  });
   baseMat.resolution.set(1280, 720);
   indexMat.resolution.set(1280, 720);
+  summitMat.resolution.set(1280, 720);
 
   // 32 levels chained into smooth strips; every 5th is a brighter index contour.
   // Levels are symmetric power-spaced (dense near mid-ground, open at the
@@ -516,11 +566,12 @@ export function buildTerrain(scene) {
   labelGroup.name = 'ops-elev-labels';
   const placed = [];
   // Batched contour field: every chained path used to be its own Line2 mesh
-  // (hundreds of draw calls per frame). All base levels accumulate into ONE
-  // LineSegments2 and all index levels into another — two draw calls for
-  // the whole terrain, pixel-identical output.
+  // (hundreds of draw calls per frame). Base levels accumulate into ONE
+  // LineSegments2, index levels into a second, summit-rank levels into a
+  // third — three draw calls for the whole terrain.
   const baseBatch = { pos: [], clr: [], paths: 0, segs: 0 };
   const indexBatch = { pos: [], clr: [], paths: 0, segs: 0 };
+  const summitBatch = { pos: [], clr: [], paths: 0, segs: 0 };
   // Task 7: levels come from the shared DEM helper — same power shaping,
   // sourced from whatever altitude the sampler resolved (DEM or fallback).
   const contourLevels = levelsForRange(mn, mx, LEVELS);
@@ -528,12 +579,14 @@ export function buildTerrain(scene) {
     const level = contourLevels[k];
     const y = level * VEX;
     const isIndex = k % 5 === 4;
-    const col = level >= 0 ? (isIndex ? INDEX_COL : BASE_COL) : BELOW_COL;
+    const isSummit = k >= LEVELS - SUMMIT_TOP_K; // rubric top rank: wider + brightest
+    const col = level >= 0 ? (isIndex || isSummit ? INDEX_COL : BASE_COL) : BELOW_COL;
     let paths = chainSegments(levelSegments(H, N, step, level)).map((p) =>
       smoothPath(p, isIndex ? 3 : 2)); // Chaikin resample: 2 base, 3 index glass
-    paths = paths.filter((p) => p.length >= 2 && (isIndex || p.length >= 4));
-    const batch = isIndex ? indexBatch : baseBatch;
-    for (const p of paths) pushPath(batch, p, y, col);
+    paths = paths.filter((p) => p.length >= 2 && (isIndex || isSummit || p.length >= 4));
+    const batch = isSummit ? summitBatch : isIndex ? indexBatch : baseBatch;
+    const glow = rankGlow(k); // elevation-ranked: brightest at summit, fading downslope
+    for (const p of paths) pushPath(batch, p, y, col, glow);
     if (isIndex) {
       const tag = `${Math.round(level * 1000)} m`;
       const ranked = paths.filter((p) => p.length >= 8).sort((a, b) => b.length - a.length).slice(0, 2);
@@ -551,7 +604,7 @@ export function buildTerrain(scene) {
       }
     }
   }
-  for (const [batch, mat] of [[baseBatch, baseMat], [indexBatch, indexMat]]) {
+  for (const [batch, mat] of [[baseBatch, baseMat], [indexBatch, indexMat], [summitBatch, summitMat]]) {
     if (!batch.pos.length) continue;
     const g = new LineSegmentsGeometry();
     g.setPositions(batch.pos);
@@ -561,8 +614,8 @@ export function buildTerrain(scene) {
     group.add(mesh);
   }
   console.info(
-    `[ops3d] contours batched: ${baseBatch.paths + indexBatch.paths} paths / ` +
-    `${baseBatch.segs + indexBatch.segs} segments → 2 meshes (was one mesh per path)`,
+    `[ops3d] contours batched: ${baseBatch.paths + indexBatch.paths + summitBatch.paths} paths / ` +
+    `${baseBatch.segs + indexBatch.segs + summitBatch.segs} segments → 3 meshes (base/index/summit)`,
   );
   labelGroup.visible = true; // inline pills read at every zoom, OS-plate style
   group.add(labelGroup);
@@ -689,34 +742,32 @@ export function buildTerrain(scene) {
   });
   group.add(new THREE.LineSegments(tickGeo, tickMat));
 
-  // Playa lake: the wash fill is the single blue water body on the map
-  // (WATER_COL, faint) — it IS standing water. Its shoreline ring is
-  // neutral grey: rings are survey lines, never water.
+  // Playa lake: flat blue fill at ONE level surface (no drape, no radial
+  // line hatch — a proper indexed fan, center + shoreline ring), bounded by
+  // the shoreline contour. The ONLY blue on the map is this standing water.
+  // Its shoreline ring stays neutral grey: rings are survey lines, not water.
   const lakeY = field(LAKE_X, LAKE_Z) * VEX;
   {
-    // Draped onto the depression so it never pokes through the body.
-    const wy = (x, z) => field(x, z) * VEX + 0.012;
-    const washPos = [];
-    for (let i = 0; i < 64; i++) {
-      const a0 = (i / 64) * Math.PI * 2, a1 = ((i + 1) / 64) * Math.PI * 2;
-      const r0 = lakeR(a0) * 0.92, r1 = lakeR(a1) * 0.92;
-      const x0 = LAKE_X + Math.cos(a0) * r0, z0 = LAKE_Z + Math.sin(a0) * r0;
-      const x1 = LAKE_X + Math.cos(a1) * r1, z1 = LAKE_Z + Math.sin(a1) * r1;
-      washPos.push(
-        LAKE_X, wy(LAKE_X, LAKE_Z), LAKE_Z,
-        x0, wy(x0, z0), z0,
-        x0, wy(x0, z0), z0,
-        x1, wy(x1, z1), z1,
-      );
+    const RING = 96;
+    const cy = lakeY + 0.015; // FLAT water surface — one Y for the whole lake
+    const pos = [LAKE_X, cy, LAKE_Z];
+    const idx = [];
+    for (let i = 0; i <= RING; i++) {
+      const a = (i % RING) / RING * Math.PI * 2;
+      const r = lakeR(a);
+      pos.push(LAKE_X + Math.cos(a) * r, cy, LAKE_Z + Math.sin(a) * r);
     }
-    const washGeo = new THREE.BufferGeometry();
-    washGeo.setAttribute('position', new THREE.Float32BufferAttribute(washPos, 3));
-    const wash = new THREE.Mesh(washGeo, new THREE.MeshBasicMaterial({
-      color: WATER_COL, transparent: true, opacity: 0.20, depthWrite: false,
+    for (let i = 1; i <= RING; i++) idx.push(0, i, i + 1);
+    const lakeGeo = new THREE.BufferGeometry();
+    lakeGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    lakeGeo.setIndex(idx);
+    lakeGeo.computeVertexNormals();
+    const lake = new THREE.Mesh(lakeGeo, new THREE.MeshBasicMaterial({
+      color: WATER_COL, transparent: true, opacity: 0.42, depthWrite: false,
       side: THREE.DoubleSide,
     }));
-    wash.renderOrder = 0;
-    group.add(wash);
+    lake.renderOrder = 0;
+    group.add(lake);
   }
   const shorePos = [];
   for (let i = 0; i < 96; i++) {
@@ -731,8 +782,11 @@ export function buildTerrain(scene) {
   }
   const shoreGeo = new LineGeometry();
   shoreGeo.setPositions(shorePos);
+  // Shoreline glow: land-water edges get the rubric top-rank treatment —
+  // wider + brighter than other survey lines, still neutral grey (blue is
+  // water-fill only) and capped so alarms lead.
   const shoreMat = new LineMaterial({
-    color: SHORE_COL, linewidth: 1.05, transparent: true, opacity: 0.40,
+    color: SHORE_COL, linewidth: 2.0, transparent: true, opacity: 0.60,
     depthWrite: false, fog: false,
   });
   shoreMat.resolution.set(1280, 720);
@@ -743,17 +797,12 @@ export function buildTerrain(scene) {
   // Drainage threads: the west draw is DRY, so its thread + feeders run
   // neutral grey (a dry creek is land, not water). Kinks in the contours
   // come from the steep-bank carve, not by hand. The main-stem Athabasca
-  // is real flowing water, so it alone keeps a faint WATER_COL thread.
+  // is real flowing water, so it alone keeps a WATER_COL flat ribbon fill.
   const drainMat = new LineMaterial({
     color: DRAIN_COL, linewidth: 1.05, transparent: true, opacity: 0.42,
     depthWrite: false, fog: false,
   });
   drainMat.resolution.set(1280, 720);
-  const riverMat = new LineMaterial({
-    color: WATER_COL, linewidth: 1.2, transparent: true, opacity: 0.38,
-    depthWrite: false, fog: false,
-  });
-  riverMat.resolution.set(1280, 720);
   const drapeRun = (pts, mat = drainMat) => {
     const runs = [[]];
     for (const [x, z] of pts) {
@@ -783,10 +832,40 @@ export function buildTerrain(scene) {
   };
   feeder(2.5, 13.5, 3.2); // off the SE hill flank
   feeder(-6.5, -11.5, -5.4); // off the southern flats
-  // Main-stem Athabasca: the one flowing-water thread on the map.
-  const stem = [];
-  for (let z = -19; z <= 19; z += 0.4) stem.push([riverX(z), z]);
-  drapeRun(stem, riverMat);
+  // Main-stem Athabasca: the one flowing-water body on the map — a FLAT
+  // blue ribbon (uniform WATER_COL fill, no thread line, no hatch). One
+  // level Y per quad so it reads as a level water surface stepping gently
+  // down the valley; contours stop at its banks (WATER_MASK); the river
+  // banks get the shoreline top-rank glow via shoreTouch.
+  {
+    const HALF = 0.6; // visible-water half-width, km — the thread of real flowing water
+    const STEP = 0.4;
+    const pos = [];
+    const idx = [];
+    let vi = 0;
+    for (let z = -19; z < 19; z += STEP) {
+      const z2 = Math.min(19, z + STEP);
+      const cx = riverX(z), cx2 = riverX(z2);
+      if (Math.hypot(cx, z) > 19.3 && Math.hypot(cx2, z2) > 19.3) continue;
+      const yq = (field(cx, z) * VEX + field(cx2, z2) * VEX) / 2 + 0.015; // FLAT quad
+      pos.push(
+        cx - HALF, yq, z, cx + HALF, yq, z,
+        cx2 - HALF, yq, z2, cx2 + HALF, yq, z2,
+      );
+      idx.push(vi, vi + 2, vi + 1, vi + 1, vi + 2, vi + 3);
+      vi += 4;
+    }
+    const ribGeo = new THREE.BufferGeometry();
+    ribGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    ribGeo.setIndex(idx);
+    ribGeo.computeVertexNormals();
+    const ribbon = new THREE.Mesh(ribGeo, new THREE.MeshBasicMaterial({
+      color: WATER_COL, transparent: true, opacity: 0.38, depthWrite: false,
+      side: THREE.DoubleSide,
+    }));
+    ribbon.renderOrder = 0;
+    group.add(ribbon);
+  }
 
   scene.add(group);
 
@@ -805,10 +884,10 @@ export function buildTerrain(scene) {
     setSize(w, h) {
       baseMat.resolution.set(w, h);
       indexMat.resolution.set(w, h);
+      summitMat.resolution.set(w, h);
       ringMat.resolution.set(w, h);
       shoreMat.resolution.set(w, h);
       drainMat.resolution.set(w, h);
-      riverMat.resolution.set(w, h);
     },
     update(t = 0) {
       // Attention lock (Phase 1 Task 10): terrain whispers at TOP so faults
@@ -816,16 +895,18 @@ export function buildTerrain(scene) {
       // sit at cool grey (never white) so red/amber alarms lead in luminance.
       baseMat.opacity = 0.28 * dimF;
       indexMat.opacity = 0.55 * dimF;
+      summitMat.opacity = 0.55 * dimF; // capped summit emphasis — alarms still lead
       ringMat.opacity = 0.35;
     },
     dispose() {
       scene.remove(group);
       group.traverse((o) => {
         if (o.geometry) o.geometry.dispose();
-        if (o.material && o.material !== baseMat && o.material !== indexMat) o.material.dispose();
+        if (o.material && o.material !== baseMat && o.material !== indexMat && o.material !== summitMat) o.material.dispose();
       });
       baseMat.dispose();
       indexMat.dispose();
+      summitMat.dispose();
     },
   };
 }
