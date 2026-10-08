@@ -127,7 +127,7 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 
 - REF GATE 1: you pick the terrain mood (photo/map screenshot); confirm the pinned center + the audit's layout.
 
-## Phase 1 iteration — feedback pass ✓ done (2026-10-08)
+### Feedback pass — Phase 1 iteration ✓ done (2026-10-08)
 Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 25-pt grid). Ratings moved: Task 8 6→7.
 - Blips: bead/diamond/speckle sizes + opacities down, glow textures 128px soft (no more zoom raster squares), speckle mapped round. NEAR holds off: orbit min 0.05→0.5, close-ups pipeline 2.2→3.0 / facility 0.45→0.9 / sensor 0.35→0.7.
 - Terrain glow: mass fills 0.30→0.12 + softer texture, summit disks 0.18→0.08, fault zone 0.13→0.08, bloom 0.5→0.4 — faults still brightest (threshold 0.36 untouched).
