@@ -69,7 +69,7 @@ try { retro = JSON.parse(readFileSync(join(root, 'src', 'ds', 'plan-retro.json')
 if (retro.length) {
   const bySha = new Map(retro.map((r) => [r.sha, r]));
   for (const c of commits) {
-    const r = !c.plan && bySha.get(c.sha);
+    const r = bySha.get(c.sha);
     if (r) { c.plan = r.plan; c.anchor = r.anchor || null; }
   }
 }

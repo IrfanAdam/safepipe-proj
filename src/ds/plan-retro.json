@@ -6,5 +6,7 @@
   { "sha": "9603e71", "plan": "2026-10-05_150017-safepipe-prototype-screens.md", "anchor": null, "note": "rail More menu — pre-trailer, attaches to first section" },
   { "sha": "0827f04", "plan": "2026-10-05_150017-safepipe-prototype-screens.md", "anchor": null, "note": "MPA deploy fix for page bundles — pre-trailer, attaches to first section" },
   { "sha": "f3721aa", "plan": "2026-10-05_150017-safepipe-prototype-screens.md", "anchor": null, "note": "pitch content from Fig — pre-trailer, attaches to first section" },
-  { "sha": "83cd61e", "plan": "2026-10-07_153000-ops3d-realworld-twin.md", "anchor": "phase-0", "note": "trailer in body not subject — Phase 0 TDD batch, tasks 1-5" }
+  { "sha": "83cd61e", "plan": "2026-10-07_153000-ops3d-realworld-twin.md", "anchor": "phase-0", "note": "trailer in body not subject — Phase 0 TDD batch, tasks 1-5" },
+  { "sha": "e9279bd", "plan": "2026-10-07_153000-ops3d-realworld-twin.md", "anchor": "phase-0", "note": "re-point: bare task-1 matches no section — Phase 0 camera batch" },
+  { "sha": "b789b14", "plan": "2026-10-07_153000-ops3d-realworld-twin.md", "anchor": "phase-0", "note": "re-point: refresh picking up 83cd61e — same Phase 0 batch" }
 ]
