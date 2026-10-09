@@ -18,13 +18,25 @@ import * as THREE from 'three';
 
 export const CLEAR_COLOR = 0x0b0c0c;
 export const FOG_NEAR = 58;
-export const FOG_FAR = 260;
+export const FOG_FAR = 244; // aerial perspective lands on the far map edge, never on the subject
 
 // Clamp a base-mix value to [0, 1]; non-finite input means "today's opaque".
 export function clampMix(m) {
   const v = Number(m);
   if (!Number.isFinite(v)) return 1;
   return Math.min(1, Math.max(0, v));
+}
+
+// Sensible pixel-ratio ceiling: 2× stays crisp on retina without melting
+// SwiftShader/fillers. Single-sourced here; twin.js applies the same cap.
+// Pure + unit-tested.
+export const PIXEL_RATIO_CAP = 2;
+export function resolvePixelRatio(dpr, cap = PIXEL_RATIO_CAP) {
+  const c = Number(cap);
+  const safeCap = Number.isFinite(c) && c > 0 ? c : PIXEL_RATIO_CAP;
+  const v = Number(dpr);
+  if (!Number.isFinite(v) || v <= 0) return 1;
+  return Math.min(v, safeCap);
 }
 
 const _live = new Set();
@@ -54,7 +66,7 @@ export function setBaseMix(m) {
 export function createScene(canvas) {
   if (!canvas) throw new Error('createScene: canvas required');
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
   renderer.setClearColor(CLEAR_COLOR, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;

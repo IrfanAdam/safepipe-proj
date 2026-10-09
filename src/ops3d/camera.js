@@ -8,6 +8,9 @@
  * post.js uses for depth-driven DoF — aperture + focal + focus distance are
  * real inputs, not a screen-space blur band.
  * Keys 1/2/3 are owned by twin.js — this module only exposes setPreset.
+ * Cinematic push-in: a slow dolly toward the orbit target on load and after
+ * every TOP-enter flight (interruptible on first user input, off under
+ * prefers-reduced-motion). Pure helpers pushInTarget/isTopView are unit-tested.
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -38,6 +41,35 @@ function presetPos({ yaw, pitch, dist }, target) {
 
 const easeInOutCubic = (k) =>
   k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
+
+// Cinematic push-in tuning: 6% closer over 5 s — felt, never nauseating.
+export const PUSH_IN_FACTOR = 0.94;
+export const PUSH_IN_MS = 5000;
+// TOP-enter detection: a flight ending high (≥60° elevation) and far (≥20)
+// reads as the TOP map view (network preset is 78°/62, 78°/30, 78°/6…).
+export const TOP_PITCH_DEG = 60;
+export const TOP_DIST = 20;
+
+const _toV3 = (v) => (v?.isVector3 ? v.clone() : new THREE.Vector3(v[0], v[1], v[2]));
+
+// Pure: where a slow dolly from pos toward tgt ends (target fixed, frame
+// tightens by 1 − factor). Unit-tested.
+export function pushInTarget(pos, tgt, factor = PUSH_IN_FACTOR) {
+  const p = _toV3(pos);
+  const t = _toV3(tgt);
+  return p.lerp(t, 1 - factor);
+}
+
+// Pure: does a flyTo destination read as a TOP view? Unit-tested.
+export function isTopView(pos, tgt, pitchDeg = TOP_PITCH_DEG, minDist = TOP_DIST) {
+  const p = _toV3(pos);
+  const t = _toV3(tgt);
+  const dx = p.x - t.x, dy = p.y - t.y, dz = p.z - t.z;
+  const dist = Math.hypot(dx, dy, dz);
+  if (!(dist >= minDist)) return false;
+  const pitch = (Math.asin(Math.min(1, Math.max(-1, dy / (dist || 1)))) * 180) / Math.PI;
+  return pitch >= pitchDeg;
+}
 
 // Full-frame stills convention: 24mm-high frame, fov = 2·atan(12/f).
 // Pure + unit-tested; 32mm ≈ 41°, 50mm ≈ 27°.
@@ -85,6 +117,26 @@ export function createRig(canvas, opts = {}) {
 
   // Active fly-to tween, stepped by update(). Null when idle.
   let tween = null;
+  // Cinematic push-in state: slow dolly toward the orbit target after load /
+  // TOP-enter. Damping stays ON during a push (no fight: no input deltas),
+  // and ANY user grab cancels it outright (see 'start' below).
+  let push = null;
+  // Trailing push chained after a TOP-enter flight lands.
+  let pendingPush = false;
+  // Load intro: fires once the opening flight (if any) settles.
+  let introPending = !reduced;
+
+  const pushEase = (k) => 1 - (1 - k) * (1 - k); // easeOutQuad: glides in, settles
+
+  function startPush(durMs = PUSH_IN_MS, factor = PUSH_IN_FACTOR) {
+    if (reduced || !(durMs > 0)) return;
+    push = {
+      t0: performance.now(),
+      dur: durMs,
+      fromPos: camera.position.clone(),
+      toPos: pushInTarget(camera.position, controls.target, factor),
+    };
+  }
 
   // Damping fights the tween: controls.update() applies leftover orbit
   // deltas on top of the lerped position, so the camera drifts on arrival.
@@ -101,6 +153,9 @@ export function createRig(canvas, opts = {}) {
         ? tgt.clone()
         : _v().set(...tgt)
       : controls.target.clone();
+    // A new flight always wins: any running/trailing push is superseded.
+    push = null;
+    pendingPush = false;
     if (reduced || durMs <= 0) {
       camera.position.copy(toPos);
       controls.target.copy(toTg);
@@ -118,11 +173,18 @@ export function createRig(canvas, opts = {}) {
       fromTg: controls.target.clone(),
       toTg,
     };
+    // TOP-enter chains a trailing slow push once this flight lands — the map
+    // breathes instead of freezing. Drilled-in flights land still.
+    if (!reduced && isTopView(toPos, toTg)) pendingPush = true;
   }
   // Grabbing the camera mid-fly cancels the fly — otherwise the tween keeps
-  // fighting the user's drag.
+  // fighting the user's drag. The same grab kills any cinematic push-in, the
+  // trailing TOP push, and the load intro: user input always wins.
   controls.addEventListener('start', () => {
     tween = null;
+    push = null;
+    pendingPush = false;
+    introPending = false;
     setDamping(true);
   });
 
@@ -161,7 +223,25 @@ export function createRig(canvas, opts = {}) {
       if (k >= 1) {
         tween = null;
         setDamping(true);
+        // Flight landed: run the chained TOP push, else the load intro.
+        if (pendingPush) {
+          pendingPush = false;
+          introPending = false;
+          startPush();
+        } else if (introPending) {
+          introPending = false;
+          startPush();
+        }
       }
+    } else if (introPending && !push) {
+      // No opening flight (already home): intro starts on first update.
+      introPending = false;
+      startPush();
+    }
+    if (push) {
+      const k = Math.min((performance.now() - push.t0) / push.dur, 1);
+      camera.position.lerpVectors(push.fromPos, push.toPos, pushEase(k));
+      if (k >= 1) push = null;
     }
     // Camera cage: never leave the mapped circle (r20) + margin.
     const tr = Math.hypot(controls.target.x, controls.target.z);
@@ -180,7 +260,7 @@ export function createRig(canvas, opts = {}) {
     controls.update();
   }
 
-  return { camera, setPreset, setFocal, flyTo, update, getTarget: () => controls.target.clone() };
+  return { camera, setPreset, setFocal, flyTo, update, getTarget: () => controls.target.clone(), pushIn: startPush, pushActive: () => !!push };
 }
 
 export const presets = Object.keys(PRESETS);

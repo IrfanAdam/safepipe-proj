@@ -20,7 +20,7 @@
  *     Kept low so dense contours glow grey, never white-hot color
  *   fx.ca        (1.0)  — CA scale; 1.0 ≈ 2px max at frame edges, 0 = off
  *   fx.grain     (0.001) — grain amplitude (±); near-off, 0 = off
- *   fx.vignette  (0.28) — edge darkening; 0 = off
+ *   fx.vignette  (0.3) — edge darkening; 0 = off
  *   fx.dof       (1) — DoF master switch (1 = on, 0 = off); twin leaves it
  *     on at every level unless the user forces it off in the camera panel
  *   fx.fstop    (5.6) — aperture: 1.4 melts the background, 16 is deep focus
@@ -180,7 +180,7 @@ export function createPost(renderer, scene, camera) {
     ca: 1.0,
     grain: 0.001, // near-off: void stays clean
     scan: 0.05,
-    vignette: 0.28,
+    vignette: 0.3,
     dof: 1,
     fstop: 5.6,
     focalMm: 32,
@@ -198,6 +198,15 @@ export function createPost(renderer, scene, camera) {
     depthBuffer: true,
     stencilBuffer: false,
   });
+  // MSAA survives the post chain: the scene renders into rtScene, so the
+  // canvas antialias flag alone never smooths lines — without samples the
+  // offscreen pass aliases while the composited frame looks soft. WebGL2
+  // multisampled RT; guarded so single-sample contexts still render.
+  try {
+    if (renderer.capabilities?.isWebGL2) rtScene.samples = 4;
+  } catch {
+    /* single-sample fallback — still renders, just softer edges */
+  }
   // Real depth for the thin-lens CoC — no extra scene pass, this just
   // exposes the buffer rtScene already renders.
   rtScene.depthTexture = new THREE.DepthTexture(2, 2);
