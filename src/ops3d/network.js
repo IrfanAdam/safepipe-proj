@@ -161,7 +161,7 @@ export function buildNetwork(scene, feed) {
   const dives = []; // dive markers riding the arc (static stations)
   const diveGeo = new THREE.OctahedronGeometry(0.11);
   const DIVE_COL = 0xcfc9bc; // neutral bone: marks where a run dives underground (never blue)
-  const chevGeo = new THREE.ConeGeometry(0.10, 0.32, 6); // faceted cone: chevron read, no sprite halo
+  const chevGeo = new THREE.ConeGeometry(0.055, 0.18, 6); // slim chevron: inside tube width, no blob read
   const UP_Y = new THREE.Vector3(0, 1, 0);
   const resMats = []; // resolution-dependent fat-line materials (see setSize)
   const raycaster = new THREE.Raycaster();
@@ -570,7 +570,7 @@ export function buildNetwork(scene, feed) {
       for (const c of flowChevs) {
         c.lvl = c.assetId === selected ? 1 : name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
         c.boost = name === 'network' ? 1.4 : 1;
-        const s = (name === 'network' ? 1.6 : name === 'segment' ? 0.8 : 0.5);
+        const s = (name === 'network' ? 1.0 : name === 'segment' ? 0.7 : 0.45);
         c.mesh.scale.setScalar(s);
       }
       for (const f of flowLines) {
