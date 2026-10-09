@@ -68,6 +68,10 @@ export function buildHud(container, cbs = {}) {
   const clock = el('div', 'ops-hud__clock', formatClockUTC(new Date()));
   clock.setAttribute('data-testid', 'ops-hud-clock');
   sector.appendChild(clock);
+  // X-ray mode badge: visible while twin.js dips terrain over a focus asset.
+  const xrayBadge = el('div', 'ops-hud__xray ops-hud__xray--hidden', 'X-RAY · ON');
+  xrayBadge.setAttribute('data-testid', 'ops-hud-xray');
+  sector.appendChild(xrayBadge);
   // — Top-left column: sector block with the critical-asset banner below it.
   // Banner is worst fault + asset only — health lives in the sector block.
   const topleft = el('div', 'ops-hud__topleft');
@@ -122,12 +126,12 @@ export function buildHud(container, cbs = {}) {
   legendBtn.setAttribute('aria-label', 'Legend: infrastructure hatch types');
   legendBtn.setAttribute('aria-expanded', 'false');
   let legendOpen = false;
-  const setLegend = (v) => {
+  const setLegendRaw = (v) => {
     legendOpen = v;
     legend.classList.toggle('ops-hud__legend--hidden', !v);
     legendBtn.setAttribute('aria-expanded', v ? 'true' : 'false');
   };
-  legendBtn.addEventListener('click', () => setLegend(!legendOpen));
+  legendBtn.addEventListener('click', () => toggleSolo('legend'));
   legendBtnWrap.appendChild(legendBtn);
   root.appendChild(legend);
   root.appendChild(legendBtnWrap);
@@ -240,12 +244,12 @@ export function buildHud(container, cbs = {}) {
   helpBtn.setAttribute('aria-label', 'Shortcuts and controls');
   helpBtn.setAttribute('aria-expanded', 'false');
   let helpOpen = false;
-  const setHelp = (v) => {
+  const setHelpRaw = (v) => {
     helpOpen = v;
     helpPanel.classList.toggle('ops-hud__help-panel--hidden', !v);
     helpBtn.setAttribute('aria-expanded', v ? 'true' : 'false');
   };
-  helpBtn.addEventListener('click', () => setHelp(!helpOpen));
+  helpBtn.addEventListener('click', () => toggleSolo('help'));
   help.appendChild(helpPanel);
   help.appendChild(helpBtn);
   root.appendChild(help);
@@ -356,12 +360,12 @@ export function buildHud(container, cbs = {}) {
   moreBtn.setAttribute('aria-label', 'Display settings: overlay, sound');
   moreBtn.setAttribute('aria-expanded', 'false');
   let menuOpen = false;
-  const setMenu = (v) => {
+  const setMenuRaw = (v) => {
     menuOpen = v;
     menu.classList.toggle('ops-hud__menu--hidden', !v);
     moreBtn.setAttribute('aria-expanded', v ? 'true' : 'false');
   };
-  moreBtn.addEventListener('click', () => setMenu(!menuOpen));
+  moreBtn.addEventListener('click', () => toggleSolo('menu'));
   const fsBtn = el('button', 'ops-hud__fs', 'FULLSCREEN');
   fsBtn.type = 'button';
   fsBtn.setAttribute('aria-label', 'Toggle fullscreen');
@@ -386,6 +390,42 @@ export function buildHud(container, cbs = {}) {
   sys.appendChild(fsBtn);
   root.appendChild(sys);
 
+  // — Single-popover manager: at most ONE open among legend / ? help /
+  // ··· overlay menu / camera panel. Opening one closes the rest; Esc
+  // closes whichever is open. The asset panel is selection-driven (not a
+  // toggle popover) so it stays exempt. The camera panel is twin-owned
+  // state — closing it means asking twin via onCamToggle().
+  // HOOK (mapbox-base): the future SAT/TWIN crossfade toggle plugs in here
+  // as a fifth member — call toggleSolo('sat') from its button and add a
+  // `which !== 'sat' && satOpen` arm + raw setter following the pattern
+  // below; closePopovers() must also close it. This manager stays the sole
+  // owner of popover exclusivity — no second closer elsewhere.
+  let camPanelOpen = false;
+  function toggleSolo(which) {
+    const isOpen =
+      which === 'legend' ? legendOpen
+      : which === 'help' ? helpOpen
+      : menuOpen;
+    if (!isOpen) {
+      // Opening: close everything else first.
+      if (which !== 'legend' && legendOpen) setLegendRaw(false);
+      if (which !== 'help' && helpOpen) setHelpRaw(false);
+      if (which !== 'menu' && menuOpen) setMenuRaw(false);
+      if (camPanelOpen) onCamToggle();
+    }
+    if (which === 'legend') setLegendRaw(!legendOpen);
+    else if (which === 'help') setHelpRaw(!helpOpen);
+    else setMenuRaw(!menuOpen);
+  }
+  function closePopovers() {
+    const any = legendOpen || helpOpen || menuOpen || camPanelOpen;
+    if (legendOpen) setLegendRaw(false);
+    if (helpOpen) setHelpRaw(false);
+    if (menuOpen) setMenuRaw(false);
+    if (camPanelOpen) onCamToggle();
+    return any;
+  }
+
   container.appendChild(root);
 
   let hidden = false;
@@ -394,6 +434,13 @@ export function buildHud(container, cbs = {}) {
     root.classList.toggle('ops-hud--hidden', v);
   };
   const onKey = (e) => {
+    if (e.key === 'Escape') {
+      // Esc closes a popover first and swallows the level-up so one key
+      // press never both closes a menu and flies the camera.
+      if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+      if (closePopovers() && e.stopImmediatePropagation) e.stopImmediatePropagation();
+      return;
+    }
     if (e.key === 'h' || e.key === 'H') {
       if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
       setHidden(!hidden);
@@ -465,17 +512,18 @@ export function buildHud(container, cbs = {}) {
       `HEALTH ${rollup.nominal ?? 0} OK · ${rollup.watch ?? 0} WATCH · ${rollup.critical ?? 0} CRITICAL`;
 
     const level = LEVELS.includes(state.level) ? state.level : 'network';
-    // Scale bar: dynamic if twin provides scaleKm (meters-per-pixel derived from camera),
-    // else per-level fallback. Label carries ≈ and bar width scales with km.
+    // Scale bar: dynamic if twin provides scaleKm (km per 120px of screen,
+    // derived live from the camera frustum each frame), else per-level
+    // fallback. Label carries ≈ and bar width tracks the true proportion:
+    // 120px ≡ scaleKm, so width = 120 · pick/scaleKm, clamped to read.
     let sc;
     if (typeof state.scaleKm === 'number' && Number.isFinite(state.scaleKm) && state.scaleKm > 0) {
-      const nice = [0.5, 1, 2, 5, 10, 20];
+      const nice = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20];
       let pick = nice[0];
       for (const n of nice) { if (n <= state.scaleKm * 1.1) pick = n; }
       sc = { km: pick, label: `${pick} KM` };
-      const barPx = Math.max(40, Math.min(160, 60 * (pick / state.scaleKm) * 1.6));
-      scaleBar.style.width = `${Math.round(barPx)}px`;
-      scaleBar.firstElementChild.style.flex = '1';
+      const barPx = Math.max(40, Math.min(160, Math.round((120 * pick) / state.scaleKm)));
+      scaleBar.style.width = `${barPx}px`;
     } else {
       sc = scaleForLevel(level);
       scaleBar.style.width = '';
@@ -485,7 +533,12 @@ export function buildHud(container, cbs = {}) {
     clock.textContent = formatClockUTC(new Date());
     if (typeof state.heading === 'number' && Number.isFinite(state.heading)) {
       needle.style.transform = `rotate(${state.heading}deg)`;
+      compass.setAttribute(
+        'aria-label',
+        `North arrow — camera heading ${Math.round(((state.heading % 360) + 360) % 360)}° clockwise from grid north`,
+      );
     }
+    xrayBadge.classList.toggle('ops-hud__xray--hidden', !state.xray);
     viewBox.classList.toggle('ops-hud__viewbox--hidden', !(state.selection ?? null));
     for (const b of levelBtns) {
       b.classList.toggle('ops-hud__level-btn--active', b.dataset.level === level);
@@ -523,6 +576,14 @@ export function buildHud(container, cbs = {}) {
     camBtn.classList.toggle('ops-hud__cam-btn--active', !!cam.panel);
     camBtn.setAttribute('aria-expanded', cam.panel ? 'true' : 'false');
     camPanel.classList.toggle('ops-hud__cam-panel--hidden', !cam.panel);
+    // Camera panel joins the single-popover set: twin opening it closes the
+    // local popovers so two plates never stack.
+    if (!!cam.panel && !camPanelOpen) {
+      if (legendOpen) setLegendRaw(false);
+      if (helpOpen) setHelpRaw(false);
+      if (menuOpen) setMenuRaw(false);
+    }
+    camPanelOpen = !!cam.panel;
     afBtn.textContent = cam.af ? 'AF · ON' : 'AF · OFF';
     afBtn.dataset.on = cam.af ? '1' : '0';
     afBtn.classList.toggle('ops-hud__cam-toggle--active', !!cam.af);
@@ -555,6 +616,7 @@ export function buildHud(container, cbs = {}) {
 
   return {
     update,
+    closePopovers,
     dispose() {
       clearInterval(clockTimer);
       window.removeEventListener('keydown', onKey);

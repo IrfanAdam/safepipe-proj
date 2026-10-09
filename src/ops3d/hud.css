@@ -832,6 +832,23 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* X-ray badge: dim row in the sector block, visible while terrain dips over
+ * a focus asset. Bone dashed chip — mode readout, never a health hue. */
+.ops-hud__xray {
+  opacity: 0.85;
+  white-space: nowrap;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  border: 1px dashed rgba(230, 232, 232, 0.6);
+  padding: 0 6px;
+  margin-top: 2px;
+  display: inline-block;
+}
+
+.ops-hud__xray--hidden {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ops-hud *,
   .ops-hud *::before,

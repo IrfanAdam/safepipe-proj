@@ -193,6 +193,31 @@ export function createTwin(container, opts = {}) {
   if (!postEnabled) post.fx.enabled = false;
 
   let selected = null;
+  // X-ray on focus: buried assets hide under terrain + contours. While a
+  // selection is drilled in (segment/asset — never at TOP), the contour and
+  // ground-fill opacities dip each frame so placement reads; deselect or
+  // zoom-out restores automatically because terrain.update() resets the
+  // absolute opacities every frame and the dip only re-applies while on.
+  // Blue (water) materials are never touched — blue is reserved for water.
+  let xrayOn = false;
+  const applyXray = () => {
+    if (!xrayOn) return;
+    try {
+      terrain.mesh.traverse((o) => {
+        const m = o.material;
+        if (!m || typeof m.opacity !== 'number') return;
+        if (m.vertexColors) {
+          m.opacity *= 0.35;
+          return;
+        }
+        if (m.isLineMaterial && m.color && m.color.b <= m.color.r + 0.05) {
+          m.opacity *= 0.35;
+        }
+      });
+    } catch {
+      /* best-effort — terrain stays readable */
+    }
+  };
 
   function pushHud() {
     syncLens();
@@ -207,18 +232,31 @@ export function createTwin(container, opts = {}) {
     const map = byId();
     const sel = selected ? map.get(selected) ?? null : null;
     const crit = sel?.health === 'critical' ? sel : current.find((a) => a.health === 'critical');
-    // Dynamic scale: ground km visible per ~120px bar, derived from camera frustum.
+    // Dynamic scale: ground km visible per 120px bar, derived live from the
+    // camera frustum (vertical FOV + orbit distance + aspect). Recomputed on
+    // every HUD push — including the throttled per-frame push in tick() —
+    // so the ≈XX KM label + bar width track wheel zoom continuously.
     let scaleKm;
     try {
-      const dist = rig.camera.position.distanceTo(rig.getTarget());
+      const tgt = rig.getTarget();
+      const dist = rig.camera.position.distanceTo(tgt);
       const vFov = (rig.camera.fov ?? 50) * Math.PI / 180;
       const h = 2 * dist * Math.tan(vFov / 2);
       const aspect = container.clientWidth / Math.max(1, container.clientHeight);
       const w = h * aspect;
-      const pxPerKm = container.clientWidth / w;
-      scaleKm = 120 / pxPerKm; // km that 120px bar represents
+      scaleKm = (120 * w) / container.clientWidth; // km that a 120px bar spans
       if (!Number.isFinite(scaleKm) || scaleKm <= 0) scaleKm = undefined;
     } catch { scaleKm = undefined; }
+    // Target-relative heading: orbit/pan moves the camera around the target,
+    // so azimuth is measured from the target, not the world origin.
+    let heading;
+    try {
+      const tgt = rig.getTarget();
+      const dx = rig.camera.position.x - tgt.x;
+      const dz = rig.camera.position.z - tgt.z;
+      heading = (Math.atan2(dx, dz) * 180) / Math.PI;
+    } catch { heading = undefined; }
+    xrayOn = !!sel && levels.name !== 'network';
     hud.update({
       rollup: healthRollup(current),
       selection: sel,
@@ -227,8 +265,9 @@ export function createTwin(container, opts = {}) {
       muted: isMuted(),
       cam: { ...focusCtl, effectiveDof: post.fx.dof },
       banner: crit ? { kind: crit.faults[0]?.type ?? 'CRITICAL', assetId: crit.assetId } : null,
-      heading: rig.camera ? (Math.atan2(rig.camera.position.x, rig.camera.position.z) * 180) / Math.PI : undefined,
+      heading,
       scaleKm,
+      xray: xrayOn,
     });
   }
 
@@ -438,15 +477,24 @@ export function createTwin(container, opts = {}) {
     rig.update(dt, now / 1000);
     table.update?.(now / 1000);
     terrain.update?.(now / 1000);
+    applyXray(); // after terrain.update resets absolute opacities
     checker.update?.(now / 1000);
     beacons.tick(now / 1000);
     network.tick?.(now / 1000);
     overlays.update?.(now / 1000);
     labels.update?.(now / 1000);
     syncLens();
+    // Live furniture: throttled HUD push so the compass needle rotates and
+    // the scale bar tracks continuously during orbit/pan/zoom — discrete
+    // events alone left both frozen mid-gesture.
+    if (now - lastHudPush > 300) {
+      lastHudPush = now;
+      pushHud();
+    }
     if (post.fx.enabled) post.render(now / 1000);
     else renderer.render(scene, rig.camera);
   };
+  let lastHudPush = 0;
   raf = requestAnimationFrame(tick);
 
   pushHud();

@@ -268,7 +268,7 @@ export function buildLabels(scene, { layout, healthById } = {}) {
     items.push({
       id, sprite, ring, ringMat, line, lineMat, lineGeo: lg,
       cv: sprite.material.map.image, tex: sprite.material.map,
-      baseY: y, phase: Math.random() * Math.PI * 2,
+      baseY: y, phase: Math.random() * Math.PI * 2, x, z,
     });
   }
 
@@ -286,7 +286,7 @@ export function buildLabels(scene, { layout, healthById } = {}) {
         id: `${p.assetId}:dest`, dest: true, pipe: p.assetId, text: DEST[p.assetId],
         sprite, ring: null, ringMat: null, line: null, lineMat: null, lineGeo: null,
         cv: sprite.material.map.image, tex: sprite.material.map,
-        baseY: LABEL_H * 0.85, phase: Math.random() * Math.PI * 2,
+        baseY: LABEL_H * 0.85, phase: Math.random() * Math.PI * 2, x: ex, z: ez,
       });
     }
   }
@@ -296,21 +296,51 @@ export function buildLabels(scene, { layout, healthById } = {}) {
   /* Label restraint: at TOP (network) ONLY hot (faulted) + selected +
    * hovered labels read — asset plates and rim destination pills alike.
    * A hot pipe's dest pill doubles as its rim landmark, so nothing extra
-   * stays on. In-field (segment) every label reads; asset level keeps
-   * the selected/hovered label in-scene (side panel covers the rest). */
+   * stays on. TOP plates are small, dim, low over the ground (terrain-hug
+   * tags, not billboards in your face) and collision-thinned so neighbours
+   * never stack: greedy keep, 2.5 km apart, hottest first. In-field
+   * (segment) every label reads full-size; asset level keeps the
+   * selected/hovered label in-scene (side panel covers the rest). */
+  const HOT_RANK = { critical: 0, watch: 1, nominal: 2 };
+  const rankOf = (c) => {
+    const h = healthOf(byId.get(c.it.dest ? c.it.pipe : c.it.id));
+    return (c.sel ? -4 : 0) + (c.hov ? -2 : 0) - (HOT_RANK[h] ?? 2);
+  };
   function refresh() {
     const inField = detailName !== 'network';
+    const topThin = detailName === 'network' ? [] : null;
     for (const it of items) {
       const sel = it.id === selected || (it.dest && it.pipe === selected);
       const hov = it.id === hovered || (it.dest && it.pipe === hovered);
       const hot = healthOf(byId.get(it.dest ? it.pipe : it.id)) !== 'nominal';
       const show = detailName === 'asset' ? (sel || hov) : inField ? true : (hot || sel || hov);
+      if (topThin && show) topThin.push({ it, sel, hov });
+      else if (!topThin) applyShow(it, show);
+    }
+    if (topThin) {
+      // Hottest first, selected/hovered pin to the front; keep a plate only
+      // if no kept plate sits within COLLIDE km of it.
+      const COLLIDE = 2.5;
+      topThin.sort((a, b) => rankOf(a) - rankOf(b));
+      const kept = [];
+      for (const c of topThin) {
+        const clear = kept.every(
+          (k) => Math.hypot(c.it.x - k.x, c.it.z - k.z) > COLLIDE,
+        );
+        if (clear || c.sel || c.hov) {
+          if (clear) kept.push(c.it);
+          applyShow(c.it, true);
+        } else applyShow(c.it, false);
+      }
+    }
+  }
+
+  function applyShow(it, show) {
       it.sprite.visible = show;
       if (it.ring) it.ring.visible = show;
       if (it.line) it.line.visible = show;
-      const w = it.sprite.userData.baseW * (it.k ?? 3.2) * (sel ? 1.3 : 1);
+      const w = it.sprite.userData.baseW * (it.k ?? 1.4) * ((it.id === selected || (it.dest && it.pipe === selected)) ? 1.3 : 1);
       it.sprite.scale.set(w, w * it.sprite.userData.aspect, 1);
-    }
   }
 
   function repaint(id, health) {
@@ -326,6 +356,7 @@ export function buildLabels(scene, { layout, healthById } = {}) {
     group,
     /* update(t, next?) — animate; optionally refresh colors when feed passed. */
     update(t = 0, next) {
+      const top = detailName === 'network';
       if (next) {
         byId = toMap(next);
         for (const it of items) {
@@ -338,10 +369,15 @@ export function buildLabels(scene, { layout, healthById } = {}) {
         if (it.ring) {
           const pulse = 1 + 0.12 * Math.sin(t * 2.4 + it.phase);
           it.ring.scale.set(0.28 * pulse * (sel ? 1.5 : 1), 0.28 * pulse * (sel ? 1.5 : 1), 1);
-          it.ringMat.opacity = (sel ? 1 : 0.65) * (0.75 + 0.25 * Math.sin(t * 2.4 + it.phase));
+          it.ringMat.opacity = (sel ? 1 : 0.65) * (0.75 + 0.25 * Math.sin(t * 2.4 + it.phase)) * (top ? 0.6 : 1);
         }
-        it.sprite.position.y = it.baseY;
-        it.sprite.material.opacity = hidden ? 0 : sel ? 1 : it.dest ? 0.94 : 0.96;
+        // TOP plates hug the ground (low, small, dim terrain tags); drill-in
+        // restores full-height readable plates. Sprites are inherently
+        // camera-facing (true ground-parallel would need plane meshes), so
+        // the TOP read comes from altitude + size + opacity, not rotation.
+        it.sprite.position.y = top ? it.baseY * 0.45 : it.baseY;
+        const base = hidden ? 0 : sel ? 1 : it.dest ? 0.94 : 0.96;
+        it.sprite.material.opacity = top && !sel ? base * 0.55 : base;
       }
     },
     setSelection(id) {
@@ -361,9 +397,9 @@ export function buildLabels(scene, { layout, healthById } = {}) {
     setDetail(name) {
       detailName = name;
       group.visible = true;
-      // Level-sized sprites: TOP reads from 68 km out, so labels grow 3×
-      // up there; ISO 1.35×; NEAR shrinks to a small tag.
-      const k = name === 'asset' ? 0.55 : name === 'segment' ? 1.35 : 3.2;
+      // Level-sized sprites: TOP tags stay small (1.4×) so they never
+      // obstruct the terrain read; ISO 1.35×; NEAR shrinks to a small tag.
+      const k = name === 'asset' ? 0.55 : name === 'segment' ? 1.35 : 1.4;
       for (const it of items) it.k = k;
       refresh();
     },

@@ -157,4 +157,73 @@ describe('ops3d HUD orientation/scale furniture', () => {
     assert.equal(needle.style.transform, 'rotate(45deg)');
     h.dispose();
   });
+
+  it('dynamic scaleKm picks a nice bar + proportional width (120px ≡ scaleKm)', () => {
+    const container = new FakeEl('div');
+    const h = hud.buildHud(container, {});
+    const root = container.children[0];
+    const label = find(root, byTestId('ops-hud-scale-label'));
+    const bar = find(root, byClass('ops-hud__scalebar-bar'));
+    h.update({ level: 'network', scaleKm: 9.5 });
+    assert.equal(label.textContent, '≈ 10 KM');
+    assert.equal(bar.style.width, '126px'); // 120·10/9.5 ≈ 126
+    h.update({ level: 'asset', scaleKm: 0.4 });
+    assert.equal(label.textContent, '≈ 0.2 KM');
+    assert.equal(bar.style.width, '60px'); // 120·0.2/0.4
+    h.update({ level: 'network' }); // fallback restores
+    assert.equal(label.textContent, '≈ 20 KM');
+    assert.equal(bar.style.width, '');
+    h.dispose();
+  });
+
+  it('single-popover manager: opening one closes the others, Esc closes', () => {
+    const container = new FakeEl('div');
+    const h = hud.buildHud(container, {});
+    const root = container.children[0];
+    const btn = (aria) => find(root, (n) => n.tagName === 'BUTTON' && n.attributes?.['aria-label'] === aria);
+    const click = (b) => b._listeners.click.forEach((fn) => fn());
+    const legendBtn = btn('Legend: infrastructure hatch types');
+    const helpBtn = btn('Shortcuts and controls');
+    const moreBtn = btn('Display settings: overlay, sound');
+    const legend = find(root, byClass('ops-hud__legend'));
+    const helpPanel = find(root, byClass('ops-hud__help-panel'));
+    const menu = find(root, byClass('ops-hud__menu'));
+    assert.ok(legend.classList.contains('ops-hud__legend--hidden'), 'legend starts closed');
+    click(legendBtn);
+    assert.ok(!legend.classList.contains('ops-hud__legend--hidden'), 'legend opens');
+    click(helpBtn); // opening ? closes legend
+    assert.ok(legend.classList.contains('ops-hud__legend--hidden'), 'legend closed by ?');
+    assert.ok(!helpPanel.classList.contains('ops-hud__help-panel--hidden'), '? opens');
+    click(moreBtn); // opening ··· closes ?
+    assert.ok(helpPanel.classList.contains('ops-hud__help-panel--hidden'), '? closed by ···');
+    assert.ok(!menu.classList.contains('ops-hud__menu--hidden'), '··· opens');
+    assert.equal(h.closePopovers(), true, 'closePopovers reports an open popover');
+    assert.ok(menu.classList.contains('ops-hud__menu--hidden'), '··· closed');
+    assert.equal(h.closePopovers(), false, 'closePopovers reports none open');
+    h.dispose();
+  });
+
+  it('camera panel joins the single-popover set + xray badge follows state', () => {
+    const container = new FakeEl('div');
+    let camToggles = 0;
+    const h = hud.buildHud(container, { onCamToggle: () => { camToggles++; } });
+    const root = container.children[0];
+    const btn = (aria) => find(root, (n) => n.tagName === 'BUTTON' && n.attributes?.['aria-label'] === aria);
+    const cam = (panel) => ({ af: true, fstop: 5.6, focalMm: 32, focusDist: 10, dof: null, panel });
+    const legend = find(root, byClass('ops-hud__legend'));
+    const camPanel = find(root, byClass('ops-hud__cam-panel'));
+    const xray = find(root, byTestId('ops-hud-xray'));
+    assert.ok(xray.classList.contains('ops-hud__xray--hidden'), 'xray starts hidden');
+    btn('Legend: infrastructure hatch types')._listeners.click.forEach((fn) => fn());
+    assert.ok(!legend.classList.contains('ops-hud__legend--hidden'), 'legend opens');
+    h.update({ level: 'network', cam: cam(true) }); // twin opens camera → legend closes
+    assert.ok(legend.classList.contains('ops-hud__legend--hidden'), 'camera panel evicts legend');
+    assert.ok(!camPanel.classList.contains('ops-hud__cam-panel--hidden'), 'camera panel shows');
+    h.update({ level: 'asset', cam: cam(true), xray: true });
+    assert.ok(!xray.classList.contains('ops-hud__xray--hidden'), 'xray badge shows on focus');
+    h.update({ level: 'network', cam: cam(false), xray: false });
+    assert.ok(xray.classList.contains('ops-hud__xray--hidden'), 'xray badge hides on zoom-out');
+    assert.equal(camToggles, 0, 'no cam toggle requested by update path');
+    h.dispose();
+  });
 });
