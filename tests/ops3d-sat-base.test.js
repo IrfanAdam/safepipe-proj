@@ -212,7 +212,10 @@ describe('ops3d satellite base — offline fallback (fake DOM)', () => {
     const bar = container.children.find((c) => c.className === 'sat-xfade');
     assert.ok(bar, 'single crossfade control, no popover');
     const btns = bar.children.filter((c) => c.tagName === 'BUTTON');
-    assert.equal(btns.length, 2, 'SAT + TWIN buttons');
+    assert.equal(btns.length, 3, 'SAT + TWIN + SCOPE buttons');
+    const scopeChip = btns.find((b) => b.attributes['data-testid'] === 'sat-scope');
+    assert.ok(scopeChip, 'SCOPE monitor chip present');
+    assert.equal(scopeChip.attributes['aria-pressed'], 'false', 'scope default OFF');
     assert.ok(bar.children.some((c) => c.tagName === 'INPUT'), 'slider present');
     api.dispose();
     assert.ok(!container.children.includes(base), 'dispose removes base');
@@ -258,5 +261,148 @@ describe('ops3d satellite base — offline fallback (fake DOM)', () => {
     api.syncFromTwin();
     assert.equal(typeof api.fadeTo(1), 'number');
     api.dispose();
+  });
+});
+
+describe('ops3d satellite monitor — clip math (pure)', () => {
+  it('SCOPE_R_KM matches the mapped circle (20 km)', () => {
+    assert.equal(sat.SCOPE_R_KM, 20);
+  });
+
+  it('projectPinhole centers the look target', () => {
+    const s = sat.projectPinhole(
+      { x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 }, 40, 1440, 900, { x: 0, y: 0, z: 0 },
+    );
+    assert.ok(Math.abs(s.x - 720) < 1, `x ${s.x}`);
+    assert.ok(Math.abs(s.y - 450) < 1, `y ${s.y}`);
+  });
+
+  it('projectPinhole returns null behind the camera', () => {
+    const s = sat.projectPinhole(
+      { x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 }, 40, 1440, 900, { x: 0, y: 200, z: 0 },
+    );
+    assert.equal(s, null);
+  });
+
+  it('rimCirclePx: top-down TOP view yields a centered disc', () => {
+    const d = sat.rimCirclePx({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 }, 40, 1440, 900);
+    assert.ok(d, 'disc computed');
+    assert.ok(Math.abs(d.cx - 720) < 2, `cx ${d.cx}`);
+    assert.ok(Math.abs(d.cy - 450) < 2, `cy ${d.cy}`);
+    assert.ok(d.r > 300 && d.r < 700, `r ${d.r}`);
+  });
+
+  it('rimCirclePx: null on degenerate input', () => {
+    assert.equal(sat.rimCirclePx({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 }, 40, 0, 900), null);
+    assert.equal(sat.rimCirclePx({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, 40, 1440, 900), null);
+    assert.equal(sat.rimCirclePx({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 }, 40, 1440, 900, 0), null);
+  });
+
+  it('scopeClipCss/scopeMaskCss confine imagery to the disc', () => {
+    assert.equal(sat.scopeClipCss(720, 450, 398.5), 'circle(398.5px at 720px 450px)');
+    const m = sat.scopeMaskCss(720, 450, 398.5);
+    assert.ok(m.includes('rgba(0,0,0,0)'), 'transparent inside');
+    assert.ok(m.includes('#000'), 'opaque outside');
+    assert.ok(m.includes('398.5px'), 'same radius');
+  });
+
+  it('level gating: overlay shows at network/TOP only', () => {
+    assert.equal(sat.isNetworkLevel('network'), true);
+    for (const l of ['segment', 'asset', '', null, undefined]) {
+      assert.equal(sat.isNetworkLevel(l), false, `level ${l}`);
+    }
+    assert.equal(sat.shouldShowScope({ scopeOn: true, level: 'network' }), true);
+    assert.equal(sat.shouldShowScope({ scopeOn: true, level: 'segment' }), false);
+    assert.equal(sat.shouldShowScope({ scopeOn: true, level: 'asset' }), false);
+    assert.equal(sat.shouldShowScope({ scopeOn: false, level: 'network' }), false);
+  });
+});
+
+describe('ops3d satellite monitor — toggle wiring + fallback (fake DOM)', () => {
+  const twinFar = () => ({
+    debug: {
+      camera: { position: { x: 0, y: 62, z: 0 }, fov: 40 },
+      target: () => ({ x: 0, y: 0, z: 0 }),
+    },
+  });
+  const sized = () => {
+    const c = new FakeEl('div');
+    c.clientWidth = 1440;
+    c.clientHeight = 900;
+    c._canvas = new FakeEl('canvas');
+    return c;
+  };
+
+  it('?scope=1 seeds ON and persists; hidden without a sized container, never throws', () => {
+    const st = memStore();
+    const c1 = new FakeEl('div');
+    const api1 = sat.initSatBase(c1, { search: '?scope=1', storage: st, getTwin: () => null });
+    assert.equal(api1.scope, true);
+    assert.equal(api1.scopeShown, false, 'no container size → hidden, never throws');
+    api1.setScope(false);
+    assert.equal(api1.scope, false);
+    assert.equal(st.getItem('ops3d.satScope'), '0');
+    const c2 = new FakeEl('div');
+    const api2 = sat.initSatBase(c2, { search: '', storage: st, getTwin: () => null });
+    assert.equal(api2.scope, false, 'choice restored from storage (default OFF)');
+    api1.dispose();
+    api2.dispose();
+  });
+
+  it('armed at TOP paints the disc; drill-in hides it and restores the mix', () => {
+    let level = 'network';
+    const container = sized();
+    const api = sat.initSatBase(container, {
+      search: '',
+      storage: memStore(),
+      getTwin: twinFar,
+      getLevel: () => level,
+    });
+    api.setMix(0.4);
+    assert.equal(api.setScope(true), true);
+    assert.equal(api.scopeShown, true, 'shown at TOP');
+    const base = container.children.find((c) => c.className === 'sat-base');
+    assert.ok(base.style.clipPath.startsWith('circle('), `clip ${base.style.clipPath}`);
+    assert.ok(container._canvas.style.maskImage.includes('radial-gradient'), 'canvas punched');
+    // Drill-in: overlay auto-hides, user mix restored untouched.
+    level = 'segment';
+    api.syncFromTwin(true);
+    assert.equal(api.scopeShown, false, 'hidden on drill-in');
+    assert.equal(base.style.clipPath, '', 'clip cleared');
+    assert.equal(container._canvas.style.maskImage, '', 'mask cleared');
+    assert.equal(container._canvas.style.opacity, '0.4', 'user mix restored');
+    const chip = container.children
+      .find((c) => c.className === 'sat-xfade')
+      .children.find((c) => c.attributes?.['data-testid'] === 'sat-scope');
+    assert.equal(chip.attributes['data-gated'], 'true', 'chip dims while gated');
+    api.dispose();
+  });
+
+  it('level resolution falls back through HUD-less, throwing, and distance paths', () => {
+    // Throwing override + far camera → network heuristic → shown.
+    const c1 = sized();
+    const a1 = sat.initSatBase(c1, {
+      search: '',
+      storage: memStore(),
+      getTwin: twinFar,
+      getLevel: () => {
+        throw new Error('hud gone');
+      },
+    });
+    a1.setScope(true);
+    assert.equal(a1.scopeShown, true, 'distance heuristic keeps TOP');
+    a1.dispose();
+    // Close camera (drill-in distance) with no override → hidden.
+    const c2 = sized();
+    const near = () => ({
+      debug: {
+        camera: { position: { x: 0, y: 3, z: 0 }, fov: 40 },
+        target: () => ({ x: 0, y: 0, z: 0 }),
+      },
+    });
+    const a2 = sat.initSatBase(c2, { search: '', storage: memStore(), getTwin: near });
+    a2.setScope(true);
+    assert.equal(a2.scopeShown, false, 'close camera reads as drilled-in');
+    a2.dispose();
   });
 });

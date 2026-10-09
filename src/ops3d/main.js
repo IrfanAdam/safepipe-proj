@@ -14,7 +14,13 @@ window.__twin = createTwin(el, {
 });
 
 // Satellite base + crossfade (tokenless open-source base, always attempted).
-const sat = initSatBase(el, { getTwin: () => window.__twin });
+// getLevel gates the circular scope monitor on the TOP/network view: read
+// from the HUD's active level button so no twin.js contract changes are
+// needed (sat-base falls back to a camera-distance heuristic).
+const sat = initSatBase(el, {
+  getTwin: () => window.__twin,
+  getLevel: () => document.querySelector('.ops-hud__level-btn--active')?.dataset?.level ?? null,
+});
 window.__satbase = sat;
 // Twin → map follow: cheap rAF-side sync (throttled inside), re-pins the
 // canvas layer + mix across DEM-swap remounts. Never breaks the twin loop.

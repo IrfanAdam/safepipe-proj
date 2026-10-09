@@ -42,6 +42,18 @@
   #ops3d-dev .sat-xfade__btn[aria-pressed="true"] { color: #ffd9a0; }
   #ops3d-dev .sat-xfade__slider { width: 110px; accent-color: #e8a33d; }
   #ops3d-dev .sat-xfade__auto { display: flex; align-items: center; gap: 4px; opacity: 0.75; }
+  /* Scope monitor chip: same diagonal-cut language as the bar. Active reads
+   * amber like SAT/TWIN; gated (armed but drilled-in) dims until TOP. */
+  #ops3d-dev .sat-xfade__scope {
+    border: 1px solid rgba(207, 212, 214, 0.25);
+    padding: 3px 10px;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  }
+  #ops3d-dev .sat-xfade__scope[aria-pressed="true"] {
+    color: #ffd9a0;
+    border-color: rgba(232, 163, 61, 0.6);
+  }
+  #ops3d-dev .sat-xfade__scope[data-gated="true"] { opacity: 0.45; }
 </style>
 </head>
 <body>
