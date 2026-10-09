@@ -621,6 +621,18 @@ export function initSatBase(container, opts = {}) {
     } catch {
       /* ignore */
     }
+    if (scopeOn) {
+      // Toggling SCOPE on always drops the camera to TOP/network first, so
+      // the disc overlay has a level to show in — same path as the HUD `1`
+      // key / network button, no twin.js contract change.
+      try {
+        document
+          .querySelector('.ops-hud__level-btn[data-level="network"]')
+          ?.click();
+      } catch {
+        /* HUD not mounted yet — overlay appears when network is active */
+      }
+    }
     refreshScope(true);
     return scopeOn;
   };
