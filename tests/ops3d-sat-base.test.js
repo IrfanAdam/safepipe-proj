@@ -194,6 +194,30 @@ describe('ops3d satellite base — camera sync math (pure)', () => {
   it('legacy twinViewToMapbox alias is the same function', () => {
     assert.equal(sat.twinViewToMapbox, sat.twinViewToMap);
   });
+  it('center follows the orbit target (pan parity, +x east / +z south)', () => {
+    const c0 = sat.twinViewToMap({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 }).center;
+    assert.ok(Math.abs(c0.lat - 57.03) < 1e-9 && Math.abs(c0.lon + 111.68) < 1e-9, `origin ${c0.lat},${c0.lon}`);
+    const t = sat.twinTargetToLatLon({ x: 22, z: 0 });
+    assert.ok(t.lon > -111.68 && t.lat === 57.03, `east ${t.lon}`);
+    assert.ok(Math.abs(t.lon + 111.68 - 22 / (111.32 * Math.cos((57.03 * Math.PI) / 180))) < 1e-9, 'equirectangular lon');
+    const s = sat.twinTargetToLatLon({ x: 0, z: 11.132 });
+    assert.ok(s.lat < 57.03 && Math.abs(s.lat - (57.03 - 0.1)) < 1e-9, `south ${s.lat}`);
+    const panned = sat.twinViewToMap({ x: 5, y: 62, z: -8 }, { x: 5, y: 0, z: -8 }).center;
+    assert.ok(panned.lon > -111.68 && panned.lat > 57.03, `pan tracks ${panned.lat},${panned.lon}`);
+  });
+  it('zoom holds ground scale (TOP 40 km span ≈ z10.7, not the old ~4×-tight fit)', () => {
+    const top = sat.twinViewToMap({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 });
+    assert.ok(top.zoom > 10.4 && top.zoom < 11.1, `TOP zoom ${top.zoom}`);
+    const near = sat.twinViewToMap({ x: 0, y: 9, z: 0 }, { x: 0, y: 0, z: 0 });
+    assert.ok(near.zoom > 13.2 && near.zoom < 13.8, `segment zoom ${near.zoom}`);
+  });
+  it('natural satellite colors: no dimming or tinted hillshade (thermal look)', () => {
+    assert.ok(!SRC.includes('raster-brightness-max'), 'no brightness dimming');
+    assert.ok(!SRC.includes('raster-saturation'), 'no saturation shift');
+    assert.ok(!SRC.includes('raster-contrast'), 'no contrast shift');
+    assert.ok(!SRC.includes('hillshade-shadow-color'), 'no tinted shadows');
+    assert.ok(!SRC.includes('hillshade-highlight-color'), 'no tinted highlights');
+  });
 });
 
 describe('ops3d satellite base — offline fallback (fake DOM)', () => {

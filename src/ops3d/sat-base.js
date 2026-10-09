@@ -1,9 +1,8 @@
 /* Safepipe Ops 3D — src/ops3d/sat-base.js · open-source satellite base + crossfade.
  *
- * Owns a MapLibre GL JS satellite map (Esri World Imagery XYZ + AWS
- * Terrarium terrain + hillshade, dusk-dimmed raster to match the dark
- * cinematic twin) in a div mounted BEHIND the three.js canvas, centred on
- * the site (57.03N 111.68W). The twin stays the interaction owner: every
+ * Owns a MapLibre GL JS satellite map (Esri World Imagery XYZ true-color +
+ * AWS Terrarium terrain + neutral hillshade) in a div mounted BEHIND the
+ * three.js canvas centred on the site (57.03N 111.68W). Every
  * frame the map center/bearing/pitch/zoom follows the twin orbit rig (one
  * way, twin → map), so the crossfade feels seamless instead of sliding.
  *
@@ -55,11 +54,34 @@ export function clampMix(m) {
   return Math.min(1, Math.max(0, v));
 }
 
-// Twin orbit → map view. Pure: camPos/target are {x,y,z}-like, world km.
+// Twin world (km, +x east, +z south) → lat/lon, equirectangular at the
+// site latitude (good to <1% over the 44 km window — same projection as
+// dem.js geoWindowForSite). Pure + unit-tested. The orbit target rides the
+// ground plane, so the map center tracks twin pans 1:1.
+export function twinTargetToLatLon(target, site = SITE) {
+  const x = Number(target?.x) || 0;
+  const z = Number(target?.z) || 0;
+  const lat = site.lat - z / 111.32;
+  const lon = site.lon + x / (111.32 * Math.cos((site.lat * Math.PI) / 180));
+  return { lat, lon };
+};
+
+// Twin orbit → map view. Pure: camPos/target are {x,y,z}-like, world km
+// (+x east, +z south, 1 unit = 1 km — matches the camera presets: the TOP
+// camera sits at +z looking north, screen-up is −z).
 // Bearing follows the orbit azimuth, pitch mirrors the camera elevation
-// (top-down twin = top-down map), zoom tracks orbit distance. Approximate
-// on purpose — the crossfade reads as one locked view, not a survey overlay.
-export function twinViewToMap(camPos, target) {
+// (top-down twin = top-down map). Zoom matches ground resolution: the
+// twin's visible span (2·dist·tan(fov/2)) over the viewport height gives
+// metres-per-pixel, converted to a WebMercator zoom at the site latitude —
+// so the crossfade holds scale instead of jumping ~4× (the old
+// 15.5 − log2(dist/9) sat two zoom levels too tight everywhere). `view`
+// is an optional {heightPx, fovDeg}; defaults (900 px, 40°) keep the
+// two-arg call shape working. Center follows the orbit target through
+// twinTargetToLatLon so panning the twin pans the map — previously the
+// center stayed pinned on SITE and every pan slid the layers apart.
+// Approximate on purpose — the crossfade reads as one locked view, not a
+// survey overlay (oblique footprints stretch beyond the top-down span).
+export function twinViewToMap(camPos, target, view = {}) {
   const dx = camPos.x - target.x;
   const dy = camPos.y - target.y;
   const dz = camPos.z - target.z;
@@ -67,8 +89,16 @@ export function twinViewToMap(camPos, target) {
   const bearing = ((Math.atan2(dx, dz) * 180) / Math.PI + 360) % 360;
   const elev = (Math.asin(Math.min(1, Math.max(-1, dy / dist))) * 180) / Math.PI;
   const pitch = Math.min(70, Math.max(0, 90 - elev));
-  const zoom = Math.min(16, Math.max(10, 15.5 - Math.log2(dist / 9)));
-  return { bearing, pitch, zoom };
+  const heightPx = Number(view.heightPx) > 0 ? Number(view.heightPx) : 900;
+  const fovDeg = Number(view.fovDeg) > 0 ? Number(view.fovDeg) : 40;
+  const spanKm = 2 * dist * Math.tan(((fovDeg * Math.PI) / 180) / 2);
+  const mpp = (spanKm * 1000) / heightPx; // twin metres per pixel
+  const center = twinTargetToLatLon(target);
+  const zoom = Math.min(
+    16,
+    Math.max(10, Math.log2((156543.03392 * Math.cos((center.lat * Math.PI) / 180)) / Math.max(mpp, 1e-6))),
+  );
+  return { bearing, pitch, zoom, center };
 }
 // Historic name (pre open-source swap): identical math, kept so any
 // existing HUD/sync import keeps working with zero edits.
@@ -233,13 +263,15 @@ function loadMaplibre() {
   return loadMaplibre._p;
 }
 
-// Inline keyless style: Esri satellite raster (dusk-dimmed to sit under the
-// dark twin) + Terrarium hillshade so relief reads in the crossfade.
+// Inline keyless style: Esri true-color satellite raster (natural,
+// Google-like — no tinting; an earlier dusk-dim + blue hillshade made it
+// read as thermal imagery) + Terrarium hillshade for relief in the
+// crossfade, + 3D terrain via moodMap().
 function satStyle() {
   return {
     version: 8,
     center: [SITE.lon, SITE.lat],
-    zoom: 13,
+    zoom: 11,
     sources: {
       'esri-sat': {
         type: 'raster',
@@ -260,27 +292,24 @@ function satStyle() {
       },
     },
     layers: [
-      // Opaque dusk floor: the canvas is never transparent, so a slow or
-      // failed tile load reads as dark base — never a black hole.
+      // Opaque floor: the canvas is never transparent, so a slow or
+      // failed tile load reads as dark base — never a black hole. Covered
+      // by imagery wherever tiles resolve.
       { id: 'void', type: 'background', paint: { 'background-color': '#0e141b' } },
       {
         id: 'sat',
         type: 'raster',
         source: 'esri-sat',
-        paint: {
-          'raster-brightness-max': 0.92,
-          'raster-saturation': 0.85,
-          'raster-contrast': 0.05,
-        },
       },
       {
         id: 'sat-hillshade',
         type: 'hillshade',
         source: 'terrain',
         paint: {
-          'hillshade-exaggeration': 0.35,
-          'hillshade-shadow-color': '#0b0c12',
-          'hillshade-highlight-color': '#5a6a86',
+          // Gentle neutral relief only — default black/white shading keeps
+          // the imagery true-color; tinted shadows/highlights here once
+          // pushed the whole base into a thermal look.
+          'hillshade-exaggeration': 0.25,
         },
       },
     ],
@@ -802,8 +831,9 @@ export function initSatBase(container, opts = {}) {
   bar.appendChild(autoWrap);
   container.appendChild(bar);
 
-  // — Twin → map follow (one way, minimal). Center stays pinned on site;
-  // bearing/pitch/zoom track the orbit rig so the fade never slides. —
+  // — Twin → map follow (one way, minimal). Center tracks the orbit target
+  // (twin pans pan the map 1:1); bearing/pitch/zoom track the orbit rig so
+  // the fade never slides. —
   let lastSync = 0;
   const syncFromTwin = (force = false) => {
     pinCanvas();
@@ -844,9 +874,15 @@ export function initSatBase(container, opts = {}) {
       }
     })();
     if (!cam?.position || !tgt) return;
-    const v = twinViewToMap(cam.position, tgt);
+    let h = 0;
     try {
-      map.jumpTo?.({ center: [SITE.lon, SITE.lat], bearing: v.bearing, pitch: v.pitch, zoom: v.zoom });
+      h = container.clientHeight || 0;
+    } catch {
+      h = 0;
+    }
+    const v = twinViewToMap(cam.position, tgt, { heightPx: h, fovDeg: cam.fov });
+    try {
+      map.jumpTo?.({ center: [v.center.lon, v.center.lat], bearing: v.bearing, pitch: v.pitch, zoom: v.zoom });
     } catch {
       /* a torn-down map never breaks the twin loop */
     }
