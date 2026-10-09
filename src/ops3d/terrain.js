@@ -160,8 +160,14 @@ export function riverX(z) {
  * with banks to spare). Part of field() — relief/sd gates cover it. */
 export const RIVER_TROUGH_D = 0.012;
 export const RIVER_TROUGH_W = 0.85;
+/* Carve axis: analytic riverX until buildTerrain installs the surveyed
+ * drainage line — then the valley + trough carve, the water masks, and the
+ * threads all share the derived channel, so water sits in the contour-V low
+ * line under either altitude source. Default keeps the node/test path on the
+ * analytic axis (relief/sd gates measure field() directly). */
+let _troughXat = riverX;
 export function riverTrough(x, z) {
-  const dx = (x - riverX(z)) / RIVER_TROUGH_W;
+  const dx = (x - _troughXat(z)) / RIVER_TROUGH_W;
   return -RIVER_TROUGH_D * Math.exp(-dx * dx);
 }
 /* Surveyed drainage line: per-row argmin of the SAMPLED altitude grid over
@@ -199,8 +205,8 @@ export function drainPathFromGrid(H, n, step, size = SIZE, axis = riverX) {
  * masks + banks follow surveyed drainage under either altitude source. */
 let _riverXat = riverX;
 function riverWet(x, z) {
-  const dx = (x - riverX(z)) / 2.2; // ~2.2 km half-width
-  return Math.exp(-dx * dx * (x > riverX(z) ? 1.6 : 0.8)); // steep cutbank E, bars W
+  const dx = (x - _troughXat(z)) / 2.2; // ~2.2 km half-width
+  return Math.exp(-dx * dx * (x > _troughXat(z) ? 1.6 : 0.8)); // steep cutbank E, bars W
 }
 const KETTLES = [
   { x: -4.5, z: 11.5, r: 0.8, d: -0.008 },
@@ -409,30 +415,37 @@ function smoothPath(pts, iterations = 2) {
  * the ring and reads at every zoom. */
 function elevLabel(text, x, y, z) {
   const cv = document.createElement('canvas');
-  cv.width = 192;
   cv.height = 48;
-  const ctx = cv.getContext('2d');
+  cv.width = 512; // measuring width — resized to fit below
+  const FONT = '600 30px ui-monospace, Menlo, monospace';
+  const mctx = cv.getContext('2d');
+  mctx.font = FONT;
+  const textW = mctx.measureText(text).width;
+  cv.width = Math.max(192, Math.ceil(56 + textW)); // long tags grow, short stay
+  const ctx = cv.getContext('2d'); // resize resets state — set everything after
   const CUT = 20; // deep enough to read at 3× TOP scale
+  const W = cv.width, CX = W / 2;
   ctx.fillStyle = 'rgba(16,20,24,0.9)';
   ctx.beginPath();
   ctx.moveTo(28, 4);
-  ctx.lineTo(164 - CUT, 4);
-  ctx.lineTo(164, 4 + CUT);
-  ctx.lineTo(164, 44);
+  ctx.lineTo(W - 28 - CUT, 4);
+  ctx.lineTo(W - 28, 4 + CUT);
+  ctx.lineTo(W - 28, 44);
   ctx.lineTo(28, 44);
   ctx.closePath();
   ctx.fill(); // dark chamfered plate behind the number
-  ctx.font = '600 30px ui-monospace, Menlo, monospace';
+  ctx.font = FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#aeb7bc';
-  ctx.fillText(text, 96, 26);
+  ctx.fillText(text, CX, 26);
   const tex = new THREE.CanvasTexture(cv);
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({
     map: tex, transparent: true, opacity: 1,
     depthWrite: false, depthTest: false, fog: false,
   }));
-  sp.scale.set(1.7, 0.425, 1); // small inline readout, never a billboard
+  sp.userData.aspect = cv.width / cv.height; // scale sites derive width from this
+  sp.scale.set(0.425 * sp.userData.aspect, 0.425, 1); // small inline readout, never a billboard
   sp.position.set(x, y, z);
   sp.renderOrder = 5;
   return sp;
@@ -442,12 +455,12 @@ function elevLabel(text, x, y, z) {
  * contours + ground fill get a sunlit/shadowed read without any shader.
  * The shade grid is derived from the sampled H grid (central differences,
  * VEX-applied normals) — zero extra field() calls — and sampled bilinearly
- * per vertex. Matte-charcoal swing (0.64–1.11): deep enough that volume
+ * per vertex. Matte-charcoal swing (0.58–1.13): deep enough that volume
  * reads at TOP, capped so greys stay grey and alarms keep the lead. */
 const SUN = new THREE.Vector3(-0.52, 0.78, -0.34).normalize(); // NW sun, ~51° alt
 const _sn = new THREE.Vector3();
 let _shadeAt = () => 0.5; // replaced per buildTerrain from the live H grid
-const shadeToBright = (t) => 0.64 + 0.47 * Math.min(1, Math.max(0, t));
+const shadeToBright = (t) => 0.58 + 0.55 * Math.min(1, Math.max(0, t));
 
 /* Fill-grid sampler (same bilinear read over H): the draped ground fill
  * rides true altitude without extra field() calls. */
@@ -528,19 +541,38 @@ export function buildTerrain(scene) {
     }
   } catch { /* layout unavailable — defaults already clear */ }
 
-  // Sample the Athabasca floor field on the grid.
+  // Sample the Athabasca floor field on the grid — two passes. The first
+  // pass (analytic carve) locates the surveyed drainage axis; the second
+  // re-carves valley + trough along that derived line, so the channel the
+  // threads ride is the contour-V low line, never a fixed drawing.
   const step = SIZE / N;
   const H = new Float32Array((N + 1) * (N + 1));
   let mn = Infinity;
   let mx = -Infinity;
-  for (let j = 0; j <= N; j++) {
-    for (let i = 0; i <= N; i++) {
-      const h = field(-SIZE / 2 + i * step, -SIZE / 2 + j * step);
-      H[j * (N + 1) + i] = h;
-      if (h < mn) mn = h;
-      if (h > mx) mx = h;
+  const sampleH = () => {
+    mn = Infinity; mx = -Infinity;
+    for (let j = 0; j <= N; j++) {
+      for (let i = 0; i <= N; i++) {
+        const h = field(-SIZE / 2 + i * step, -SIZE / 2 + j * step);
+        H[j * (N + 1) + i] = h;
+        if (h < mn) mn = h;
+        if (h > mx) mx = h;
+      }
     }
-  }
+  };
+  sampleH();
+  // Surveyed drainage axis: derived from THIS grid (live DEM or fallback),
+  // so threads + water masks sit on the real valley floor, never a fixed
+  // drawing. Bilinear readout for sub-cell smoothness.
+  const _drain = drainPathFromGrid(H, N, step);
+  const drainAt = (z) => {
+    const gz = Math.min(N, Math.max(0, (z + SIZE / 2) / step));
+    const j0 = Math.min(N - 1, Math.floor(gz)), f = gz - j0;
+    return _drain[j0] * (1 - f) + _drain[j0 + 1] * f;
+  };
+  _riverXat = drainAt;
+  _troughXat = drainAt;
+  sampleH(); // re-carve along the surveyed line; contours + threads share it
   if (mn < -0.15 || mx > 0.16) console.warn(`[terrain] field out of expected band mn=${mn.toFixed(3)} mx=${mx.toFixed(3)} — check amplitudes`);
 
   // Baked hillshade grid: VEX-applied normals from H, dotted with the
@@ -569,16 +601,6 @@ export function buildTerrain(scene) {
   _shadeAt = (x, z) => bilin(SG, x, z);
   _heightAt = (x, z) => bilin(H, x, z);
   _fillLo = mn; _fillHi = mx;
-  // Surveyed drainage axis: derived from THIS grid (live DEM or fallback),
-  // so threads + water masks sit on the real valley floor, never a fixed
-  // drawing. Bilinear readout for sub-cell smoothness.
-  const _drain = drainPathFromGrid(H, N, step);
-  const drainAt = (z) => {
-    const gz = Math.min(N, Math.max(0, (z + SIZE / 2) / step));
-    const j0 = Math.min(N - 1, Math.floor(gz)), f = gz - j0;
-    return _drain[j0] * (1 - f) + _drain[j0 + 1] * f;
-  };
-  _riverXat = drainAt;
 
   // Two shared fat-line materials: dim base + muted index, both additive
   // so the land reads without owning the frame. Cool greys, fog off.
@@ -586,7 +608,7 @@ export function buildTerrain(scene) {
   const baseMat = new LineMaterial({
     color: 0xffffff,
     vertexColors: true,
-    linewidth: 1.15,
+    linewidth: 1.0,
     transparent: true,
     opacity: 0.16,
     blending: THREE.AdditiveBlending,
@@ -662,7 +684,7 @@ export function buildTerrain(scene) {
         placed.push([q[0], q[1]]);
         if (placed.length > 18) break;
         const sp = elevLabel(tag, q[0], y + 0.14, q[1]);
-        sp.scale.set(1.85, 0.46, 1);
+        sp.scale.set(0.46 * sp.userData.aspect, 0.46, 1);
         labelGroup.add(sp);
       }
     }
@@ -700,7 +722,7 @@ export function buildTerrain(scene) {
     disk.position.set(sx, y + 0.04, sz);
     group.add(disk);
     const tag = elevLabel(`▲ ${Math.round(h * 1000)} m`, sx, y + 0.62, sz);
-    tag.scale.set(2.0, 0.5, 1);
+    tag.scale.set(0.5 * tag.userData.aspect, 0.5, 1);
     summitGroup.add(tag);
   }
   // Valley-floor proof: the low landmark gets the same treatment as the
@@ -709,7 +731,7 @@ export function buildTerrain(scene) {
     const vz = 6, vx = drainAt(vz);
     const vh = field(vx, vz);
     const tag = elevLabel(`▼ ${Math.round(vh * 1000)} m · VALLEY`, vx, vh * VEX + 0.55, vz);
-    tag.scale.set(2.6, 0.5, 1);
+    tag.scale.set(0.5 * tag.userData.aspect, 0.5, 1);
     summitGroup.add(tag);
   }
   group.add(summitGroup);
@@ -722,7 +744,7 @@ export function buildTerrain(scene) {
   {
     const SECT = 160, RINGS = 56;
     const LO = new THREE.Color(0x0c0e10); // valley-floor near-black charcoal, neutral
-    const HI = new THREE.Color(0x323536); // high-ground matte grey — volume without glare
+    const HI = new THREE.Color(0x3a3d40); // high-ground matte grey — volume without glare
     const pos = [0, 0, 0];
     const clr = [0, 0, 0];
     const idx = [];
@@ -731,7 +753,7 @@ export function buildTerrain(scene) {
       const h = _heightAt(x, z);
       const te = Math.min(1, Math.max(0, (h - _fillLo) / Math.max(1e-6, _fillHi - _fillLo)));
       const rim = 1 - 0.55 * smooth(18.5, 20, Math.hypot(x, z));
-      tmpC.copy(LO).lerp(HI, te).multiplyScalar((0.50 + 0.62 * _shadeAt(x, z)) * rim);
+      tmpC.copy(LO).lerp(HI, te).multiplyScalar((0.42 + 0.78 * _shadeAt(x, z)) * rim);
       pos.push(x, h * VEX - 0.02, z);
       clr.push(tmpC.r, tmpC.g, tmpC.b);
       return pos.length / 3 - 1;
@@ -739,7 +761,7 @@ export function buildTerrain(scene) {
     // center vertex (average height, mid shade) then ring verts
     {
       const h = _heightAt(0, 0);
-      tmpC.copy(LO).lerp(HI, 0.5).multiplyScalar(0.50 + 0.62 * _shadeAt(0, 0));
+      tmpC.copy(LO).lerp(HI, 0.5).multiplyScalar(0.42 + 0.78 * _shadeAt(0, 0));
       pos[1] = h * VEX - 0.02;
       clr[0] = tmpC.r; clr[1] = tmpC.g; clr[2] = tmpC.b;
     }
@@ -951,7 +973,7 @@ export function buildTerrain(scene) {
       }
       if (pts.length < 6) continue;
       const wg = new LineGeometry(); wg.setPositions(pts);
-      const wm = new LineMaterial({ color: WATER_COL, linewidth: 1.2, transparent: true, opacity: 0.45, depthWrite: false, fog: false });
+      const wm = new LineMaterial({ color: WATER_COL, linewidth: 1.7, transparent: true, opacity: 0.6, depthWrite: false, fog: false });
       wm.resolution.set(1280, 720);
       const wl = new LineSegments2(wg, wm); wl.renderOrder = 1; group.add(wl);
     }
@@ -968,8 +990,8 @@ export function buildTerrain(scene) {
       labelGroup.visible = name !== 'network';
       dimF = name === 'network' ? 0.8 : name === 'asset' ? 0.5 : name === 'segment' ? 0.6 : 1;
       pillF = name === 'asset' ? 0.35 : name === 'segment' ? 0.6 : 1;
-      for (const sp of labelGroup.children) sp.scale.set(1.85 * pillF, 0.46 * pillF, 1);
-      for (const sp of summitGroup.children) sp.scale.set(2.0 * pillF, 0.5 * pillF, 1);
+      for (const sp of labelGroup.children) sp.scale.set(0.46 * pillF * (sp.userData.aspect || 4), 0.46 * pillF, 1);
+      for (const sp of summitGroup.children) sp.scale.set(0.5 * pillF * (sp.userData.aspect || 4), 0.5 * pillF, 1);
     },
     setSize(w, h) {
       baseMat.resolution.set(w, h);
