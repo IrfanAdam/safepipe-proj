@@ -92,7 +92,13 @@ export function twinViewToMap(camPos, target, view = {}) {
   const heightPx = Number(view.heightPx) > 0 ? Number(view.heightPx) : 900;
   const fovDeg = Number(view.fovDeg) > 0 ? Number(view.fovDeg) : 40;
   const spanKm = 2 * dist * Math.tan(((fovDeg * Math.PI) / 180) / 2);
-  const mpp = (spanKm * 1000) / heightPx; // twin metres per pixel
+  // Oblique stretch: the centre-pixel ray meets the ground at a slant, so
+  // ground-per-pixel grows by 1/sin(elevation). Without this the map sits
+  // ~2-3× too tight at ISO and the crossfade double-visions mid-fade.
+  // Top-down is unaffected (sin 90° = 1). Factor clamped to 3 (twin camera
+  // floor is 16° elevation) so grazing views never over-zoom out.
+  const slant = Math.min(3, 1 / Math.max(Math.sin((Math.max(elev, 5) * Math.PI) / 180), 1 / 3));
+  const mpp = ((spanKm * 1000) / heightPx) * slant; // twin metres per pixel
   const center = twinTargetToLatLon(target);
   const zoom = Math.min(
     16,
@@ -835,6 +841,7 @@ export function initSatBase(container, opts = {}) {
   // (twin pans pan the map 1:1); bearing/pitch/zoom track the orbit rig so
   // the fade never slides. —
   let lastSync = 0;
+  let lastCamKey = null;
   const syncFromTwin = (force = false) => {
     pinCanvas();
     // Scope overlay reconciles every tick (throttled inside): the disc
@@ -857,7 +864,19 @@ export function initSatBase(container, opts = {}) {
     if (!map || !mapReady) return;
     const now =
       typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
-    if (!force && now - lastSync < 150) return;
+    // Motion-adaptive throttle: a fixed 150 ms timer makes the map drag
+    // visibly behind the camera mid-orbit (crossfade out of sync). When the
+    // rig moved since the last sync, follow it immediately; at rest, rest.
+    let moved = true;
+    try {
+      const q = (v) => Math.round(Number(v) * 1e3) / 1e3;
+      const key = [q(cam.position.x), q(cam.position.y), q(cam.position.z), q(tgt.x), q(tgt.y), q(tgt.z)].join(',');
+      moved = key !== lastCamKey;
+      lastCamKey = key;
+    } catch {
+      moved = true;
+    }
+    if (!force && !moved && now - lastSync < 150) return;
     lastSync = now;
     let twin = null;
     try {

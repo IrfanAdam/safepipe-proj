@@ -211,6 +211,13 @@ describe('ops3d satellite base — camera sync math (pure)', () => {
     const near = sat.twinViewToMap({ x: 0, y: 9, z: 0 }, { x: 0, y: 0, z: 0 });
     assert.ok(near.zoom > 13.2 && near.zoom < 13.8, `segment zoom ${near.zoom}`);
   });
+  it('oblique views widen the map (slant-corrected, no ISO double-vision)', () => {
+    const tgt = { x: 0, y: 0, z: 0 };
+    const top = sat.twinViewToMap({ x: 0, y: 30, z: 0.1 }, tgt);
+    const iso = sat.twinViewToMap({ x: 0, y: 30 * Math.sin((25 * Math.PI) / 180), z: 30 * Math.cos((25 * Math.PI) / 180) }, tgt);
+    assert.ok(iso.zoom < top.zoom - 0.8, `iso ${iso.zoom} vs top ${top.zoom}`);
+    assert.ok(iso.zoom >= 10, 'still clamped');
+  });
   it('natural satellite colors: no dimming or tinted hillshade (thermal look)', () => {
     assert.ok(!SRC.includes('raster-brightness-max'), 'no brightness dimming');
     assert.ok(!SRC.includes('raster-saturation'), 'no saturation shift');
