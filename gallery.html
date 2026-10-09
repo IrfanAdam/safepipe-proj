@@ -19,6 +19,35 @@
 <link rel="stylesheet" href="./src/components/tag.css" />
 <link rel="stylesheet" href="./src/components/icon.css" />
 <link rel="stylesheet" href="./gallery.css" />
+<style>
+  /* Satellite crossfade bar inside the ops3d specimen (same as ops3d.html). */
+  #ops3d-specimen .sat-xfade {
+    position: absolute; right: 12px; bottom: 12px; z-index: 2;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px;
+    background: rgba(10, 14, 18, 0.88);
+    border: 1px solid rgba(207, 212, 214, 0.18);
+    clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+    font: 10px/1 ui-monospace, monospace; letter-spacing: 0.12em; color: #cfd4d6;
+  }
+  #ops3d-specimen .sat-xfade__btn {
+    background: none; border: 0; padding: 4px 2px; cursor: pointer;
+    font: inherit; letter-spacing: inherit; color: rgba(207, 212, 214, 0.65);
+  }
+  #ops3d-specimen .sat-xfade__btn[aria-pressed="true"] { color: #ffd9a0; }
+  #ops3d-specimen .sat-xfade__slider { width: 110px; accent-color: #e8a33d; }
+  #ops3d-specimen .sat-xfade__auto { display: flex; align-items: center; gap: 4px; opacity: 0.75; }
+  #ops3d-specimen .sat-xfade__scope {
+    border: 1px solid rgba(207, 212, 214, 0.25);
+    padding: 3px 10px;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  }
+  #ops3d-specimen .sat-xfade__scope[aria-pressed="true"] {
+    color: #ffd9a0;
+    border-color: rgba(232, 163, 61, 0.6);
+  }
+  #ops3d-specimen .sat-xfade__scope[data-gated="true"] { opacity: 0.45; }
+</style>
 </head>
 <body>
 <header class="gtop">
@@ -113,8 +142,22 @@
 <script type="module" src="./src/ds/gallery-shell.js"></script>
 <script type="module">
   import { createTwin } from './src/ops3d/twin.js';
+  import { initSatBase } from './src/ops3d/sat-base.js';
   const el = document.getElementById('ops3d-specimen');
-  if (el) createTwin(el, {});
+  if (el) {
+    window.__twin = createTwin(el, {});
+    // Same open-source satellite base + SAT/TWIN/SCOPE bar as ops3d.html.
+    const sat = initSatBase(el, {
+      getTwin: () => window.__twin,
+      getLevel: () => document.querySelector('.ops-hud__level-btn--active')?.dataset?.level ?? null,
+    });
+    window.__satbase = sat;
+    const satLoop = () => {
+      try { sat.syncFromTwin(); } catch { /* twin runs without sat */ }
+      requestAnimationFrame(satLoop);
+    };
+    requestAnimationFrame(satLoop);
+  }
 </script>
 </body>
 </html>
