@@ -16,6 +16,23 @@ const LEVEL_NUM = { 1: 'network', 2: 'segment', 3: 'asset' };
  * moves true scale inside a level, so the label carries ≈. */
 export const SITE_COORDS = { lat: 57.03, lon: -111.68 };
 export const SITE_COORDS_LABEL = '57.03°N 111.68°W';
+// Live site label: "57.03°N 111.68°W" style from any {lat,lon}. Pure +
+// unit-tested — the HUD follows ?site=<lat>,<lon> twins instead of
+// hard-labelling Fort McMurray everywhere.
+export function siteCoordsLabel(site = SITE_COORDS) {
+  const la = Number(site?.lat);
+  const lo = Number(site?.lon);
+  if (!Number.isFinite(la) || !Number.isFinite(lo)) return SITE_COORDS_LABEL;
+  const laS = `${Math.abs(la).toFixed(2)}°${la >= 0 ? 'N' : 'S'}`;
+  const loS = `${Math.abs(lo).toFixed(2)}°${lo >= 0 ? 'E' : 'W'}`;
+  return `${laS} ${loS}`;
+}
+export function isDefaultSite(site = SITE_COORDS) {
+  return (
+    Math.abs(Number(site?.lat) - SITE_COORDS.lat) < 1e-9 &&
+    Math.abs(Number(site?.lon) - SITE_COORDS.lon) < 1e-9
+  );
+}
 export const SCALE_FOR_LEVEL = {
   network: { km: 20, label: '20 KM' },
   segment: { km: 5, label: '5 KM' },
@@ -60,11 +77,14 @@ export function buildHud(container, cbs = {}) {
   // duplicated here.
   const sector = el('div', 'ops-hud__sector');
   sector.appendChild(el('div', 'ops-hud__title', 'PIPELINE NETWORK'));
-  sector.appendChild(el('div', 'ops-hud__sub', 'SECTOR 7G — ATHABASCA · FORT MCMURRAY · R 20 KM'));
+  const sectorSub = el('div', 'ops-hud__sub', 'SECTOR 7G — ATHABASCA · FORT MCMURRAY · R 20 KM');
+  sector.appendChild(sectorSub);
   const healthLine = el('div', 'ops-hud__health', 'HEALTH —/—/—');
   sector.appendChild(healthLine);
   // Site anchor + live clock: dim rows in the sector block, no new box.
-  sector.appendChild(el('div', 'ops-hud__coords', `${SITE_COORDS_LABEL} · SITE CENTER`));
+  // Both follow state.site (the ?site= twin) via update() below.
+  const coordsLine = el('div', 'ops-hud__coords', `${SITE_COORDS_LABEL} · SITE CENTER`);
+  sector.appendChild(coordsLine);
   const clock = el('div', 'ops-hud__clock', formatClockUTC(new Date()));
   clock.setAttribute('data-testid', 'ops-hud-clock');
   sector.appendChild(clock);
@@ -531,6 +551,13 @@ export function buildHud(container, cbs = {}) {
     scaleLabel.textContent = `≈ ${sc.label}`;
     scalebar.setAttribute('aria-label', `Approximate scale at ${level} view: ${sc.label} — 1:1 km, dynamic with zoom`);
     clock.textContent = formatClockUTC(new Date());
+    // Live site: a ?site=<lat>,<lon> twin re-labels coords + sector rows.
+    if (state.site !== undefined) {
+      coordsLine.textContent = `${siteCoordsLabel(state.site)} · SITE CENTER`;
+      sectorSub.textContent = isDefaultSite(state.site)
+        ? 'SECTOR 7G — ATHABASCA · FORT MCMURRAY · R 20 KM'
+        : `CUSTOM SITE · R 20 KM`;
+    }
     if (typeof state.heading === 'number' && Number.isFinite(state.heading)) {
       needle.style.transform = `rotate(${state.heading}deg)`;
       compass.setAttribute(

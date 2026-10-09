@@ -1,6 +1,6 @@
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { SITE, DEM_TILES, levelsForRange, loadDEM, sampleProcedural, geoWindowForSite, sampleGrid, demCacheKey, DEM_CACHE_VERSION, _cacheMemSeed, _cacheMemClear, mosaicSample, downsampleGrid, detailStepForRange, copernicusTileUrl, demTileUrls, getDemStatus, onDemStatus, DEM_NATIVE_RES_M, DEM_STAGES, SEAM_BLEND_DEG, coarseCropForSite, COARSE_EXTENT_PX } from '../src/ops3d/dem.js';
+import { SITE, DEM_TILES, levelsForRange, loadDEM, sampleProcedural, geoWindowForSite, sampleGrid, demCacheKey, DEM_CACHE_VERSION, _cacheMemSeed, _cacheMemClear, mosaicSample, downsampleGrid, detailStepForRange, copernicusTileUrl, demTileUrls, getDemStatus, onDemStatus, DEM_NATIVE_RES_M, DEM_STAGES, SEAM_BLEND_DEG, coarseCropForSite, COARSE_EXTENT_PX, GLOBAL_BUDGET_MS, TERRARIUM_MAXZOOM, TERRARIUM_TILE_PX, TERRARIUM_EFFECTIVE_RES_M, TERRARIUM_COARSE_ZOOM, terrariumTileUrl, latLonToTile, terrariumResM, terrariumDecodePixel, terrariumElevationsFromRGBA, terrariumWindowTiles, terrariumTileCount, lonLatToTilePixel, tilePixelToLonLat, stitchTerrariumGrid, loadTerrariumStage, _injectTerrariumFetcher, parseSiteParam, resolveSite, srtmTileName, srtmTileNames, reliefPassesGate, DEM_RELIEF_MIN_KM, TERRARIUM_RELIEF_MIN_KM } from '../src/ops3d/dem.js';
 
 describe('ops3d DEM seam (phase 1)', () => {
   it('SITE pin is Fort McMurray', () => {
@@ -313,5 +313,302 @@ describe('ops3d DEM delivery (fidelity pass: progression, seams, zoom, sources)'
     // Crop + full tile mix: outside-crop points use the full tile.
     const full = { ...cropTile, win: { left: 0, top: 2780, right: 2458, bottom: 3601 }, ww: 2458, hh: 821, crop: false, data: new Int16Array(2458 * 821).fill(400), latTop: 58 + 2780 * res[1], latBot: 58 + 3601 * res[1] };
     assert.ok(Math.abs(mosaicSample([cropTile, full], -111.0, 57.5, -1) - 0.4) < 1e-9, 'falls through to full tile');
+  });
+});
+
+describe('ops3d DEM Terrarium primary (task-0: tile math, decode, staging)', () => {
+  afterEach(() => { _cacheMemClear(); _injectTerrariumFetcher(null); });
+
+  it('slippy tile math pins the verified site tiles (z13/z14/z15)', () => {
+    assert.deepEqual(latLonToTile(57.03, -111.68, 13), { x: 1554, y: 2508 });
+    assert.deepEqual(latLonToTile(57.03, -111.68, 14), { x: 3109, y: 5016 });
+    assert.deepEqual(latLonToTile(57.03, -111.68, 15), { x: 6218, y: 10033 });
+    assert.equal(TERRARIUM_MAXZOOM, 15);
+    assert.equal(
+      terrariumTileUrl(15, 6218, 10033),
+      'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/6218/10033.png',
+    );
+  });
+
+  it('decode: elev = R*256+G+B/256-32768 (verified site px 323.1 m)', () => {
+    assert.ok(Math.abs(terrariumDecodePixel(129, 67, 31) - 323.12) < 0.01, 'site pixel');
+    assert.equal(terrariumDecodePixel(0, 0, 0), -32768);
+    assert.ok(Math.abs(terrariumDecodePixel(255, 255, 255) - 32768) < 1, 'max white');
+  });
+
+  it('RGBA decode is pure: synthetic 2x2 tile', () => {
+    const enc = (elev) => {
+      const v = elev + 32768;
+      const R = Math.floor(v / 256), G = Math.floor(v % 256), B = Math.round((v - Math.floor(v)) * 256);
+      return [R, G, B, 255];
+    };
+    const rgba = new Uint8ClampedArray([...enc(0), ...enc(100.5)]);
+    const out = terrariumElevationsFromRGBA(rgba, 2, 1);
+    assert.ok(Math.abs(out[0]) < 0.01, `zero ${out[0]}`);
+    assert.ok(Math.abs(out[1] - 100.5) < 0.01, `gradient ${out[1]}`);
+  });
+
+  it('posting halves per zoom (z13 ≈ 10.4 m/px at the site; effective 20 m)', () => {
+    const r13 = terrariumResM(13);
+    assert.ok(Math.abs(r13 - 10.4) < 0.5, `z13 posting ${r13}`);
+    assert.ok(Math.abs(terrariumResM(14) * 2 - r13) < 1e-9, 'z14 halves');
+    assert.ok(Math.abs(terrariumResM(15) * 4 - r13) < 1e-9, 'z15 quarters');
+    assert.equal(TERRARIUM_EFFECTIVE_RES_M, 20);
+    assert.equal(TERRARIUM_TILE_PX, 256);
+  });
+
+  it('zoom staging: z13 window bounded, z15 full-window impractical (capped, never whole)', () => {
+    const w13 = terrariumWindowTiles(13);
+    const c13 = terrariumTileCount(w13);
+    assert.ok(c13 >= 100 && c13 <= 500, `z13 full-window ${c13} tiles`);
+    assert.ok(w13.x0 <= 1554 && 1554 <= w13.x1 && w13.y0 <= 2508 && 2508 <= w13.y1, 'site tile inside');
+    const w15 = terrariumWindowTiles(15);
+    assert.ok(terrariumTileCount(w15) > 1000, `z15 full-window ${terrariumTileCount(w15)} — must cap, never fetch whole`);
+  });
+
+  it('tile-pixel helpers round-trip lon/lat at the site pixel', () => {
+    const fp = lonLatToTilePixel(SITE.lon, SITE.lat, 15);
+    assert.deepEqual({ x: fp.x, y: fp.y }, { x: 6218, y: 10033 });
+    assert.ok(Math.abs(fp.px - 163) < 2 && Math.abs(fp.py - 203) < 2, `site pixel ${fp.px},${fp.py}`);
+    const ll = tilePixelToLonLat(fp.x, fp.y, fp.px, fp.py, 15);
+    assert.ok(Math.abs(ll.lon - SITE.lon) < 1e-6 && Math.abs(ll.lat - SITE.lat) < 1e-6, 'round-trip');
+  });
+
+  it('stitch: constant tile samples through the mosaic at full validFrac', () => {
+    const S = TERRARIUM_TILE_PX;
+    const rgba = new Uint8ClampedArray(S * S * 4);
+    for (let i = 0; i < S * S; i++) { rgba[i * 4] = 129; rgba[i * 4 + 1] = 67; rgba[i * 4 + 2] = 31; rgba[i * 4 + 3] = 255; }
+    const st = stitchTerrariumGrid([{ x: 6218, y: 10033, grid: terrariumElevationsFromRGBA(rgba) }], 15, 256);
+    assert.equal(st.ww, 256); assert.equal(st.hh, 256);
+    assert.equal(st.validFrac, 1);
+    const payload = {
+      origin: [st.bbox.lonLeft, st.bbox.latTop],
+      res: [(st.bbox.lonRight - st.bbox.lonLeft) / st.ww, -(st.bbox.latTop - st.bbox.latBot) / st.hh],
+      win: { left: 0, top: 0, right: st.ww, bottom: st.hh },
+      data: st.data, ww: st.ww, hh: st.hh, noData: -32768,
+      latTop: st.bbox.latTop, latBot: st.bbox.latBot,
+    };
+    assert.ok(Math.abs(mosaicSample([payload], SITE.lon, SITE.lat, -1) - 0.32312) < 0.001, 'site reads 323 m');
+  });
+
+  it('source order: Terrarium primary, SRTM→Copernicus fallback, Copernicus last', () => {
+    const urls = demTileUrls('N57W112');
+    assert.equal(urls.length, 2);
+    assert.match(urls[0], /SRTM_GL1/);
+    assert.match(urls[1], /copernicus-dem-30m/, 'Copernicus last (no browser CORS)');
+  });
+});
+
+// Synthetic Terrarium PNG supplier: E-W elevation gradient so relief probes
+// pass with zero network. elev = base + (globalTilePx)*k.
+const terrariumGradientFetcher = (metersPerPx = 0.1, baseM = 300) => async (url, _signal) => {
+  const m = /terrarium\/(\d+)\/(\d+)\/(\d+)\.png/.exec(url);
+  assert.ok(m, `tile url ${url}`);
+  const tx = Number(m[2]), ty = Number(m[3]);
+  const S = TERRARIUM_TILE_PX;
+  const rgba = new Uint8ClampedArray(S * S * 4);
+  for (let j = 0; j < S; j++) {
+    for (let i = 0; i < S; i++) {
+      const elev = baseM + (tx * S + i) * metersPerPx + (ty * S + j) * 0.001;
+      const v = elev + 32768;
+      const R = Math.floor(v / 256), G = Math.floor(v % 256), B = Math.round((v - Math.floor(v)) * 256);
+      const o = (j * S + i) * 4;
+      rgba[o] = R; rgba[o + 1] = G; rgba[o + 2] = B; rgba[o + 3] = 255;
+    }
+  }
+  return rgba;
+};
+
+describe('ops3d DEM Terrarium staging (fetch → stitch → layer)', () => {
+  afterEach(() => { _cacheMemClear(); _injectTerrariumFetcher(null); });
+
+  it('loadTerrariumStage stitches injected tiles; mosaic reads the gradient', async () => {
+    _injectTerrariumFetcher(terrariumGradientFetcher());
+    const r = await loadTerrariumStage(13, { extentKm: 4, maxPx: 256, budgetMs: 5000 });
+    assert.ok(r && r.src === 'terrarium-z13', `stage ${r?.src}`);
+    assert.ok(r.terrTiles >= 1 && r.terrTiles <= r.terrTotal);
+    assert.ok(r.terrValidFrac > 0.9, `validFrac ${r.terrValidFrac}`);
+    const w = r.win.right - r.win.left;
+    const west = mosaicSample([r], r.origin[0] + r.res[0] * w * 0.1, SITE.lat, -1);
+    const east = mosaicSample([r], r.origin[0] + r.res[0] * w * 0.9, SITE.lat, -1);
+    assert.ok(Number.isFinite(west) && Number.isFinite(east), 'finite samples');
+    assert.ok(east - west > 0.005, `E-W gradient ${(east - west) * 1000} m`);
+  });
+
+  it('fine zoom honors maxTiles (z15 progressive, never full-window)', async () => {
+    let fetches = 0;
+    _injectTerrariumFetcher(async (url, signal) => { fetches++; return terrariumGradientFetcher()(url, signal); });
+    const r = await loadTerrariumStage(15, { extentKm: SITE.extentKm, maxPx: 256, budgetMs: 10000, maxTiles: 4 });
+    assert.ok(r, 'stage resolves');
+    assert.ok(fetches <= 4, `fetched ${fetches} ≤ 4`);
+    assert.equal(r.terrTotal, 4);
+  });
+
+  it('Terrarium-primary pipeline resolves dem with injected PNGs (SRTM budgeted out)', async () => {
+    _injectTerrariumFetcher(terrariumGradientFetcher(0.15));
+    const prog = [];
+    const r = await loadDEM({
+      fetchTimeoutMs: 300, coarseBudgetMs: 300,
+      onProgress: (res) => prog.push(res.meta.stage),
+    });
+    assert.equal(r.terrainSource, 'dem');
+    assert.equal(r.meta.src, 'terrarium');
+    assert.equal(r.meta.stage, 'fine');
+    assert.ok(r.meta.reliefKm > 0.08, `relief ${r.meta.reliefKm}`);
+    assert.ok(r.meta.timings && typeof r.meta.timings.terrCoarseMs === 'number', 'phase timings recorded');
+    assert.ok(prog.includes('coarse') && prog[prog.length - 1] === 'fine', `progression ${prog}`);
+  }, { timeout: 30000 });
+});
+
+describe('ops3d DEM site parametrization (?site=<lat>,<lon> / opts.site)', () => {
+  afterEach(() => { _cacheMemClear(); _injectTerrariumFetcher(null); });
+
+  it('parseSiteParam accepts lat,lon, rejects garbage + out-of-SRTM range', () => {
+    assert.deepEqual(parseSiteParam('57.03,-111.68'), { lat: 57.03, lon: -111.68 });
+    assert.deepEqual(parseSiteParam('-23.95, -46.63'), { lat: -23.95, lon: -46.63 });
+    assert.deepEqual(parseSiteParam('2.3 45.1'), { lat: 2.3, lon: 45.1 });
+    assert.equal(parseSiteParam(null), null);
+    assert.equal(parseSiteParam(''), null);
+    assert.equal(parseSiteParam('abc,def'), null);
+    assert.equal(parseSiteParam('57.03'), null);
+    assert.equal(parseSiteParam('57.03,-111.68,5'), null);
+    assert.equal(parseSiteParam('61,-111.68'), null, 'lat > 60 outside SRTM GL1');
+    assert.equal(parseSiteParam('-61,0'), null, 'lat < -60 outside SRTM GL1');
+    assert.equal(parseSiteParam('0,181'), null, 'lon > 180');
+  });
+
+  it('resolveSite: opts.site wins, then ?site=, then default (garbage → default)', () => {
+    assert.deepEqual(resolveSite(), { lat: 57.03, lon: -111.68, extentKm: 44 });
+    assert.deepEqual(resolveSite(null, '-23.95,-46.63'), { lat: -23.95, lon: -46.63, extentKm: 44 });
+    assert.deepEqual(
+      resolveSite({ lat: 2.3, lon: 45.1 }, '-23.95,-46.63'),
+      { lat: 2.3, lon: 45.1, extentKm: 44 },
+      'explicit opts.site beats the param',
+    );
+    assert.deepEqual(resolveSite('garbage', 'also-bad'), { lat: 57.03, lon: -111.68, extentKm: 44 });
+    assert.deepEqual(resolveSite({ lat: 75, lon: 0 }), { lat: 57.03, lon: -111.68, extentKm: 44 }, 'out-of-range → default');
+  });
+
+  it('srtmTileName derives the SW-corner pattern in all quadrants', () => {
+    assert.equal(srtmTileName(57.03, -111.68), 'N57W112');
+    assert.equal(srtmTileName(-23.55, -46.63), 'S24W047');
+    assert.equal(srtmTileName(2.3, 45.1), 'N02E045');
+    assert.equal(srtmTileName(-0.5, 100.9), 'S01E100');
+  });
+
+  it('srtmTileNames: Fort McMurray ≡ DEM_TILES; southern straddle crosses rows', () => {
+    assert.deepEqual(srtmTileNames(57.03, -111.68), ['N57W112', 'N56W112']);
+    assert.deepEqual(srtmTileNames(57.03, -111.68), [...DEM_TILES], 'default pin: zero behavior change');
+    assert.deepEqual(srtmTileNames(-23.95, -46.63), ['S24W047', 'S25W047'], 'window crosses 24°S');
+    assert.deepEqual(srtmTileNames(-23.55, -46.63), ['S24W047'], 'single row when clear');
+    assert.match(copernicusTileUrl('S24W047'), /S24_00_W047_00/, 'Copernicus key derives from the same name');
+  });
+
+  it('z12 coarse window is ~9×9 (first-paint bounded); site tile 777/1254', () => {
+    assert.equal(TERRARIUM_COARSE_ZOOM, 12);
+    assert.deepEqual(latLonToTile(57.03, -111.68, 12), { x: 777, y: 1254 });
+    const w12 = terrariumWindowTiles(12);
+    assert.equal(terrariumTileCount(w12), 81, '9×9 full-window');
+    assert.ok(w12.x0 <= 777 && 777 <= w12.x1 && w12.y0 <= 1254 && 1254 <= w12.y1, 'site tile inside');
+    const s12 = terrariumWindowTiles(12, { lat: -23.95, lon: -46.63, extentKm: 44 });
+    assert.ok(terrariumTileCount(s12) >= 25 && terrariumTileCount(s12) <= 64, `southern window ${terrariumTileCount(s12)}`);
+  });
+
+  it('loadDEM({site}) builds for that location: meta.site + derived tiles', async () => {
+    _injectTerrariumFetcher(terrariumGradientFetcher());
+    const r = await loadDEM({
+      site: { lat: -23.95, lon: -46.63 }, fetchTimeoutMs: 300, coarseBudgetMs: 300,
+    });
+    assert.equal(r.terrainSource, 'dem');
+    assert.deepEqual(r.meta.site, { lat: -23.95, lon: -46.63 });
+    assert.ok(r.meta.reliefKm > 0.08, `relief ${r.meta.reliefKm}`);
+  }, { timeout: 30000 });
+
+  it('loadDEM default meta.site is the Fort McMurray pin', async () => {
+    const r = await loadDEM({ url: 'https://127.0.0.1:9/nope.tif', fetchTimeoutMs: 200 });
+    assert.deepEqual(r.meta.site, { lat: 57.03, lon: -111.68 });
+  });
+
+  it('reliefPassesGate: 80 m SRTM bar, 25 m Terrarium bar (CDEM ~38 m here)', () => {
+    assert.equal(DEM_RELIEF_MIN_KM, 0.08);
+    assert.equal(TERRARIUM_RELIEF_MIN_KM, 0.025);
+    assert.equal(reliefPassesGate(0.09), true);
+    assert.equal(reliefPassesGate(0.05), false, 'SRTM-only 50 m rejected');
+    assert.equal(reliefPassesGate(0.05, true), true, 'Terrarium 50 m passes');
+    assert.equal(reliefPassesGate(0.038, true), true, 'verified site relief passes');
+    assert.equal(reliefPassesGate(0.01, true), false, 'near-flat still rejected');
+    assert.equal(reliefPassesGate(0), false);
+  });
+
+  it('low-relief Terrarium (~30 m) resolves dem (SRTM bar would reject)', async () => {
+    _injectTerrariumFetcher(terrariumGradientFetcher(0.038));
+    const c = await loadTerrariumStage(12, { extentKm: 44, maxPx: 1100, budgetMs: 10000, cacheName: 'terr-z12' });
+    const f = await loadTerrariumStage(15, { extentKm: 12, maxPx: 1200, maxTiles: 48, budgetMs: 10000, cacheName: 'terr-f15' });
+    assert.ok(c && f, 'stages seed the cache');
+    _injectTerrariumFetcher(null);
+    const prog = [];
+    const r = await loadDEM({ fetchTimeoutMs: 300, coarseBudgetMs: 300, onProgress: (res) => prog.push(res.meta.stage) });
+    assert.equal(r.terrainSource, 'dem');
+    assert.ok(prog.includes('coarse'), `progression ${prog}`);
+  }, { timeout: 30000 });
+});
+
+describe('ops3d DEM bus + budgets (task-1)', () => {
+  afterEach(() => { _cacheMemClear(); _injectTerrariumFetcher(null); });
+
+  it('status bus is pinned to globalThis and snapshots are copies', () => {
+    assert.ok(globalThis.__safepipeDem, 'shared bus object');
+    assert.ok(globalThis.__safepipeDem.listeners instanceof Set, 'shared listeners');
+    const a = getDemStatus();
+    a.stage = 'hacked'; a.fromCache.push('x');
+    assert.notEqual(getDemStatus().stage, 'hacked', 'snapshot is a copy');
+    assert.deepEqual(getDemStatus().fromCache.includes('x'), false, 'fromCache is a copy');
+    const seen = [];
+    const unsub = onDemStatus((s) => seen.push(s.stage));
+    assert.ok(seen.length >= 1, 'immediate snapshot on subscribe');
+    unsub();
+  });
+
+  it('cold-failure meta carries timings + null coarseError + procedural src', async () => {
+    const r = await loadDEM({ url: 'https://127.0.0.1:9/nope.tif', fetchTimeoutMs: 200 });
+    assert.equal(r.terrainSource, 'procedural');
+    assert.equal(r.meta.src, 'procedural');
+    assert.ok(typeof r.meta.coarseError === 'string' && r.meta.coarseError.includes('__override__'), `coarse notes recorded: ${r.meta.coarseError}`);
+    assert.ok(r.meta.timings && typeof r.meta.timings.cacheMs === 'number', 'timings recorded');
+    assert.ok(typeof r.meta.wallMs === 'number', 'wallMs recorded');
+  });
+
+  it('warm-cache result carries timings + src contract', async () => {
+    const res = [1 / 3600, -1 / 3600];
+    const mk = (origin, win) => {
+      const ww = win.right - win.left, hh = win.bottom - win.top;
+      const data = new Int16Array(ww * hh);
+      for (let z = 0; z < hh; z++) for (let x = 0; x < ww; x++) data[z * ww + x] = Math.round(250 + 0.15 * x);
+      const [, dy] = res;
+      return {
+        origin, res, win, data, ww, hh, noData: -32768,
+        latTop: origin[1] + win.top * dy, latBot: origin[1] + win.bottom * dy,
+        lonLeft: origin[0], dx: res[0],
+      };
+    };
+    _cacheMemSeed('N57W112', mk([-112, 58], { left: 677, top: 3233, right: 1628, bottom: 3601 }));
+    _cacheMemSeed('N56W112', mk([-112, 57], { left: 677, top: 0, right: 1628, bottom: 152 }));
+    const r = await loadDEM({ fetchTimeoutMs: 4000 });
+    assert.equal(r.meta.stage, 'cache');
+    assert.ok(typeof r.meta.src === 'string', 'src present');
+    assert.equal(r.meta.coarseError, null);
+    assert.ok(r.meta.timings && typeof r.meta.timings.cacheMs === 'number', 'timings present');
+  });
+
+  it('global budget expiry cuts a hung pipeline: procedural + flag, fast', async () => {
+    _injectTerrariumFetcher((_url, signal) => new Promise((_res, rej) => {
+      signal?.addEventListener('abort', () => rej(new Error('aborted')), { once: true });
+    }));
+    assert.ok(GLOBAL_BUDGET_MS >= 30000, `global default ${GLOBAL_BUDGET_MS}`);
+    const t0 = Date.now();
+    const r = await loadDEM({ fetchTimeoutMs: 200, coarseBudgetMs: 50, skipCoarse: true, globalBudgetMs: 150 });
+    assert.ok(Date.now() - t0 < 10000, 'budget cuts the pipeline');
+    assert.equal(r.terrainSource, 'procedural');
+    assert.equal(r.meta.globalBudgetExpired, true);
   });
 });

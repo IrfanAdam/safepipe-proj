@@ -437,3 +437,21 @@ describe('ops3d satellite monitor — toggle wiring + fallback (fake DOM)', () =
     a2.dispose();
   });
 });
+
+describe('ops3d satellite base — site parametrization (?site= / opts.site)', () => {
+  it('twinTargetToLatLon honors an explicit site (southern hemisphere)', () => {
+    const site = { lat: -23.95, lon: -46.63 };
+    const c = sat.twinTargetToLatLon({ x: 0, z: 0 }, site);
+    assert.ok(Math.abs(c.lat + 23.95) < 1e-9 && Math.abs(c.lon + 46.63) < 1e-9, `origin ${c.lat},${c.lon}`);
+    const e = sat.twinTargetToLatLon({ x: 11.132 * Math.cos((-23.95 * Math.PI) / 180), z: 0 }, site);
+    assert.ok(Math.abs(e.lon - (-46.63 + 0.1)) < 1e-9, `east ${e.lon}`);
+  });
+
+  it('twinViewToMap centers on view.site, defaults to the pin', () => {
+    const site = { lat: -23.95, lon: -46.63 };
+    const v = sat.twinViewToMap({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 }, { site });
+    assert.ok(Math.abs(v.center.lat + 23.95) < 1e-6 && Math.abs(v.center.lon + 46.63) < 1e-6, `site center ${v.center.lat},${v.center.lon}`);
+    const d = sat.twinViewToMap({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 });
+    assert.ok(Math.abs(d.center.lat - 57.03) < 1e-9 && Math.abs(d.center.lon + 111.68) < 1e-9, 'default pin unchanged');
+  });
+});

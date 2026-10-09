@@ -113,6 +113,16 @@ describe('ops3d HUD orientation/scale furniture', () => {
     assert.match(hud.SITE_COORDS_LABEL, /57\.03.*111\.68/);
   });
 
+  it('siteCoordsLabel follows ?site= twins, garbage falls back to default', () => {
+    assert.equal(hud.siteCoordsLabel({ lat: 57.03, lon: -111.68 }), '57.03°N 111.68°W');
+    assert.equal(hud.siteCoordsLabel({ lat: -23.95, lon: -46.63 }), '23.95°S 46.63°W');
+    assert.equal(hud.siteCoordsLabel({ lat: 1.35, lon: 103.8 }), '1.35°N 103.80°E');
+    assert.equal(hud.siteCoordsLabel(null), hud.SITE_COORDS_LABEL);
+    assert.equal(hud.siteCoordsLabel({}), hud.SITE_COORDS_LABEL);
+    assert.equal(hud.isDefaultSite({ lat: 57.03, lon: -111.68 }), true);
+    assert.equal(hud.isDefaultSite({ lat: -23.95, lon: -46.63 }), false);
+  });
+
   it('scaleForLevel maps TOP/ISO/NEAR to 20/5/1 km, unknown falls back to TOP', () => {
     assert.equal(hud.scaleForLevel('network').label, '20 KM');
     assert.equal(hud.scaleForLevel('segment').label, '5 KM');

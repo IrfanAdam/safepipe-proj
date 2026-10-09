@@ -30,6 +30,7 @@
  */
 
 import { setBaseMix as sceneSetBaseMix } from './scene.js';
+import { resolveSite } from './dem.js';
 
 export const SITE = { lat: 57.03, lon: -111.68 };
 export const LS_MIX_KEY = 'ops3d.satMix';
@@ -99,7 +100,9 @@ export function twinViewToMap(camPos, target, view = {}) {
   // floor is 16° elevation) so grazing views never over-zoom out.
   const slant = Math.min(3, 1 / Math.max(Math.sin((Math.max(elev, 5) * Math.PI) / 180), 1 / 3));
   const mpp = ((spanKm * 1000) / heightPx) * slant; // twin metres per pixel
-  const center = twinTargetToLatLon(target);
+  // Site follows the twin: view.site (or the default pin) so a
+  // ?site=<lat>,<lon> twin pans the map around the same ground.
+  const center = twinTargetToLatLon(target, view.site ?? SITE);
   const zoom = Math.min(
     16,
     Math.max(10, Math.log2((156543.03392 * Math.cos((center.lat * Math.PI) / 180)) / Math.max(mpp, 1e-6))),
@@ -273,10 +276,10 @@ function loadMaplibre() {
 // Google-like — no tinting; an earlier dusk-dim + blue hillshade made it
 // read as thermal imagery) + Terrarium hillshade for relief in the
 // crossfade, + 3D terrain via moodMap().
-function satStyle() {
+function satStyle(site = SITE) {
   return {
     version: 8,
-    center: [SITE.lon, SITE.lat],
+    center: [site.lon, site.lat],
     zoom: 11,
     sources: {
       'esri-sat': {
@@ -339,10 +342,12 @@ function mk(tag, cls, text) {
   return n;
 }
 
-/* initSatBase(container, {getTwin, search, storage}) →
+/* initSatBase(container, {getTwin, search, storage, site}) →
  *   {setMix, fadeTo, syncFromTwin, available, mix, dispose}
  * container is the twin mount element (#ops3d-dev). Never throws: any
- * failure degrades to the styled fallback with the twin untouched. */
+ * failure degrades to the styled fallback with the twin untouched.
+ * site ({lat,lon} or "lat,lon") centers the map; defaults to ?site=, then
+ * the Fort McMurray pin. */
 export function initSatBase(container, opts = {}) {
   const noop = {
     setMix: (m) => clampMix(m),
@@ -357,6 +362,11 @@ export function initSatBase(container, opts = {}) {
   if (!container || typeof document === 'undefined') return noop;
   const getTwin = opts.getTwin ?? (() => (typeof window !== 'undefined' ? window.__twin : null));
   const search = opts.search ?? (typeof window !== 'undefined' ? window.location.search : '');
+  // Working site: explicit opts.site wins, then ?site=, then the default
+  // pin — the map style center + every twin→map follow use this one site.
+  const site = resolveSite(opts.site, (() => {
+    try { return new URLSearchParams(search || '').get('site'); } catch { return null; }
+  })());
   const storage = opts.storage ?? (() => {
     try {
       return typeof window !== 'undefined' ? window.localStorage : null;
@@ -459,8 +469,8 @@ export function initSatBase(container, opts = {}) {
     try {
       map = new ml.Map({
         container: base,
-        style: satStyle(),
-        center: [SITE.lon, SITE.lat],
+        style: satStyle(site),
+        center: [site.lon, site.lat],
         zoom: 13,
         attributionControl: { compact: true },
         interactive: false,
@@ -899,7 +909,7 @@ export function initSatBase(container, opts = {}) {
     } catch {
       h = 0;
     }
-    const v = twinViewToMap(cam.position, tgt, { heightPx: h, fovDeg: cam.fov });
+    const v = twinViewToMap(cam.position, tgt, { heightPx: h, fovDeg: cam.fov, site });
     try {
       map.jumpTo?.({ center: [v.center.lon, v.center.lat], bearing: v.bearing, pitch: v.pitch, zoom: v.zoom });
     } catch {

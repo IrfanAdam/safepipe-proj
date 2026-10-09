@@ -26,7 +26,7 @@ import { buildZones } from './zones.js';
 import { createLevels } from './levels.js';
 import { buildTerrain } from './terrain.js';
 import { setFieldSource, terrainSource } from './terrain.js';
-import { loadDEM } from './dem.js';
+import { loadDEM, resolveSite } from './dem.js';
 import { buildStructures } from './structures.js';
 import { buildBeacons } from './beacons.js';
 import { buildLabels } from './labels.js';
@@ -53,6 +53,11 @@ export function createTwin(container, opts = {}) {
 
   const params = new URLSearchParams(window.location.search);
   const postEnabled = params.get('post') !== '0';
+  // Location param: ?site=<lat>,<lon> (or opts.site) rebuilds the EXACT
+  // twin for that location — DEM tile names derive from lat/lon and the
+  // satellite base centers there (main.js passes the same site through).
+  // Absent/invalid → default Fort McMurray pin (zero behavior change).
+  const site = resolveSite(opts.site, params.get('site'));
 
   const canvas = document.createElement('canvas');
   canvas.className = 'ops-twin';
@@ -289,6 +294,7 @@ export function createTwin(container, opts = {}) {
       rollup: healthRollup(current),
       selection: sel,
       level: levels.name,
+      site,
       overlay: overlayMode,
       muted: isMuted(),
       cam: { ...focusCtl, effectiveDof: post.fx.dof },
@@ -559,7 +565,7 @@ export function createTwin(container, opts = {}) {
   // covered by test). Stale guard: skip if the container detached or
   // another mount already swapped to DEM.
   if (!opts._dem) {
-    loadDEM({ fetchTimeoutMs: 30000 }).then((r) => {
+    loadDEM({ fetchTimeoutMs: 30000, site }).then((r) => {
       if (!r || r.terrainSource !== 'dem') return;
       try {
         if (!container.isConnected || terrainSource() === 'dem') return;
@@ -592,6 +598,7 @@ export function createTwin(container, opts = {}) {
   }
 
   const api = {
+    site,
     rollup: () => healthRollup(current),
     debug: { camera: rig.camera, scene, target: () => rig.getTarget() },
     // DEM staged swap-in restores the exact pre-swap viewpoint (dur 0 =

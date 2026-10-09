@@ -5,10 +5,15 @@
  */
 import { createTwin } from './twin.js';
 import { initSatBase } from './sat-base.js';
+import { resolveSite } from './dem.js';
 
 const el = document.getElementById('ops3d-dev');
 if (!el) throw new Error('ops3d dev harness: #ops3d-dev missing');
+// Location param (?site=<lat>,<lon>): the same resolved site drives the
+// twin (DEM tiles) and the satellite base (map center + follow).
+const site = resolveSite(null, new URLSearchParams(window.location.search).get('site'));
 window.__twin = createTwin(el, {
+  site,
   // eslint-disable-next-line no-console
   onSelect: (id) => console.log('[ops3d] select', id),
 });
@@ -18,6 +23,7 @@ window.__twin = createTwin(el, {
 // from the HUD's active level button so no twin.js contract changes are
 // needed (sat-base falls back to a camera-distance heuristic).
 const sat = initSatBase(el, {
+  site,
   getTwin: () => window.__twin,
   getLevel: () => document.querySelector('.ops-hud__level-btn--active')?.dataset?.level ?? null,
 });
