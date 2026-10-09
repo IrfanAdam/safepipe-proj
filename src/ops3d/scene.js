@@ -8,10 +8,10 @@
  *   - scene.background is null-able (opaque Color only at mix ≈ 1);
  *   - setBaseMix(m) controls the custom-layer fade, default m = 1 which is
  *     pixel-identical to the previous opaque look (clearAlpha 1 + background
- *     color). Lower mixes reveal the Mapbox div mounted BEHIND the canvas.
+ *     color). Lower mixes reveal the satellite div mounted BEHIND the canvas.
  *   - createScene(canvas) signature unchanged; it now also returns a
  *     per-scene setBaseMix bound to its own renderer/scene. The module-level
- *     setBaseMix(m) fans out to every live scene (used by mapbox-base.js so
+ *     setBaseMix(m) fans out to every live scene (used by sat-base.js so
  *     a DEM-swap remount re-applies the current mix with no twin.js edits).
  */
 import * as THREE from 'three';
