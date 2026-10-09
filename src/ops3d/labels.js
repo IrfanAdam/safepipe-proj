@@ -320,17 +320,26 @@ export function buildLabels(scene, { layout, healthById } = {}) {
   for (const p of L.pipelines ?? []) {
     const [x, z] = anchorOf('pipe', p);
     addLabel(p.assetId, x, z);
-    // Edge destination tag at the rim exit point (no ring/leader — pill only).
+    // Edge destination tag at the rim exit point: pill + thin vertical leader
+    // to the ground, like asset plates — no leader-less floaters (gap 6).
     if (DEST[p.assetId]) {
       const [ex, ez] = exitPoint(p.points);
       const health = healthOf(byId.get(p.assetId));
       const sprite = makeDestSprite(DEST[p.assetId], health);
       const egy = groundAt(ex, ez);
+      const destY = egy + LABEL_H * 0.85;
       sprite.position.set(ex, egy + LABEL_H * 0.85, ez);
       group.add(sprite);
+      const dlg = new THREE.BufferGeometry().setFromPoints(
+        [new THREE.Vector3(ex, egy + RING_Y, ez), new THREE.Vector3(ex, destY - 0.1, ez)]);
+      const dlm = new THREE.LineBasicMaterial({
+        color: new THREE.Color(colorOf(health)), transparent: true, opacity: 0.4, depthTest: true,
+      });
+      const dline = new THREE.Line(dlg, dlm);
+      group.add(dline);
       items.push({
         id: `${p.assetId}:dest`, dest: true, pipe: p.assetId, text: DEST[p.assetId],
-        sprite, ring: null, ringMat: null, line: null, lineMat: null, lineGeo: null,
+        sprite, ring: null, ringMat: null, line: dline, lineMat: dlm, lineGeo: dlg,
         cv: sprite.material.map.image, tex: sprite.material.map,
         baseY: egy + LABEL_H * 0.85, groundY: egy, lift: LABEL_H * 0.85,
         phase: Math.random() * Math.PI * 2, x: ex, z: ez, occFade: 1,
@@ -420,7 +429,10 @@ export function buildLabels(scene, { layout, healthById } = {}) {
       if (next) {
         byId = toMap(next);
         for (const it of items) {
-          if (it.dest) drawDest(it.cv, it.tex, it.text, healthOf(byId.get(it.pipe)));
+          if (it.dest) {
+            drawDest(it.cv, it.tex, it.text, healthOf(byId.get(it.pipe)));
+            it.lineMat?.color?.set?.(colorOf(healthOf(byId.get(it.pipe))));
+          }
           else repaint(it.id, healthOf(byId.get(it.id)));
         }
       }
@@ -450,7 +462,9 @@ export function buildLabels(scene, { layout, healthById } = {}) {
           it.occFade = 1;
         }
         const base = hidden ? 0 : sel ? 1 : it.dest ? 0.94 : 0.96;
-        it.sprite.material.opacity = (top && !sel ? base * 0.55 : base) * it.occFade;
+        // Fit-zoom legibility: TOP tags hold more body (0.72×) instead of
+        // washing out — plates stay far below alarm luminance regardless.
+        it.sprite.material.opacity = (top && !sel ? base * 0.72 : base) * it.occFade;
       }
     },
     setSelection(id) {

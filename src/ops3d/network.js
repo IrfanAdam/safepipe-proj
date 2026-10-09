@@ -37,7 +37,7 @@ const DIM_FACTOR = 0.3;
 // Neutral flow palette — BLUE RESERVED FOR WATER ONLY. Warm white reads on
 // dark pipe walls and bright contours alike without borrowing a data hue.
 const FLOW_COLOR = 0xf5f2ea; // warm-white flow — never blue/cyan, never amber
-const FLOW_LINE_OPACITY = 0.5; // flow-trace peak — present, never alarming
+const FLOW_LINE_OPACITY = 0.62; // flow-trace peak — present at fit zoom, never alarming (≤0.65 lock)
 const FLOW_LINE_SEGS = 6; // chunks per pipe flow trace — the traveling-envelope unit
 const FLOW_LINE_SPEED = 0.10; // envelope travel along the pipe (cycles/s — slow dissolve)
 const FLOW_BREATHE = 0.18; // gentler swell so flow doesn't pump, just breathes
@@ -209,7 +209,9 @@ export function buildNetwork(scene, feed) {
       const tubeMat = new THREE.MeshLambertMaterial({
         color: colorFor(health),
         transparent: true,
-        opacity: (health === 'nominal' ? 0.30 : 0.75) * (run.buried ? 0.50 : 1),
+        // Fit-zoom read: nominal walls hold a touch more body so the network
+        // leads quiet land (index 0.32); faults stay clearly brightest.
+        opacity: (health === 'nominal' ? 0.34 : 0.78) * (run.buried ? 0.50 : 1),
         depthWrite: false,
       });
       const tube = new THREE.Mesh(tubeGeo, tubeMat);
@@ -223,12 +225,12 @@ export function buildNetwork(scene, feed) {
       wallGeo.setPositions(run.pts);
       const wallMat = new LineMaterial({
         color: colorFor(health),
-        linewidth: health === 'nominal' ? 2.2 : 2.4, // neutral pipes lead over quiet land
+        linewidth: health === 'nominal' ? 2.4 : 2.6, // neutral pipes lead over quiet land
         dashed: run.buried,
         dashSize: 0.4,
         gapSize: 0.3,
         transparent: true,
-        opacity: (health === 'nominal' ? 0.55 : 0.8) * (run.buried ? 0.50 : 1), // pipes over land, alarms still top
+        opacity: (health === 'nominal' ? 0.62 : 0.85) * (run.buried ? 0.50 : 1), // pipes over land, alarms still top
         depthWrite: false,
       });
       wallMat.resolution.set(1280, 720);
@@ -285,7 +287,7 @@ export function buildNetwork(scene, feed) {
         fg.setPositions(chunk);
         const fm = new LineMaterial({
           color: FLOW_COLOR,
-          linewidth: 1.6,
+          linewidth: 2.0, // fit-zoom legibility: trace holds against bright index lines
           transparent: true,
           opacity: 0,
           depthWrite: false,
@@ -570,7 +572,9 @@ export function buildNetwork(scene, feed) {
       for (const c of flowChevs) {
         c.lvl = c.assetId === selected ? 1 : name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
         c.boost = name === 'network' ? 1.4 : 1;
-        const s = (name === 'network' ? 1.0 : name === 'segment' ? 0.7 : 0.45);
+        // Fit-zoom chevrons read as direction marks, not subpixels: 1.25× at
+        // TOP, taper drilled-in. Opacity envelope untouched (alarms still lead).
+        const s = (name === 'network' ? 1.25 : name === 'segment' ? 0.8 : 0.45);
         c.mesh.scale.setScalar(s);
       }
       for (const f of flowLines) {

@@ -77,7 +77,7 @@ export function paintHatch(ctx, W, H, sig) {
   else chamferPath(ctx, 2, 2, W - 4, H - 4);
   ctx.clip();
   ctx.strokeStyle = HATCH_INK;
-  ctx.lineWidth = Math.max(2, spacing / 5); // bold enough to survive TOP downsample
+  ctx.lineWidth = Math.max(2.5, spacing / 5); // bold enough to survive TOP downsample at fit zoom
   const rad = (angle * Math.PI) / 180;
   const dx = Math.cos(rad), dy = Math.sin(rad);
   const nx = -dy, ny = dx;
@@ -92,7 +92,7 @@ export function paintHatch(ctx, W, H, sig) {
   ctx.restore();
   // Edge stroke: the silhouette reads even where hatch lines clip out.
   ctx.strokeStyle = HATCH_EDGE;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 3.5;
   if (shape === 'circle') circlePath(ctx, W, H);
   else chamferPath(ctx, 2, 2, W - 4, H - 4);
   ctx.stroke();
