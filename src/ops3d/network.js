@@ -1,29 +1,28 @@
-/* Safepipe Ops 3D — src/ops3d/network.js · solid-wall network layer.
- * Pipelines render as continuous Line2 walls (buried stretches dashed +
- * dimmed), colored by feed health: faint bone nominal, amber #ff8c39 watch,
- * red #e31919 critical at 1.5× dot size. Fault chainages get brighter beads;
- * the selected asset's faults get a ground ring. Facilities are wireframe
- * boxes at line junctions, colored by own health; sensors are small diamonds.
- * Soft comet pulses ride each pipe path (tick/update(t) advances sprite
-  * phase along the arc) — cyan, never amber, so flow direction can't read
-  * as a watch state. Each pulse fades in/out over its life (tapered alpha
-  * head-to-tail), never a hard-tipped dash. A solid cyan flow LINE runs the
-  * same path under the pulses: split into FLOW_LINE_SEGS chunks whose alpha
-  * follows a slow traveling envelope + global breathing, so lines gently
-  * emerge and dissolve along the pipe instead of sitting hard. Outer runs (first/last 15% of arc
- * length, or radius > 12 km) render buried: sunk, dimmed ~40%, dash-grouped.
- * Picking raycasts invisible fat-tube/box proxies (never the dots).
+/* Safepipe Ops 3D — src/ops3d/network.js · cylindrical-tube network layer.
+ * Pipelines render as TubeGeometry cylinders (radialSegments 8, draped on the
+ * terrain skin at field+offset) in neutral bone-grey — nominal a low-opacity
+ * whisper, watch/amber #ff8c39 + critical/red #e31919 tint only on fault
+ * state. A thin Line2 overlay traces each run for crispness (surface solid,
+ * buried dashed + dimmed ~50%); the tubes carry the cylindrical read at ISO
+ * drill-in. BLUE IS RESERVED FOR WATER — no blue/cyan anywhere in this file.
+ * Flow direction = warm-white chevron cones riding the tube centerline
+ * upstream→downstream, each under a traveling emerge/fade envelope (zero
+ * alpha at birth/death, no hard tips, no blur-glow sprites), over a thin
+ * white flow trace split into FLOW_LINE_SEGS chunks with the same traveling
+ * envelope + global breathing. Buried runs stay dashed + dimmed by design.
+ * Fault chainages get brighter beads; the selected asset's faults get a
+ * ground ring. Facilities are proxied here (visible boxes live in
+ * structures.js); sensors are small diamonds.
+ * Picking raycasts invisible fat-tube/box proxies (never the tubes).
  * Contract: buildNetwork(scene, feed) →
  *   {update, tick, setSelection, setHover, pick, setSize, setDetail, dispose, stats}.
  */
 
 import * as THREE from 'three';
 import { getLayout } from './health-feed.js';
-import { field, VEX } from './terrain.js'; // drape buried runs onto the surface; VEX single-sourced
+import { field, VEX } from './terrain.js'; // drape tubes onto the surface; VEX single-sourced
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
-import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 const HEALTH_COLOR = {
@@ -35,14 +34,19 @@ const DOT_Y = 0.06;
 export const BASE_DOT_SIZE = 0.05;
 export const CRITICAL_GAIN = 1.5; // critical renders at 1.5× dot size
 const DIM_FACTOR = 0.3;
-const FLOW_COLOR = 0x35c5d8; // cool cyan oil-flow — never amber (watch #ff8c39)
-const PULSE_OPACITY = 0.0; // blur sprites off — user: "remove the blur glow moving across the pipeline"
-const PULSE_SPEED = 1.6; // kept for test compatibility; no sprites add when opacity 0
-const PULSES_PER_PIPE = 0; // zero blur sprites — flow reads via solid-line envelope only
-const FLOW_LINE_OPACITY = 0.55; // flow-line peak — prominently visible, pipeline walls recede
-const FLOW_LINE_SEGS = 6; // chunks per pipe flow line — the traveling-envelope unit
+// Neutral flow palette — BLUE RESERVED FOR WATER ONLY. Warm white reads on
+// dark pipe walls and bright contours alike without borrowing a data hue.
+const FLOW_COLOR = 0xf5f2ea; // warm-white flow — never blue/cyan, never amber
+const FLOW_LINE_OPACITY = 0.5; // flow-trace peak — present, never alarming
+const FLOW_LINE_SEGS = 6; // chunks per pipe flow trace — the traveling-envelope unit
 const FLOW_LINE_SPEED = 0.10; // envelope travel along the pipe (cycles/s — slow dissolve)
 const FLOW_BREATHE = 0.18; // gentler swell so flow doesn't pump, just breathes
+const FLOW_CHEV_OPACITY = 0.9; // chevron peak at envelope crest
+const CHEVRONS_PER_PIPE = 4; // direction markers riding the centerline
+const FLOW_SPEED = 0.055; // chevron travel upstream→downstream (cycles/s)
+const TUBE_R = 0.085; // pipe wall radius (km-world) — cylindrical at ISO, whisper at TOP
+const TUBE_RADIAL = 8; // low radial segs: cheap, still round at drill-in
+const TUBE_LIFT = 0.05; // wall centerline rides just above the skin
 const BURIED_EDGE_T = 0.15; // outer 15% of each run dives underground
 const BURIED_R = 12; // any stretch past r=12 km is buried too
 
@@ -51,29 +55,12 @@ function smooth01(x) {
   return x * x * (3 - 2 * x);
 }
 
-/* Soft radial dot shared by all flow pulses: hot core falling smoothly to
- * transparent — the pulse sprite itself has no edge, so flow can never
- * show a hard tip. Procedural DataTexture (no document/canvas) so the
- * network layer stays importable in Node tests. */
-let pulseTex = null;
-function getPulseTexture() {
-  if (pulseTex) return pulseTex;
-  const s = 64;
-  const data = new Uint8Array(s * s * 4);
-  for (let y = 0; y < s; y++) {
-    for (let x = 0; x < s; x++) {
-      const dx = (x + 0.5) / s - 0.5, dy = (y + 0.5) / s - 0.5;
-      const r = Math.hypot(dx, dy) * 2; // 0 center → ~1 at edge
-      const a = Math.pow(Math.max(0, 1 - r), 2); // smooth falloff, exactly 0 at the rim
-      const i = (y * s + x) * 4;
-      data[i] = data[i + 1] = data[i + 2] = 255;
-      data[i + 3] = Math.round(a * 255);
-    }
-  }
-  pulseTex = new THREE.DataTexture(data, s, s);
-  pulseTex.colorSpace = THREE.SRGBColorSpace;
-  pulseTex.needsUpdate = true;
-  return pulseTex;
+/* Traveling emerge/fade envelope: 0 at cycle ends, crest mid-travel.
+ * Shared by flow-trace chunks (spatial order) and chevrons (travel phase)
+ * so nothing in the flow layer ever shows a hard tip. */
+export function flowEnvelope(ph) {
+  const p = (((ph % 1) + 1) % 1);
+  return smooth01(p / 0.25) * (1 - smooth01((p - 0.5) / 0.5));
 }
 
 /* Burial depth 0 (surface) → 1 (buried) at arc fraction t with radius r:
@@ -160,8 +147,6 @@ function polyPoint(points, t) {
 export function buildNetwork(scene, feed) {
   const layout = getLayout();
   const pipeById = new Map(layout.pipelines.map((p) => [p.assetId, p]));
-  const facById = new Map(layout.facilities.map((f) => [f.assetId, f]));
-  const senById = new Map(layout.sensors.map((s) => [s.assetId, s]));
   const healthById = new Map((feed ?? []).map((f) => [f.assetId, f]));
 
   const group = new THREE.Group();
@@ -171,15 +156,18 @@ export function buildNetwork(scene, feed) {
   const byId = new Map(); // assetId → {mats:[{m,base}], dots?, setHealth}
   const proxies = [];
   const beadMats = []; // fault beads dim independently at NEAR (kit takes over)
-  const pulses = []; // soft comet flow pulses (sprite phase advanced in tick)
-  const flowLines = []; // solid flow-line chunks (traveling soft-fade envelope in tick)
-  const chevrons = []; // dive markers riding the arc (pulses carry direction)
+  const flowLines = []; // white flow-trace chunks (traveling soft-fade envelope in tick)
+  const flowChevs = []; // white chevron cones riding the centerline (direction read)
+  const dives = []; // dive markers riding the arc (static stations)
   const diveGeo = new THREE.OctahedronGeometry(0.11);
-  const DIVE_COL = 0x7fa3b8; // cool steel: marks where a run dives underground
+  const DIVE_COL = 0xcfc9bc; // neutral bone: marks where a run dives underground (never blue)
+  const chevGeo = new THREE.ConeGeometry(0.10, 0.32, 6); // faceted cone: chevron read, no sprite halo
+  const UP_Y = new THREE.Vector3(0, 1, 0);
   const resMats = []; // resolution-dependent fat-line materials (see setSize)
   const raycaster = new THREE.Raycaster();
   let dotTotal = 0;
   let beadTotal = 0;
+  let tubeTotal = 0;
   let selected = null;
   let hovered = null;
   let detailF = 1; // view-driven dot scale (TOP 1 → NEAR 0.35)
@@ -200,24 +188,47 @@ export function buildNetwork(scene, feed) {
 
   const colorFor = (health) => new THREE.Color(HEALTH_COLOR[health] ?? HEALTH_COLOR.nominal);
 
-  /* --- pipelines: dotted Points traces + flow overlay + fault beads + proxies --- */
+  /* --- pipelines: cylindrical tube walls + crisp line overlay + flow + beads + proxies --- */
   for (const pipe of layout.pipelines) {
     const item = healthById.get(pipe.assetId);
     const health = item?.health ?? 'nominal';
     const trace = sampleTrace(pipe.points);
-    // Solid pipe walls: surface runs solid, buried runs dashed + dimmed.
+    // Primary walls: Lambert-shaded cylinders (radialSegments 8) draped on
+    // the skin. Nominal whispers bone-grey; watch/amber + critical/red tint
+    // only on fault state. Buried runs dim ~50% (dashes live on the overlay).
     for (const run of trace.runs) {
       if (run.pts.length < 6) continue;
+      const v3 = [];
+      for (let i = 0; i < run.pts.length; i += 3)
+        v3.push(new THREE.Vector3(run.pts[i], run.pts[i + 1] + TUBE_LIFT, run.pts[i + 2]));
+      const curve = new THREE.CatmullRomCurve3(v3);
+      const arcLen = curve.getLength();
+      const tubeGeo = new THREE.TubeGeometry(
+        curve, Math.min(220, Math.max(8, Math.ceil(arcLen / 0.25))), TUBE_R, TUBE_RADIAL, false,
+      );
+      const tubeMat = new THREE.MeshLambertMaterial({
+        color: colorFor(health),
+        transparent: true,
+        opacity: (health === 'nominal' ? 0.30 : 0.75) * (run.buried ? 0.50 : 1),
+        depthWrite: false,
+      });
+      const tube = new THREE.Mesh(tubeGeo, tubeMat);
+      tube.frustumCulled = false;
+      group.add(tube);
+      track(pipe.assetId, tubeMat, tubeMat.opacity);
+      tubeTotal += 1;
+      // Crispness overlay: thin solid trace on surface, dashed + dimmed where
+      // buried — dashes survive ONLY here in the pipe layer.
       const wallGeo = new LineGeometry();
       wallGeo.setPositions(run.pts);
       const wallMat = new LineMaterial({
         color: colorFor(health),
-        linewidth: health === 'nominal' ? 1.35 : 1.9, // less prominent — flow owns the read
+        linewidth: 1.0,
         dashed: run.buried,
         dashSize: 0.4,
         gapSize: 0.3,
         transparent: true,
-        opacity: (health === 'nominal' ? 0.20 : 0.62) * (run.buried ? 0.50 : 1), // walls whisper
+        opacity: (health === 'nominal' ? 0.22 : 0.6) * (run.buried ? 0.50 : 1),
         depthWrite: false,
       });
       wallMat.resolution.set(1280, 720);
@@ -230,9 +241,8 @@ export function buildNetwork(scene, feed) {
       dotTotal += run.pts.length / 3;
     }
 
-    /* Soft comet flow: radial-gradient sprites ride the draped pipe path.
-     * Disabled — blur glow removed per feedback; flow reads via the solid
-     * traveling-envelope line below, no hard tips, no sprite halo. */
+    /* Flow: draped centerline path shared by the white trace chunks below
+     * and the chevron cones after. t always advances upstream→downstream. */
     const flowPts = trace.flow;
     const flowCum = [0];
     for (let i = 3; i < flowPts.length; i += 3) {
@@ -256,32 +266,15 @@ export function buildNetwork(scene, feed) {
         flowPts[i0 * 3 + 2] + (flowPts[i1 * 3 + 2] - flowPts[i0 * 3 + 2]) * f);
       return out;
     };
-    const entry = { assetId: pipe.assetId, sprites: [], cum: flowCum, len: flowLen, at: flowAt, tmp: new THREE.Vector3(), lvl: 1, boost: 1 };
-    for (let k = 0; k < PULSES_PER_PIPE; k++) {
-      const mat = new THREE.SpriteMaterial({
-        map: getPulseTexture(),
-        color: FLOW_COLOR,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const sp = new THREE.Sprite(mat);
-      sp.scale.setScalar(0.55);
-      sp.frustumCulled = false;
-      group.add(sp);
-      entry.sprites.push({ sp, mat, off: k / PULSES_PER_PIPE });
-    }
-    pulses.push(entry);
+    const pipePhase = (layout.pipelines.indexOf(pipe)) / Math.max(1, layout.pipelines.length);
 
-    /* Solid flow line under the pulses: the same draped path as one Line2
+    /* White flow trace under the chevrons: the same draped path as one Line2
      * per chunk (FLOW_LINE_SEGS chunks/pipe), each with its own material so
-     * tick can sweep a soft-fade envelope along the pipe — chunks emerge and
-     * dissolve in sequence instead of sitting hard. Solid + additive, never
-     * dashed (dashes survive only on buried pipe walls). */
+     * tick sweeps the traveling envelope along the pipe — chunks emerge and
+     * dissolve in sequence instead of sitting hard. Solid, never dashed
+     * (dashes survive only on buried pipe walls). */
     {
       const nPts = flowPts.length / 3;
-      const pipePhase = pulses.length / Math.max(1, layout.pipelines.length);
       const per = Math.max(1, Math.ceil((nPts - 1) / FLOW_LINE_SEGS));
       for (let c0 = 0; c0 < nPts - 1; c0 += per) {
         const c1 = Math.min(nPts - 1, c0 + per);
@@ -292,10 +285,9 @@ export function buildNetwork(scene, feed) {
         fg.setPositions(chunk);
         const fm = new LineMaterial({
           color: FLOW_COLOR,
-          linewidth: 2,
+          linewidth: 1.6,
           transparent: true,
           opacity: 0,
-          blending: THREE.AdditiveBlending,
           depthWrite: false,
           fog: false,
         });
@@ -309,7 +301,27 @@ export function buildNetwork(scene, feed) {
       }
     }
 
-    // Dive markers: steel octahedrons at the two points where the run
+    /* Direction chevrons: faceted cones riding the tube centerline, noses
+     * pointed downstream. Each loops upstream→downstream under the same
+     * emerge/fade envelope — born and dying invisible, so direction reads
+     * with no hard tips and no blur-glow sprites. */
+    {
+      for (let k = 0; k < CHEVRONS_PER_PIPE; k++) {
+        const cm = new THREE.MeshBasicMaterial({
+          color: FLOW_COLOR, transparent: true, opacity: 0, depthWrite: false, fog: false,
+        });
+        const cone = new THREE.Mesh(chevGeo, cm);
+        cone.frustumCulled = false;
+        group.add(cone);
+        flowChevs.push({
+          mesh: cone, mat: cm, at: flowAt, off: k / CHEVRONS_PER_PIPE,
+          pipePhase, assetId: pipe.assetId, lvl: 1, boost: 1,
+          a: new THREE.Vector3(), b: new THREE.Vector3(), tan: new THREE.Vector3(),
+        });
+      }
+    }
+
+    // Dive markers: neutral-bone octahedrons at the two points where the run
     // leaves the surface — the explicit "pipeline goes underground HERE".
     for (const t0 of [BURIED_EDGE_T, 1 - BURIED_EDGE_T]) {
       const dp = polyPoint(pipe.points, t0);
@@ -323,7 +335,7 @@ export function buildNetwork(scene, feed) {
       dive.rotation.y = Math.atan2(dq.x - dp.x, dq.z - dp.z);
       dive.frustumCulled = false;
       group.add(dive);
-      chevrons.push({ mesh: dive, points: pipe.points, t0, detailF: 1, assetId: pipe.assetId, dive: true });
+      dives.push({ mesh: dive, points: pipe.points, t0, detailF: 1, assetId: pipe.assetId });
     }
 
     // Fault beads: brighter spheres at fault chainage fractions.
@@ -474,42 +486,42 @@ export function buildNetwork(scene, feed) {
     showRings(selected);
   };
 
-  // Comet pulses ride the arc: phase advances with scene time, alpha
-  // follows a fade-in/out envelope (tapered head-to-tail, zero at both
-  // ends) so pulses breathe in and out with no hard tips. Flow-line chunks
-  // sweep the same trick spatially: a slow envelope travels along the pipe
-  // (phase = time travel + along-pipe order + per-pipe offset) under a
-  // global breathing swell, so lines emerge and dissolve instead of sitting
-  // hard. Accepts absolute scene time.
+  // Flow tick: white trace chunks sweep the traveling envelope spatially
+  // (phase = time travel + along-pipe order + per-pipe offset) under a slow
+  // global breathing swell, so traces emerge and dissolve instead of sitting
+  // hard. Chevron cones loop upstream→downstream (t increasing) with noses
+  // on the tangent; their travel-phase envelope births/kills them invisible.
+  // Dive markers hold station on the arc. Accepts absolute scene time.
   const tickFlow = (t = 0) => {
     const breathe = 1 - FLOW_BREATHE * (0.5 + 0.5 * Math.sin(t * 0.6)); // slow swell/dissolve
     for (const f of flowLines) {
       const ph = (((t * FLOW_LINE_SPEED + f.pipePhase + f.order) % 1) + 1) % 1;
-      const env = smooth01(ph / 0.25) * (1 - smooth01((ph - 0.5) / 0.5));
+      const env = flowEnvelope(ph);
       const dim = selected && selected !== f.assetId ? DIM_FACTOR : 1;
       f.mat.opacity = FLOW_LINE_OPACITY * env * breathe * (f.lvl ?? 1) * (f.boost ?? 1) * dim;
     }
-    for (const e of pulses) {
-      const dim = selected && selected !== e.assetId ? DIM_FACTOR : 1;
-      const lvl = e.assetId === selected ? 1 : e.lvl ?? 1;
-      for (const s of e.sprites) {
-        const phase = ((t * PULSE_SPEED) / e.len + s.off) % 1;
-        const env = smooth01(phase / 0.18) * (1 - smooth01((phase - 0.55) / 0.45));
-        e.at(phase, e.tmp);
-        s.sp.position.copy(e.tmp);
-        s.mat.opacity = PULSE_OPACITY * env * lvl * dim * e.boost;
+    for (const c of flowChevs) {
+      const tt = (((t * FLOW_SPEED + c.pipePhase + c.off) % 1) + 1) % 1; // downstream travel
+      c.at(tt, c.a);
+      c.at(Math.min(tt + 0.004, 1), c.b);
+      c.tan.subVectors(c.b, c.a);
+      if (c.tan.lengthSq() > 1e-10) {
+        c.tan.normalize();
+        c.mesh.quaternion.setFromUnitVectors(UP_Y, c.tan); // nose downstream
       }
+      c.mesh.position.copy(c.a);
+      const env = flowEnvelope(tt);
+      const dim = selected && selected !== c.assetId ? DIM_FACTOR : 1;
+      const lvl = c.assetId === selected ? 1 : (c.lvl ?? 1);
+      c.mat.opacity = FLOW_CHEV_OPACITY * env * breathe * lvl * (c.boost ?? 1) * dim;
     }
-    // Dive markers hold station on the arc (pulses carry direction).
-    for (const c of chevrons) {
-      const tt = c.dive ? c.t0 : (c.t0 + t * PULSE_SPEED * 0.02) % 1;
-      const p = polyPoint(c.points, tt);
-      const q = polyPoint(c.points, Math.min(tt + 0.01, 1));
-      const d = buryDepth(tt, Math.hypot(p.x, p.z));
+    // Dive markers hold station on the arc (chevrons carry direction).
+    for (const c of dives) {
+      const p = polyPoint(c.points, c.t0);
+      const d = buryDepth(c.t0, Math.hypot(p.x, p.z));
       const surfY = field(p.x, p.z) * VEX + 0.03;
       const y = (DOT_Y + 0.07) * (1 - d) + (surfY + 0.05) * d;
       c.mesh.position.set(p.x, y, p.z);
-      if (!c.dive) c.mesh.rotation.y = Math.atan2(q.x - p.x, q.z - p.z);
       const fade = 1 - d * 0.5;
       const dim = selected && selected !== c.assetId ? DIM_FACTOR : 1;
       const lvl = c.assetId === selected ? 1 : (c.detailF ?? 1);
@@ -522,6 +534,7 @@ export function buildNetwork(scene, feed) {
       assets: byId.size,
       dots: dotTotal,
       beads: beadTotal,
+      tubes: tubeTotal,
       proxies: proxies.length,
       pipelines: layout.pipelines.length,
       facilities: layout.facilities.length,
@@ -549,23 +562,22 @@ export function buildNetwork(scene, feed) {
     },
     // Level-driven declutter: TOP-sized dots would read as boulders at NEAR —
     // ghost the dotted trace down there so the physical pipe + fault kit lead.
-    // Flow legibility: pulses grow + brighten at TOP (the earlier TOP failure
-    // was CONTRAST — thin cyan washing out over blown contour blobs), shrink
-    // to a whisper drilled-in. No dashes anywhere in the flow layer.
+    // Flow legibility: chevrons + trace breathe at TOP, shrink to a whisper
+    // drilled-in. No dashes anywhere in the flow layer.
     setDetail(name) {
       levelName = name;
       detailF = name === 'asset' ? 0.25 : name === 'segment' ? 0.7 : 1;
-      for (const e of pulses) {
-        e.lvl = e.assetId === selected ? 1 : name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
-        e.boost = name === 'network' ? 1.5 : 1; // TOP legibility peak ≈0.9, still under alarm bloom
-        const s = (name === 'network' ? 1.8 : name === 'segment' ? 0.7 : 0.45);
-        for (const p of e.sprites) p.sp.scale.setScalar(0.55 * s);
+      for (const c of flowChevs) {
+        c.lvl = c.assetId === selected ? 1 : name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
+        c.boost = name === 'network' ? 1.4 : 1;
+        const s = (name === 'network' ? 1.6 : name === 'segment' ? 0.8 : 0.5);
+        c.mesh.scale.setScalar(s);
       }
       for (const f of flowLines) {
         f.lvl = f.assetId === selected ? 1 : name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
-        f.boost = name === 'network' ? 1.3 : 1; // TOP line peak ≈0.39 — present, never alarming
+        f.boost = name === 'network' ? 1.3 : 1; // TOP trace peak — present, never alarming
       }
-      for (const c of chevrons) c.detailF = name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
+      for (const c of dives) c.detailF = name === 'asset' ? 0.12 : name === 'segment' ? 0.6 : 1;
       applySelection(); // owns ALL byId opacity (level + selection + NEAR beads)
     },
     setHover(id) {

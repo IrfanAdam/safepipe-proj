@@ -17,8 +17,8 @@ import assert from 'node:assert/strict';
  * [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
  */
 const THRESHOLD = 0.44; // post.js fx.threshold — keep in sync by hand
-const FLOW = 0x35c5d8; // network.js FLOW_COLOR (cool cyan)
-const AMBER = 0xff8c39; // watch amber — flow must never read as watch
+const FLOW = 0xf5f2ea; // network.js FLOW_COLOR (warm-white neutral — BLUE RESERVED FOR WATER)
+const AMBER = 0xff8c39; // watch amber — flow stays achromatic so it never reads as watch
 
 const lum = (hex) => {
   const r = ((hex >> 16) & 255) / 255, g = ((hex >> 8) & 255) / 255, b = (hex & 255) / 255;
@@ -52,8 +52,12 @@ describe('ops3d attention photometry (phase 1 task 10)', () => {
     assert.ok(lum(0xe31919) < THRESHOLD, `critical red L=${lum(0xe31919).toFixed(3)} rides under the threshold by design`);
   });
 
-  it('flow cyan vs watch amber are opposite hues (never confusable)', () => {
-    assert.ok(hueSep(FLOW, AMBER) > 90, `hue separation ${hueSep(FLOW, AMBER).toFixed(0)}°`);
+  it('flow neutral-white vs watch amber are never confusable (achromatic, not amber)', () => {
+    const r = ((FLOW >> 16) & 255) / 255, g = ((FLOW >> 8) & 255) / 255, b = (FLOW & 255) / 255;
+    const sat = (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(r, g, b);
+    assert.ok(sat < 0.08, `flow saturation ${sat.toFixed(3)} must be near-zero (neutral white)`);
+    assert.ok(!(b > r && b > g), 'flow must never be blue-dominant (blue reserved for water)');
+    assert.ok(hueSep(FLOW, AMBER) > 90 || sat < 0.08, 'achromatic flow cannot read as a watch state');
   });
 });
 
@@ -114,13 +118,13 @@ describe('ops3d label-plate contrast (phase 1 remainder)', () => {
   });
 });
 
-/* Soft-fade flow (user direction: no hard-tipped dashes in the flow layer).
- * Locks src/ops3d/network.js: flow rides comet sprites with a fade-in/out
- * envelope — zero alpha at both ends of each pulse life — and no dashed
- * LineMaterial remains outside buried pipe walls.
- * [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
+/* Chevron flow (user direction: cylindrical bone-grey tubes primary; flow is
+ * warm-white chevrons + trace with a traveling emerge/fade envelope — no
+ * hard-tipped dashes, no blur-glow sprites, no blue/cyan anywhere).
+ * Locks src/ops3d/network.js: TubeGeometry walls, cone chevrons with fade
+ * in/out envelope, and no dashed LineMaterial outside buried pipe walls.
  */
-describe('ops3d soft flow pulses (no hard dash tips)', () => {
+describe('ops3d chevron flow (no hard dash tips, no blue)', () => {
   const loadNetworkSrc = async () => {
     const { readFileSync } = await import('node:fs');
     const { fileURLToPath } = await import('node:url');
@@ -135,11 +139,22 @@ describe('ops3d soft flow pulses (no hard dash tips)', () => {
     assert.ok(src.includes('dashOffset') === false, 'no dashOffset animation may remain in the flow layer');
   });
 
-  it('pulse envelope tapers to zero at both ends (tapered head-to-tail)', async () => {
+  it('chevron envelope tapers to zero at both ends (tapered head-to-tail)', async () => {
     const src = await loadNetworkSrc();
-    assert.ok(src.includes('smooth01(phase / 0.18)'), 'fade-in ramp over pulse life must exist');
-    assert.ok(src.includes('1 - smooth01((phase - 0.55) / 0.45)'), 'fade-out ramp over pulse life must exist');
-    assert.ok(src.includes('AdditiveBlending'), 'pulses must be additive (whisper over bright contours)');
+    assert.ok(src.includes('flowEnvelope('), 'shared emerge/fade envelope must exist');
+    assert.ok(src.includes('smooth01(p / 0.25)'), 'fade-in ramp over travel must exist');
+    assert.ok(src.includes('1 - smooth01((p - 0.5) / 0.5)'), 'fade-out ramp over travel must exist');
+    assert.ok(src.includes('ConeGeometry'), 'direction chevrons must be cone geometry (no sprites)');
+    assert.ok(!src.includes('SpriteMaterial'), 'no blur-glow sprite pulses may remain');
+    assert.ok(!src.includes('AdditiveBlending'), 'no additive glow may remain in the flow layer');
+  });
+
+  it('no blue/cyan anywhere in network.js (blue reserved for water)', async () => {
+    const src = await loadNetworkSrc();
+    const stripped = src.replace(/blue\/cyan/gi, '').replace(/blue-led/gi, '');
+    assert.ok(!/\bcyan\b/i.test(stripped), 'no cyan reference may remain');
+    assert.ok(!src.includes('35c5d8'), 'old cyan flow hex must be gone');
+    assert.ok(!src.includes('7fa3b8'), 'old steel-blue dive hex must be gone');
   });
 
   it('envelope math holds: alpha 0 at birth/death, >0 mid-life', () => {
@@ -152,14 +167,14 @@ describe('ops3d soft flow pulses (no hard dash tips)', () => {
   });
 });
 
-/* Traveling soft-fade flow lines (user direction: flow lines stay, but must
+/* Traveling soft-fade flow trace (user direction: white trace stays, but must
  * gently emerge and fade along the pipe — never sit hard).
- * Locks src/ops3d/network.js: each pipe carries a SOLID cyan flow line split
- * into FLOW_LINE_SEGS chunks; tick sweeps a smooth01 envelope along the pipe
- * (time travel + along-pipe order + per-pipe offset) under a slow global
- * breathing swell. Comet pulses stay. No dashes, no dashOffset — the dashed
- * ban from the comet pass holds for the whole flow layer.
- * [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
+ * Locks src/ops3d/network.js: each pipe carries a SOLID neutral-white flow
+ * trace split into FLOW_LINE_SEGS chunks; tick sweeps the shared
+ * flowEnvelope along the pipe (time travel + along-pipe order + per-pipe
+ * offset) under a slow global breathing swell. Cone chevrons carry
+ * direction. No dashes, no dashOffset, no blue — the dashed ban holds for
+ * the whole flow layer, dashes survive only on buried walls.
  */
 describe('ops3d traveling flow-line envelope (emerge/fade, never hard)', () => {
   const loadNetworkSrc = async () => {
@@ -174,10 +189,11 @@ describe('ops3d traveling flow-line envelope (emerge/fade, never hard)', () => {
       'FLOW_LINE_SPEED',
       'FLOW_BREATHE',
       'flowLines.push',
-      'smooth01(ph / 0.25)',
-      '(ph - 0.5) / 0.5',
+      'flowEnvelope(ph)',
       'Math.sin(t * 0.6)',
       'FLOW_LINE_OPACITY',
+      'CHEVRONS_PER_PIPE',
+      'TubeGeometry',
     ]) assert.ok(src.includes(needle), `network.js must contain \`${needle}\``);
   });
 
