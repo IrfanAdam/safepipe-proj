@@ -20,6 +20,47 @@ export const CLEAR_COLOR = 0x0b0c0c;
 export const FOG_NEAR = 58;
 export const FOG_FAR = 244; // aerial perspective lands on the far map edge, never on the subject
 
+// Deliberate disc-edge treatment (fidelity loop 1 — opener rim per ref-01).
+// The mapped circle (R_MAP 20 in terrain.js) ends in a bare hard clip today;
+// a thin survey-grey rim ring + soft halo gives the slab a lit edge instead.
+// Brightened survey grey — rim light, never an accent hue (amber = watch,
+// red = critical, blue = water stay reserved).
+export const RIM_RADIUS = 20;
+export const RIM_COLOR = 0xb9c2c7;
+export const RIM_OPACITY = 0.55;
+export const RIM_HALO_OPACITY = 0.16;
+
+// Build the rim group: crisp hairline ring on the boundary + a soft outer
+// halo for the floating-slab read. fog:false throughout — fog would wash
+// the one edge that must stay deliberate. Pure (no renderer) + unit-tested.
+export function createRimRing(parent, opts = {}) {
+  const radius = opts.radius ?? RIM_RADIUS;
+  const color = opts.color ?? RIM_COLOR;
+  const group = new THREE.Group();
+  group.userData.rim = true;
+  const flat = (geo, opacity) => {
+    const mat = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity,
+      fog: false,
+      toneMapped: false,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const m = new THREE.Mesh(geo, mat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = 0.05;
+    m.renderOrder = 5;
+    group.add(m);
+    return m;
+  };
+  flat(new THREE.RingGeometry(radius - 0.09, radius + 0.09, 180), opts.opacity ?? RIM_OPACITY);
+  flat(new THREE.RingGeometry(radius - 0.35, radius + 0.9, 180), opts.haloOpacity ?? RIM_HALO_OPACITY);
+  if (parent) parent.add(group);
+  return group;
+}
+
 // Clamp a base-mix value to [0, 1]; non-finite input means "today's opaque".
 export function clampMix(m) {
   const v = Number(m);
@@ -75,6 +116,13 @@ export function createScene(canvas) {
   const bg = new THREE.Color(CLEAR_COLOR);
   scene.background = bg;
   scene.fog = new THREE.Fog(CLEAR_COLOR, FOG_NEAR, FOG_FAR);
+  // Deliberate disc edge: the rim ring ships with the scene so the plate
+  // never ends in a bare clip — zero twin.js edits, additive only.
+  try {
+    createRimRing(scene);
+  } catch {
+    /* rim is garnish — a headless/test scene never breaks on it */
+  }
 
   // Base light stays dim: every hologram layer (contours, outlines, dots,
   // beacons) is unlit by design — bright lights only grey-wash the table

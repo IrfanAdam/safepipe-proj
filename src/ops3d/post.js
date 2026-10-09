@@ -29,6 +29,10 @@
  *   fx.focusDist (10) — focus distance in world units (1 unit = 1 m); twin
  *     autofocuses this to the hovered/clicked point every frame
  *   fx.maxCoc    (14) — CoC clamp in px (perf + taste guard)
+ *   fx.atmo      (1) — aerial-perspective strength (0 = off); far pixels
+ *     desaturate + melt toward the void inside [ATMO_NEAR, ATMO_FAR].
+ *     Drill-in subjects sit under the ramp start, so depth reads without
+ *     ever washing what you drilled into.
  *   fx.enabled   (true) — false = raw renderer.render (debug/perf escape hatch)
  */
 import * as THREE from 'three';
@@ -94,6 +98,10 @@ uniform float uCa;
 uniform float uGrain;
 uniform float uScan;
 uniform float uVig;
+uniform float uAtmo;
+uniform float uAtmoNear;
+uniform float uAtmoFar;
+uniform vec3 uAtmoColor;
 varying vec2 vUv;
 float hash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7)) + uTime * 13.0) * 43758.5453);
@@ -147,6 +155,24 @@ void main() {
       col = mix(col, soft, clamp((coc - 0.5) / 2.0, 0.0, 1.0));
     }
   }
+  // Aerial perspective (fidelity loop 1): far pixels desaturate + lift
+  // toward the void color with real view distance, so distance falloff
+  // reads across the disc. The ramp starts just inside the scene-fog near
+  // (drill-in subjects sit far under it, never touched) and saturates
+  // well before scene-fog far: the far rim visibly melts while the near
+  // rim takes only a whisper. Skybox pixels (depth ≈ 1 → huge distance)
+  // saturate the ramp and take the full lift — the void fade, for free.
+  {
+    float d01 = texture2D(tDepth, vUv).x;
+    float vz = (uNear * uFar) / ((uFar - uNear) * d01 - uFar);
+    float subjD = max(-vz, 0.001);
+    float k = smoothstep(uAtmoNear, uAtmoFar, subjD) * uAtmo;
+    if (k > 0.001) {
+      float g = dot(col, vec3(0.299, 0.587, 0.114));
+      col = mix(col, vec3(g), k * 0.6);
+      col = mix(col, uAtmoColor, k * 0.5);
+    }
+  }
   // Vignette.
   float d = distance(vUv, vec2(0.5));
   col *= 1.0 - uVig * smoothstep(0.35, 0.75, d);
@@ -158,6 +184,16 @@ void main() {
   #include <colorspace_fragment>
 }
 `;
+
+// Aerial-perspective ramp (fidelity loop 1): spans the visible depth
+// range so falloff actually reads. Scene fog (58/244) barely moves across
+// a 40 km disc at fit zoom (near rim ~61, far rim ~69 distance units);
+// this ramp is steep across exactly that band: the near rim takes a
+// whisper, the far rim visibly melts, drill-in subjects (≤40) stay
+// untouched. Pure + unit-tested via the fx.atmo default below.
+export const ATMO_NEAR = 52;
+export const ATMO_FAR = 95;
+export const ATMO_COLOR = 0x0b0c0c; // the void — melts to background, never a tint
 
 // Auto aperture by semantic view: readable DoF at every level — TOP keeps
 // near-deep focus so the map stays legible, drilled-in levels open up so
@@ -186,6 +222,7 @@ export function createPost(renderer, scene, camera) {
     focalMm: 32,
     focusDist: 10,
     maxCoc: 18, // wider blur span so drilled-in DoF is unmistakable
+    atmo: 1, // aerial perspective on (0 = off); ramp ATMO_NEAR..ATMO_FAR
     enabled: true,
   };
 
@@ -254,6 +291,10 @@ export function createPost(renderer, scene, camera) {
       uGrain: { value: fx.grain },
       uScan: { value: fx.scan },
       uVig: { value: fx.vignette },
+      uAtmo: { value: fx.atmo },
+      uAtmoNear: { value: ATMO_NEAR },
+      uAtmoFar: { value: ATMO_FAR },
+      uAtmoColor: { value: new THREE.Color(ATMO_COLOR) },
     },
     vertexShader: VERT,
     fragmentShader: COMP_FRAG,
@@ -352,6 +393,7 @@ export function createPost(renderer, scene, camera) {
     compMat.uniforms.uGrain.value = fx.grain;
     compMat.uniforms.uScan.value = fx.scan;
     compMat.uniforms.uVig.value = fx.vignette;
+    compMat.uniforms.uAtmo.value = fx.atmo;
     blit(compMat, null);
   }
 

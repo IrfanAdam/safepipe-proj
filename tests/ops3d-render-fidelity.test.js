@@ -17,6 +17,10 @@ import {
   PIXEL_RATIO_CAP,
   FOG_NEAR,
   FOG_FAR,
+  RIM_RADIUS,
+  RIM_COLOR,
+  RIM_OPACITY,
+  createRimRing,
 } from '../src/ops3d/scene.js';
 import {
   pushInTarget,
@@ -26,7 +30,7 @@ import {
   TOP_PITCH_DEG,
   TOP_DIST,
 } from '../src/ops3d/camera.js';
-import { autoFstop } from '../src/ops3d/post.js';
+import { autoFstop, ATMO_NEAR, ATMO_FAR, ATMO_COLOR } from '../src/ops3d/post.js';
 import { readFileSync } from 'node:fs';
 
 const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
@@ -146,5 +150,51 @@ describe('fidelity: cinematic push-in', () => {
       assert.ok(startBlock.includes(needle), `start listener must clear \`${needle}\``);
     assert.ok(camSrc.includes('pushActive'), 'rig exposes pushActive for verification');
     assert.ok(camSrc.includes('pushIn: startPush'), 'rig exposes pushIn');
+  });
+});
+
+describe('loop1: deliberate disc edge (rim ring, no bare clip)', () => {
+  it('rim radius matches the mapped circle (terrain R_MAP)', () => {
+    const terrainSrc = src('../src/ops3d/terrain.js');
+    const m = terrainSrc.match(/R_MAP\s*=\s*([0-9.]+)/);
+    assert.ok(m, 'terrain.js must declare R_MAP');
+    assert.equal(RIM_RADIUS, Number(m[1]), 'rim sits exactly on the boundary');
+  });
+  it('rim is survey-grey light, never an accent hue', () => {
+    assert.equal(typeof createRimRing, 'function');
+    assert.ok(RIM_OPACITY > 0 && RIM_OPACITY <= 0.7, `rim restrained: ${RIM_OPACITY}`);
+    // Amber = watch, red = critical, blue = water stay reserved — the rim
+    // must not borrow any of them (brightened survey grey only).
+    for (const acc of [0xff8c39, 0xe31919, 0x6792a5, 0xff4545]) {
+      assert.notEqual(RIM_COLOR, acc, 'rim must not wear an accent hue');
+    }
+  });
+  it('rim ignores fog (the deliberate edge never washes) + ships with the scene', () => {
+    const sceneSrc = src('../src/ops3d/scene.js');
+    assert.ok(/fog:\s*false/.test(sceneSrc), 'rim materials must opt out of fog');
+    assert.ok(sceneSrc.includes('createRimRing(scene)'), 'createScene auto-attaches the rim');
+    assert.ok(sceneSrc.includes('RingGeometry'), 'rim is a true ring mesh');
+  });
+});
+
+describe('loop1: aerial perspective without washing the subject', () => {
+  it('atmo ramp spans the visible depth range, drill-in sits under it', () => {
+    assert.ok(ATMO_NEAR >= 48 && ATMO_NEAR <= 58, `ramp starts past drill subjects: ${ATMO_NEAR}`);
+    assert.ok(ATMO_FAR > ATMO_NEAR && ATMO_FAR <= 160, `ramp ends on the far edge: ${ATMO_FAR}`);
+    assert.equal(ATMO_COLOR, 0x0b0c0c, 'melts to the void, never a tint');
+  });
+  it('composite desaturates + lifts far pixels from real depth', () => {
+    const postSrc = src('../src/ops3d/post.js');
+    for (const needle of ['uAtmo', 'uAtmoNear', 'uAtmoFar', 'uAtmoColor', 'smoothstep(uAtmoNear, uAtmoFar'])
+      assert.ok(postSrc.includes(needle), `post.js must contain \`${needle}\``);
+    const a = postSrc.match(/\batmo:\s*([0-9.]+)/);
+    assert.ok(a, 'fx must declare atmo strength');
+    assert.ok(Number(a[1]) > 0 && Number(a[1]) <= 1, `atmo on but bounded: ${a[1]}`);
+  });
+  it('attention gate untouched by the atmo addition', () => {
+    const postSrc = src('../src/ops3d/post.js');
+    assert.ok(/threshold:\s*0\.44/.test(postSrc), 'threshold still 0.44');
+    const b = postSrc.match(/\bbloom:\s*([0-9.]+)/);
+    assert.ok(b && Number(b[1]) <= 0.12, 'bloom still restrained');
   });
 });
