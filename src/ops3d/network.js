@@ -223,12 +223,12 @@ export function buildNetwork(scene, feed) {
       wallGeo.setPositions(run.pts);
       const wallMat = new LineMaterial({
         color: colorFor(health),
-        linewidth: 1.0,
+        linewidth: health === 'nominal' ? 2.2 : 2.4, // neutral pipes lead over quiet land
         dashed: run.buried,
         dashSize: 0.4,
         gapSize: 0.3,
         transparent: true,
-        opacity: (health === 'nominal' ? 0.22 : 0.6) * (run.buried ? 0.50 : 1),
+        opacity: (health === 'nominal' ? 0.55 : 0.8) * (run.buried ? 0.50 : 1), // pipes over land, alarms still top
         depthWrite: false,
       });
       wallMat.resolution.set(1280, 720);
