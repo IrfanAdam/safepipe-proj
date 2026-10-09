@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-09T13:59:02.017Z",
+  "generated": "2026-10-09T14:29:26.173Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,24 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "d371f08",
+      "full": "d371f082301b599b7114298e53e495b6e71c568e",
+      "date": "2026-10-09",
+      "time": "19:33",
+      "subject": "chore: plan-tracker + changelog catch-up (loop commits through dfc8411)",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "dfc8411",
+      "full": "dfc84118b5f273f9a7d3797aa5a05e0d8562d92d",
+      "date": "2026-10-09",
+      "time": "19:29",
+      "subject": "feat(ops3d): Terrarium-primary DEM (16s cold), shared status bus, global budget, ?site= twins",
+      "plan": null,
+      "anchor": null
+    },
     {
       "sha": "a7dec9d",
       "full": "a7dec9dcb6ab75c28778d7b573e4d0a503726bbc",
@@ -1102,14 +1120,6 @@
     }
   ],
   "wip": [
-    "scripts/plan-track.mjs",
-    "src/changelog/changelog-drawer.css",
-    "src/changelog/changelog-links.js",
-    "src/changelog/changelog/paint-detail.js",
-    "src/ops3d/dem.js",
-    "src/ops3d/hud.js",
-    "src/ops3d/main.js",
-    "src/ops3d/sat-base.js",
-    "src/ops3d/twin.js"
+    "src/ops3d/terrain.js"
   ]
 }

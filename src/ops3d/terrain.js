@@ -11,7 +11,11 @@
  * — total relief ≈ −170…+115 m true, VEX 4.5.
  * Altitude source is swappable (setFieldSource/sample): contours sample the
  * active source, so the pinned SRTM DEM renders real relief when it resolves
- * and every drape stays coherent. [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
+ * and every drape stays coherent. Standing water follows the source too:
+ * live DEM surveys its own river channel + lake basins from the sampled
+ * grid (waterPlacementFromGrid — positions/levels measured, never
+ * hand-tuned, possibly river-only); the synthetic playa + kettles render
+ * only in procedural fallback. [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
  * Volumetric read (topo-pass): contours carry baked NW-sun hillshade in
  * their vertex colors + a dark matte-charcoal draped ground fill
  * (neutral-grey elevation tint × strengthened directional hillshade) rides
@@ -85,7 +89,7 @@ const rankGlow = (k) => ELEV_GLOW_MIN + (ELEV_GLOW_MAX - ELEV_GLOW_MIN) * smooth
  * core. Contours use it as a mask (wet segments skipped — water renders as
  * flat fills, never line hatch); land edges near it get the shoreline glow. */
 function waterWet(x, z) {
-  const lake = lakeWet(x, z);
+  const lake = lakeWetActive(x, z);
   const dxr = (x - _riverXat(z)) / 0.7; // visible-water core half-width, km
   return Math.max(lake, Math.exp(-dxr * dxr));
 }
@@ -93,7 +97,7 @@ function waterWet(x, z) {
  * or river thread) get the rubric TOP-rank glow — same treatment as the
  * summit, so shorelines read as bright edges without any blue lines. */
 function shoreTouch(x, z) {
-  if (lakeWet(x, z) > 0.02) return true;
+  if (lakeWetActive(x, z) > 0.02) return true;
   return Math.abs(x - _riverXat(z)) < 1.2;
 }
 /* Dry-draw centerline, shared by the field carve and the drainage thread. */
@@ -107,9 +111,15 @@ const smooth = (a, b, v) => {
 };
 
 /* Organic shoreline: radius modulated by low-order harmonics so the playa
- * reads as a real water body, never a compass circle. 1 inside → 0 outside. */
+ * reads as a real water body, never a compass circle. 1 inside → 0 outside.
+ * lakeRAt parameterizes the harmonics by radius so DEM-measured basins reuse
+ * the same shoreline read at their own grid-derived size; lakeR is the
+ * synthetic-playa specialization (field() carve path — unchanged). */
+function lakeRAt(a, R) {
+  return R * (1 + 0.28 * Math.sin(2 * a + 1.1) + 0.16 * Math.sin(3 * a + 0.4) + 0.1 * Math.sin(5 * a + 2.3));
+}
 function lakeR(a) {
-  return LAKE_R * (1 + 0.28 * Math.sin(2 * a + 1.1) + 0.16 * Math.sin(3 * a + 0.4) + 0.1 * Math.sin(5 * a + 2.3));
+  return lakeRAt(a, LAKE_R);
 }
 function lakeWet(x, z) {
   const dx = x - LAKE_X, dz = z - LAKE_Z;
@@ -117,6 +127,29 @@ function lakeWet(x, z) {
   if (d < 1e-6) return 1;
   const w = d / lakeR(Math.atan2(dz, dx)); // 1 = shoreline
   return 1 - smooth(0.85, 1.15, w);
+}
+/* Render-time lake bodies: the synthetic playa by default (procedural
+ * fallback path); buildTerrain replaces this with DEM-derived basins when
+ * the live DEM source is active, so fills/isobaths/shores sit on real
+ * depressions at grid-measured levels. field() ALWAYS reads the synthetic
+ * lakeWet above — relief/sd gates measure the procedural floor, never the
+ * render list. Circular-basin wetness is for DEM-measured lakes (radius
+ * from the grid, not the synthetic shoreline harmonics). */
+let _renderLakes = null; // null = synthetic default
+function activeLakes() {
+  return _renderLakes ?? [{ x: LAKE_X, z: LAKE_Z, r: LAKE_R, level: null, organic: true }];
+}
+function basinWet(x, z, L) {
+  const dx = x - L.x, dz = z - L.z;
+  const d = Math.hypot(dx, dz);
+  if (d < 1e-6) return 1;
+  const w = d / lakeRAt(Math.atan2(dz, dx), L.r); // 1 = shoreline (same read as the fill)
+  return 1 - smooth(0.85, 1.15, w);
+}
+function lakeWetActive(x, z) {
+  let w = 0;
+  for (const L of activeLakes()) w = Math.max(w, L.organic ? lakeWet(x, z) : basinWet(x, z, L));
+  return w;
 }
 
 /* Athabasca-basin representative floor field (km units). Eastward dip ~2.2 m/km,
@@ -199,6 +232,220 @@ export function drainPathFromGrid(H, n, step, size = SIZE, axis = riverX) {
     }
   }
   return drain;
+}
+/* DEM-derived channel survey: full-window Viterbi path (no analytic axis,
+ * no corridor) — per-row altitude plus a bend penalty per km of lateral
+ * jump, so the line rides the real valley floor wherever the DEM puts it
+ * yet never teleports across the window (a river cannot jump 10 km
+ * row-to-row). The Athabasca course runs x≈+3…+12 diagonally; the corridor
+ * survey above assumes the analytic path. Band ±maxJumpKm per row (hard),
+ * bendPenalty km-alt per km lateral (soft, default 10 m/km — meanders cost
+ * centimetres, teleports cost hundreds of metres). Boxcar-smoothed ×2 for
+ * thread rendering. Pure + unit-tested. */
+export function surveyChannelFromGrid(H, n, step, size = SIZE, opts = {}) {
+  const margin = Math.max(1, opts.margin ?? 1);
+  const maxJump = opts.maxJumpKm ?? 2.5;
+  const bend = opts.bendPenalty ?? 0.01;
+  const B = Math.max(1, Math.ceil(maxJump / step));
+  const m = n + 1 - 2 * margin;
+  const idx = (j, k) => j * m + k;
+  const dp = new Float64Array((n + 1) * m);
+  const par = new Int16Array((n + 1) * m);
+  for (let k = 0; k < m; k++) dp[idx(0, k)] = H[margin + k];
+  for (let j = 1; j <= n; j++) {
+    const row = j * (n + 1) + margin;
+    for (let k = 0; k < m; k++) {
+      let bv = Infinity, bk = 0;
+      const k0 = Math.max(0, k - B), k1 = Math.min(m - 1, k + B);
+      for (let pk = k0; pk <= k1; pk++) {
+        const v = dp[idx(j - 1, pk)] + bend * Math.abs(k - pk) * step;
+        if (v < bv) { bv = v; bk = k - pk; }
+      }
+      dp[idx(j, k)] = H[row + k] + bv;
+      par[idx(j, k)] = bk;
+    }
+  }
+  const chan = new Float32Array(n + 1);
+  let k = 0;
+  {
+    let bv = Infinity;
+    for (let kk = 0; kk < m; kk++) {
+      if (dp[idx(n, kk)] < bv) { bv = dp[idx(n, kk)]; k = kk; }
+    }
+  }
+  for (let j = n; j >= 0; j--) {
+    chan[j] = -size / 2 + (margin + k) * step;
+    if (j > 0) k = Math.min(m - 1, Math.max(0, k - par[idx(j, k)]));
+  }
+  for (let p = 0; p < 2; p++) {
+    const s = Float32Array.from(chan);
+    for (let j = 0; j <= n; j++) {
+      const a = s[Math.max(0, j - 1)], b = s[j], c = s[Math.min(n, j + 1)];
+      chan[j] = (a + 2 * b + c) / 4;
+    }
+  }
+  return chan;
+}
+/* Bilinear read of a sampled altitude grid (world km → km altitude). */
+function gridAt(H, n, step, size, x, z) {
+  const gx = Math.min(n, Math.max(0, (x + size / 2) / step));
+  const gz = Math.min(n, Math.max(0, (z + size / 2) / step));
+  const i0 = Math.min(n - 1, Math.floor(gx)), j0 = Math.min(n - 1, Math.floor(gz));
+  const fx = gx - i0, fz = gz - j0;
+  const a = H[j0 * (n + 1) + i0], b = H[j0 * (n + 1) + i0 + 1];
+  const c = H[(j0 + 1) * (n + 1) + i0], d = H[(j0 + 1) * (n + 1) + i0 + 1];
+  return a * (1 - fx) * (1 - fz) + b * fx * (1 - fz) + c * (1 - fx) * fz + d * fx * fz;
+}
+/* DEM-derived lake basins: closed COMPACT off-channel depressions in the
+ * SAMPLED grid — local minima whose surrounding rings stand ≥ minDepthKm
+ * above the floor (spill = highest of the 1.2/1.8/2.4 km ring-minima, so
+ * wide bowls are not under-measured), outside the river corridor and the
+ * map rim. Breadth + compactness vetoes reject narrow Vs and elongated
+ * canyon reaches (lakes are broad and compact).
+ * Compactness veto (wet cells below floor + half depth inside ±2.5 km must
+ * read ≤ ~2.5:1 axes): linear canyon reaches and river pools are elongated,
+ * lakes are not. Render size is conservative (quarter-depth contour) so a
+ * small pond in flat bog does not paint a catchment-sized disc; level sits
+ * at floor + 25% of depth (above the bottom, below the spill). Returns up
+ * to maxLakes sorted by depth×area. Empty when the DEM holds no closed
+ * water — then the twin is river-only, as the real site mostly is.
+ * Pure + unit-tested. */
+export function detectLakeBasins(H, n, step, size = SIZE, opts = {}) {
+  const channel = opts.channel ?? null;
+  const excludeKm = opts.excludeKm ?? 1.6;
+  const ringKm = opts.ringKm ?? 1.2;
+  const minDepthKm = opts.minDepthKm ?? 0.004;
+  const maxLakes = opts.maxLakes ?? 2;
+  const rimKm = opts.rimKm ?? 19.3;
+  const chanXat = channel ? (z) => {
+    const gz = Math.min(n, Math.max(0, (z + size / 2) / step));
+    const j0 = Math.min(n - 1, Math.floor(gz)), f = gz - j0;
+    return channel[j0] * (1 - f) + channel[j0 + 1] * f;
+  } : null;
+  const cand = [];
+  for (let j = 2; j <= n - 2; j++) {
+    for (let i = 2; i <= n - 2; i++) {
+      const x = -size / 2 + i * step, z = -size / 2 + j * step;
+      if (Math.hypot(x, z) > rimKm) continue;
+      if (chanXat && Math.abs(x - chanXat(z)) < excludeKm) continue;
+      const h = H[j * (n + 1) + i];
+      let isMin = true;
+      for (let dj = -1; dj <= 1 && isMin; dj++) {
+        for (let di = -1; di <= 1; di++) {
+          if (!di && !dj) continue;
+          if (H[(j + dj) * (n + 1) + i + di] < h) { isMin = false; break; }
+        }
+      }
+      if (!isMin) continue;
+      // Spill proxy: highest of the 1.2/1.8/2.4 km ring-minima — a wide
+      // bowl's inner rings sit inside the depression, so the spill is the
+      // outermost (highest) ring floor; 16 samples per ring so narrow
+      // gullies cannot hide between sample angles.
+      let spill = -Infinity;
+      for (const rr of [ringKm, ringKm * 1.5, ringKm * 2]) {
+        let rm = Infinity;
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2;
+          rm = Math.min(rm, gridAt(H, n, step, size, x + Math.cos(a) * rr, z + Math.sin(a) * rr));
+        }
+        spill = Math.max(spill, rm);
+      }
+      const depth = spill - h;
+      if (!(depth >= minDepthKm)) continue;
+      // Breadth test: the 8 neighbours must average below floor + half
+      // depth — a narrow V (gully, canyon, noise spike) is deep only at
+      // its centre cell, a lake bowl is broad.
+      let nsum = 0;
+      for (let dj = -1; dj <= 1; dj++) {
+        for (let di = -1; di <= 1; di++) {
+          if (!di && !dj) continue;
+          nsum += H[(j + dj) * (n + 1) + i + di];
+        }
+      }
+      if (nsum / 8 > h + 0.5 * depth) continue;
+      // Compactness veto: wet cells (below floor + half depth) inside
+      // ±2.5 km must read compact (eigenvalue ratio ≤ 6 ≈ 2.5:1 axes) —
+      // a bending canyon stays wet for kilometres along its axis.
+      if (!basinCompact(H, n, step, size, x, z, h + 0.5 * depth)) continue;
+      // Radius: expand until banks exceed quarter depth (capped 3 km) —
+      // render size stays near the open-water core, not the catchment.
+      let radius = ringKm;
+      for (let r = step; r <= 3; r += step) {
+        let bank = Infinity;
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * Math.PI * 2 + 0.4;
+          bank = Math.min(bank, gridAt(H, n, step, size, x + Math.cos(a) * r, z + Math.sin(a) * r));
+        }
+        radius = r;
+        if (bank - h > 0.25 * depth) break;
+      }
+      cand.push({ x, z, radiusKm: Math.max(0.4, radius), levelKm: h + 0.25 * depth, depthKm: depth });
+    }
+  }
+  // Deepest-first, merging neighbors (keep the deeper basin within 2.5 km).
+  cand.sort((a, b) => (b.depthKm * b.radiusKm) - (a.depthKm * a.radiusKm));
+  const out = [];
+  for (const c of cand) {
+    if (out.length >= maxLakes) break;
+    if (out.some((k) => Math.hypot(k.x - c.x, k.z - c.z) < 2.5)) continue;
+    out.push(c);
+  }
+  return out;
+}
+/* Compactness veto for basin candidates: cells below `wetBelow` inside a
+ * ±2.5 km box must read compact (covariance eigenvalue ratio ≤ 6, ≈ 2.5:1
+ * axes). Too few cells to judge (< 8) passes — a sub-cell puddle cannot be
+ * a canyon reach. Pure (unit-tested via detectLakeBasins). */
+function basinCompact(H, n, step, size, x, z, wetBelow) {
+  const R2 = 2.5;
+  const i0 = Math.max(0, Math.ceil((x - R2 + size / 2) / step));
+  const i1 = Math.min(n, Math.floor((x + R2 + size / 2) / step));
+  const j0 = Math.max(0, Math.ceil((z - R2 + size / 2) / step));
+  const j1 = Math.min(n, Math.floor((z + R2 + size / 2) / step));
+  let cnt = 0, sx = 0, sz = 0;
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      if (H[j * (n + 1) + i] < wetBelow) {
+        cnt++;
+        sx += -size / 2 + i * step; sz += -size / 2 + j * step;
+      }
+    }
+  }
+  if (cnt < 8) return true;
+  const mx = sx / cnt, mz = sz / cnt;
+  let cxx = 0, czz = 0, cxz = 0;
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      if (H[j * (n + 1) + i] < wetBelow) {
+        const dx = -size / 2 + i * step - mx, dz = -size / 2 + j * step - mz;
+        cxx += dx * dx; czz += dz * dz; cxz += dx * dz;
+      }
+    }
+  }
+  cxx /= cnt; czz /= cnt; cxz /= cnt;
+  const tr = cxx + czz, det = cxx * czz - cxz * cxz;
+  const disc = Math.max(0, (tr * tr) / 4 - det);
+  const l1 = tr / 2 + Math.sqrt(disc), l2 = tr / 2 - Math.sqrt(disc);
+  if (!(l2 > 1e-9)) return false; // collinear wet cells = gully, not a lake
+  return l1 / l2 <= 6;
+}
+/* Water placement from the sampled grid (the DEM→water seam): DEM source →
+ * surveyed channel + measured basins (positions + levels from the grid,
+ * never hand-tuned); anything else → analytic drainage + synthetic playa
+ * (offline fallback, never half-derived). Pure + unit-tested. */
+export function waterPlacementFromGrid(H, n, step, size = SIZE, source = 'procedural') {
+  if (source === 'dem') {
+    const channel = surveyChannelFromGrid(H, n, step, size);
+    const basins = detectLakeBasins(H, n, step, size, { channel });
+    return {
+      channel,
+      lakes: basins.map((b) => ({ x: b.x, z: b.z, r: b.radiusKm, level: b.levelKm, organic: false })),
+    };
+  }
+  return {
+    channel: drainPathFromGrid(H, n, step, size),
+    lakes: [{ x: LAKE_X, z: LAKE_Z, r: LAKE_R, level: null, organic: true }],
+  };
 }
 /* Active river axis: analytic fallback until buildTerrain installs the
  * grid-derived surveyed line. waterWet/shoreTouch read through this so
@@ -563,8 +810,13 @@ export function buildTerrain(scene) {
   sampleH();
   // Surveyed drainage axis: derived from THIS grid (live DEM or fallback),
   // so threads + water masks sit on the real valley floor, never a fixed
-  // drawing. Bilinear readout for sub-cell smoothness.
-  const _drain = drainPathFromGrid(H, N, step);
+  // drawing. DEM source surveys the full window + measures lake basins
+  // (waterPlacementFromGrid — positions/levels from the grid, never
+  // hand-tuned); fallback keeps the analytic corridor + synthetic playa.
+  // Bilinear readout for sub-cell smoothness.
+  const _placed = waterPlacementFromGrid(H, N, step, SIZE, _source);
+  const _drain = _placed.channel;
+  _renderLakes = _placed.lakes.map((L) => ({ ...L, level: L.level ?? field(L.x, L.z) }));
   const drainAt = (z) => {
     const gz = Math.min(N, Math.max(0, (z + SIZE / 2) / step));
     const j0 = Math.min(N - 1, Math.floor(gz)), f = gz - j0;
@@ -827,20 +1079,28 @@ export function buildTerrain(scene) {
   });
   group.add(new THREE.LineSegments(tickGeo, tickMat));
 
-  // Playa lake: flat blue fill at ONE level surface (no drape, no radial
-  // line hatch — a proper indexed fan, center + shoreline ring), bounded by
-  // the shoreline contour. The ONLY blue on the map is this standing water.
-  // Its shoreline ring stays neutral grey: rings are survey lines, not water.
-  const lakeY = field(LAKE_X, LAKE_Z) * VEX;
+  // Standing water: one flat fill + isobaths + shoreline per placed lake
+  // body — the synthetic playa in fallback, DEM-measured basins when live
+  // (possibly zero: the real site is mostly river). Flat surface at the
+  // placed level, bounded by the shoreline contour. Blue is water-only.
+  // shoreMat stays build-scoped (setSize touches it) — per-lake materials
+  // share identical params, so the last one serves resolution updates.
+  let shoreMat = null;
+  for (const L of _renderLakes) {
+  const LX = L.x, LZ = L.z;
+  // DEM-measured basins reuse the organic shoreline harmonics at their own
+  // grid-derived radius — never a compass circle.
+  const lakeRad = (a) => lakeRAt(a, L.organic ? LAKE_R : L.r);
+  const lakeY = L.level * VEX;
   {
     const RING = 96;
     const cy = lakeY + 0.015; // FLAT water surface — one Y for the whole lake
-    const pos = [LAKE_X, cy, LAKE_Z];
+    const pos = [LX, cy, LZ];
     const idx = [];
     for (let i = 0; i <= RING; i++) {
       const a = (i % RING) / RING * Math.PI * 2;
-      const r = lakeR(a);
-      pos.push(LAKE_X + Math.cos(a) * r, cy, LAKE_Z + Math.sin(a) * r);
+      const r = lakeRad(a);
+      pos.push(LX + Math.cos(a) * r, cy, LZ + Math.sin(a) * r);
     }
     for (let i = 1; i <= RING; i++) idx.push(0, i, i + 1);
     const lakeGeo = new THREE.BufferGeometry();
@@ -860,7 +1120,10 @@ export function buildTerrain(scene) {
   // only (no land grey). Outer strongest, fading inward. Reads as waves.
   {
     const cy = lakeY + 0.016; // just above fill, avoids z-fight but stays flat
-    for (let k = 0; k < LAKE_ISO_SCALES.length; k++) {
+    // Sub-cell ponds (r < 0.45 km) render fill + shore only — isobaths
+    // would be sub-pixel mush at TOP.
+    if (L.r < 0.45) { /* fill + shore carry it */ }
+    else for (let k = 0; k < LAKE_ISO_SCALES.length; k++) {
       const s = LAKE_ISO_SCALES[k];
       const wob = (a) => 1
         + 0.10 * Math.sin(3 * a + k * 1.7)
@@ -869,10 +1132,10 @@ export function buildTerrain(scene) {
       const pts = [];
       for (let i = 0; i < 64; i++) {
         const a0 = (i / 64) * Math.PI * 2, a1 = ((i + 1) / 64) * Math.PI * 2;
-        const r0 = lakeR(a0) * s * wob(a0), r1 = lakeR(a1) * s * wob(a1);
+        const r0 = lakeRad(a0) * s * wob(a0), r1 = lakeRad(a1) * s * wob(a1);
         pts.push(
-          LAKE_X + Math.cos(a0) * r0, cy, LAKE_Z + Math.sin(a0) * r0,
-          LAKE_X + Math.cos(a1) * r1, cy, LAKE_Z + Math.sin(a1) * r1,
+          LX + Math.cos(a0) * r0, cy, LZ + Math.sin(a0) * r0,
+          LX + Math.cos(a1) * r1, cy, LZ + Math.sin(a1) * r1,
         );
       }
       const ig = new LineGeometry(); ig.setPositions(pts);
@@ -886,9 +1149,9 @@ export function buildTerrain(scene) {
   const shorePos = [];
   for (let i = 0; i < 96; i++) {
     const a0 = (i / 96) * Math.PI * 2, a1 = ((i + 1) / 96) * Math.PI * 2;
-    const r0 = lakeR(a0), r1 = lakeR(a1);
-    const sx0 = LAKE_X + Math.cos(a0) * r0, sz0 = LAKE_Z + Math.sin(a0) * r0;
-    const sx1 = LAKE_X + Math.cos(a1) * r1, sz1 = LAKE_Z + Math.sin(a1) * r1;
+    const r0 = lakeRad(a0), r1 = lakeRad(a1);
+    const sx0 = LX + Math.cos(a0) * r0, sz0 = LZ + Math.sin(a0) * r0;
+    const sx1 = LX + Math.cos(a1) * r1, sz1 = LZ + Math.sin(a1) * r1;
     shorePos.push(
       sx0, field(sx0, sz0) * VEX + 0.02, sz0,
       sx1, field(sx1, sz1) * VEX + 0.02, sz1
@@ -899,7 +1162,7 @@ export function buildTerrain(scene) {
   // Shoreline glow: land-water edges get the rubric top-rank treatment —
   // wider + brighter than other survey lines, still neutral grey (blue is
   // water-fill only) and capped so alarms lead.
-  const shoreMat = new LineMaterial({
+  shoreMat = new LineMaterial({
     color: SHORE_COL, linewidth: 2.0, transparent: true, opacity: 0.45,
     depthWrite: false, fog: false,
   });
@@ -907,6 +1170,7 @@ export function buildTerrain(scene) {
   const shore = new Line2(shoreGeo, shoreMat);
   shore.renderOrder = 2;
   group.add(shore);
+  } // end per-lake standing water (zero iterations when DEM holds no basins)
 
   // Drainage threads: the west draw is DRY, so its thread + feeders run
   // neutral grey (a dry creek is land, not water). Kinks in the contours
@@ -998,7 +1262,7 @@ export function buildTerrain(scene) {
       indexMat.resolution.set(w, h);
       summitMat.resolution.set(w, h);
       ringMat.resolution.set(w, h);
-      shoreMat.resolution.set(w, h);
+      shoreMat?.resolution.set(w, h);
       drainMat.resolution.set(w, h);
     },
     update(t = 0) {
