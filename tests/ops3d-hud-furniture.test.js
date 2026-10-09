@@ -91,6 +91,7 @@ const byTestId = (id) => (n) => n.attributes?.['data-testid'] === id;
 const byClass = (cls) => (n) => n.classList?.contains(cls);
 
 let hud;
+let labels;
 before(async () => {
   const g = globalThis;
   const docListeners = {};
@@ -103,6 +104,7 @@ before(async () => {
   };
   g.window = { addEventListener: () => {}, removeEventListener: () => {} };
   hud = await import('../src/ops3d/hud.js');
+  labels = await import('../src/ops3d/labels.js');
 });
 
 describe('ops3d HUD orientation/scale furniture', () => {
@@ -225,5 +227,33 @@ describe('ops3d HUD orientation/scale furniture', () => {
     assert.ok(xray.classList.contains('ops-hud__xray--hidden'), 'xray badge hides on zoom-out');
     assert.equal(camToggles, 0, 'no cam toggle requested by update path');
     h.dispose();
+  });
+});
+
+describe('ops3d label occlusion probe (grazing-angle fade)', () => {
+  it('open sight line over flat ground is not occluded', () => {
+    const cam = { x: 0, y: 10, z: 0 };
+    const anc = { x: 0, y: 1, z: 10 };
+    assert.equal(labels.sightOccluded(cam, anc, () => 0), false);
+  });
+
+  it('relief poking through the sight line counts as occluded', () => {
+    const cam = { x: 0, y: 6, z: 0 };
+    const anc = { x: 0, y: 1, z: 10 };
+    // Sight height at t=.35/.7 ≈ 4.25/2.5 — a ridge of 5 buries the anchor.
+    assert.equal(labels.sightOccluded(cam, anc, () => 5), true);
+  });
+
+  it('grazing view over a rise hides the anchor, high view clears it', () => {
+    const anc = { x: 0, y: 1, z: 10 };
+    const ridge = (x, z) => (z > 3 && z < 8 ? 4 : 0);
+    assert.equal(labels.sightOccluded({ x: 0, y: 2, z: 0 }, anc, ridge), true);
+    assert.equal(labels.sightOccluded({ x: 0, y: 30, z: 0 }, anc, ridge), false);
+  });
+
+  it('missing viewpoint or heightfield never occludes', () => {
+    const anc = { x: 0, y: 1, z: 10 };
+    assert.equal(labels.sightOccluded(null, anc, () => 99), false);
+    assert.equal(labels.sightOccluded({ x: 0, y: 1, z: 0 }, anc, null), false);
   });
 });

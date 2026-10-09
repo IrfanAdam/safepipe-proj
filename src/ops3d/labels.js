@@ -10,6 +10,7 @@
  */
 
 import * as THREE from 'three';
+import { field, VEX } from './terrain.js';
 
 const DEST = {
   'PIPE-01': 'MIDLAND REFINERY',
@@ -28,8 +29,40 @@ const INK = {
 const LABEL_H = 1.0;
 const RING_Y = 0.05;
 
+/* Occlusion probe (pure, unit-tested): is `anc` hidden from `cam` by relief?
+ * Samples the sight line at two interior points; if the heightfield pokes
+ * above the line (+margin), the anchor reads as buried/occluded from this
+ * viewpoint and its plate should fade instead of drawing over the map. */
+export function sightOccluded(cam, anc, heightAt, margin = 0.15) {
+  if (!cam || !anc || typeof heightAt !== 'function') return false;
+  for (const t of [0.35, 0.7]) {
+    const px = anc.x + (cam.x - anc.x) * t;
+    const pz = anc.z + (cam.z - anc.z) * t;
+    const py = anc.y + (cam.y - anc.y) * t;
+    let h = 0;
+    try {
+      h = heightAt(px, pz);
+    } catch {
+      return false;
+    }
+    if (typeof h === 'number' && Number.isFinite(h) && h > py + margin) return true;
+  }
+  return false;
+}
+
 const healthOf = (v) => (typeof v === 'string' ? v : v?.health ?? 'nominal');
 const colorOf = (h) => INK[h] ?? INK.nominal;
+
+/* Terrain height under a label anchor — guarded: layout points far outside
+ * the mapped field return NaN in some sources, fall back to 0. */
+function groundAt(x, z) {
+  try {
+    const h = field(x, z) * VEX;
+    return Number.isFinite(h) ? h : 0;
+  } catch {
+    return 0;
+  }
+}
 
 function toMap(src) {
   if (src instanceof Map) return src;
@@ -245,30 +278,42 @@ export function buildLabels(scene, { layout, healthById } = {}) {
     return a.position;
   }
 
-  function addLabel(id, x, z, y = LABEL_H) {
+  function addLabel(id, x, z, lift = LABEL_H) {
     const health = healthOf(byId.get(id));
     const col = new THREE.Color(colorOf(health));
+    // Terrain-seated: ring and plate ride the relief (gy), never a fixed
+    // datum — at grazing angles a fixed y reads as floating under the map.
+    const gy = groundAt(x, z);
+    const baseY = gy + lift;
     const sprite = makeTextSprite(id, health);
-    sprite.position.set(x, y, z);
+    sprite.position.set(x, baseY, z);
     group.add(sprite);
     const ringMat = new THREE.SpriteMaterial({
       map: getRingTexture(), color: col, sizeAttenuation: true,
       transparent: true, opacity: 0.8,
       blending: THREE.AdditiveBlending, depthWrite: false,
+      // Buried segments hide: the ring/leader depth-test against terrain so
+      // relief between camera and anchor occludes them instead of drawing
+      // through. (Plates keep depthTest:false by design — contours must
+      // never poke through the backplate; occlusion fades them instead.)
+      depthTest: true,
     });
     const ring = new THREE.Sprite(ringMat);
     ring.scale.set(0.28, 0.28, 1);
-    ring.position.set(x, RING_Y, z);
+    ring.position.set(x, gy + RING_Y, z);
     group.add(ring);
     const lg = new THREE.BufferGeometry().setFromPoints(
-      [new THREE.Vector3(x, RING_Y, z), new THREE.Vector3(x, y - 0.12, z)]);
-    const lineMat = new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.45 });
+      [new THREE.Vector3(x, gy + RING_Y, z), new THREE.Vector3(x, baseY - 0.12, z)]);
+    const lineMat = new THREE.LineBasicMaterial({
+      color: col, transparent: true, opacity: 0.45, depthTest: true,
+    });
     const line = new THREE.Line(lg, lineMat);
     group.add(line);
     items.push({
       id, sprite, ring, ringMat, line, lineMat, lineGeo: lg,
       cv: sprite.material.map.image, tex: sprite.material.map,
-      baseY: y, phase: Math.random() * Math.PI * 2, x, z,
+      baseY, groundY: gy, lift, phase: Math.random() * Math.PI * 2, x, z,
+      occFade: 1,
     });
   }
 
@@ -280,13 +325,15 @@ export function buildLabels(scene, { layout, healthById } = {}) {
       const [ex, ez] = exitPoint(p.points);
       const health = healthOf(byId.get(p.assetId));
       const sprite = makeDestSprite(DEST[p.assetId], health);
-      sprite.position.set(ex, LABEL_H * 0.85, ez);
+      const egy = groundAt(ex, ez);
+      sprite.position.set(ex, egy + LABEL_H * 0.85, ez);
       group.add(sprite);
       items.push({
         id: `${p.assetId}:dest`, dest: true, pipe: p.assetId, text: DEST[p.assetId],
         sprite, ring: null, ringMat: null, line: null, lineMat: null, lineGeo: null,
         cv: sprite.material.map.image, tex: sprite.material.map,
-        baseY: LABEL_H * 0.85, phase: Math.random() * Math.PI * 2, x: ex, z: ez,
+        baseY: egy + LABEL_H * 0.85, groundY: egy, lift: LABEL_H * 0.85,
+        phase: Math.random() * Math.PI * 2, x: ex, z: ez, occFade: 1,
       });
     }
   }
@@ -352,8 +399,21 @@ export function buildLabels(scene, { layout, healthById } = {}) {
     it.lineMat.color.copy(col);
   }
 
+  /* Viewpoint for the occlusion fade (twin.js hands over its camera once).
+   * Every OCC_EVERY seconds each visible plate probes its sight line: an
+   * anchor buried behind relief from this viewpoint fades to OCC_FADE
+   * instead of drawing over the map. Selected plates never fade — the
+   * drill-in target must stay readable (X-ray dips the terrain instead). */
+  let viewCam = null;
+  let lastOcc = -1;
+  const OCC_EVERY = 0.25;
+  const OCC_FADE = 0.22;
+
   return {
     group,
+    setView(cam) {
+      viewCam = cam ?? null;
+    },
     /* update(t, next?) — animate; optionally refresh colors when feed passed. */
     update(t = 0, next) {
       const top = detailName === 'network';
@@ -364,6 +424,8 @@ export function buildLabels(scene, { layout, healthById } = {}) {
           else repaint(it.id, healthOf(byId.get(it.id)));
         }
       }
+      const doOcc = viewCam && t - lastOcc > OCC_EVERY;
+      if (doOcc) lastOcc = t;
       for (const it of items) {
         const sel = it.id === selected;
         if (it.ring) {
@@ -371,13 +433,24 @@ export function buildLabels(scene, { layout, healthById } = {}) {
           it.ring.scale.set(0.28 * pulse * (sel ? 1.5 : 1), 0.28 * pulse * (sel ? 1.5 : 1), 1);
           it.ringMat.opacity = (sel ? 1 : 0.65) * (0.75 + 0.25 * Math.sin(t * 2.4 + it.phase)) * (top ? 0.6 : 1);
         }
-        // TOP plates hug the ground (low, small, dim terrain tags); drill-in
+        // TOP plates hug the relief (low, small, dim terrain tags) — height
+        // is relative to the seated ground, not a fixed datum; drill-in
         // restores full-height readable plates. Sprites are inherently
         // camera-facing (true ground-parallel would need plane meshes), so
         // the TOP read comes from altitude + size + opacity, not rotation.
-        it.sprite.position.y = top ? it.baseY * 0.45 : it.baseY;
+        it.sprite.position.y = top ? it.groundY + it.lift * 0.45 : it.baseY;
+        if (doOcc && it.sprite.visible && !sel) {
+          const occ = sightOccluded(
+            viewCam.position,
+            { x: it.x, y: it.baseY, z: it.z },
+            (x, z) => groundAt(x, z),
+          );
+          it.occFade = occ ? OCC_FADE : 1;
+        } else if (!viewCam || sel) {
+          it.occFade = 1;
+        }
         const base = hidden ? 0 : sel ? 1 : it.dest ? 0.94 : 0.96;
-        it.sprite.material.opacity = top && !sel ? base * 0.55 : base;
+        it.sprite.material.opacity = (top && !sel ? base * 0.55 : base) * it.occFade;
       }
     },
     setSelection(id) {

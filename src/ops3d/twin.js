@@ -81,6 +81,34 @@ export function createTwin(container, opts = {}) {
   const gridfloor = buildGridFloor(scene);
   const checker = buildChecker(scene);
   const labels = buildLabels(scene, { layout, healthById: byId() });
+  labels.setView?.(rig.camera); // viewpoint for the occlusion fade
+  // Camera floor (grazing-angle armor): the view can never go fully
+  // grazing or under-terrain. Enforced post-update every frame in tick():
+  // a minimum 16° elevation above the orbit target plus a hard deck above
+  // the local relief. Additive to the rig — no camera.js changes, no
+  // clear-color or background assumptions (mapbox-base stays under us).
+  const MIN_ELEV = Math.sin((16 * Math.PI) / 180);
+  const clampCamera = () => {
+    try {
+      const tgt = rig.getTarget();
+      const p = rig.camera.position;
+      const ox = p.x - tgt.x, oy = p.y - tgt.y, oz = p.z - tgt.z;
+      const len = Math.hypot(ox, oy, oz);
+      if (len > 1e-6 && oy < len * MIN_ELEV) {
+        p.y = tgt.y + len * MIN_ELEV;
+      }
+      let deck = 1.2;
+      try {
+        const g = field(p.x, p.z) * VEX;
+        if (Number.isFinite(g)) deck = g + 1.2;
+      } catch {
+        /* relief unknown — keep the margin deck */
+      }
+      if (p.y < deck) p.y = deck;
+    } catch {
+      /* best-effort — never fight the rig */
+    }
+  };
   const overlays = buildOverlays(scene, { layout });
   // Twin-data overlays: O cycles OFF → WEATHER → TECTONIC → FORECAST.
   let overlayMode = null;
@@ -475,6 +503,7 @@ export function createTwin(container, opts = {}) {
     const dt = Math.min((now - last) / 1000, 0.1);
     last = now;
     rig.update(dt, now / 1000);
+    clampCamera(); // before any render: grazing/under-terrain never shows
     table.update?.(now / 1000);
     terrain.update?.(now / 1000);
     applyXray(); // after terrain.update resets absolute opacities
