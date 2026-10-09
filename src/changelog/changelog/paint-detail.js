@@ -10,11 +10,57 @@ const marked = {
     // no stray </p> lands after headings (Task-1 record: Modify/Create <li>s
     // swallowed the Verify paragraph into one <ul>).
     const liOf = (ln) => {
-      const t = ln
+      const t0 = ln
         .replace(/^- \[x\] /i, '<input type="checkbox" checked disabled> ')
         .replace(/^- \[ \] /, '<input type="checkbox" disabled> ')
         .replace(/^- /, '');
-      return '<li>' + t + '</li>';
+      // Plain bullets (no checkbox) are sub-points, not tasks — leave untouched.
+      if (!/^<input/.test(t0)) return '<li>' + t0 + '</li>';
+      // Task item: the inline `✓ done —` / `✗ cancelled —` is redundant (the
+      // checkbox already carries it) — strip it and re-emit as its own line.
+      let t = t0, status = '';
+      t = t.replace(/\*\*(.+?)\*\* ✓ done( — )?/, (m, ti) => { status = 'done'; return '**' + ti + '** '; });
+      if (!status) t = t.replace(/\*\*(.+?)\*\* &lt;span class="ds-cancelled"&gt;✗ cancelled&lt;\/span&gt;( — )?/, (m, ti) => { status = 'cancelled'; return '**' + ti + '** '; });
+      const hm = t.match(/^(<input[^>]*> \*\*.+?\*\*)\s*([\s\S]*)$/);
+      let head = t, rest = '';
+      if (hm) { head = hm[1]; rest = hm[2]; }
+      let html = head;
+      // Done needs no line (the checked box already says it); cancelled does
+      // (its box is checked too, so without the line it reads as done).
+      if (status === 'cancelled') html += `<span class="ds-status ds-is-cancelled">✗ cancelled</span>`;
+      // Box `**Label:**` segments (Files, Verify, Accuracy…) as compact rows;
+      // the Objective flows inline right after the bold title instead.
+      if (rest && /\*\*([^*]{1,160}?):\*\*/.test(rest)) {
+        const parts = rest.split(/\*\*([^*]{1,160}?):\*\*/);
+        const lead = (parts[0] || '').trim();
+        let i = 1;
+        if ((parts[1] || '').trim().toLowerCase() === 'objective' && (parts[2] || '').trim()) {
+          html += ' — ' + (parts[2] || '').trim();
+          i = 3;
+        }
+        let fields = '';
+        for (; i + 1 < parts.length; i += 2) {
+          const label = (parts[i] || '').trim(), val = (parts[i + 1] || '').trim();
+          if (!label && !val) continue;
+          fields += `<div class="ds-field"><dt>${label}</dt><dd>${val}</dd></div>`;
+        }
+        if (fields) {
+          if (lead) html += ' ' + lead;
+          html += `<dl class="ds-fields">${fields}</dl>`;
+        } else if (lead && i !== 1) html += ' ' + lead;
+        else if (i === 1) html += ' ' + rest;
+      } else if (rest) html += ' ' + rest;
+      return '<li>' + html + '</li>';
+    };
+    // Headings carrying a trailing `✓ done (date)` / `✗ cancelled` mark get
+    // the mark stripped and re-emitted as its own status line (no checkbox
+    // exists on a heading, so the line preserves the information).
+    const headOf = (tag, text) => {
+      const m = text.match(/\s*([✓✗])\s*(done|cancelled)(\s*\([^)]*\))?\s*$/i);
+      if (!m) return `<${tag}>` + text + `</${tag}>`;
+      const st = m[1] === '✗' ? 'cancelled' : 'done';
+      return `<${tag}>` + text.slice(0, m.index) + `</${tag}>` +
+        `<p class="ds-status ds-is-${st}">${m[1]} ${m[2]}${m[3] || ''}</p>`;
     };
     const out = [];
     let fence = null;
@@ -44,9 +90,9 @@ const marked = {
       const flushL = () => { if (list.length) { out.push('<ul>' + list.join('') + '</ul>'); list = []; } };
       for (const ln of block.split('\n')) {
         let m;
-        if ((m = ln.match(/^### (.+)$/))) { flushP(); flushL(); out.push('<h3>' + m[1] + '</h3>'); }
-        else if ((m = ln.match(/^## (.+)$/))) { flushP(); flushL(); out.push('<h2>' + m[1] + '</h2>'); }
-        else if ((m = ln.match(/^# (.+)$/))) { flushP(); flushL(); out.push('<h1>' + m[1] + '</h1>'); }
+        if ((m = ln.match(/^### (.+)$/))) { flushP(); flushL(); out.push(headOf('h3', m[1])); }
+        else if ((m = ln.match(/^## (.+)$/))) { flushP(); flushL(); out.push(headOf('h2', m[1])); }
+        else if ((m = ln.match(/^# (.+)$/))) { flushP(); flushL(); out.push(headOf('h1', m[1])); }
         else if (/^- /.test(ln)) { flushP(); list.push(liOf(ln)); }
         else if (ln.trim() === '') { flushP(); flushL(); }
         else { flushL(); para.push(ln); }
@@ -106,7 +152,7 @@ export function paintDetail(root, ctx){
     ` · `,
     esc(short(sprint.head)),
     `</b><button data-close aria-label="Close detail">✕</button></div><div class="ds-md">`,
-    marked.parse(sprint.body) + badges(hs),
+    marked.parse(sprint.body) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : ''),
     `</div>`,
   ].join('');
   const u = unlinked(texts);

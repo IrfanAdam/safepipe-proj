@@ -7,7 +7,7 @@ const GH = 'https://github.com/IrfanAdam/safepipe-proj/commit/';
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 export const commits = manifest.commits || [];
 export const wip = manifest.wip || [];
-const badgeItem = (c) => `<div class="ds-timeline-item"><a href="${GH}${c.full}">${c.sha}</a> <span>${esc(c.subject)}</span>${c.time ? `<small>${esc(fmtTime(c.time))}</small>` : `<small>${esc(c.date)}</small>`}</div>`;
+const badgeItem = (c) => `<div class="ds-timeline-item"><a href="${GH}${c.full}">${c.sha}</a> <span>${esc(c.subject)}</span><small>${esc(c.time ? `${c.date} ${fmtTime(c.time)}` : c.date)}</small></div>`;
 // Anchor-less commits attach to their plan's first section; anchored ones to
 // the first section whose text boundary-matches the anchor.
 export const hits = (file, text, first) => commits

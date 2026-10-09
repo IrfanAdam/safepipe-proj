@@ -23,13 +23,13 @@ const plans = existsSync(plansDir)
   : [];
 
 let commits = [];
-const log = git(['log', '--format=%H|%h|%ad|%s', '--date=short', '--', ...TRACKED]);
+const log = git(['log', '--format=%H|%h|%ad|%s', '--date=format:%Y-%m-%d|%H:%M', '--', ...TRACKED]);
 if (log) {
   for (const line of log.split('\n').filter(Boolean)) {
-    const [full, sha, date, ...rest] = line.split('|');
+    const [full, sha, date, time, ...rest] = line.split('|');
     const subject = rest.join('|');
     const m = subject.match(TAG);
-    commits.push({ sha, full, date, subject, plan: m ? m[1] : null, anchor: m ? (m[2] || null) : null });
+    commits.push({ sha, full, date, time, subject, plan: m ? m[1] : null, anchor: m ? (m[2] || null) : null });
   }
 }
 

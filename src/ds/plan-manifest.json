@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-08T13:31:26.991Z",
+  "generated": "2026-10-09T13:59:02.017Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -12,9 +12,199 @@
   ],
   "commits": [
     {
+      "sha": "a7dec9d",
+      "full": "a7dec9dcb6ab75c28778d7b573e4d0a503726bbc",
+      "date": "2026-10-09",
+      "time": "18:45",
+      "subject": "fix(ops3d): crossfade in sync — slant-corrected zoom + motion-adaptive map follow",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "1b7b48f",
+      "full": "1b7b48f289767b61ac879a7b76187695f7442bd6",
+      "date": "2026-10-09",
+      "time": "18:33",
+      "subject": "feat(ops3d): loop-1 atmosphere+edge — depth aerial perspective, survey-grey rim ring",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "9790bf4",
+      "full": "9790bf4b3c5c5df87050d6d691813234a7cae5ca",
+      "date": "2026-10-09",
+      "time": "18:31",
+      "subject": "feat(ops3d): real-map parity — pan-tracking center, true-scale zoom, natural satellite colors",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "cd74165",
+      "full": "cd741651fdf316941a064bdb84ecc77c22b14904",
+      "date": "2026-10-09",
+      "time": "18:25",
+      "subject": "fix(ops3d): sat bar above system cluster — no more overlap",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "f299a0f",
+      "full": "f299a0fde1d67400be3a5f97caa3695ccf2d46aa",
+      "date": "2026-10-09",
+      "time": "18:24",
+      "subject": "fix(ops3d): satellite never black — opaque base layer, loading/offline honesty, gallery base styles",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "24d7397",
+      "full": "24d73975bd536adab26f927eba4d1e312946e1a6",
+      "date": "2026-10-09",
+      "time": "18:13",
+      "subject": "ops3d terrain loop1: surveyed carve axis, relief swing, thread legibility, valley-tag clip fix",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "795dce9",
+      "full": "795dce9abd08734f3224c907e55c77979e73a0ff",
+      "date": "2026-10-09",
+      "time": "18:10",
+      "subject": "fix(ops3d): satellite base + SAT/TWIN/SCOPE bar in gallery specimen",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "d9994f2",
+      "full": "d9994f20c9c444b07bcb990226d2cf2220b5a61f",
+      "date": "2026-10-09",
+      "time": "18:04",
+      "subject": "feat(ops3d): SCOPE toggle flies camera to TOP/network on enable",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "5cfb524",
+      "full": "5cfb5248735aa46980b1853366ea916d6229b2b5",
+      "date": "2026-10-09",
+      "time": "18:04",
+      "subject": "ops3d loop1: emissive hierarchy + label leaders (network/labels/markers)",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "3f4896e",
+      "full": "3f4896ef90c4aa526b516b3c125d0b224b39ffc6",
+      "date": "2026-10-09",
+      "time": "17:38",
+      "subject": "feat(ops3d): valley-seated water lines (no slab/carets), glow cut 0.55-0.95, trough carve",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "432fdca",
+      "full": "432fdca23d35709a4a2a18217f727e09d2695bcc",
+      "date": "2026-10-09",
+      "time": "17:36",
+      "subject": "feat(ops3d): render-fidelity pass — MSAA post RT, pixel-ratio cap, fog/vignette depth, cinematic push-in",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "6086d3b",
+      "full": "6086d3b153f62619ac1ce886141e6045b9a17630",
+      "date": "2026-10-09",
+      "time": "17:32",
+      "subject": "feat(ops3d): circular satellite monitor clipped to TOP scope disc",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "ae68eba",
+      "full": "ae68ebac65c6cb3f5bc5b53b328154cf3873746e",
+      "date": "2026-10-09",
+      "time": "17:02",
+      "subject": "feat(ops3d): staged DEM delivery — crop-preview coarse paint, strip-parallel ranges, seam feathering, status bus [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "ddd4507",
+      "full": "ddd45072f7d2b506ad02fcf498e41c7076f4e23f",
+      "date": "2026-10-09",
+      "time": "16:46",
+      "subject": "feat(ops3d): grazing-angle armor — camera floor, terrain-seated labels, occlusion fade",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "04a5b49",
+      "full": "04a5b49bb9118d0991c49f277c1dde93e34ef46e",
+      "date": "2026-10-09",
+      "time": "16:38",
+      "subject": "feat(ops3d): open-source satellite base (MapLibre + Esri/Terrarium, tokenless)",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "ef68282",
+      "full": "ef682827af87f40e31518ecad8ab3a6a8b13bdff",
+      "date": "2026-10-09",
+      "time": "16:32",
+      "subject": "fix(ops3d): neutral pipes lead over quiet land — walls up, contour glow cut (terrain agent)",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "d5f4bd8",
+      "full": "d5f4bd821736582366444ab44dc7026379172f4d",
+      "date": "2026-10-09",
+      "time": "16:29",
+      "subject": "feat(ops3d): live compass+scale furniture, single-popover manager, TOP label restraint, focus X-ray",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "3ab1323",
+      "full": "3ab1323b980da98e6b04ce34da175e437a7ac82b",
+      "date": "2026-10-09",
+      "time": "16:27",
+      "subject": "fix(ops3d): shrink flow chevrons to tube width — no more blobs at TOP",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "2c14b61",
+      "full": "2c14b6136557b0bd892e6f34a4bf15288abe8215",
+      "date": "2026-10-09",
+      "time": "16:20",
+      "subject": "feat(ops3d): mapbox satellite base + crossfade to custom twin (tokenless-safe)",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "ccbc26e",
+      "full": "ccbc26efde65448732fe15fc0e0ad0e904531b31",
+      "date": "2026-10-09",
+      "time": "16:19",
+      "subject": "feat(ops3d): cylindrical tube walls + neutral-white chevron flow, blue reserved for water",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "4666a95",
+      "full": "4666a954a058eeaf66e2f6d85b160d174569710d",
+      "date": "2026-10-08",
+      "time": "19:01",
+      "subject": "feat(ops3d): legend behind ▣, calmer pipes + prominent flow, stronger elevation glow, blue wave isobaths, dynamic scale [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
       "sha": "53099eb",
       "full": "53099ebf599bb9f6bc92821c315098ccfd07c64f",
       "date": "2026-10-08",
+      "time": "18:50",
       "subject": "fix(ops3d): live-DEM staged swap-in — parallel tiles, tile cache, view-preserving remount [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -23,6 +213,7 @@
       "sha": "cf2a505",
       "full": "cf2a50591dcaaa634f3d865e50a2fb1d88d5eb2c",
       "date": "2026-10-08",
+      "time": "18:49",
       "subject": "feat(ops3d): hatched infrastructure type markers + legend, drop subterranean bleeders [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -31,6 +222,7 @@
       "sha": "f177209",
       "full": "f177209a2534705c13111455f6726f2b12c9aa3c",
       "date": "2026-10-08",
+      "time": "18:49",
       "subject": "feat(ops3d): traveling flow-line envelope, elevation-ranked contour glow, shore glow, flat water fills [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -39,6 +231,7 @@
       "sha": "25a3e18",
       "full": "25a3e18d9f2b9ff868221c171b4acd6d59a32faa",
       "date": "2026-10-08",
+      "time": "18:13",
       "subject": "fix(ops3d): letterbox positioning, live compass heading, threshold mirror 0.44 [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -47,6 +240,7 @@
       "sha": "c83ad79",
       "full": "c83ad798da13c6be851693c11a03d4da815377bb",
       "date": "2026-10-08",
+      "time": "18:12",
       "subject": "feat(ops3d): HUD orientation/scale furniture — compass, scale bar, coords, UTC clock [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -55,6 +249,7 @@
       "sha": "08097ad",
       "full": "08097adedcb67c4c04e35eed91f6660b8bf9b397",
       "date": "2026-10-08",
+      "time": "18:09",
       "subject": "fix(ops3d): volumetric terrain — baked hillshade contours + draped neutral fill, blue reserved for water [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -63,6 +258,7 @@
       "sha": "3ff0b16",
       "full": "3ff0b167f292272ccdcecb8e94b98bd5d400ff2a",
       "date": "2026-10-08",
+      "time": "18:07",
       "subject": "fix(ops3d): hard bloom restraint + desat halo + near-off grain [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -71,6 +267,7 @@
       "sha": "2b95ca3",
       "full": "2b95ca3828a99ff795d2f2919b729c3138a0b70e",
       "date": "2026-10-08",
+      "time": "18:02",
       "subject": "chore(ds): plan-history snapshot [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -79,6 +276,7 @@
       "sha": "22f3f8e",
       "full": "22f3f8efd3210827e7a6a6b2f3693a5df419cc41",
       "date": "2026-10-08",
+      "time": "18:02",
       "subject": "chore(ds): manifest refresh [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -87,6 +285,7 @@
       "sha": "973232d",
       "full": "973232d2ea9f339ad145a0be5b3c27454096efec",
       "date": "2026-10-08",
+      "time": "18:01",
       "subject": "fix(ops3d): legible label plates at TOP + soft comet flow pulses [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -95,6 +294,7 @@
       "sha": "815d3ad",
       "full": "815d3ad323baf19705cb09dcec8f1d333d474bde",
       "date": "2026-10-08",
+      "time": "17:51",
       "subject": "fix(ops3d): Chaikin-resample chained contours so rings bend smooth, elevations untouched [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -103,6 +303,7 @@
       "sha": "af7c310",
       "full": "af7c310d37baf7d7ff9f1e870d4293a80c547cc7",
       "date": "2026-10-08",
+      "time": "17:50",
       "subject": "fix(ops3d): TOP label restraint to hot/sel/hov, stroked chamfer cuts on HUD + plates [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -111,6 +312,7 @@
       "sha": "fef4a91",
       "full": "fef4a911db40a97bd97a135f7bc98872821ee2dd",
       "date": "2026-10-08",
+      "time": "17:37",
       "subject": "fix(ops3d): dim contour core so alarms lead at TOP — grey index/base, no summit whitening [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -119,6 +321,7 @@
       "sha": "8ea1931",
       "full": "8ea1931ecc5b5fae03a87867b0bd6f3cae53d861",
       "date": "2026-10-08",
+      "time": "17:33",
       "subject": "chore(ops3d): Task 8 8/10 rating, gridfloor level hookup, twin debug handle [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -127,6 +330,7 @@
       "sha": "8b17385",
       "full": "8b173856b18e084a2be94aa78ace09196daf42c4",
       "date": "2026-10-08",
+      "time": "17:33",
       "subject": "fix(ops3d): TOP flow contrast, progressive disclosure, NEAR label scale, grid deprecation, bloom restraint [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -135,6 +339,7 @@
       "sha": "dac26cf",
       "full": "dac26cfc9e4a96edadc4e503dfa6ca9e4b174a07",
       "date": "2026-10-08",
+      "time": "17:27",
       "subject": "[plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1] fidelity pass: masked plateau swell lifts relief 243->274m sd 43->48m, neutral cool-grey palette",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -143,6 +348,7 @@
       "sha": "d16fcef",
       "full": "d16fcef82d9750f7298ce5c3b9fc1c2dbe38cb87",
       "date": "2026-10-08",
+      "time": "17:15",
       "subject": "fix(ops3d): NEAR fault highlight — zone disc hidden, slim beacon, kit grounding shadow [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -151,6 +357,7 @@
       "sha": "533e978",
       "full": "533e978864c3f07b3a099aae6e4593bfc334149f",
       "date": "2026-10-08",
+      "time": "17:06",
       "subject": "test(ops3d): attention photometry gates + geo round-trip contract; T9 6/10, T10 claim corrected [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -159,6 +366,7 @@
       "sha": "a08e67b",
       "full": "a08e67bafd3ef17104b01861901569cae4b65460",
       "date": "2026-10-08",
+      "time": "17:05",
       "subject": "perf(ops3d): mid-freq swell relief 243m + DEM fetch window 5s [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -167,6 +375,7 @@
       "sha": "82fc86d",
       "full": "82fc86db1970ae128ed654ab96267b94bd9a8cea",
       "date": "2026-10-08",
+      "time": "17:04",
       "subject": "fix(ops3d): georeferenced DEM mosaic — named-export bug, 2-tile affine decode, live-verified vs Copernicus [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -175,6 +384,7 @@
       "sha": "32ff9a6",
       "full": "32ff9a653b5abafa5ae39686b4ccb328c5b5d311",
       "date": "2026-10-08",
+      "time": "16:50",
       "subject": "feat(ops3d): phase-1 iteration — drape, restraint, chamfer, DoF, comet flow, Task 8 7/10 [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -183,6 +393,7 @@
       "sha": "116f51e",
       "full": "116f51ec9750b03743e82ff5ce07a31d810fa0a1",
       "date": "2026-10-08",
+      "time": "16:30",
       "subject": "feat(ops3d): HUD declutter — trimmed top-left, ··· menu, clickable banner, ? help, split camera/VIEW [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -191,6 +402,7 @@
       "sha": "4afe729",
       "full": "4afe729bbd6851f8ebccc565a11809587b0990bd",
       "date": "2026-10-08",
+      "time": "14:24",
       "subject": "chore(ds): track refresh — pick up phase-1 shas [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -199,6 +411,7 @@
       "sha": "a94fd6d",
       "full": "a94fd6d4ce7a92aad51954826da5a6a42d9450d1",
       "date": "2026-10-08",
+      "time": "14:23",
       "subject": "feat(ops3d): Athabasca valley + density roles + attention lock — river/cutbank/kettle/muskeg, quadrant roles, cyan flow, single sun, TOP whisper [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -207,6 +420,7 @@
       "sha": "97add68",
       "full": "97add684f996799cc4f480d3aa361226d83b1eb6",
       "date": "2026-10-08",
+      "time": "14:14",
       "subject": "feat(ops3d): DEM seam + contour-on-altitude — SITE pin, swappable field source, twin remount upgrade [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -215,6 +429,7 @@
       "sha": "167b082",
       "full": "167b0827d621c03cd345737f24ab8d8c9d5213d7",
       "date": "2026-10-08",
+      "time": "14:09",
       "subject": "fix(ops3d): louder sound blips + NEAR with no selection dollies in place [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-0"
@@ -223,6 +438,7 @@
       "sha": "f09fa2e",
       "full": "f09fa2e8632cc0919dc2c0722271b6215101ad01",
       "date": "2026-10-08",
+      "time": "14:01",
       "subject": "fix(ds): retro re-points mis-cited anchors — task-1 matches no section, phase-0 badges [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-0"
@@ -231,6 +447,7 @@
       "sha": "5a4c621",
       "full": "5a4c62169a9e21773124d07891ab795669e50e88",
       "date": "2026-10-08",
+      "time": "13:57",
       "subject": "chore(ds): retro-link 83cd61e phase-0 TDD batch — body trailer invisible to tracker [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-0"
@@ -239,6 +456,7 @@
       "sha": "b5a2c7b",
       "full": "b5a2c7ba06eb97acbfe286f0b1d672376f50df73",
       "date": "2026-10-08",
+      "time": "13:55",
       "subject": "fix(changelog): tooltip inner clip + even padding, anchor strip, drawer polish [plan:2026-10-07_130000-safepipe-changelog.md#task-7]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-7"
@@ -247,6 +465,7 @@
       "sha": "e9279bd",
       "full": "e9279bd981882020f82ad9a85cb7d81c7a0bd9ae",
       "date": "2026-10-08",
+      "time": "13:31",
       "subject": "fix(ops3d): real camera focus — thin-lens DoF + anchor aim [plan:2026-10-07_153000-ops3d-realworld-twin.md#task-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-0"
@@ -255,6 +474,7 @@
       "sha": "b789b14",
       "full": "b789b1433174767571154e395bf5aa074e7f22ea",
       "date": "2026-10-07",
+      "time": "17:13",
       "subject": "chore(ds): track refresh — pick up 83cd61e [plan:2026-10-07_153000-ops3d-realworld-twin.md#task-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-0"
@@ -263,6 +483,7 @@
       "sha": "83cd61e",
       "full": "83cd61efeabc9e8f8755fc4ce8c658115d3d41a7",
       "date": "2026-10-07",
+      "time": "17:12",
       "subject": "fix(ops3d): phase 0 — fly damping kill + terrain-aware aim + single box layer + feed crash constants (TDD) + sound mute",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-0"
@@ -271,6 +492,7 @@
       "sha": "899b2a2",
       "full": "899b2a27ccf92686e18226ba990668dabf672beb",
       "date": "2026-10-07",
+      "time": "15:51",
       "subject": "docs(ops3d-v2): hide phase anchors from renderer + blank lines before task tables [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-0"
@@ -279,6 +501,7 @@
       "sha": "07eb5ec",
       "full": "07eb5ec1d207500a922b18ff3ab20af6c45a66bb",
       "date": "2026-10-07",
+      "time": "15:49",
       "subject": "docs(ops3d-v2): 30 task lists across 7 phases — objective/files/verify per task [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-0"
@@ -287,6 +510,7 @@
       "sha": "c1b8e2c",
       "full": "c1b8e2c761a9ac253d4042f3bf70275fdd77bf53",
       "date": "2026-10-07",
+      "time": "15:44",
       "subject": "docs(ops3d-v2): pin Fort McMurray 57.03N 111.68W — satellite audit evidence + hotspot-first map phase [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
@@ -295,6 +519,7 @@
       "sha": "fddbfe8",
       "full": "fddbfe8b868b45da2daa99dd03b46cac7bf0fb29",
       "date": "2026-10-07",
+      "time": "15:18",
       "subject": "docs(ops3d-v2): v2 plan — real data pins (SRTM DEM, Open-Meteo, USGS FDSN, OPERA InSAR, MapLibre+deck.gl, Overpass, H3, Poly Haven CC0 kit) [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-0"
@@ -303,6 +528,7 @@
       "sha": "50f77be",
       "full": "50f77be9dfc48b274569e2750ae0dbcbf91aefb0",
       "date": "2026-10-07",
+      "time": "15:07",
       "subject": "docs(ops3d-v2): draft real-world twin plan — 7 phases + ref gates + audit [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-0]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-0"
@@ -311,6 +537,7 @@
       "sha": "dc5ebe5",
       "full": "dc5ebe5ff3fd58b59807c24e0af9f61fbfdf6eda",
       "date": "2026-10-07",
+      "time": "14:01",
       "subject": "docs(ops3d): polish 003000 plan — status + shipped SHAs + iteration log [plan:2026-10-06_003000-ops3d-theatre-style.md#task-8]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-8"
@@ -319,6 +546,7 @@
       "sha": "471a4bf",
       "full": "471a4bf9cf635af186cbdc1bff34a59b54522623",
       "date": "2026-10-07",
+      "time": "13:59",
       "subject": "chore(ds): sync plan manifest [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -327,6 +555,7 @@
       "sha": "b6e7abe",
       "full": "b6e7abe67dd854aed31c9468b8cfe6cb8ba7c643",
       "date": "2026-10-07",
+      "time": "13:59",
       "subject": "chore(ds): sync plan manifest [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -335,6 +564,7 @@
       "sha": "299fe91",
       "full": "299fe91b995c8b332736d8ff39ed169ea2c264a4",
       "date": "2026-10-07",
+      "time": "13:59",
       "subject": "fix(ops3d): GPU context-loss armor — pause loop, badge, auto-resume [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -343,6 +573,7 @@
       "sha": "1cd76ad",
       "full": "1cd76adb10be184e9656cc208c6770030b18a260",
       "date": "2026-10-07",
+      "time": "13:43",
       "subject": "chore(ds): sync plan manifest [plan:2026-10-07_130000-safepipe-changelog.md#task-6]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-6"
@@ -351,6 +582,7 @@
       "sha": "5414c8b",
       "full": "5414c8bc48d010e85636c114a3ec5539cde498f7",
       "date": "2026-10-07",
+      "time": "13:43",
       "subject": "feat(changelog): plan-iteration history — backfill + tracker hook + rev views [plan:2026-10-07_130000-safepipe-changelog.md#task-6]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-6"
@@ -359,6 +591,7 @@
       "sha": "6976fbc",
       "full": "6976fbca2100e8e5c7a4780182a7b68b7b7b6386",
       "date": "2026-10-07",
+      "time": "13:23",
       "subject": "chore(ds): sync plan manifest [plan:2026-10-07_130000-safepipe-changelog.md#task-5]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-5"
@@ -367,6 +600,7 @@
       "sha": "a7d7434",
       "full": "a7d74345ddeb5f072080fb1602fa696420730565",
       "date": "2026-10-07",
+      "time": "13:23",
       "subject": "fix(changelog): sanity pass — phantom task, hidden plan, retro links, wip parse [plan:2026-10-07_130000-safepipe-changelog.md#task-5]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-5"
@@ -375,6 +609,7 @@
       "sha": "485319d",
       "full": "485319d82e0a92cb66742c8f55da5da4c3c2c941",
       "date": "2026-10-07",
+      "time": "13:16",
       "subject": "chore(ds): sync plan manifest [plan:2026-10-06_153000-ops3d-terrain-topo.md#task-1]",
       "plan": "2026-10-06_153000-ops3d-terrain-topo.md",
       "anchor": "task-1"
@@ -383,6 +618,7 @@
       "sha": "89494ec",
       "full": "89494ec88e7126b5273d3aa1cc80d178b6ecb223",
       "date": "2026-10-07",
+      "time": "13:15",
       "subject": "docs(ops3d): terrain topo Task 1 — pre-flight audit, bar + before/after captures [plan:2026-10-06_153000-ops3d-terrain-topo.md#task-1]",
       "plan": "2026-10-06_153000-ops3d-terrain-topo.md",
       "anchor": "task-1"
@@ -391,6 +627,7 @@
       "sha": "6564ab3",
       "full": "6564ab39457176f8915b1812c36b571b80319698",
       "date": "2026-10-07",
+      "time": "13:14",
       "subject": "chore(ds): sync plan manifest [plan:2026-10-07_130000-safepipe-changelog.md#task-4]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-4"
@@ -399,6 +636,7 @@
       "sha": "5678a10",
       "full": "5678a10d29e8af930668eb2efc617f592ecfef19",
       "date": "2026-10-07",
+      "time": "13:14",
       "subject": "feat(changelog): sidebar More menu gains Changelog link [plan:2026-10-07_130000-safepipe-changelog.md#task-4]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-4"
@@ -407,6 +645,7 @@
       "sha": "59c38f3",
       "full": "59c38f37a1fa2737a5f5a73da45a0474b8364ab7",
       "date": "2026-10-07",
+      "time": "13:12",
       "subject": "docs(changelog): close tasks 1-4 — build green, 41 linked, 0 wip [plan:2026-10-07_130000-safepipe-changelog.md#task-4]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-4"
@@ -415,6 +654,7 @@
       "sha": "5103a57",
       "full": "5103a57d0a83c2fd95bd426a7073d4b9064cf970",
       "date": "2026-10-07",
+      "time": "13:12",
       "subject": "feat(changelog): shell + safepipe styling + build entry [plan:2026-10-07_130000-safepipe-changelog.md#task-3]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-3"
@@ -423,6 +663,7 @@
       "sha": "86dd63e",
       "full": "86dd63ed8c8d6fd5dde03edcd3223e84523b570f",
       "date": "2026-10-07",
+      "time": "13:12",
       "subject": "feat(changelog): pure parse+link+view layers, task-plan adapter, tested [plan:2026-10-07_130000-safepipe-changelog.md#task-2]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-2"
@@ -431,6 +672,7 @@
       "sha": "e9c609b",
       "full": "e9c609b6d4e874b602e22eea2291644a818a9070",
       "date": "2026-10-07",
+      "time": "13:12",
       "subject": "feat(changelog): plan file + manifest readiness + per-plan names [plan:2026-10-07_130000-safepipe-changelog.md#task-1]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-1"
@@ -439,6 +681,7 @@
       "sha": "8d1cb49",
       "full": "8d1cb49c01af515016db1041834fab306b4c2086",
       "date": "2026-10-07",
+      "time": "12:59",
       "subject": "docs(ds): close ds-extraction — all 5 tasks done, drift gate PASS [plan:2026-10-05_150017-safepipe-ds-extraction.md#task-5]",
       "plan": "2026-10-05_150017-safepipe-ds-extraction.md",
       "anchor": "task-5"
@@ -447,6 +690,7 @@
       "sha": "8472b8e",
       "full": "8472b8edef535dced4e14b85fa9fc7c3210a3a6d",
       "date": "2026-10-06",
+      "time": "17:15",
       "subject": "docs(ops3d): close terrain-topo Task 8 — 3-distance QA + style doc [plan:2026-10-06_153000-ops3d-terrain-topo.md#task-8]",
       "plan": "2026-10-06_153000-ops3d-terrain-topo.md",
       "anchor": "task-8"
@@ -455,6 +699,7 @@
       "sha": "11658c5",
       "full": "11658c52e4222f8590fb58491787506580c68c71",
       "date": "2026-10-06",
+      "time": "17:08",
       "subject": "chore(ds): sync plan manifest [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -463,6 +708,7 @@
       "sha": "5750284",
       "full": "5750284e7e93319daf110e8375081b5bda3c2353",
       "date": "2026-10-06",
+      "time": "16:58",
       "subject": "fix(ops3d): single-source VEX from terrain.js — drape matches surface [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -471,6 +717,7 @@
       "sha": "de7248d",
       "full": "de7248d0c48fa115febde25040a2d9c95e1a0641",
       "date": "2026-10-06",
+      "time": "16:58",
       "subject": "fix(ops3d): freeze contour + ring opacity — landmass pulse removed [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -479,6 +726,7 @@
       "sha": "33e2483",
       "full": "33e2483782bbdce39ca1278e030821b7969e1f6b",
       "date": "2026-10-06",
+      "time": "16:58",
       "subject": "fix(ops3d): checker parterre → static radial gradient wash — no grid, no pulse [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -487,6 +735,7 @@
       "sha": "167a614",
       "full": "167a61489498ee9a349762b5635c36a74a37e5e3",
       "date": "2026-10-06",
+      "time": "15:50",
       "subject": "feat(ops3d): legible topo — 32-level white strata + hill wash + checker parterre [plan:2026-10-06_153000-ops3d-terrain-topo.md#task-7]",
       "plan": "2026-10-06_153000-ops3d-terrain-topo.md",
       "anchor": "task-7"
@@ -495,6 +744,7 @@
       "sha": "6d6e70d",
       "full": "6d6e70d8f42e7f66f31c1ac3bafd59a7393ddcbe",
       "date": "2026-10-06",
+      "time": "15:25",
       "subject": "feat(ops3d): small elevation voice, power-spaced levels [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -503,6 +753,7 @@
       "sha": "e0b881f",
       "full": "e0b881fccd307b7baa6e40c6c2d0cd079673e42c",
       "date": "2026-10-06",
+      "time": "15:21",
       "subject": "feat(ops3d): neon-plate void — body fill removed, drill-in restraint [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -511,6 +762,7 @@
       "sha": "79d7b5d",
       "full": "79d7b5d11e1addac0cd7dc13524f255c90ef0ae7",
       "date": "2026-10-06",
+      "time": "15:17",
       "subject": "feat(ops3d): matte survey ring, dark body, OS inline elevation pills [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -519,6 +771,7 @@
       "sha": "de514d5",
       "full": "de514d5098708de9fe356e9a904e29d1561f430c",
       "date": "2026-10-06",
+      "time": "15:07",
       "subject": "feat(ops3d): elevation reads at TOP — hypsometric hillshade, summit tags, index hierarchy [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -527,6 +780,7 @@
       "sha": "7e11f37",
       "full": "7e11f3781faa009b483d38b3c1f49e37ea9c1350",
       "date": "2026-10-06",
+      "time": "15:02",
       "subject": "feat(ops3d): drainage thread + steep-bank contour Vs [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -535,6 +789,7 @@
       "sha": "909d9f3",
       "full": "909d9f3d7d9da8992bfe41f81c0f8d90d326b036",
       "date": "2026-10-06",
+      "time": "14:59",
       "subject": "feat(ops3d): contours as technique — hills, numbered index rings, hypsometric body [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -543,6 +798,7 @@
       "sha": "9603e71",
       "full": "9603e7131b55e30f8e14fa4a3e8e82ecf56738a6",
       "date": "2026-10-06",
+      "time": "14:42",
       "subject": "feat(rail): expose Logic/DS/Pitch in More menu, sync manifest",
       "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
       "anchor": null
@@ -551,6 +807,7 @@
       "sha": "fcf9f94",
       "full": "fcf9f945ee970091a12f44c38023bcdf4060086e",
       "date": "2026-10-06",
+      "time": "14:40",
       "subject": "feat(ops3d): clickable overlay toggle in HUD [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -559,6 +816,7 @@
       "sha": "f2e6bdc",
       "full": "f2e6bdc10c158d9a4abf06e54738d7682f44eea1",
       "date": "2026-10-06",
+      "time": "14:39",
       "subject": "feat(ops3d): solid pipe walls, buried runs dashed [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -567,6 +825,7 @@
       "sha": "c710996",
       "full": "c7109961201c717141a806b80c88be286fdc5b66",
       "date": "2026-10-06",
+      "time": "14:36",
       "subject": "feat(ops3d): still labels, no vertical bob [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -575,6 +834,7 @@
       "sha": "9a17f38",
       "full": "9a17f383da168880b34c62f6eafa7af54f5bd959",
       "date": "2026-10-06",
+      "time": "14:36",
       "subject": "feat(ops3d): drop flow chevrons, moving dashes carry direction [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -583,6 +843,7 @@
       "sha": "6387567",
       "full": "63875671c73529a103afc9d0f9444ac222fed705",
       "date": "2026-10-06",
+      "time": "13:51",
       "subject": "feat(ops3d): organic lake+blue contours, selection survives zoom, subtle flow [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -591,6 +852,7 @@
       "sha": "7aba9fa",
       "full": "7aba9fac1ee57903853a754e4d99679a015abd2d",
       "date": "2026-10-06",
+      "time": "13:44",
       "subject": "feat(ops3d): feedback run — neutral terrain+lake, flow chevrons, buried drape, destinations, hover halo, sounds, overlays [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -599,6 +861,7 @@
       "sha": "dd72c5a",
       "full": "dd72c5a7c64c630654d8fb05aeb6459740b13869",
       "date": "2026-10-06",
+      "time": "13:10",
       "subject": "feat(ops3d): agent lanes — glass facilities, labels, red grid, draped+decluttered [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -607,6 +870,7 @@
       "sha": "6aaa5cc",
       "full": "6aaa5cc1257063f2f53af78e080f41e69b68fe4c",
       "date": "2026-10-06",
+      "time": "12:47",
       "subject": "feat(ops3d): ref run — luminous terrain body, zone fill, tamed bloom [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -615,6 +879,7 @@
       "sha": "8cad190",
       "full": "8cad19049e011dc048e0ce5095f5dfd4c02ff77e",
       "date": "2026-10-06",
+      "time": "12:41",
       "subject": "feat(ops3d): view run — kind-sized close-ups, speckle gate, ISO restraint, halo fit [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -623,6 +888,7 @@
       "sha": "712b219",
       "full": "712b219dfe2f935b63d88c471d4a36ead7814046",
       "date": "2026-10-06",
+      "time": "12:34",
       "subject": "feat(ops3d): fidelity loop — fault pipe kit, level declutter, caged cam, scanlines [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -631,6 +897,7 @@
       "sha": "36f8a00",
       "full": "36f8a009a0fd39225798bc8661fc0d1f4dfb085e",
       "date": "2026-10-06",
+      "time": "12:14",
       "subject": "fix(ops3d): terrain whispers — halved contour palette, 1.5px, 0.45 opacity [plan:2026-10-06_003000-ops3d-theatre-style.md#task-10]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-10"
@@ -639,6 +906,7 @@
       "sha": "c4fcb61",
       "full": "c4fcb6179e654409545fcd0dc0c05c7d9363522c",
       "date": "2026-10-06",
+      "time": "12:03",
       "subject": "feat(ops3d): ref-driven detail — lattice derrick, tank rings, drop lines, speckle [plan:2026-10-06_003000-ops3d-theatre-style.md#task-9]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-9"
@@ -647,6 +915,7 @@
       "sha": "52499eb",
       "full": "52499eb0a3441c8cfe25ab8e697e1f7ca59cbf47",
       "date": "2026-10-06",
+      "time": "12:01",
       "subject": "feat(ops3d): all-hologram pass — outline facilities, stacked topo strata, linear table [plan:2026-10-06_003000-ops3d-theatre-style.md#task-9]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-9"
@@ -655,6 +924,7 @@
       "sha": "ca9fe88",
       "full": "ca9fe88c650d1d83583479ad927b81278267ce6b",
       "date": "2026-10-06",
+      "time": "11:49",
       "subject": "feat(ops3d): tilt-shift DoF in ISO/NEAR, sharp in TOP [plan:2026-10-06_003000-ops3d-theatre-style.md#task-6]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-6"
@@ -663,6 +933,7 @@
       "sha": "c63b04c",
       "full": "c63b04cb2052f76e3395d0aaced2f5e44424545e",
       "date": "2026-10-06",
+      "time": "11:46",
       "subject": "feat(ops3d): realism pass — terrain, structures, beacons wired; TOP/ISO/NEAR [plan:2026-10-06_003000-ops3d-theatre-style.md#task-9]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-9"
@@ -671,6 +942,7 @@
       "sha": "562c476",
       "full": "562c476b6d892d29ae2e8375282c8af808fbb668",
       "date": "2026-10-06",
+      "time": "11:34",
       "subject": "fix(ops3d): canvas fills container (fixes pick rays + drill target); TOP/ISO/NEAR views [plan:2026-10-06_003000-ops3d-theatre-style.md#task-7]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-7"
@@ -679,6 +951,7 @@
       "sha": "c6f8385",
       "full": "c6f83856a489b9e8ec37235ed6add09ac292c2ee",
       "date": "2026-10-06",
+      "time": "11:23",
       "subject": "fix(ops3d): drill-down centers clicked point, not asset midpoint [plan:2026-10-06_003000-ops3d-theatre-style.md#task-7]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-7"
@@ -687,6 +960,7 @@
       "sha": "ff3e222",
       "full": "ff3e222796102b21311cc3968dd2379e239df408",
       "date": "2026-10-06",
+      "time": "11:22",
       "subject": "fix(ops3d): ignore drag-ending clicks so pan never drills down [plan:2026-10-06_003000-ops3d-theatre-style.md#task-7]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-7"
@@ -695,6 +969,7 @@
       "sha": "5f7e62f",
       "full": "5f7e62f7cc7f93e127064b58a740f396d2521520",
       "date": "2026-10-06",
+      "time": "11:16",
       "subject": "feat(ops3d): wire drill-down, HUD sync, deep link, fullscreen toggle; bloom threshold [plan:2026-10-06_003000-ops3d-theatre-style.md#task-7]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-7"
@@ -703,6 +978,7 @@
       "sha": "c557479",
       "full": "c5574795ad733b40fa9ca888a9bbae703a349c4c",
       "date": "2026-10-06",
+      "time": "11:16",
       "subject": "feat(ops3d): semantic levels, DOM HUD, cheap post chain [plan:2026-10-06_003000-ops3d-theatre-style.md#task-4] [plan:2026-10-06_003000-ops3d-theatre-style.md#task-5] [plan:2026-10-06_003000-ops3d-theatre-style.md#task-6]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-4"
@@ -711,6 +987,7 @@
       "sha": "b4e3654",
       "full": "b4e36545733a0c0fa6f08ca3fbf79b5ec05d1eea",
       "date": "2026-10-06",
+      "time": "02:26",
       "subject": "fix(ops3d): resolution-independent lines — fat-line boxes, full dpr, AA grid [plan:2026-10-06_003000-ops3d-theatre-style.md#task-2]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-2"
@@ -719,6 +996,7 @@
       "sha": "ba46a39",
       "full": "ba46a3907cf5cb968df0ce3869a5da07545750e1",
       "date": "2026-10-06",
+      "time": "01:54",
       "subject": "fix(ops3d): round dot sprites, fatter pick tubes, hover target feedback [plan:2026-10-06_003000-ops3d-theatre-style.md#task-3]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-3"
@@ -727,6 +1005,7 @@
       "sha": "dfbe32d",
       "full": "dfbe32d649ccecc3029db85074441133d0bb10e1",
       "date": "2026-10-06",
+      "time": "01:37",
       "subject": "feat(gallery): mount live Ops 3D twin in Special specimen [plan:2026-10-06_003000-ops3d-theatre-style.md#task-8]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-8"
@@ -735,6 +1014,7 @@
       "sha": "802e799",
       "full": "802e79914f27cfef88b6bf3266d22a3683e964a1",
       "date": "2026-10-06",
+      "time": "01:23",
       "subject": "feat(gallery): Special category with Ops 3D slot [plan:2026-10-06_003000-ops3d-theatre-style.md#task-8]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-8"
@@ -743,6 +1023,7 @@
       "sha": "eae4303",
       "full": "eae4303a04093748e696999857b4924151d0b916",
       "date": "2026-10-06",
+      "time": "01:23",
       "subject": "feat(ops3d): table/camera/feed/dotted network/zones first pass [plan:2026-10-06_003000-ops3d-theatre-style.md#task-2] [plan:2026-10-06_003000-ops3d-theatre-style.md#task-3]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-2"
@@ -751,6 +1032,7 @@
       "sha": "8cbbd27",
       "full": "8cbbd277aba7043176694ce833bb541186e60324",
       "date": "2026-10-06",
+      "time": "01:23",
       "subject": "feat(ops3d): twin module with container-agnostic mount API + dev harness [plan:2026-10-06_003000-ops3d-theatre-style.md#task-1]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-1"
@@ -759,6 +1041,7 @@
       "sha": "bcbdd95",
       "full": "bcbdd95d3dad33fb629133068afac6dc475a8179",
       "date": "2026-10-06",
+      "time": "00:45",
       "subject": "chore(tracker): plan-track script + manifest, build hook [plan:2026-10-06_003000-ops3d-theatre-style.md#task-8]",
       "plan": "2026-10-06_003000-ops3d-theatre-style.md",
       "anchor": "task-8"
@@ -767,6 +1050,7 @@
       "sha": "0827f04",
       "full": "0827f04cbd4ba6eabccd05971f09b770a54d1583",
       "date": "2026-10-05",
+      "time": "20:23",
       "subject": "Deploy fix: MPA bundles gallery/logic/pitch into dist, relative asset refs, redirect guards",
       "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
       "anchor": null
@@ -775,6 +1059,7 @@
       "sha": "f3721aa",
       "full": "f3721aadfb7ef11723186f75cd841621808285f9",
       "date": "2026-10-05",
+      "time": "17:10",
       "subject": "Pitch page: pre-login landing language from Fig (header nav, split hero, ring logo), DS tokens, Fig renders",
       "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
       "anchor": null
@@ -783,6 +1068,7 @@
       "sha": "b5e4c38",
       "full": "b5e4c38762e31110b4063b081671337e369efc1a",
       "date": "2026-10-05",
+      "time": "16:29",
       "subject": "Prototype screens + fig archive: operations/workforce sizing, variants/records fixtures, mobile shell",
       "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
       "anchor": null
@@ -791,6 +1077,7 @@
       "sha": "bbc5d17",
       "full": "bbc5d172c81d6f2acff7a11557f5c9b51f98829d",
       "date": "2026-10-05",
+      "time": "16:28",
       "subject": "Gallery explorable docs: shell, foundations, 13 component docs, icons, CSS backfill",
       "plan": "2026-10-05_150017-safepipe-ds-extraction.md",
       "anchor": null
@@ -799,6 +1086,7 @@
       "sha": "ba00e7f",
       "full": "ba00e7f6e6c20092608c5056e30755dcb20a36ca",
       "date": "2026-10-05",
+      "time": "16:14",
       "subject": "Plan A: measured DS from live .fig — tokens, 12 specs, 12 components, gallery",
       "plan": "2026-10-05_150017-safepipe-ds-extraction.md",
       "anchor": null
@@ -807,15 +1095,21 @@
       "sha": "5370999",
       "full": "53709998f710f34a300a06a7ea4313648cf61105",
       "date": "2026-10-05",
+      "time": "14:49",
       "subject": "safepipe v0 boilerplate: web-first Vite shell, ontology stub, DS tokens, twin placeholder",
       "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
       "anchor": null
     }
   ],
   "wip": [
+    "scripts/plan-track.mjs",
+    "src/changelog/changelog-drawer.css",
+    "src/changelog/changelog-links.js",
+    "src/changelog/changelog/paint-detail.js",
+    "src/ops3d/dem.js",
     "src/ops3d/hud.js",
-    "src/ops3d/network.js",
-    "src/ops3d/terrain.js",
+    "src/ops3d/main.js",
+    "src/ops3d/sat-base.js",
     "src/ops3d/twin.js"
   ]
 }
