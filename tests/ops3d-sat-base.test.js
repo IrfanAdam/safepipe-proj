@@ -207,8 +207,8 @@ describe('ops3d satellite base — offline fallback (fake DOM)', () => {
     assert.ok(base, 'sat-base behind layer mounted first');
     assert.equal(container.children[0], base);
     await tick();
-    const tag = base.children.find((c) => c.className === 'sat-base__tag');
-    assert.ok(tag && tag.textContent.includes('CUSTOM TWIN'), 'offline tag');
+    const tag = base.children.find((c) => c.className === 'sat-base__tag' && c.textContent.includes('CUSTOM TWIN'));
+    assert.ok(tag, 'offline tag');
     const bar = container.children.find((c) => c.className === 'sat-xfade');
     assert.ok(bar, 'single crossfade control, no popover');
     const btns = bar.children.filter((c) => c.tagName === 'BUTTON');

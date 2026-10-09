@@ -260,6 +260,9 @@ function satStyle() {
       },
     },
     layers: [
+      // Opaque dusk floor: the canvas is never transparent, so a slow or
+      // failed tile load reads as dark base — never a black hole.
+      { id: 'void', type: 'background', paint: { 'background-color': '#0e141b' } },
       {
         id: 'sat',
         type: 'raster',
@@ -373,6 +376,7 @@ export function initSatBase(container, opts = {}) {
   let tileErrs = 0;
   const showOfflineTag = () => {
     try {
+      hideLoadingTag();
       if (base.querySelector?.('[data-testid="sat-base-tag"]')) return;
       const tag = mk('div', 'sat-base__tag', 'SATELLITE OFFLINE · CUSTOM TWIN');
       tag.setAttribute('data-testid', 'sat-base-tag');
@@ -381,6 +385,35 @@ export function initSatBase(container, opts = {}) {
       /* tag is cosmetic */
     }
   };
+  // Loading state: honest "LOADING" text until the map fires load (or fails
+  // into the offline tag). Silence used to read as a black hole.
+  const showLoadingTag = () => {
+    try {
+      if (base.querySelector?.('[data-testid="sat-base-loading"]')) return;
+      const tag = mk('div', 'sat-base__tag', 'SATELLITE LOADING…');
+      tag.setAttribute('data-testid', 'sat-base-loading');
+      base.appendChild(tag);
+    } catch {
+      /* tag is cosmetic */
+    }
+  };
+  const hideLoadingTag = () => {
+    try {
+      base.querySelector?.('[data-testid="sat-base-loading"]')?.remove();
+    } catch {
+      /* already gone */
+    }
+  };
+  showLoadingTag();
+  // Watchdog: CDN/tiles slower than 20 s still resolve into honesty —
+  // loading text leaves, offline tag explains, twin untouched.
+  try {
+    setTimeout(() => {
+      if (!mapReady) showOfflineTag();
+    }, 20000);
+  } catch {
+    /* timer is cosmetic */
+  }
   loadMaplibre().then((ml) => {
     if (!ml || !base.isConnected) {
       // In jsdom/fake-DOM unit tests base.isConnected is undefined — only
@@ -400,6 +433,7 @@ export function initSatBase(container, opts = {}) {
       });
       map.on?.('load', () => {
         mapReady = true;
+        hideLoadingTag();
         moodMap(map);
         syncFromTwin(true);
       });
