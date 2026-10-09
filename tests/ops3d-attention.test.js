@@ -229,10 +229,12 @@ describe('ops3d traveling flow-line envelope (emerge/fade, never hard)', () => {
 /* Elevation-ranked contour glow + land-water edges + flat water fills
  * (user direction, four sub-locks). Locks src/ops3d/terrain.js:
  *  (a) rubric: brightness × width scaled by level rank, summit brightest,
- *      CAPPED so alarms lead (glow ≤1.15, summit width ≤2.4, whisper opacities);
+ *      CAPPED below bloom so alarms lead (glow ≤1.0, summit width ≤2.0, whisper opacities);
  *  (b) shore: land edges touching water get the rubric top-rank glow;
- *  (c) water: playa lake + river render as FLAT blue fills (indexed, one
- *      level Y), contours masked off water, no blue lines anywhere.
+ *  (c) water: playa lake renders as a FLAT blue fill (indexed, one level Y)
+ *      + 6 organic isobath rings; the main stem carries 2 thin draped blue
+ *      wave threads seated on the derived valley floor (no slab, no carets).
+ *      Contours masked off water; shore/drain stay neutral grey.
  * [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
  */
 describe('ops3d elevation-ranked contour glow (capped, alarms lead)', () => {
@@ -252,27 +254,27 @@ describe('ops3d elevation-ranked contour glow (capped, alarms lead)', () => {
     ]) assert.ok(src.includes(needle), `terrain.js must contain \`${needle}\``);
   });
 
-  it('glow is capped: summit brightness ≤1.35, summit width ≤2.8', async () => {
+  it('glow is capped: summit brightness ≤1.0, summit width ≤2.0 (TOP review: no contour bloom)', async () => {
     const src = await loadTerrainSrc();
     const gm = src.match(/const ELEV_GLOW_MAX = ([\d.]+)/);
     assert.ok(gm, 'ELEV_GLOW_MAX must be a literal const');
-    assert.ok(parseFloat(gm[1]) <= 1.35, `summit glow ${gm[1]} capped at 1.35 (volume reads, still below white)`);
+    assert.ok(parseFloat(gm[1]) <= 1.0, `summit glow ${gm[1]} capped at 1.0 (below bloom, alarms lead)`);
     const wm = src.match(/const SUMMIT_WIDTH = ([\d.]+)/);
     assert.ok(wm, 'SUMMIT_WIDTH must be a literal const');
-    assert.ok(parseFloat(wm[1]) <= 2.8, `summit width ${wm[1]} capped at 2.8`);
+    assert.ok(parseFloat(wm[1]) <= 2.0, `summit width ${wm[1]} capped at 2.0`);
   });
 
-  it('whisper opacities hold (terrain never outshines faults)', async () => {
+  it('whisper opacities hold (land sits below pipes/flow/water)', async () => {
     const src = await loadTerrainSrc();
     for (const needle of [
-      'baseMat.opacity = 0.28 * dimF',
-      'indexMat.opacity = 0.55 * dimF',
-      'summitMat.opacity = 0.55 * dimF',
+      'baseMat.opacity = 0.16 * dimF',
+      'indexMat.opacity = 0.32 * dimF',
+      'summitMat.opacity = 0.32 * dimF',
     ]) assert.ok(src.includes(needle), `terrain.js must contain \`${needle}\``);
   });
 
   it('rubric math holds: brightest at summit, fading downslope', () => {
-    const MIN = 0.72, MAX = 1.32, LEVELS = 32;
+    const MIN = 0.55, MAX = 0.95, LEVELS = 32;
     const smooth = (a, b, v) => {
       const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
       return t * t * (3 - 2 * t);
@@ -295,8 +297,8 @@ describe('ops3d land-water edges + flat blue water fills', () => {
     for (const needle of ['shoreTouch', 'waterWet', 'WATER_MASK', 'shoreTouch(x, z) ? ELEV_GLOW_MAX']) {
       assert.ok(src.includes(needle), `terrain.js must contain \`${needle}\``);
     }
-    assert.ok(src.includes('linewidth: 2.0') && src.includes('opacity: 0.60'),
-      'shoreline ring must carry the top-rank treatment (2.0 wide, 0.60 alpha)');
+    assert.ok(src.includes('linewidth: 2.0') && src.includes('opacity: 0.45'),
+      'shoreline ring stays restrained (2.0 wide, 0.45 alpha)');
   });
 
   it('contours stay off water (fills own it, never hatches)', async () => {
@@ -305,14 +307,16 @@ describe('ops3d land-water edges + flat blue water fills', () => {
     assert.ok(src.includes('batch.segs += 1'), 'segment counts must reflect the mask (per-push, not upfront)');
   });
 
-  it('water is flat fills: indexed lake fan + river ribbon, no drape/thread', async () => {
+  it('water is a flat lake fill + draped river threads (no slab, no hatch)', async () => {
     const src = await loadTerrainSrc();
-    for (const needle of ['lakeGeo.setIndex', 'ribGeo.setIndex', 'FLAT']) {
+    for (const needle of ['lakeGeo.setIndex', 'const offs = [-0.18, 0.18]', '_heightAt(cx, z) * VEX']) {
       assert.ok(src.includes(needle), `terrain.js must contain \`${needle}\``);
     }
     assert.ok(!src.includes('washPos'), 'old draped wash fan must be gone');
+    assert.ok(!src.includes('ribGeo'), 'seamed ribbon slab must be gone (kill-list: water sits IN the trough)');
     assert.ok(!src.includes('drapeRun(stem'), 'old river thread line must be gone');
-    assert.ok(!src.includes('riverMat'), 'river line material must be gone (fill-only blue)');
+    assert.ok(!src.includes('riverMat'), 'river line material must be gone (threads only)');
+    assert.ok(!src.includes('flowChevs'), 'chevron carets must be gone (kill-list: lines carry flow)');
   });
 
   it('blue is fill-only: shore/drain stay neutral grey', async () => {
@@ -320,8 +324,8 @@ describe('ops3d land-water edges + flat blue water fills', () => {
     assert.ok(src.includes('SHORE_COL = 0x848b90'), 'shoreline stays neutral grey');
     assert.ok(src.includes('DRAIN_COL = 0x848b90'), 'dry-draw stays neutral grey');
     const fills = (src.match(/color: WATER_COL/g) || []).length;
-    // 2 fills (lake + ribbon) + isobaths/wave lines all use WATER_COL — count ≥2
-    assert.ok(fills >= 2, `WATER_COL must feed at least 2 fills (lake + ribbon) plus wave lines, found ${fills}`);
+    // lake fill + isobaths + 2 wave threads all use WATER_COL — count ≥2
+    assert.ok(fills >= 2, `WATER_COL must feed lake + isobath rings + wave threads, found ${fills}`);
     // ensure no contour blue leaks
     assert.ok(!src.includes('BASE_COL = 0x5f'), 'base contours stay grey, not blue');
   });
