@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T16:18:00.240Z",
+  "generated": "2026-10-10T16:29:29.899Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,33 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "852091d",
+      "full": "852091dc49e043899c8ca623f2072e527a134f63",
+      "date": "2026-10-10",
+      "time": "21:59",
+      "subject": "chore(ring2): stamp BUILD_ID [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "59974fe",
+      "full": "59974fee0de6b70636586d01b9e21a13a6d602fe",
+      "date": "2026-10-10",
+      "time": "21:59",
+      "subject": "fix(3d): guarded GL precision kills Safari black-tab crash; render-first boot unblocks twin on hung tiles [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "f3b68aa",
+      "full": "f3b68aa2f32027142376ae3dcc1dc82e6521406c",
+      "date": "2026-10-10",
+      "time": "21:48",
+      "subject": "docs(plan): track refresh [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "87cc555",
       "full": "87cc555ba3982c84ee5733209442edf8a05780c1",
