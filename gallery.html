@@ -186,6 +186,7 @@
   maybeMountRing2();
   /* Legacy v1 twin stack: dynamic import so a failure here can never take
    * Ring-2 down with it; errors paint into the v1 panels as text. */
+  (async () => {
   try {
     const [{ createTwin }, { initSatBase, LS_MIX_KEY, LS_SCOPE_KEY }, { SANGACHAL }] = await Promise.all([
       import('./src/ops3d/twin.js'),
@@ -262,6 +263,7 @@
   } catch (err) {
     paintMountError(err?.message ?? err);
   }
+  })();
 </script>
 </body>
 </html>

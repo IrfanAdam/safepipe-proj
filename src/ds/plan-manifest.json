@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T15:04:06.912Z",
+  "generated": "2026-10-10T15:08:43.191Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,24 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "eba6a6b",
+      "full": "eba6a6b765e19fc3b459631d1daf0cd04ff854fd",
+      "date": "2026-10-10",
+      "time": "20:38",
+      "subject": "fix(ring2): twin paints no-WebGL verdict instead of silent blank [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "f0f1243",
+      "full": "f0f12438fb8262b8b53564f53bf42f060fd29e64",
+      "date": "2026-10-10",
+      "time": "20:34",
+      "subject": "docs(plan): track refresh [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "f0d0ba1",
       "full": "f0d0ba1d91d4723af4f1739fd7e6c509cf64bb68",
@@ -1274,5 +1292,7 @@
       "anchor": null
     }
   ],
-  "wip": []
+  "wip": [
+    "gallery.html"
+  ]
 }
