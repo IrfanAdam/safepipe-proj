@@ -5,3 +5,6 @@ dist/
 # under .hermes/ (cache, scratch, session state) stays local.
 .hermes/*
 !.hermes/plans/
+# temp local probes
+_ring2-*.mjs
+shot.mjs
