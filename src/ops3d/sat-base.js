@@ -152,8 +152,13 @@ export function isNetworkLevel(level) {
   return level === 'network';
 }
 
-export function shouldShowScope({ scopeOn, level } = {}) {
-  return !!scopeOn && isNetworkLevel(level ?? 'network');
+export function shouldShowScope({ scopeOn, level, mix = 0 } = {}) {
+  if (!scopeOn || !isNetworkLevel(level ?? 'network')) return false;
+  // Full-TWIN retires the lens: the slider promises the pure custom twin,
+  // and a satellite punch on top of it reads as photo bleed / a rim
+  // mismatch. Drag back toward SAT and the lens returns.
+  if (Number(mix) >= 0.999) return false;
+  return true;
 }
 
 // Pinhole projection of a world point through the twin orbit camera.
@@ -713,7 +718,8 @@ export function initSatBase(container, opts = {}) {
         /* ignore */
       }
     }
-    // Scoped disc shows satellite: yield the ground to MapLibre here too.
+    // Lens punch only — ground ownership stays mix-driven (driveGroundMode),
+    // so the twin mesh outside the disc survives at TWIN side.
     try {
       driveGroundMode();
     } catch {
@@ -735,7 +741,7 @@ export function initSatBase(container, opts = {}) {
     if (!force && now - lastScope < 150) return scopeShown;
     lastScope = now;
     const level = resolveLevel();
-    const show = shouldShowScope({ scopeOn, level });
+    const show = shouldShowScope({ scopeOn, level, mix });
     try {
       btnScope?.setAttribute?.('data-gated', scopeOn && !show ? 'true' : 'false');
     } catch {
@@ -802,18 +808,18 @@ export function initSatBase(container, opts = {}) {
     refreshScope(true);
     return scopeOn;
   };
-  // Ground ownership: the crossfade decides who renders the ground. SAT
-  // side → MapLibre real 3D terrain (hide the synthetic mesh so two
-  // terrains never fight); TWIN side → custom holographic ground. Scoped
-  // disc → maplibre (satellite shows through the punch). Guarded: a twin
-  // without the seam (or none yet) keeps today's look. Never throws.
+  // Ground ownership follows the MIX only — never the scope lens. The lens
+  // punches satellite through inside the disc while the twin stays opaque
+  // outside it, so the mesh must stay up whenever the twin side shows
+  // (mix >= 0.5); yielding it on scope alone blacked out the twin ground
+  // outside the disc and read as photo bleed + a rim mismatch. Guarded:
+  // a twin without the seam (or none yet) keeps today's look. Never throws.
   const driveGroundMode = () => {
     try {
       const twin = getTwin?.();
       const fn = twin?.setTerrainMode;
       if (typeof fn !== 'function') return;
-      if (scopeShown) fn.call(twin, 'maplibre');
-      else fn.call(twin, mix < 0.5 ? 'maplibre' : 'twin');
+      fn.call(twin, mix < 0.5 ? 'maplibre' : 'twin');
     } catch {
       /* ground mode is cosmetic */
     }

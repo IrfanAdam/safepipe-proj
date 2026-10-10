@@ -349,6 +349,14 @@ describe('ops3d satellite monitor — clip math (pure)', () => {
     assert.equal(sat.shouldShowScope({ scopeOn: true, level: 'asset' }), false);
     assert.equal(sat.shouldShowScope({ scopeOn: false, level: 'network' }), false);
   });
+
+  it('mix gating: full-TWIN retires the lens (no photo bleed over pure twin)', () => {
+    assert.equal(sat.shouldShowScope({ scopeOn: true, level: 'network', mix: 1 }), false);
+    assert.equal(sat.shouldShowScope({ scopeOn: true, level: 'network', mix: 0.999 }), false);
+    assert.equal(sat.shouldShowScope({ scopeOn: true, level: 'network', mix: 0.9 }), true);
+    assert.equal(sat.shouldShowScope({ scopeOn: true, level: 'network', mix: 0 }), true);
+    assert.equal(sat.shouldShowScope({ scopeOn: true, level: 'network' }), true, 'mix defaults to SAT-side (shown)');
+  });
 });
 
 describe('ops3d satellite monitor — toggle wiring + fallback (fake DOM)', () => {
@@ -412,10 +420,11 @@ describe('ops3d satellite monitor — toggle wiring + fallback (fake DOM)', () =
   });
 
   it('level resolution falls back through HUD-less, throwing, and distance paths', () => {
-    // Throwing override + far camera → network heuristic → shown.
+    // Throwing override + far camera → network heuristic → shown (SAT-side
+    // mix so the full-TWIN lens stand-down doesn't apply).
     const c1 = sized();
     const a1 = sat.initSatBase(c1, {
-      search: '',
+      search: '?sat=0',
       storage: memStore(),
       getTwin: twinFar,
       getLevel: () => {
@@ -518,6 +527,32 @@ describe('ops3d maplibre-terrain redo — real ground, ground seam, showcase', (
       SRC.includes('[data-testid="sat-base-tag"]') && SRC.includes('.remove()'),
       'load handler drops the offline tag so live maps never read OFFLINE',
     );
+  });
+
+  it('scope lens stands down at full TWIN (no photo bleed), returns mid-fade', () => {
+    const calls = [];
+    const twin = {
+      setTerrainMode: (m) => { calls.push(m); return m; },
+      debug: {
+        camera: { position: { x: 0.8, y: 57, z: 12 }, fov: 50 },
+        target: () => ({ x: 0, y: 0, z: 0 }),
+      },
+    };
+    const container = new FakeEl('div');
+    container.clientWidth = 1280;
+    container.clientHeight = 800;
+    container._canvas = new FakeEl('canvas');
+    const api = sat.initSatBase(container, { search: '?sat=1', storage: memStore(), getTwin: () => twin });
+    api.setScope(true);
+    api.syncFromTwin();
+    assert.equal(api.scopeShown, false, 'no lens over pure twin even when toggled on');
+    api.setMix(0.7);
+    api.syncFromTwin(true);
+    assert.equal(api.scopeShown, true, 'lens returns mid-fade');
+    assert.equal(calls[calls.length - 1], 'twin', 'mesh stays up while the lens is punched');
+    api.setMix(0.2);
+    assert.equal(calls[calls.length - 1], 'maplibre', 'SAT still yields to MapLibre');
+    api.dispose();
   });
 
   it('DEM-remount heals the crossfade when the twin canvas element swaps', () => {
