@@ -8,9 +8,14 @@
  *      sized to the DEM window (v1 lens class). Labelled source:mapped.
  *   2. Schematic terminal blocks — analytic boxes/tanks near the pin, each
  *      sprite-labelled `source:schematic` (never poses as surveyed).
+ *      Every label pill (ring, pin, schematic, contour) declutters by
+ *      range: max 3 + a +N count pill at map range, the full set only
+ *      zoomed in, each pill joined to its anchor by a leader line.
  *   3. Contours from sampleH — 2-tier (minor + major index), index rings
  *      numbered with elevation labels sourced from the live field status.
- *   4. Water tint — WATER_COL blue ONLY where sampleH < 0 (sea level).
+ *      Contour alpha fades to 0 across the outer 10% of the DEM window.
+ *   4. Water tint — WATER_COL blue ONLY where sampleH < 0 (sea level), as a
+ *      per-sample feathered-alpha mesh (never an opaque fill quad or box).
  *      WATER_COL must not be used for any non-water overlay.
  *
  * Rebuilds (re-drapes) when the field bus transitions to a better source.
@@ -36,6 +41,13 @@ const LIFT_RING = 25;
 const LIFT_MINOR = 12;
 const LIFT_MAJOR = 18;
 const LIFT_WATER = 8;
+
+/* Defect-fix tuning (verified against mix0/50/100 TOP captures). */
+const WATER_FEATHER_M = 8; // shoreline feather band: alpha ramps 0->full over this depth
+const WATER_MAX_OPACITY = 0.55;
+const EDGE_FADE_FRAC = 0.10; // outer 10% of the DEM window fades to 0 (no razor edge)
+const PILL_COLLAPSE_RANGE_M = 12000; // above: max 3 pills + count; below: full set
+const PILL_MAX_MAP_RANGE = 3;
 
 /* Schematic terminal program (NOT surveyed — every block is labelled). */
 const SCHEMATIC_BLOCKS = [
@@ -242,6 +254,12 @@ export function createOverlayTwin(container, opts = {}) {
     reg(lbl.material);
     lbl.position.set(RING_RADIUS_M * Math.cos(Math.PI / 4), groundY(RING_RADIUS_M * 0.7, RING_RADIUS_M * 0.7, 700), RING_RADIUS_M * Math.sin(Math.PI / 4));
     group.add(lbl);
+    const ringAnchor = new THREE.Vector3(
+      RING_RADIUS_M * Math.cos(Math.PI / 4),
+      groundY(RING_RADIUS_M * Math.cos(Math.PI / 4), RING_RADIUS_M * Math.sin(Math.PI / 4), 0),
+      RING_RADIUS_M * Math.sin(Math.PI / 4),
+    );
+    labels.push({ sprite: lbl, leader: makeLeader(ringAnchor, lbl.position), anchor: ringAnchor });
     // Site pin cross at the terminal.
     const pinG = track(new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(-500, 0, 0), new THREE.Vector3(500, 0, 0),
@@ -258,11 +276,29 @@ export function createOverlayTwin(container, opts = {}) {
     reg(pinLbl.material);
     pinLbl.position.set(0, groundY(0, 0, 1100), 0);
     group.add(pinLbl);
+    const pinAnchor = new THREE.Vector3(0, groundY(0, 0, 0), 0);
+    labels.push({ sprite: pinLbl, leader: makeLeader(pinAnchor, pinLbl.position), anchor: pinAnchor });
   }
+
+  function makeLeader(a, bPos) {
+    const g = track(new THREE.BufferGeometry().setFromPoints([a.clone(), bPos.clone()]));
+    const line = new THREE.Line(g, reg(track(new THREE.LineBasicMaterial({
+      color: SCHEMATIC_EDGE_COL, transparent: true, opacity: 0.55, depthWrite: false,
+    })), 0.55));
+    line.frustumCulled = false;
+    group.add(line);
+    return line;
+  }
+
+  /* Every label pill: tracked for map-range declutter (max 3 + count). */
+  let labels = [];
+  let countPill = null;
+  let countLeader = null;
 
   function buildSchematic() {
     for (const b of SCHEMATIC_BLOCKS) {
       const gy = groundY(b.x, b.z, 0);
+      const blockTop = new THREE.Vector3(b.x, gy + (b.h ?? 60) * VEX, b.z);
       let mesh;
       if (b.kind === 'box') {
         mesh = new THREE.Mesh(
@@ -287,6 +323,7 @@ export function createOverlayTwin(container, opts = {}) {
         tip.position.set(b.x, gy + b.h * VEX + 260, b.z);
         tip.name = 'flare-tip';
         group.add(tip);
+        labels.push({ sprite: tip, leader: makeLeader(blockTop, tip.position), anchor: blockTop });
       }
       mesh.name = `schematic-${b.name}`;
       group.add(mesh);
@@ -300,7 +337,51 @@ export function createOverlayTwin(container, opts = {}) {
       reg(lbl.material);
       lbl.position.set(b.x, gy + (b.h ?? 60) * VEX + 520, b.z);
       group.add(lbl);
+      labels.push({ sprite: lbl, leader: makeLeader(blockTop, lbl.position), anchor: blockTop });
     }
+  }
+
+  /* +N count pill for the collapsed map-range set; sits over the hidden
+   * labels' centroid with its own leader line. Built LAST so N covers
+   * every label (ring, pin, schematic, contour). */
+  function buildCountPill() {
+    if (labels.length <= PILL_MAX_MAP_RANGE) return;
+    const hidden = labels.slice(PILL_MAX_MAP_RANGE);
+    const c = new THREE.Vector3();
+    for (const p of hidden) c.add(p.anchor);
+    c.multiplyScalar(1 / hidden.length);
+    countPill = makeLabelSprite(`+${hidden.length} MORE`, { h: 300, accent: '#9aa4ad' });
+    reg(countPill.material);
+    countPill.position.set(c.x, c.y + 2600, c.z);
+    group.add(countPill);
+    countLeader = makeLeader(c, countPill.position);
+    countPill.visible = false;
+    countLeader.visible = false;
+  }
+
+  /* Map-range declutter: above PILL_COLLAPSE_RANGE_M only the first
+   * PILL_MAX_MAP_RANGE pills draw, plus the +N count pill; zoomed in the
+   * full set returns. Runs per frame from update(). */
+  function updatePills() {
+    if (!labels.length) return;
+    const collapsed = camera.position.distanceTo(controls.target) > PILL_COLLAPSE_RANGE_M;
+    labels.forEach((p, i) => {
+      const vis = !collapsed || i < PILL_MAX_MAP_RANGE;
+      p.sprite.visible = vis;
+      p.leader.visible = vis;
+    });
+    const showCount = collapsed && labels.length > PILL_MAX_MAP_RANGE;
+    if (countPill) countPill.visible = showCount;
+    if (countLeader) countLeader.visible = showCount;
+  }
+
+  function getPillState() {
+    return {
+      range: Math.round(camera.position.distanceTo(controls.target)),
+      collapsed: camera.position.distanceTo(controls.target) > PILL_COLLAPSE_RANGE_M,
+      visible: labels.filter((p) => p.sprite.visible).length,
+      total: labels.length,
+    };
   }
 
   function buildContours(src) {
@@ -329,7 +410,9 @@ export function createOverlayTwin(container, opts = {}) {
     if (!levels.length) return { min: mn, max: mx, indexCount: 0 };
     const perLevel = contourSegments(grid, half, levels);
     const minorPos = [];
+    const minorFade = [];
     const majorPos = [];
+    const majorFade = [];
     let indexCount = 0;
     const labelBudget = 24;
     for (const L of levels) {
@@ -338,9 +421,11 @@ export function createOverlayTwin(container, opts = {}) {
       const isIndex = Math.round(L / MINOR_INTERVAL_M) % INDEX_EVERY === 0;
       const lift = isIndex ? LIFT_MAJOR : LIFT_MINOR;
       const arr = isIndex ? majorPos : minorPos;
+      const fadeArr = isIndex ? majorFade : minorFade;
       const y = L * VEX + lift;
       for (let k = 0; k < segs.length; k += 2) {
         arr.push(segs[k].x, y, segs[k].z, segs[k + 1].x, y, segs[k + 1].z);
+        fadeArr.push(edgeFade(segs[k].x, segs[k].z), edgeFade(segs[k + 1].x, segs[k + 1].z));
       }
       if (isIndex && indexCount < labelBudget) {
         const flat = [];
@@ -351,57 +436,115 @@ export function createOverlayTwin(container, opts = {}) {
         if (longest && longest.length > 24) {
           const mid = longest[Math.floor(longest.length / 2)];
           const lbl = makeLabelSprite(`${L} m · source:${src}`, { h: 300, accent: '#ffc46b' });
+          lbl.material.opacity = edgeFade(mid.x, mid.z); // dissolve at coverage edge
           reg(lbl.material);
           lbl.position.set(mid.x, L * VEX + 420, mid.z);
           group.add(lbl);
+          const cAnchor = new THREE.Vector3(mid.x, L * VEX, mid.z);
+          labels.push({ sprite: lbl, leader: makeLeader(cAnchor, lbl.position), anchor: cAnchor });
           indexCount++;
         }
       }
     }
-    const mkLines = (arr, color, opacity) => {
+    const mkLines = (arr, fade, color, opacity) => {
       if (!arr.length) return;
       const g = track(new THREE.BufferGeometry());
       g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(arr), 3));
+      // RGBA vertex colors: per-vertex alpha carries the outer-10% DEM
+      // fade so contours dissolve at the coverage edge (no razor line).
+      const c = new THREE.Color(color);
+      const carr = new Float32Array(fade.length * 4);
+      for (let i = 0; i < fade.length; i++) {
+        const f = Math.min(1, Math.max(0, fade[i]));
+        carr[i * 4] = c.r;
+        carr[i * 4 + 1] = c.g;
+        carr[i * 4 + 2] = c.b;
+        carr[i * 4 + 3] = f * f * (3 - 2 * f);
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(carr, 4));
       const m = new THREE.LineSegments(g, reg(track(new THREE.LineBasicMaterial({
-        color, transparent: true, opacity, depthWrite: false,
+        color: 0xffffff, vertexColors: true, transparent: true, opacity, depthWrite: false,
       }))));
       m.frustumCulled = false;
       group.add(m);
     };
-    mkLines(minorPos, CONTOUR_MINOR_COL, 0.4);
-    mkLines(majorPos, CONTOUR_MAJOR_COL, 0.85);
+    mkLines(minorPos, minorFade, CONTOUR_MINOR_COL, 0.4);
+    mkLines(majorPos, majorFade, CONTOUR_MAJOR_COL, 0.85);
     return { min: mn, max: mx, indexCount };
   }
+
+/* Outer-10% DEM-window fade: 1 inside, smoothstepping to 0 at the
+ * extent edge, so overlays never end in a razor line. The 10 km ring
+ * itself is exempt (it is the mapped radius, not DEM coverage). */
+function edgeFade(x, z) {
+  const half = EXTENT_M / 2;
+  const m = Math.max(Math.abs(x), Math.abs(z));
+  const inner = half * (1 - EDGE_FADE_FRAC);
+  if (m <= inner) return 1;
+  if (m >= half) return 0;
+  const u = (m - inner) / (half - inner);
+  return 1 - u * u * (3 - 2 * u);
+}
 
   function buildWater() {
     const half = EXTENT_M / 2;
     const n = 90;
+    const vn = n + 1;
     const cell = (2 * half) / n;
-    const quads = [];
-    for (let i = 0; i < n; i++) {
-      for (let j = 0; j < n; j++) {
-        const x = -half + (j + 0.5) * cell;
-        const z = -half + (i + 0.5) * cell;
-        if (sampleH(x, z) >= 0) continue; // WATER_COL ONLY on water
-        const x0 = -half + j * cell;
-        const x1 = x0 + cell;
-        const z0 = -half + i * cell;
-        const z1 = z0 + cell;
-        const y = LIFT_WATER; // sea level 0 + lift
-        quads.push(x0, y, z0, x1, y, z0, x1, y, z1, x0, y, z0, x1, y, z1, x0, y, z1);
+    // Shared vertices (not per-cell quads): per-vertex alpha interpolates,
+    // so the shoreline feathers instead of stair-stepping, and the DEM
+    // window edge fades instead of clipping to a box. Water ONLY where
+    // sampleH < 0 — no fill quad is ever emitted for land.
+    const wc = new THREE.Color(WATER_COL);
+    const pos = new Float32Array(vn * vn * 3);
+    const col = new Float32Array(vn * vn * 4);
+    const alphaAt = (x, z) => {
+      const depth = -sampleH(x, z);
+      if (!(depth > 0)) return 0;
+      const u = Math.min(1, depth / WATER_FEATHER_M);
+      return (u * u * (3 - 2 * u)) * edgeFade(x, z);
+    };
+    for (let i = 0; i < vn; i++) {
+      for (let j = 0; j < vn; j++) {
+        const x = -half + j * cell;
+        const z = -half + i * cell;
+        const k = i * vn + j;
+        pos[k * 3] = x;
+        pos[k * 3 + 1] = LIFT_WATER; // flat sea plane: sea level 0 + lift
+        pos[k * 3 + 2] = z;
+        col[k * 4] = wc.r;
+        col[k * 4 + 1] = wc.g;
+        col[k * 4 + 2] = wc.b;
+        col[k * 4 + 3] = alphaAt(x, z);
       }
     }
-    if (!quads.length) return 0;
+    const idx = [];
+    let wet = 0;
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const k00 = i * vn + j;
+        const k10 = k00 + 1;
+        const k01 = k00 + vn;
+        const k11 = k01 + 1;
+        if (col[k00 * 4 + 3] <= 0 && col[k10 * 4 + 3] <= 0 &&
+            col[k01 * 4 + 3] <= 0 && col[k11 * 4 + 3] <= 0) continue;
+        idx.push(k00, k01, k10, k10, k01, k11);
+        wet++;
+      }
+    }
+    if (!idx.length) return 0;
     const g = track(new THREE.BufferGeometry());
-    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(quads), 3));
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 4)); // RGBA: per-sample alpha
+    g.setIndex(idx);
     const m = new THREE.Mesh(g, reg(track(new THREE.MeshBasicMaterial({
-      color: WATER_COL, transparent: true, opacity: 0.55, depthWrite: false,
-      side: THREE.DoubleSide, // quads face up from hand-wound triangles
-    })), 0.55));
+      color: 0xffffff, vertexColors: true, transparent: true, opacity: WATER_MAX_OPACITY,
+      depthWrite: false, side: THREE.DoubleSide,
+    })), WATER_MAX_OPACITY));
     m.name = 'ring2-water';
     m.frustumCulled = false;
     group.add(m);
-    return quads.length / 18;
+    return wet;
   }
 
   let lastInfo = null;
@@ -423,11 +566,15 @@ export function createOverlayTwin(container, opts = {}) {
       } catch { /* noop */ }
     }
     emphasisMats = [];
+    labels = [];
+    countPill = null;
+    countLeader = null;
     const src = sampleSource(0, 0);
     buildRing(src === 'terrarium' ? 'mapped' : src);
     buildSchematic();
     const c = buildContours(src);
     const waterCells = buildWater();
+    buildCountPill(); // last: +N covers ring + pin + schematic + contour labels
     lastInfo = { ...c, waterCells, source: src, at: Date.now() };
     applyEmphasis(lastT);
     return lastInfo;
@@ -466,6 +613,7 @@ export function createOverlayTwin(container, opts = {}) {
 
   function update() {
     controls.update();
+    updatePills();
     const t = perfClock.getElapsedTime();
     const flare = group.getObjectByName('flare-tip');
     if (flare) {
@@ -500,6 +648,6 @@ export function createOverlayTwin(container, opts = {}) {
   return {
     renderer, scene, camera, controls, canvas,
     rebuild, setEmphasis, update, getPose, dispose, onResize,
-    getInfo: () => ({ ...(lastInfo ?? {}), status: getStatus() }),
+    getInfo: () => ({ ...(lastInfo ?? {}), status: getStatus(), pills: getPillState() }),
   };
 }

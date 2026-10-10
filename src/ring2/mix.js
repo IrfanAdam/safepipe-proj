@@ -3,9 +3,10 @@
  * 100 = pure twin (map ground hidden, twin takes over). Mid = blend.
  *
  *   - Drives the twin canvas opacity + overlay emphasis (setEmphasis).
- *   - TOP-only satellite rule: near TOP-down (pitch < TOP_PITCH_DEG) the
- *     satellite ground is forced full via setGroundOwns(true); oblique
- *     views let the twin take over (setGroundOwns(mix < 99)).
+ *   - Takeover rule: mix >= 99 forces setGroundOwns(false) at ANY pitch,
+ *     so TOP-down at slider 100 shows zero satellite photo. The TOP-only
+ *     satellite rule (pitch < TOP_PITCH_DEG forces satellite full) applies
+ *     below 99 only.
  *   - Canvas-identity watch: a MutationObserver on the twin container
  *     re-applies the full mix (opacity + pointer-events + emphasis) whenever
  *     the canvas remounts, so a remount can never reset to a stale look
@@ -119,13 +120,17 @@ export function mountMixBar(el, opts = {}) {
     paintLabel();
   }
 
-  /* TOP-only satellite rule. */
+  /* Takeover rule: mix >= 99 forces twin ground at ANY pitch (TOP-down
+   * at slider 100 shows zero satellite photo). The TOP-only satellite
+   * rule applies below 99 only. */
   function applyGroundRule(pitchDeg) {
     lastPitch = pitchDeg;
-    if (pitchDeg < TOP_PITCH_DEG) {
+    if (mix >= TWIN_TAKEOVER_MIX) {
+      setGroundOwns(false);
+    } else if (pitchDeg < TOP_PITCH_DEG) {
       setGroundOwns(true); // satellite full at TOP
     } else {
-      setGroundOwns(mix < TWIN_TAKEOVER_MIX); // twin takes over oblique
+      setGroundOwns(mix < TWIN_TAKEOVER_MIX); // below 99 the map keeps ground
     }
     forceGroundLayers();
     paintLabel();
