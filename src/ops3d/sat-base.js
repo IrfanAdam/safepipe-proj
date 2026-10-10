@@ -532,6 +532,8 @@ export function initSatBase(container, opts = {}) {
   let mapReady = false;
   let degraded = false;
   let tileErrs = 0;
+  let tileOks = 0;
+  let terrainBad = false;
   const showOfflineTag = () => {
     try {
       hideLoadingTag();
@@ -629,11 +631,16 @@ export function initSatBase(container, opts = {}) {
       });
       map.on?.('error', (e) => {
         /* stay silent: fallback gradient shows through map gaps. When tiles
-         * keep failing (blocked network), shed the sat layers after a small
-         * error budget so the map stops requesting and the twin runs
-         * custom-only over the gradient + offline tag. */
+         * keep failing (blocked network), shed the 3D terrain + reclaim the
+         * twin so the tab is twin-over-gradient + offline tag — NEVER a
+         * black hole. Sat layers are KEPT (not removed) so tile retries
+         * continue and the recovery listener below can un-shed. An explicit
+         * user SAT choice is still reversed: an unfulfillable choice must
+         * not strand the viewport on a layerless map. */
         if (degraded) return;
         if (!e || (!e.tile && e.sourceId !== 'esri-sat' && e.sourceId !== 'terrain')) return;
+        tileOks = 0;
+        if (e.sourceId === 'terrain') terrainBad = true;
         if (++tileErrs < 8) return;
         degraded = true;
         try {
@@ -641,22 +648,45 @@ export function initSatBase(container, opts = {}) {
         } catch {
           /* ignore */
         }
-        for (const id of ['sat-hillshade', 'sat-ref', 'sat']) {
-          try {
-            if (map.getLayer?.(id)) map.removeLayer(id);
-          } catch {
-            /* ignore */
-          }
-        }
         showOfflineTag();
-        // Showcase may have auto-faded the twin to transparent over this
-        // map: with the sat layers shed, bring the twin back so the tab is
-        // twin-over-gradient instead of black. An explicit user mix choice
-        // always wins — only the auto-showcase is reclaimed.
+        // Shed may land while the twin sits transparent (user slid to SAT):
+        // bring it back — twin-over-gradient + tag beats black every time.
         try {
-          if (!userChoseMix) fadeTo(1);
+          fadeTo(1);
         } catch {
           /* twin stays as-is */
+        }
+      });
+      // Self-heal: tile retries continue after a shed (layers kept). Six
+      // consecutive successful sat/reference tile loads mean the network
+      // breathes again → un-shed, re-apply terrain unless terrain itself
+      // was the culprit, drop the offline tag.
+      map.on?.('sourcedata', (e) => {
+        try {
+          if (!e || e.sourceDataType !== 'content') return;
+          if (!e.tile || e.tile.state !== 'loaded') return;
+          const id = e.sourceId || e.source?.id;
+          if (id !== 'esri-sat' && id !== 'esri-ref') return;
+          if (!degraded) {
+            tileErrs = 0;
+            return;
+          }
+          if (++tileOks < 6) return;
+          degraded = false;
+          tileErrs = 0;
+          tileOks = 0;
+          try {
+            if (!terrainBad) map.setTerrain?.({ source: 'terrain', exaggeration: TERRAIN_EXAGGERATION });
+          } catch {
+            /* satellite alone is still a fine base */
+          }
+          try {
+            base.querySelector?.('[data-testid="sat-base-tag"]')?.remove();
+          } catch {
+            /* tag is cosmetic */
+          }
+        } catch {
+          /* recovery is best-effort */
         }
       });
     } catch {
