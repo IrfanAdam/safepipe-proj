@@ -106,27 +106,6 @@ async function boot() {
   });
   paintStatus();
 
-  const MAP_TIMEOUT_MS = 30000;
-  try {
-    const { map: m } = await Promise.race([
-      mountMapBase(mapDiv, { zoom: 11, pitch: 0, bearing: 0 }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`map mount timed out after ${MAP_TIMEOUT_MS / 1000}s (tiles/worker blocked?)`)), MAP_TIMEOUT_MS)),
-    ]);
-    map = m;
-  } catch (err) {
-    vexWarned = true;
-    statusDiv.textContent = `RING-2 · boot: twin ✓ · map FAILED: ${err?.message ?? err}`;
-    throw err;
-  }
-  try {
-    assertTerrainOn(map);
-  } catch (err) {
-    vexWarned = true;
-    statusDiv.textContent = `RING-2 · terrain FAILED: ${err?.message ?? err}`;
-    throw err;
-  }
-
   window.__ring2 = {
     map,
     twin,
@@ -138,6 +117,7 @@ async function boot() {
     diag: () => ({
       build: BUILD_ID,
       canvases: canvasDims(),
+      mapReady: !!map,
       frames: twinFrames,
       twinErr,
       status: statusDiv?.textContent ?? null,
@@ -145,6 +125,34 @@ async function boot() {
       dem: getStatus(),
     }),
   };
+
+  // Rendering-first: the loop starts NOW, not after the map. A hung tile
+  // host used to gate every painted frame behind mountMapBase (map:- +
+  // black twin until the 30s timeout). The map resolves in the background
+  // and sync engages when it lands (guarded per-frame).
+  const MAP_TIMEOUT_MS = 30000;
+  Promise.race([
+    mountMapBase(mapDiv, { zoom: 11, pitch: 0, bearing: 0 }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`map mount timed out after ${MAP_TIMEOUT_MS / 1000}s (tiles/worker blocked?)`)), MAP_TIMEOUT_MS)),
+  ]).then(
+    ({ map: m }) => {
+      map = m;
+      window.__ring2.map = m;
+      try {
+        assertTerrainOn(map);
+      } catch (err) {
+        vexWarned = true;
+        statusDiv.textContent = `RING-2 · terrain FAILED: ${err?.message ?? err}`;
+        return;
+      }
+      paintStatus();
+    },
+    (err) => {
+      vexWarned = true;
+      statusDiv.textContent = `RING-2 · twin ✓ · map FAILED: ${err?.message ?? err}`;
+    },
+  );
 
   // Frame heartbeat: a silently-throwing update() renders as an
   // unexplained black twin. Count frames, keep the first error, and paint
@@ -156,13 +164,15 @@ async function boot() {
       twinFrames++;
       const pose = twin.getPose();
       const viewportPx = Math.max(twinDiv.clientHeight || window.innerHeight, 1);
-      try {
-        applyTwinToMap(map, pose, { viewportPx, fovDeg: FOV_DEG });
-      } catch (err) {
-        if (!vexWarned) {
-          vexWarned = true;
-          // eslint-disable-next-line no-console
-          console.warn('[ring2] sync skipped:', err?.message ?? err);
+      if (map) {
+        try {
+          applyTwinToMap(map, pose, { viewportPx, fovDeg: FOV_DEG });
+        } catch (err) {
+          if (!vexWarned) {
+            vexWarned = true;
+            // eslint-disable-next-line no-console
+            console.warn('[ring2] sync skipped:', err?.message ?? err);
+          }
         }
       }
       const pitch = pitchForPose(pose.eye, pose.target, pose.target.y ?? 0);

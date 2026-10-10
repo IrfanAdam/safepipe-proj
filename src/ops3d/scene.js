@@ -15,6 +15,7 @@
  *     a DEM-swap remount re-applies the current mix with no twin.js edits).
  */
 import * as THREE from 'three';
+import { pickGLPrecision } from '../glprecision.js';
 
 export const CLEAR_COLOR = 0x0b0c0c;
 export const FOG_NEAR = 58;
@@ -107,7 +108,10 @@ export function setBaseMix(m) {
 export function createScene(canvas) {
   if (!canvas) throw new Error('createScene: canvas required');
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+  // Guarded precision: Safari on some GPUs returns null from
+  // getShaderPrecisionFormat(), which three dereferences unguarded at
+  // construction (mount failed → black tab). Probe first, pass explicitly.
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance', precision: pickGLPrecision() });
   renderer.setClearColor(CLEAR_COLOR, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;

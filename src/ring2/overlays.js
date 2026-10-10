@@ -22,6 +22,7 @@
  * [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-3]
  */
 import * as THREE from 'three';
+import { pickGLPrecision } from '../glprecision.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { SANGACHAL, VEX, RING_RADIUS_M, EXTENT_M } from './site.js';
 import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
@@ -181,7 +182,10 @@ export function createOverlayTwin(container, opts = {}) {
 
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // Guarded precision: Safari on some GPUs returns null from
+    // getShaderPrecisionFormat(), which three dereferences unguarded and
+    // dies at construction (whole tab black, one TypeError).
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, precision: pickGLPrecision() });
   } catch (err) {
     // No WebGL (blocked GPU, old browser): leave a readable verdict in the
     // container instead of a silent transparent canvas. Plain DOM survives.
