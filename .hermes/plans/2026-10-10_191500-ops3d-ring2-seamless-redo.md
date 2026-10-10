@@ -106,3 +106,12 @@
 - Remount opacity reset → canvas-identity watch re-applies full mix (Task 8).
 - Lens sized to DEM window → ring always full 10 km mapped radius (Task 7).
 - Twin features masquerading as surveyed → every asset carries `source` label (Task 7).
+
+---
+## Handoff — Safari black-tab war, 2026-10-10 night (lean resume)
+- HEAD stamps: Ring-2 `BUILD_ID 66a5502` (src/ring2/main.js), v1 `V1_BUILD 66a5502` (gallery.html). If user's screenshot shows older → stale code, stop debugging.
+- Proven root causes (all fault-injected headless, not assumed): (1) three.js null precision deref on user's GPU → src/glprecision.js probe + v1 step-down chain; (2) hung (not failed) Esri host gates map `load` forever → hasty 8s mount, terrain best-effort; (3) reject-on-first-tile-error killed map → errors now recorded only; (4) v1 hidden-mount 0×0 map → resize-on-show; (5) showcase-over-dead-map → shed reclaims twin, shed wins over late load; (6) mix dead-ends → 50-floor pre-map, pull-to-twin on mapFatal.
+- Ring-2 polish shipped: shader ring-clip + radial rim fade (vertex fade also radial now — square curtain gone), reference hides at twin takeover, SELFTEST box removed.
+- Diagnostics live: Ring-2 status (stamp/dims/frames/MAPERR/MAPFAILED sticky); v1 captions (stamp/mix/map:wait-on-deg-off/cv).
+- Pending USER confirmation only: Ring-2 SAT paint, v1 tabs content. /loop stays open until user confirms all three.
+- Hygiene: no temp servers (5198/5199 free), no stray *.tmp.mjs, tree clean, dist rebuilt per fix. Subagents deleg_5c4e98b4 + deleg_d0f89fcf done (findings applied).
