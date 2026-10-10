@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T16:29:29.899Z",
+  "generated": "2026-10-10T16:33:21.790Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,24 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "3208092",
+      "full": "3208092834832dd7fe04f04b4ff710a96983ff98",
+      "date": "2026-10-10",
+      "time": "22:03",
+      "subject": "fix(v1): map resize on tab show cures hidden-mount black tab; always paint mount errors; ring2 boot failure overwrites status [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "ab8e13b",
+      "full": "ab8e13bca95d5b796d8bf67df3354200cf5013ef",
+      "date": "2026-10-10",
+      "time": "21:59",
+      "subject": "docs(plan): track refresh [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "852091d",
       "full": "852091dc49e043899c8ca623f2072e527a134f63",
