@@ -40,7 +40,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = 60;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = '26af437';
+const BUILD_ID = 'e84dbcf';
 let map = null;
 let twin = null;
 let mixCtl = null;
