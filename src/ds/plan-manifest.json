@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T16:54:20.169Z",
+  "generated": "2026-10-10T16:58:10.531Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,33 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "ea83ee8",
+      "full": "ea83ee8f4b9a486a294c30d4d5d0bf336980836b",
+      "date": "2026-10-10",
+      "time": "22:28",
+      "subject": "chore(ring2): stamp BUILD_ID [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "91a0a1f",
+      "full": "91a0a1fc276caff0477e7a28fc6180a5c0b0e68c",
+      "date": "2026-10-10",
+      "time": "22:27",
+      "subject": "feat(ring2): shader ring-clip cuts overlays to 10km disc; reference hides at twin takeover [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "42051f5",
+      "full": "42051f5453967b4922ce1a9d1f5a377774faf64e",
+      "date": "2026-10-10",
+      "time": "22:24",
+      "subject": "docs(plan): track refresh [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "7687268",
       "full": "7687268750e6cd45966bfe7f01bda9ebb6b318c0",
