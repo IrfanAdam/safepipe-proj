@@ -89,3 +89,17 @@
 | 3 | Commit + close | Build green |
 
 ### Task 1 ✓ done · Task 2 ✓ done · Task 3 ✓ done
+
+---
+
+## Phase 4 — scope-lens parity (mix snap, disc size, sea read) {#phase-4}
+
+*Mid-slider snapped SAT-only (punch discarded mix); lens was 45% of ring (DEM window sized global imagery); sea unreadable; -78 m bathymetry mislabeled VALLEY.*
+
+| # | Task | Done when |
+|---|---|---|
+| 1 | Crossfade carries live mix (mid = SAT + twin), lens = full 20 km ring, feather melts at oblique | Mid-blend capture shows both layers, full ring |
+| 2 | Sea: source-gated WATER_COL fill above land band, SHADE_VEX shading-only relief, CASPIAN SEA label, SEABED pill | 11/11 sea-contrast green |
+| 3 | Commit + close | 346/346 suite green, build green |
+
+### Task 1 ✓ done · Task 2 ✓ done · Task 3 ✓ done

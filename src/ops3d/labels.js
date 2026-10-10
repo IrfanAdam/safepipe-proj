@@ -239,6 +239,49 @@ function drawDest(cv, tex, text, health) {
   tex.needsUpdate = true;
 }
 
+/* Open-water identity label (Sangachal twin): a true-scale dark scene leaves
+ * the sea as flat blue fill that reads as blobs without a name — one
+ * water-blue tracking-wide sprite rides the open water so the Caspian is
+ * identifiable at every zoom, oblique included. Blue-only (never an alarm
+ * color), depthTest off so it overdraws the fill, tagged userData.sea so
+ * terrain detail-rescale leaves its size alone. Dark ops theme kept: pale
+ * ice-blue text with a near-black halo, no light-map colors. */
+export const SEA_LABEL_TEXT = 'CASPIAN SEA';
+export function makeSeaLabelSprite(text = SEA_LABEL_TEXT) {
+  const cv = document.createElement('canvas');
+  cv.width = 512;
+  cv.height = 128;
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.SpriteMaterial({
+    map: tex, color: 0x9fc6d8, sizeAttenuation: true,
+    transparent: true, opacity: 0.92, depthWrite: false,
+    depthTest: false, fog: false,
+  });
+  const sp = new THREE.Sprite(mat);
+  sp.renderOrder = 6; // over the sea fill, under asset plates
+  sp.scale.set(5, 5 * (128 / 512), 1);
+  sp.userData.sea = true;
+  sp.userData.aspect = 128 / 512;
+  drawSeaLabel(cv, tex, text);
+  return sp;
+}
+
+function drawSeaLabel(cv, tex, text) {
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.font = '600 46px ui-monospace, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  try { ctx.letterSpacing = '10px'; } catch { /* older canvas: tight tracking is fine */ }
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#cfe6ef';
+  ctx.fillText(text, cv.width / 2, cv.height / 2 + 2);
+  ctx.shadowBlur = 0;
+  tex.needsUpdate = true;
+}
+
 let ringTex = null;
 function getRingTexture() {
   if (ringTex) return ringTex;

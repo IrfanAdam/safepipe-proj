@@ -303,10 +303,56 @@ describe('ops3d satellite monitor — clip math (pure)', () => {
     assert.equal(sat.SCOPE_R_KM, 20);
   });
 
-  it('scopeRadiusForSite scales the TOP disc by site window', () => {
-    assert.equal(sat.scopeRadiusForSite({}), 20, 'no extent → Fort McMurray disc');
-    assert.equal(sat.scopeRadiusForSite({ extentKm: 44 }), 20);
-    assert.ok(Math.abs(sat.scopeRadiusForSite({ extentKm: 20 }) - (20 * 20) / 44) < 1e-9, 'Sangachal ≈ 9.09 km');
+  it('scopeMaskCss carries the mix inside the disc (true crossfade, not a punch)', () => {
+    // Mid-blend (e.g. 0.55) must ghost the twin over the satellite inside
+    // the lens: inside-stop alpha tracks the mix instead of snapping to 0.
+    assert.ok(sat.scopeMaskCss(720, 450, 398.5, 0.55).includes('0.55'), 'mid mix inside');
+    assert.ok(sat.scopeMaskCss(720, 450, 398.5, 0).includes('rgba(0,0,0,0)'), 'SAT end stays clean');
+    assert.equal(sat.scopeMaskCss(720, 450, 398.5), sat.scopeMaskCss(720, 450, 398.5, 0), 'default is the SAT end');
+  });
+
+  it('scopeFeatherPx: crisp lens up top, soft limb at oblique tilt (no sphere read)', () => {
+    assert.equal(sat.scopeFeatherPx(78), 1.5, 'TOP keeps the crisp edge');
+    assert.equal(sat.scopeFeatherPx(90), 1.5, 'clamped top');
+    assert.ok(sat.scopeFeatherPx(25) >= 12, `oblique melts the limb, got ${sat.scopeFeatherPx(25)}`);
+    assert.ok(sat.scopeFeatherPx(10) >= sat.scopeFeatherPx(25), 'lower tilt never sharpens');
+    assert.equal(sat.scopeFeatherPx(NaN), 1.5, 'non-finite falls back crisp');
+  });
+
+  it('scope lens fills the FULL mapped ring at every site (Sangachal 20 km, not a 9.09 km cutout)', () => {
+    // North-up fix: the lens must cover the mapped circle (r = SCOPE_R_KM,
+    // matches terrain.js / gridfloor.js) — never a DEM-window cutout that
+    // strands pipes on black outside the disc.
+    assert.equal(sat.scopeRadiusForSite({}), sat.SCOPE_R_KM, 'no extent → full ring');
+    assert.equal(sat.scopeRadiusForSite({ extentKm: 44 }), sat.SCOPE_R_KM, 'Fort McMurray → full ring');
+    assert.equal(sat.scopeRadiusForSite({ extentKm: 20 }), sat.SCOPE_R_KM, 'Sangachal → full ring');
+    assert.equal(sat.scopeRadiusForSite({ extentKm: 5 }), sat.SCOPE_R_KM, 'small window → still full ring');
+  });
+
+  it('default TOP pose drives map bearing north-up (sea east in the disc)', () => {
+    // Plan-preset ray (yaw 4°, pitch 78°, dist 62): bearing must read
+    // ≈0 so SAT registers under the north-up TWIN instead of skewing it.
+    const y = (4 * Math.PI) / 180, p = (78 * Math.PI) / 180, d = 62;
+    const v = sat.twinViewToMap(
+      { x: d * Math.cos(p) * Math.sin(y), y: d * Math.sin(p), z: d * Math.cos(p) * Math.cos(y) },
+      { x: 0, y: 0, z: 0 },
+    );
+    const offNorth = Math.min(v.bearing, 360 - v.bearing);
+    assert.ok(offNorth < 5, `TOP bearing north-up, got ${v.bearing}`);
+  });
+
+  it('map bearing tracks twin azimuth 1:1 (orbit never counter-rotates SAT vs TWIN)', () => {
+    // User orbits ±10° off the default ray: the map must turn WITH the
+    // twin (same rotational sense), never mirrored against it.
+    const at = (yawDeg) => {
+      const y = (yawDeg * Math.PI) / 180, p = (25 * Math.PI) / 180, d = 30;
+      return sat.twinViewToMap(
+        { x: d * Math.cos(p) * Math.sin(y), y: d * Math.sin(p), z: d * Math.cos(p) * Math.cos(y) },
+        { x: 0, y: 0, z: 0 },
+      ).bearing;
+    };
+    assert.ok(Math.abs(at(14) - 346) < 0.5, `orbit +10° → bearing 346, got ${at(14)}`);
+    assert.ok(Math.abs(at(-6) - 6) < 0.5, `orbit −10° → bearing 6, got ${at(-6)}`);
   });
 
   it('projectPinhole centers the look target', () => {
@@ -423,6 +469,26 @@ describe('ops3d satellite monitor — toggle wiring + fallback (fake DOM)', () =
       .find((c) => c.className === 'sat-xfade')
       .children.find((c) => c.attributes?.['data-testid'] === 'sat-scope');
     assert.equal(chip.attributes['data-gated'], 'true', 'chip dims while gated');
+    api.dispose();
+  });
+
+  it('mid-blend ghosts the twin over the satellite inside the lens (no snap)', () => {
+    let level = 'network';
+    const container = sized();
+    const api = sat.initSatBase(container, {
+      search: '?sat=0',
+      storage: memStore(),
+      getTwin: twinFar,
+      getLevel: () => level,
+    });
+    assert.equal(api.setScope(true), true);
+    assert.equal(api.scopeShown, true, 'lens armed at TOP');
+    api.setMix(0.55);
+    const mask = container._canvas.style.maskImage ?? '';
+    assert.ok(mask.includes('radial-gradient'), 'lens mask painted');
+    assert.ok(mask.includes('0.55'), `mid mix rides inside the disc, got ${mask.slice(0, 120)}`);
+    api.setMix(0);
+    assert.ok((container._canvas.style.maskImage ?? '').includes('rgba(0,0,0,0)'), 'SAT end stays clean');
     api.dispose();
   });
 

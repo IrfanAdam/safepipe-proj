@@ -1121,5 +1121,70 @@
     }
    ]
   }
+ ],
+ "2026-10-10_150100-ops3d-sangachal-twin.md": [
+  {
+   "sha": null,
+   "date": "2026-10-10",
+   "hash": "2b6c1d64",
+   "sections": [
+    {
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
+     "hash": "be725659",
+     "state": "5/5"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-10",
+   "hash": "6f03270e",
+   "sections": [
+    {
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
+     "hash": "e3aa1864",
+     "state": "5/5"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-10",
+   "hash": "adb6c4f9",
+   "sections": [
+    {
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
+     "hash": "4daccbf5",
+     "state": "5/5"
+    },
+    {
+     "head": "Phase 2 — edge-streak fix (apron renders fake terrain) {#phase-2}",
+     "hash": "d39a89b8",
+     "state": "1/1"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-10",
+   "hash": "4630fb7b",
+   "sections": [
+    {
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
+     "hash": "4daccbf5",
+     "state": "5/5"
+    },
+    {
+     "head": "Phase 2 — edge-streak fix (apron renders fake terrain) {#phase-2}",
+     "hash": "d1f29061",
+     "state": "1/1"
+    },
+    {
+     "head": "Phase 3 — true-scale landmass parity {#phase-3}",
+     "hash": "cdf3f767",
+     "state": "1/1"
+    }
+   ]
+  }
  ]
 }

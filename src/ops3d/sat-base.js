@@ -152,14 +152,16 @@ export const twinViewToMapbox = twinViewToMap;
 export const SCOPE_R_KM = 20;
 export const LS_SCOPE_KEY = 'ops3d.satScope';
 
-// Per-site TOP scope disc radius: the 20 km Fort McMurray disc scaled by the
-// site window (Sangachal extentKm 20 → ~9.09 km). Default (no extentKm) is
-// exactly SCOPE_R_KM, so Fort McMurray behavior is unchanged.
+// TOP scope disc radius: the FULL mapped circle (r = SCOPE_R_KM, matches
+// terrain.js / gridfloor.js) at every site. An earlier revision scaled the
+// disc by the site DEM window (Sangachal extentKm 20 → ~9.09 km), which cut
+// the satellite lens to ~45% of the ring diameter and stranded pipes on
+// black outside the disc — the DEM window bounds surveyed relief, not the
+// global Esri imagery under the lens. North-up fix: sea-east registration
+// needs the whole ring, so the lens is the ring, period.
 // [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-1]
-export function scopeRadiusForSite(site = {}) {
-  const raw = Number(site?.extentKm ?? 44);
-  const extent = Number.isFinite(raw) && raw > 0 ? raw : 44;
-  return 20 * (extent / 44);
+export function scopeRadiusForSite(_site = {}) {
+  return SCOPE_R_KM;
 }
 
 export function isNetworkLevel(level) {
@@ -265,13 +267,31 @@ export function scopeClipCss(cx, cy, r) {
   return `circle(${r}px at ${cx}px ${cy}px)`;
 }
 
+// Lens-limb feather (px) by camera elevation: crisp hairline up top where
+// the lens reads as a survey instrument, melting at oblique tilt where a
+// hard circular limb + bezel ring would read as a planet sphere. Pure.
+export function scopeFeatherPx(elevDeg) {
+  const e = Number(elevDeg);
+  if (!Number.isFinite(e)) return 1.5;
+  if (e >= 70) return 1.5;
+  if (e <= 20) return 28;
+  return 1.5 + ((70 - e) / 50) * (28 - 1.5);
+}
+
 // CSS mask that punches the same disc out of the twin canvas: satellite
-// shows through inside, custom twin stays opaque outside. Transparent
-// inside → black outside with a 1.5px feathered rim.
-export function scopeMaskCss(cx, cy, r) {
+// shows through inside, custom twin stays opaque outside. `inside` is the
+// twin's alpha inside the disc — the crossfade mix, so mid-blend ghosts the
+// twin (contours/pipes) over the satellite instead of snapping SAT-only.
+// `featherPx` softens the limb (see scopeFeatherPx). Transparent
+// inside → black outside with a feathered rim. Pure.
+export function scopeMaskCss(cx, cy, r, inside = 0, featherPx = 1.5) {
+  const a = Number(inside);
+  const inner = `rgba(0,0,0,${Number.isFinite(a) ? Math.min(1, Math.max(0, a)) : 0})`;
+  const f = Number(featherPx);
+  const feather = Number.isFinite(f) ? Math.min(64, Math.max(0.5, f)) : 1.5;
   return (
     `radial-gradient(circle ${r}px at ${cx}px ${cy}px, ` +
-    `rgba(0,0,0,0) 0, rgba(0,0,0,0) ${r}px, #000 calc(${r}px + 1.5px))`
+    `${inner} 0, ${inner} ${r}px, #000 calc(${r}px + ${feather}px))`
   );
 }
 
@@ -718,8 +738,33 @@ export function initSatBase(container, opts = {}) {
 
   // Paint the shown-scope look: sat layer clipped to the disc, twin canvas
   // punched open inside it (satellite through) and forced opaque outside
-  // (custom twin). Never throws.
+  // (custom twin). The punch carries the live crossfade mix — mid-blend
+  // ghosts twin contours/pipes over the satellite instead of snapping
+  // SAT-only — and the limb feather melts at oblique tilt so the lens never
+  // reads as a planet sphere. Never throws.
   const paintScope = (disc) => {
+    let feather = 1.5;
+    try {
+      const twin = getTwin();
+      const cam = twin?.debug?.camera;
+      let tgt = null;
+      try {
+        tgt = twin?.debug?.target?.();
+      } catch {
+        tgt = null;
+      }
+      if (cam?.position && tgt) {
+        const dx = cam.position.x - tgt.x;
+        const dy = cam.position.y - tgt.y;
+        const dz = cam.position.z - tgt.z;
+        const dist = Math.hypot(dx, dy, dz);
+        if (dist > 1e-9) {
+          feather = scopeFeatherPx((Math.asin(Math.min(1, Math.max(-1, dy / dist))) * 180) / Math.PI);
+        }
+      }
+    } catch {
+      feather = 1.5;
+    }
     try {
       base.style.clipPath = scopeClipCss(disc.cx, disc.cy, disc.r);
     } catch {
@@ -728,7 +773,7 @@ export function initSatBase(container, opts = {}) {
     const c = canvasOf();
     if (c && c.style) {
       try {
-        const mask = scopeMaskCss(disc.cx, disc.cy, disc.r);
+        const mask = scopeMaskCss(disc.cx, disc.cy, disc.r, mix, feather);
         c.style.maskImage = mask;
         c.style.webkitMaskImage = mask;
         c.style.opacity = '';

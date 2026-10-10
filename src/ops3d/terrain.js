@@ -46,6 +46,7 @@ import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { getLayout } from './health-feed.js';
 import { levelsForRange, _injectField } from './dem.js';
+import { makeSeaLabelSprite } from './labels.js';
 
 function await_import_layout() {
   try { return { getLayout }; } catch { return {}; }
@@ -56,6 +57,25 @@ const R_MAP = 20; // boundary ring radius, km
 const N = 160; // marching-squares grid cells per side (128→160 for tighter high rings)
 const LEVELS = 32; // contour levels (20→32 so slope reads as density)
 export const VEX = 1; // true-scale landmass parity — twin matches satellite/map terrain 1:1, no exaggeration
+/* Shading-only relief exaggeration (Sangachal read): at VEX 1 the true
+ * gradients are ~mm/km, so VEX-applied normals go near-flat and the baked
+ * hillshade loses all direction. Normals for SHADING are computed with
+ * SHADE_VEX while every geometry height stays h×VEX — relief reads, data
+ * stays 1:1, field() untouched. Rendering-only. */
+export const SHADE_VEX = 4.5;
+/* Sea-fill brightness ramp (Sangachal read): the old 0.35–0.80 sea verts sat
+ * inside the charcoal band and read as blobs. The floor now clears the
+ * brightest possible land vert so open water is unmistakable, capped below
+ * alarm bloom. Blue stays water-only (this file's only blue is WATER_COL). */
+export const SEA_BRIGHT_LO = 0.72;
+export const SEA_BRIGHT_SPAN = 0.48;
+/* Bathymetry vs valley (Sangachal read): DEM heights are absolute (km above
+ * sea level), so a sub-sea-level low under the DEM source is water-covered
+ * seabed — never a valley. The procedural datum is relative, so its lows
+ * stay valleys. Pure. */
+export function isSeaDepth(h, source = 'procedural') {
+  return source === 'dem' && h < 0;
+}
 const SLOPE_MIN = 0.0028; // skip contour cells flatter than ~2.8 m/km — flats go truly clean
 const BASE_COL = new THREE.Color(0x8b949a); // dim cool-grey hairline base — whispers under alarms
 const INDEX_COL = new THREE.Color(0x9fabb3); // cool-grey index, never white — alarms own the top luminance
@@ -702,12 +722,12 @@ function elevLabel(text, x, y, z) {
  * contours + ground fill get a sunlit/shadowed read without any shader.
  * The shade grid is derived from the sampled H grid (central differences,
  * VEX-applied normals) — zero extra field() calls — and sampled bilinearly
- * per vertex. Matte-charcoal swing (0.58–1.13): deep enough that volume
+ * per vertex. Matte-charcoal swing (0.52–1.13): deep enough that volume
  * reads at TOP, capped so greys stay grey and alarms keep the lead. */
 const SUN = new THREE.Vector3(-0.52, 0.78, -0.34).normalize(); // NW sun, ~51° alt
 const _sn = new THREE.Vector3();
 let _shadeAt = () => 0.5; // replaced per buildTerrain from the live H grid
-const shadeToBright = (t) => 0.58 + 0.55 * Math.min(1, Math.max(0, t));
+const shadeToBright = (t) => 0.52 + 0.61 * Math.min(1, Math.max(0, t));
 
 /* Fill-grid sampler (same bilinear read over H): the draped ground fill
  * rides true altitude without extra field() calls. */
@@ -827,7 +847,8 @@ export function buildTerrain(scene) {
   sampleH(); // re-carve along the surveyed line; contours + threads share it
   if (mn < -0.15 || mx > 0.16) console.warn(`[terrain] field out of expected band mn=${mn.toFixed(3)} mx=${mx.toFixed(3)} — check amplitudes`);
 
-  // Baked hillshade grid: VEX-applied normals from H, dotted with the
+  // Baked hillshade grid: SHADE_VEX-applied normals from H (shading-only
+  // relief — geometry stays true-scale), dotted with the
   // single NW sun → 0..1 (shadowed..sunlit). Contours + fill sample this
   // bilinearly; field() is never touched so the relief/sd gates hold.
   const SG = new Float32Array((N + 1) * (N + 1));
@@ -837,7 +858,7 @@ export function buildTerrain(scene) {
       const xp = H[j * (N + 1) + Math.min(i + 1, N)];
       const zm = H[Math.max(j - 1, 0) * (N + 1) + i];
       const zp = H[Math.min(j + 1, N) * (N + 1) + i];
-      _sn.set(-((xp - xm) / (2 * step)) * VEX, 1, -((zp - zm) / (2 * step)) * VEX).normalize();
+      _sn.set(-((xp - xm) / (2 * step)) * SHADE_VEX, 1, -((zp - zm) / (2 * step)) * SHADE_VEX).normalize();
       SG[j * (N + 1) + i] = (_sn.dot(SUN) + 1) / 2;
     }
   }
@@ -978,15 +999,42 @@ export function buildTerrain(scene) {
     summitGroup.add(tag);
   }
   // Valley-floor proof: the low landmark gets the same treatment as the
-  // summits, so the full relief span reads before any drill-in.
+  // summits, so the full relief span reads before any drill-in. Bathymetry
+  // check (Sangachal read): a sub-sea-level DEM low is water-covered seabed
+  // — the -78 m pill sitting in the Caspian is a depth, never a valley.
   {
     const vz = 6, vx = drainAt(vz);
     const vh = field(vx, vz);
-    const tag = elevLabel(`▼ ${Math.round(vh * 1000)} m · VALLEY`, vx, vh * VEX + 0.55, vz);
+    const seaLow = isSeaDepth(vh, _source);
+    const tag = elevLabel(`▼ ${Math.round(vh * 1000)} m · ${seaLow ? 'SEABED' : 'VALLEY'}`, vx, vh * VEX + 0.55, vz);
     tag.scale.set(0.5 * tag.userData.aspect, 0.5, 1);
     summitGroup.add(tag);
   }
   group.add(summitGroup);
+
+  // Open-water identity (Sangachal read): one CASPIAN SEA label rides the
+  // DEM open-water centroid so the sea is named at every zoom, oblique
+  // included. DEM-only — the procedural floor has no sea, so there is
+  // nothing to name. Dark ops theme kept (labels.js water-blue on halo).
+  {
+    if (_source === 'dem') {
+      let seaCount = 0, seaX = 0, seaZ = 0;
+      for (let j = 0; j <= N; j++) {
+        for (let i = 0; i <= N; i++) {
+          if (H[j * (N + 1) + i] < 0) {
+            seaCount++;
+            seaX += -SIZE / 2 + i * step;
+            seaZ += -SIZE / 2 + j * step;
+          }
+        }
+      }
+      if (seaCount > (N + 1) * (N + 1) * 0.01) {
+        const seaSp = makeSeaLabelSprite();
+        seaSp.position.set(seaX / seaCount, 0.9, seaZ / seaCount);
+        group.add(seaSp);
+      }
+    }
+  }
 
   // Draped ground fill: polar mesh (center fan + 56 rings × 160 sectors)
   // riding true altitude just under the contour lines. Vertex colors =
@@ -1006,10 +1054,12 @@ export function buildTerrain(scene) {
       const h = _heightAt(x, z);
       const te = Math.min(1, Math.max(0, (h - _fillLo) / Math.max(1e-6, _fillHi - _fillLo)));
       const rim = 1 - 0.55 * smooth(18.5, 20, Math.hypot(x, z));
-      // Landmass parity: sub-sea-level verts read as WATER_COL water so the
-      // coastline tells land from sea at a glance; bathymetry contours stay.
+      // Landmass parity: sub-sea-level DEM verts read as WATER_COL water so
+      // the coastline tells land from sea at a glance; bathymetry contours
+      // stay. Gated on the DEM source — the procedural datum is relative,
+      // so its lows stay charcoal land, never water.
       // [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-3]
-      if (h < 0) tmpC.copy(SEA).multiplyScalar((0.35 + 0.45 * _shadeAt(x, z)) * rim);
+      if (_source === 'dem' && h < 0) tmpC.copy(SEA).multiplyScalar((SEA_BRIGHT_LO + SEA_BRIGHT_SPAN * _shadeAt(x, z)) * rim);
       else tmpC.copy(LO).lerp(HI, te).multiplyScalar((0.42 + 0.78 * _shadeAt(x, z)) * rim);
       pos.push(x, h * VEX - 0.02, z);
       clr.push(tmpC.r, tmpC.g, tmpC.b);
@@ -1018,7 +1068,7 @@ export function buildTerrain(scene) {
     // center vertex (average height, mid shade) then ring verts
     {
       const h = _heightAt(0, 0);
-      if (h < 0) tmpC.copy(SEA).multiplyScalar(0.35 + 0.45 * _shadeAt(0, 0));
+      if (_source === 'dem' && h < 0) tmpC.copy(SEA).multiplyScalar(SEA_BRIGHT_LO + SEA_BRIGHT_SPAN * _shadeAt(0, 0));
       else tmpC.copy(LO).lerp(HI, 0.5).multiplyScalar(0.42 + 0.78 * _shadeAt(0, 0));
       pos[1] = h * VEX - 0.02;
       clr[0] = tmpC.r; clr[1] = tmpC.g; clr[2] = tmpC.b;
