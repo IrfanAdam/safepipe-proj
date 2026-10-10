@@ -277,6 +277,37 @@
   }
   document.querySelector('[data-tab="ops3d"]')?.addEventListener('click', resizeOps3d);
   window.addEventListener('hashchange', resizeOps3d);
+  /* Live v1 caption: mix + map state + canvas dims, repainted 1/s. Whatever
+   * a v1 tab shows (or doesn't), one screenshot now names it — the same
+   * instrumentation strategy that cracked the Ring-2 case. Display-only;
+   * never touches mount, mix, or sizing. */
+  function v1Caption(sel, satKey) {
+    const host = document.querySelector(sel);
+    if (!host) return;
+    let cap = host.querySelector('[data-v1diag]');
+    if (!cap) {
+      cap = document.createElement('div');
+      cap.dataset.v1diag = '1';
+      cap.style.cssText = 'position:absolute;right:12px;top:12px;z-index:5;padding:4px 12px;background:rgba(10,14,18,.88);color:rgba(207,212,214,.8);font:10px/1.6 ui-monospace,monospace;letter-spacing:.1em;pointer-events:none;white-space:nowrap;';
+      if (!host.style.position) host.style.position = 'relative';
+      host.appendChild(cap);
+    }
+    try {
+      const sat = window[satKey];
+      const cvs = [...host.querySelectorAll('canvas')].map((c) => `${c.width}x${c.height}`).join(' ');
+      cap.textContent = `V1 · mix:${sat?.mix?.toFixed?.(2) ?? '-'} · map:${sat ? (sat.available ? (sat.degraded ? 'deg' : 'on') : 'off') : 'no-sat'} · cv:${cvs || 'none'}`;
+    } catch {
+      /* caption never breaks the tab */
+    }
+  }
+  setInterval(() => {
+    try {
+      v1Caption('#ops3d-specimen', '__satbase');
+      v1Caption('#ops3d-sangachal', '__satbaseSangachal');
+    } catch {
+      /* caption never breaks the tab */
+    }
+  }, 1000);
   } catch (err) {
     paintMountError(err?.message ?? err);
   }
