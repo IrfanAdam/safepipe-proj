@@ -38,10 +38,27 @@ const barDiv = el.querySelector('[data-ring2="bar"]');
 const statusDiv = el.querySelector('[data-ring2="status"]');
 
 const FOV_DEG = 60;
+// Bump on every user-visible Ring-2 change: proves from a screenshot alone
+// which build Safari actually ran (stale-build confusion ends here).
+const BUILD_ID = '10cf7cb';
 let map = null;
 let twin = null;
 let mixCtl = null;
 let vexWarned = false;
+
+function canvasDims() {
+  let mapSize = 'map:-';
+  try {
+    const c = map?.getCanvas?.();
+    if (c) mapSize = `map:${c.width}x${c.height}`;
+  } catch { /* pre-mount */ }
+  let twinSize = 'twin:-';
+  try {
+    const c = twin?.canvas;
+    if (c) twinSize = `twin:${c.width}x${c.height}`;
+  } catch { /* pre-mount */ }
+  return `${mapSize} ${twinSize}`;
+}
 
 function paintStatus() {
   if (!statusDiv) return;
@@ -50,7 +67,8 @@ function paintStatus() {
   const info = twin?.getInfo?.();
   const mapErr = globalThis.__ring2mapErrors?.at(-1);
   statusDiv.textContent =
-    `RING-2 · dem:${s.stage}/${s.source} tiles:${s.tilesLoaded}/${s.tilesTotal}` +
+    `RING-2 [${BUILD_ID}] · dem:${s.stage}/${s.source} tiles:${s.tilesLoaded}/${s.tilesTotal}` +
+    ` · ${canvasDims()}` +
     ` · mix:${mix}` +
     (info && info.min !== undefined
       ? ` · relief:${(info.max - info.min).toFixed(0)}m idx:${info.indexCount ?? 0} src:${info.source ?? '?'}`
@@ -106,9 +124,17 @@ async function boot() {
     map,
     twin,
     mix: mixCtl,
+    build: BUILD_ID,
     getPose: () => twin.getPose(),
     setMix: (v) => mixCtl.setMix(v),
     getStatus,
+    diag: () => ({
+      build: BUILD_ID,
+      canvases: canvasDims(),
+      status: statusDiv?.textContent ?? null,
+      mapErrors: globalThis.__ring2mapErrors ?? [],
+      dem: getStatus(),
+    }),
   };
 
   const loop = () => {
