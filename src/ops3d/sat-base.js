@@ -278,6 +278,16 @@ export function scopeFeatherPx(elevDeg) {
   return 1.5 + ((70 - e) / 50) * (28 - 1.5);
 }
 
+// Satellite is a TOP instrument: off-nadir the imagery drape reads as a
+// sphere/blur and tile seams show, so the base layer hides below 70°
+// elevation (same TOP boundary as scopeFeatherPx). Unknown camera fails
+// visible (legacy). Pure.
+export const SAT_TOP_MIN_ELEV = 70;
+export function satVisibleAtTilt(elevDeg) {
+  const e = Number(elevDeg);
+  if (!Number.isFinite(e)) return true;
+  return e >= SAT_TOP_MIN_ELEV;
+}
 // CSS mask that punches the same disc out of the twin canvas: satellite
 // shows through inside, custom twin stays opaque outside. `inside` is the
 // twin's alpha inside the disc — the crossfade mix, so mid-blend ghosts the
@@ -795,10 +805,60 @@ export function initSatBase(container, opts = {}) {
     }
   };
 
+  // Twin camera elevation (deg above horizon) for tilt gates; NaN when the
+  // twin API is unavailable (gates fail visible — legacy).
+  const twinElevDeg = () => {
+    try {
+      const twin = getTwin();
+      const cam = twin?.debug?.camera;
+      let tgt = null;
+      try {
+        tgt = twin?.debug?.target?.();
+      } catch {
+        tgt = null;
+      }
+      if (!cam?.position || !tgt) return NaN;
+      const dx = cam.position.x - tgt.x;
+      const dy = cam.position.y - tgt.y;
+      const dz = cam.position.z - tgt.z;
+      const dist = Math.hypot(dx, dy, dz);
+      if (!(dist > 1e-9)) return NaN;
+      return (Math.asin(Math.min(1, Math.max(-1, dy / dist))) * 180) / Math.PI;
+    } catch {
+      return NaN;
+    }
+  };
+
   // Reconcile the scope overlay with toggle + level (throttled; force on
   // toggle/resize). Shown only at TOP/network — drill-ins auto-hide and
   // the user's crossfade mix is restored untouched.
   const refreshScope = (force = false) => {
+    // TOP-only satellite (user call): the base imagery hides off-nadir so
+    // oblique views are pure twin — no sphere read, no drape blur. Runs
+    // ahead of the paint throttle so orbit drags gate promptly. When the
+    // base hides, the twin canvas is forced opaque: at the SAT end of the
+    // slider its opacity is ~0 (nothing underneath) which would leave a
+    // black void — oblique is twin territory regardless of mix.
+    try {
+      const satVis = satVisibleAtTilt(twinElevDeg());
+      if (base && base.style) base.style.display = satVis ? '' : 'none';
+      if (!satVis) {
+        const c = canvasOf();
+        if (c && c.style) c.style.opacity = '';
+        try {
+          const twin = getTwin();
+          if (typeof twin?.setTerrainMode === 'function') twin.setTerrainMode('twin');
+        } catch {
+          /* ground mode is cosmetic */
+        }
+      } else {
+        // Back at TOP: restore the mix-driven twin fade so SAT shows through.
+        const c = canvasOf();
+        if (c && c.style) c.style.opacity = mix >= 0.999 ? '' : String(mix);
+      }
+    } catch {
+      /* base stays as-is */
+    }
     const now =
       typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
     if (!force && now - lastScope < 150) return scopeShown;

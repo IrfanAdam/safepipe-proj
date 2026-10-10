@@ -103,3 +103,16 @@
 | 3 | Commit + close | 346/346 suite green, build green |
 
 ### Task 1 ✓ done · Task 2 ✓ done · Task 3 ✓ done
+
+---
+
+## Phase 5 — TOP-only satellite {#phase-5}
+
+*Off-nadir the imagery drape reads as sphere/blur with seams. Base layer hides below 70° elevation; twin forced opaque + grounded so oblique is never a black void; TOP restores mix fade.*
+
+| # | Task | Done when |
+|---|---|---|
+| 1 | `satVisibleAtTilt` + per-tick tilt gate in `refreshScope` | RED→GREEN, oblique = pure twin verified |
+| 2 | Commit + close | 347/347 suite green, build green |
+
+### Task 1 ✓ done · Task 2 ✓ done
