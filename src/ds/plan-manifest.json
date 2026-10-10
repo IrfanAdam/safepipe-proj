@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T15:08:43.191Z",
+  "generated": "2026-10-10T15:12:35.024Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,24 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "59a209b",
+      "full": "59a209b0dc8697c68ce5064905ab8e25b1bfaf84",
+      "date": "2026-10-10",
+      "time": "20:42",
+      "subject": "fix(ring2): surface map errors + WebGL context loss in status overlay [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "6b483d6",
+      "full": "6b483d6fd92e74eb79c4d0db2d33f4e15d4b9242",
+      "date": "2026-10-10",
+      "time": "20:39",
+      "subject": "fix(gallery): async-iife import guard builds clean, ring2 mount import-free [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "eba6a6b",
       "full": "eba6a6b765e19fc3b459631d1daf0cd04ff854fd",
@@ -1292,7 +1310,5 @@
       "anchor": null
     }
   ],
-  "wip": [
-    "gallery.html"
-  ]
+  "wip": []
 }
