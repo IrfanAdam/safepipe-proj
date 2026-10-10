@@ -513,6 +513,13 @@ describe('ops3d maplibre-terrain redo — real ground, ground seam, showcase', (
     api2.dispose();
   });
 
+  it('late map load clears a stale watchdog offline tag', () => {
+    assert.ok(
+      SRC.includes('[data-testid="sat-base-tag"]') && SRC.includes('.remove()'),
+      'load handler drops the offline tag so live maps never read OFFLINE',
+    );
+  });
+
   it('DEM-remount heals the crossfade when the twin canvas element swaps', () => {
     const calls = [];
     const twin = { setTerrainMode: (m) => { calls.push(m); return m; } };

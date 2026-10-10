@@ -543,6 +543,13 @@ export function initSatBase(container, opts = {}) {
       map.on?.('load', () => {
         mapReady = true;
         hideLoadingTag();
+        // Late load after the watchdog fired: drop the stale offline tag so
+        // the DOM never claims OFFLINE under a live map.
+        try {
+          base.querySelector?.('[data-testid="sat-base-tag"]')?.remove();
+        } catch {
+          /* tag is cosmetic */
+        }
         moodMap(map);
         syncFromTwin(true);
         // First-visit showcase: no explicit choice + TOP/network → glide to

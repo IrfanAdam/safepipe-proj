@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T07:50:48.039Z",
+  "generated": "2026-10-10T08:04:50.680Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,15 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "f2ece53",
+      "full": "f2ece53af54bd22de8e37ac272a089daf9f3e1c5",
+      "date": "2026-10-10",
+      "time": "13:30",
+      "subject": "feat(ops3d): MapLibre owns the ground — real 3D terrain + satellite, twin overlays only",
+      "plan": null,
+      "anchor": null
+    },
     {
       "sha": "8b94752",
       "full": "8b94752a77ad15ecf0a8de3e827b0c308c4c5fe7",
@@ -1129,7 +1138,6 @@
     }
   ],
   "wip": [
-    "src/ops3d/sat-base.js",
-    "src/ops3d/twin.js"
+    "src/ops3d/sat-base.js"
   ]
 }
