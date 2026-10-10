@@ -49,7 +49,7 @@ const WATER_FEATHER_M = 8; // shoreline feather band: alpha ramps 0->full over t
 const WATER_MAX_OPACITY = 0.55;
 const EDGE_FADE_FRAC = 0.10; // outer 10% of the DEM window fades to 0 (no razor edge)
 const PILL_COLLAPSE_RANGE_M = 12000; // above: max 3 pills + count; below: full set
-const MASK_COL = 0x101418; // page/map background: masked ground reads as vignette, not void
+const MASK_COL = 0x0b0c0c; // page/map background: masked ground reads as vignette, not void
 const MASK_LIFT_M = 30; // hugs terrain outside the ring, hides satellite beneath
 const MASK_SIZE_M = 300000; // covers the oblique horizon (far plane raised to match)
 const MASK_SEG = 100;
@@ -240,7 +240,7 @@ export function createOverlayTwin(container, opts = {}) {
   controls.dampingFactor = 0.08;
   controls.maxPolarAngle = (85 * Math.PI) / 180;
   controls.minDistance = 800;
-  controls.maxDistance = 60000;
+  controls.maxDistance = 32000; // user call: a touch past the lens frame, never deep void
 
   const group = new THREE.Group();
   group.name = 'ring2-overlays';

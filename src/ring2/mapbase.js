@@ -37,7 +37,7 @@ export const IMAGERY_LAYER_ID = 'esri-imagery';
 export const IMAGERY_BACKUP_LAYER_ID = 'esri-imagery-backup';
 export const HILLSHADE_LAYER_ID = 'ring2-hillshade';
 export const REFERENCE_LAYER_ID = 'esri-reference';
-export const MASK_FILL_COL = '#101418'; // page bg: clipped ground reads as vignette, not void
+export const MASK_FILL_COL = '#0b0c0c'; // page bg: clipped ground reads as vignette, not void
 
 /* Map-side ring clip (world-space, projection-proof). The twin-side mask
  * (overlays.js) is drawn through the twin perspective camera, which
@@ -272,8 +272,8 @@ export async function mountMapBase(el, opts = {}) {
     try {
       map.setSky({
         'sky-color': '#0b0c0c',
-        'horizon-color': '#101418',
-        'fog-color': '#101418',
+        'horizon-color': '#0b0c0c',
+        'fog-color': '#0b0c0c',
         'fog-ground-blend': 0.55,
         'horizon-fog-blend': 1,
         'sky-horizon-blend': 0.5,
