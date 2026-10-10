@@ -603,6 +603,35 @@ function edgeFade(x, z) {
     const c = buildContours(src);
     const waterCells = buildWater();
     buildCountPill(); // last: +N covers ring + pin + schematic + contour labels
+    // Ring-clip: every overlay EXCEPT the ring itself + label sprites is
+    // cut to the 10km disc in-shader. Without this the square extent's
+    // corners (up to 41% past R) poke out as a rotated quad with a hard
+    // diagonal edge. Sprites (pills/labels) stay unclipped by design.
+    group.traverse((o) => {
+      if (!o.material || o.isSprite || o.name === 'ring2-ring') return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        if (!m || m.userData.ringClipped) continue;
+        m.userData.ringClipped = true;
+        m.onBeforeCompile = (sh) => {
+          sh.uniforms.uRingR = { value: RING_RADIUS_M };
+          sh.vertexShader =
+            'varying vec3 vRingW;\n' +
+            sh.vertexShader.replace(
+              '#include <begin_vertex>',
+              '#include <begin_vertex>\n vRingW = (modelMatrix * vec4(position, 1.0)).xyz;',
+            );
+          sh.fragmentShader =
+            'varying vec3 vRingW;\nuniform float uRingR;\n' +
+            sh.fragmentShader.replace(
+              '#include <clipping_planes_fragment>',
+              '#include <clipping_planes_fragment>\n if (length(vRingW.xz) > uRingR) discard;',
+            );
+        };
+        m.customProgramCacheKey = () => 'ring2-clip';
+        m.needsUpdate = true;
+      }
+    });
     lastInfo = { ...c, waterCells, source: src, at: Date.now() };
     applyEmphasis(lastT);
     return lastInfo;

@@ -131,7 +131,7 @@ export function setGroundOwns(on) {
   const m = _map;
   if (m && m.loaded()) {
     const vis = _groundOwns ? 'visible' : 'none';
-    for (const id of [IMAGERY_LAYER_ID, HILLSHADE_LAYER_ID]) {
+    for (const id of [IMAGERY_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID]) {
       try {
         m.setLayoutProperty(id, 'visibility', vis);
       } catch {
@@ -144,7 +144,7 @@ export function setGroundOwns(on) {
 
 function applyGroundFlag(m) {
   if (!_groundOwns) {
-    for (const id of [IMAGERY_LAYER_ID, HILLSHADE_LAYER_ID]) {
+    for (const id of [IMAGERY_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID]) {
       try {
         m.setLayoutProperty(id, 'visibility', 'none');
       } catch {
