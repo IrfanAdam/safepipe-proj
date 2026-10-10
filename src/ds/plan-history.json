@@ -1327,6 +1327,33 @@
      "state": ""
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-10",
+   "hash": "d89f7666",
+   "sections": [
+    {
+     "head": "Phase 1 — Site + field truth (fresh seam) {#phase-1}",
+     "hash": "70f77c3c",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — MapLibre ground + camera parity {#phase-2}",
+     "hash": "34331757",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 3 — Twin overlays + seamless slider {#phase-3}",
+     "hash": "0375f0f6",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Prove + ship ✓ done {#phase-4}",
+     "hash": "d6ecb56e",
+     "state": "2/2"
+    }
+   ]
   }
  ]
 }
