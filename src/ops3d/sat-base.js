@@ -544,7 +544,7 @@ function satStyle(site = SITE) {
       // Opaque floor: the canvas is never transparent, so a slow or
       // failed tile load reads as dark base — never a black hole. Covered
       // by imagery wherever tiles resolve.
-      { id: 'void', type: 'background', paint: { 'background-color': '#0e141b' } },
+      { id: 'void', type: 'background', paint: { 'background-color': '#0b0c0c' } },
       // Backup FIRST (bottom): identical pixels when both hosts live; failed
       // primary tiles are transparent, so the backup shows through the gaps —
       // same transparent gap-through as ring2/mapbase.js.
@@ -599,9 +599,9 @@ function moodMap(map) {
   }
   try {
     map.setSky?.({
-      'sky-color': '#0e141b',
-      'horizon-color': 'rgba(146, 160, 175, 0.35)',
-      'fog-color': '#0e141b',
+      'sky-color': '#0b0c0c',
+      'horizon-color': '#0b0c0c',
+      'fog-color': '#0b0c0c',
       'fog-ground-blend': 0.5,
       'horizon-fog-blend': 0.5,
       'sky-horizon-blend': 0.5,
