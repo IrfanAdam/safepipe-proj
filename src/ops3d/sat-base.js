@@ -186,14 +186,15 @@ export function lensCirclePts(site = SITE, rKm = SCOPE_R_KM, seg = 72) {
 }
 export function lensMaskGeoJSON(site = SITE, radiusKm = SCOPE_R_KM) {
   const R = Number(radiusKm) > 0 ? Number(radiusKm) : SCOPE_R_KM;
-  const c = [site.lon, site.lat];
-  const half = 1.5; // degrees: past any in-ring view, sky/fog melts the edge
-  const square = [
-    [c[0] - half, c[1] - half],
-    [c[0] + half, c[1] - half],
-    [c[0] + half, c[1] + half],
-    [c[0] - half, c[1] + half],
-    [c[0] - half, c[1] - half],
+  // Outer shell = the whole world (mercator limits): zoomed-out oblique
+  // views otherwise show photo past a fixed-degree box. The lens hole is
+  // the only imagery window at any zoom or pitch.
+  const world = [
+    [-180, -85],
+    [180, -85],
+    [180, 85],
+    [-180, 85],
+    [-180, -85],
   ];
   const band = (outer, hole, id, op) => ({
     type: 'Feature',
@@ -202,7 +203,7 @@ export function lensMaskGeoJSON(site = SITE, radiusKm = SCOPE_R_KM) {
   });
   return {
     type: 'FeatureCollection',
-    features: [band(square, lensCirclePts(site, R), 1, 1)],
+    features: [band(world, lensCirclePts(site, R), 1, 1)],
   };
 }
 

@@ -61,14 +61,15 @@ function circleRing(rM, seg = 72) {
 }
 function maskGeoJSON() {
   const R = SANGACHAL.radiusKm * 1000;
-  const c = [SANGACHAL.lon, SANGACHAL.lat];
-  const half = 1.5; // degrees: past any in-ring view, fog melts the edge
-  const square = [
-    [c[0] - half, c[1] - half],
-    [c[0] + half, c[1] - half],
-    [c[0] + half, c[1] + half],
-    [c[0] - half, c[1] + half],
-    [c[0] - half, c[1] - half],
+  // Outer shell = the whole world (mercator limits): zoomed-out oblique
+  // views otherwise show photo past a fixed-degree box. The lens hole is
+  // the only imagery window at any zoom or pitch.
+  const world = [
+    [-180, -85],
+    [180, -85],
+    [180, 85],
+    [-180, 85],
+    [-180, -85],
   ];
   const band = (outer, hole, id, op) => ({
     type: 'Feature',
@@ -78,7 +79,7 @@ function maskGeoJSON() {
   return {
     type: 'FeatureCollection',
     features: [
-      band(square, circleRing(R), 1),
+      band(world, circleRing(R), 1),
     ],
   };
 }

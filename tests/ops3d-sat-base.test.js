@@ -573,9 +573,10 @@ describe('ops3d satellite monitor — toggle wiring + fallback (fake DOM)', () =
     assert.equal(g.type, 'FeatureCollection');
     assert.equal(g.features.length, 1, 'single band');
     assert.deepEqual(g.features.map((f) => f.properties.band), [1]);
-    // The band: square shell with an R=20 km hole (≈0.1797° latitude).
+    // The band: world shell with an R=20 km hole (≈0.1797° latitude).
     const [outer, hole] = g.features[0].geometry.coordinates;
-    assert.equal(outer.length, 5, 'square shell closed');
+    assert.equal(outer.length, 5, 'world shell closed');
+    assert.deepEqual(outer[0], [-180, -85], 'shell starts at mercator corner');
     assert.ok(hole.length > 60, 'circular hole');
     assert.deepEqual(hole[0], hole[hole.length - 1], 'hole ring closed');
     let maxDLat = 0;
