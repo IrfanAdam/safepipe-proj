@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T17:26:24.942Z",
+  "generated": "2026-10-10T17:39:40.681Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,33 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "018b16d",
+      "full": "018b16dbdcdecba4060155e3a8ac4e24a10d5ada",
+      "date": "2026-10-10",
+      "time": "23:09",
+      "subject": "chore: stamp BUILD_IDs [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "fee40e0",
+      "full": "fee40e012984d5d89c73ea0cf67b04bf70ed60c9",
+      "date": "2026-10-10",
+      "time": "23:09",
+      "subject": "feat(ring2): dual-host satellite imagery with gap-through failover [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "a20100d",
+      "full": "a20100d309dde61ce21d8817bddbf4e999709cb2",
+      "date": "2026-10-10",
+      "time": "22:56",
+      "subject": "docs(plan): track refresh [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "585adb8",
       "full": "585adb864d6e64e5540ca4157a739a695e4c8465",
