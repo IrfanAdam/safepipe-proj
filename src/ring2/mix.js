@@ -1,12 +1,15 @@
 /* Safepipe Ops3D Ring-2 — src/ring2/mix.js (Phase 3, Task 8).
- * One slider owns the seamless crossfade. 0 = pure map (twin invisible),
- * 100 = pure twin (map ground hidden, twin takes over). Mid = blend.
+ * One slider owns the seamless crossfade. 0 = overlays off (quiet map),
+ * 100 = overlays full (analysis look). The satellite ground itself stays
+ * on at every mix — the slider fades overlay emphasis only. Mid = blend.
  *
  *   - Drives the twin canvas opacity + overlay emphasis (setEmphasis).
- *   - Takeover rule: mix >= 99 forces setGroundOwns(false) at ANY pitch,
- *     so TOP-down at slider 100 shows zero satellite photo. The TOP-only
- *     satellite rule (pitch < TOP_PITCH_DEG forces satellite full) applies
- *     below 99 only.
+ *   - Ground-always-on: the satellite stays visible at EVERY mix and pitch,
+ *     superimposed under the overlays and ring-clipped by the twin mask.
+ *     Hiding ground at mix>=99 turned pure-twin into a black hole and is
+ *     removed; the slider fades overlay emphasis only. The TOP-only rule is
+ *     retired per owner direction — with ring clipping the superimpose
+ *     holds at all angles.
  *   - Canvas-identity watch: a MutationObserver on the twin container
  *     re-applies the full mix (opacity + pointer-events + emphasis) whenever
  *     the canvas remounts, so a remount can never reset to a stale look
@@ -16,8 +19,8 @@
 import { setGroundOwns, getGroundOwns, IMAGERY_LAYER_ID, IMAGERY_BACKUP_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID } from './mapbase.js';
 
 export const MIX_STORE_KEY = 'ring2.mix';
-export const TOP_PITCH_DEG = 20;
-export const TWIN_TAKEOVER_MIX = 99;
+export const TOP_PITCH_DEG = 20; // retired: ground no longer pitch-gated (kept for API compat)
+export const TWIN_TAKEOVER_MIX = 99; // retired: takeover removed, ground always on (kept for API compat)
 
 export function clampMix(v) {
   const n = Number(v);
@@ -113,7 +116,9 @@ export function mountMixBar(el, opts = {}) {
     const canvas = getTwinCanvas();
     lastCanvas = canvas ?? lastCanvas;
     if (canvas) {
-      canvas.style.opacity = String(t);
+      // Canvas stays opaque: the ring mask lives on this canvas and must
+      // survive at every mix. Overlay fade rides on emphasis alone.
+      canvas.style.opacity = '1';
       // Pure-map end: twin gets out of the way so the map is directly
       // interactive; any visible twin owns orbit (sync drives the map).
       canvas.style.pointerEvents = t < 0.02 ? 'none' : 'auto';
@@ -126,18 +131,12 @@ export function mountMixBar(el, opts = {}) {
     paintLabel();
   }
 
-  /* Takeover rule: mix >= 99 forces twin ground at ANY pitch (TOP-down
-   * at slider 100 shows zero satellite photo). The TOP-only satellite
-   * rule applies below 99 only. */
+  /* Takeover rule RETIRED (was: mix >= 99 hid all ground at any pitch —
+   * pure-twin became a black hole). Ground is always on now; the slider
+   * fades overlay emphasis only, satellite superimposes at all angles. */
   function applyGroundRule(pitchDeg) {
     lastPitch = pitchDeg;
-    if (mix >= TWIN_TAKEOVER_MIX) {
-      setGroundOwns(false);
-    } else if (pitchDeg < TOP_PITCH_DEG) {
-      setGroundOwns(true); // satellite full at TOP
-    } else {
-      setGroundOwns(mix < TWIN_TAKEOVER_MIX); // below 99 the map keeps ground
-    }
+    setGroundOwns(true);
     forceGroundLayers();
     paintLabel();
   }
@@ -161,10 +160,7 @@ export function mountMixBar(el, opts = {}) {
   /* Canvas-identity watch: any remount re-applies the full mix. */
   const seen = () => getTwinContainer();
   const observer = new MutationObserver(() => {
-    const cur = getTwinCanvas();
-    if (cur !== lastCanvas || cur?.style.opacity !== String(mix / 100)) {
-      reapply();
-    }
+    if (getTwinCanvas() !== lastCanvas) reapply();
   });
   const watchRoot = seen() ?? el;
   observer.observe(watchRoot, { childList: true, subtree: true });

@@ -12,7 +12,7 @@
  */
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { SANGACHAL, VEX } from './site.js';
+import { SANGACHAL, VEX, worldToGeo } from './site.js';
 
 /* Keyless tile endpoints. Imagery has TWO hosts for the same Esri
  * service: some Safari setups (content blockers) kill tile subresources on
@@ -37,6 +37,53 @@ export const IMAGERY_LAYER_ID = 'esri-imagery';
 export const IMAGERY_BACKUP_LAYER_ID = 'esri-imagery-backup';
 export const HILLSHADE_LAYER_ID = 'ring2-hillshade';
 export const REFERENCE_LAYER_ID = 'esri-reference';
+export const MASK_FILL_COL = '#101418'; // page bg: clipped ground reads as vignette, not void
+
+/* Map-side ring clip (world-space, projection-proof). The twin-side mask
+ * (overlays.js) is drawn through the twin perspective camera, which
+ * misregisters against the MapLibre mercator camera by tens of px at
+ * oblique pitch — map photo leaked past it with square tile corners. A
+ * fill layer conforms to map terrain in map space BY CONSTRUCTION, so its
+ * edge is always a world circle under every projection: 3 stepped bands
+ * fade the photo out across 0.75R–0.95R, opaque beyond. Topmost layer, so
+ * labels clip to the disc too. */
+function circleRing(rM, seg = 72) {
+  const ring = [];
+  for (let i = 0; i < seg; i++) {
+    const a = (i / seg) * Math.PI * 2;
+    const g = worldToGeo(Math.cos(a) * rM, Math.sin(a) * rM);
+    ring.push([g.lon, g.lat]);
+  }
+  ring.push(ring[0].slice());
+  return ring;
+}
+function maskGeoJSON() {
+  const R = SANGACHAL.radiusKm * 1000;
+  const c = [SANGACHAL.lon, SANGACHAL.lat];
+  const half = 1.5; // degrees: past any in-ring view, fog melts the edge
+  const square = [
+    [c[0] - half, c[1] - half],
+    [c[0] + half, c[1] - half],
+    [c[0] + half, c[1] + half],
+    [c[0] - half, c[1] + half],
+    [c[0] - half, c[1] - half],
+  ];
+  const band = (outer, hole, id, op) => ({
+    type: 'Feature',
+    properties: { band: id, 'fill-opacity': op },
+    geometry: { type: 'Polygon', coordinates: hole ? [outer, hole] : [outer] },
+  });
+  return {
+    type: 'FeatureCollection',
+    features: [
+      band(square, circleRing(R * 0.95), 1),
+      band(circleRing(R * 0.95), circleRing(R * 0.85), 2),
+      band(circleRing(R * 0.85), circleRing(R * 0.75), 3),
+    ],
+  };
+}
+export const MASK_BAND_LAYER_IDS = ['ring2-mask-1', 'ring2-mask-2', 'ring2-mask-3'];
+const MASK_BAND_OPACITY = [1, 0.55, 0.25];
 
 const ESRI_ATTRIB =
   'Imagery &copy; Esri, Maxar, Earthstar Geographics | Terrain: AWS Terrarium (Mapzen)';
@@ -83,6 +130,10 @@ export function mapStyle() {
         maxzoom: 19,
         attribution: 'Reference &copy; Esri',
       },
+      'ring2-mask-src': {
+        type: 'geojson',
+        data: maskGeoJSON(),
+      },
     },
     layers: [
       // Backup FIRST (bottom): identical pixels when both hosts live; failed
@@ -108,6 +159,14 @@ export function mapStyle() {
         source: 'esri-reference-src',
         paint: { 'raster-opacity': 0.85 },
       },
+      // Map-side ring clip, topmost: world-circular stepped fade (see above).
+      ...MASK_BAND_LAYER_IDS.map((id, i) => ({
+        id,
+        type: 'fill',
+        source: 'ring2-mask-src',
+        filter: ['==', ['get', 'band'], i + 1],
+        paint: { 'fill-color': MASK_FILL_COL, 'fill-opacity': MASK_BAND_OPACITY[i] },
+      })),
     ],
   };
 }
@@ -200,6 +259,28 @@ export async function mountMapBase(el, opts = {}) {
   map.addControl(new maplibregl.TerrainControl({ source: TERRAIN_SOURCE_ID, exaggeration }), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
+  // Flat-earth pin: projection stays mercator — any globe/perspective flavor
+  // renders the ground as a convex sphere at oblique pitch, which the twin
+  // overlays then can't superimpose on. Sky melts the horizon into the page
+  // background so distant terrain can't read as a planet limb; the
+  // twin-side mask (overlays.js) does the actual ring clip.
+  try {
+    map.setProjection({ type: 'mercator' });
+  } catch { /* maplibre without projections — already flat */ }
+  const applySky = () => {
+    try {
+      map.setSky({
+        'sky-color': '#0b0c0c',
+        'horizon-color': '#101418',
+        'fog-color': '#101418',
+        'fog-ground-blend': 0.55,
+        'horizon-fog-blend': 1,
+        'sky-horizon-blend': 0.5,
+      });
+    } catch { /* style not ready — the load handler below retries */ }
+  };
+  applySky();
+
   // Capture every source/tile error from the start (surfaced in status).
   map.on('error', (e) => {
     const msg = e?.error?.message ?? e?.error ?? e;
@@ -222,6 +303,7 @@ export async function mountMapBase(el, opts = {}) {
   let loadedClean = false;
   map.once('load', () => {
     loadedClean = true;
+    applySky();
     try {
       map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration });
     } catch {

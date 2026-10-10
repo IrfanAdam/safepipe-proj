@@ -144,6 +144,15 @@ async function boot() {
     ({ map: m, loadedClean }) => {
       map = m;
       window.__ring2.map = m;
+      // Release the pre-map mix floor: reapply() floored the EFFECTIVE mix
+      // at 50 while getMap() was null (dead-end guard). The map is here now —
+      // re-apply so the stored mix (e.g. persisted 0) actually drives
+      // emphasis. Without this, overlays render stuck at half-fade.
+      try {
+        mixCtl.reapply();
+      } catch {
+        /* mix bar drives on without us */
+      }
       try {
         assertTerrainOn(map);
       } catch (err) {

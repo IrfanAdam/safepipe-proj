@@ -1,7 +1,8 @@
 /* Safepipe Ops3D Ring-2 — src/ring2/overlays.js (Phase 3, Task 7).
  * Twin draws OVERLAYS ONLY on a transparent three.js canvas over the
- * MapLibre base. No ground mesh, no sky, no satellite — the map owns all
- * ground (mapbase.js). Every overlay vertex is ground-sat via sampleH.
+ * MapLibre base. No ground mesh (except the ring mask that clips the map
+ * to a disc), no sky, no satellite — the map owns all ground (mapbase.js).
+ * Every overlay vertex is ground-sat via sampleH.
  *
  * Layers:
  *   1. RING-2 ring line — FULL 10 km mapped radius (RING_RADIUS_M), never
@@ -48,6 +49,10 @@ const WATER_FEATHER_M = 8; // shoreline feather band: alpha ramps 0->full over t
 const WATER_MAX_OPACITY = 0.55;
 const EDGE_FADE_FRAC = 0.10; // outer 10% of the DEM window fades to 0 (no razor edge)
 const PILL_COLLAPSE_RANGE_M = 12000; // above: max 3 pills + count; below: full set
+const MASK_COL = 0x101418; // page/map background: masked ground reads as vignette, not void
+const MASK_LIFT_M = 30; // hugs terrain outside the ring, hides satellite beneath
+const MASK_SIZE_M = 300000; // covers the oblique horizon (far plane raised to match)
+const MASK_SEG = 100;
 const PILL_MAX_MAP_RANGE = 3;
 
 /* Schematic terminal program (NOT surveyed — every block is labelled). */
@@ -224,7 +229,7 @@ export function createOverlayTwin(container, opts = {}) {
     fovDeg,
     Math.max(container.clientWidth, 1) / Math.max(container.clientHeight, 1),
     10,
-    120000,
+    600000, // mask spans the oblique horizon; nothing writes depth so no fighting
   );
   const startRange = opts.startRange ?? 26000;
   camera.position.set(0, startRange, 0.01);
@@ -576,6 +581,68 @@ function edgeFade(x, z) {
     return wet;
   }
 
+  /* Ring mask: an opaque page-background drape OUTSIDE the 10 km ring that
+   * clips the satellite to a disc at every pitch (map tiles are square and
+   * full-bleed; oblique without this shows a planet-limb of satellite the
+   * overlays can't superimpose on). Alpha is the inverse of edgeFade: 0
+   * inside 0.9R feathering to 1 at R. Never registered for emphasis (must
+   * survive mix 0) and skipped by the ring-clip pass below (it IS the
+   * clipper). depthWrite off — nothing in this scene writes depth, so
+   * paint order alone composites mask-first, overlays-over. */
+  function buildMask() {
+    const half = MASK_SIZE_M / 2;
+    const cell = MASK_SIZE_M / MASK_SEG;
+    const vn = MASK_SEG + 1;
+    const mc = new THREE.Color(MASK_COL);
+    const pos = new Float32Array(vn * vn * 3);
+    const col = new Float32Array(vn * vn * 4);
+    const inner = RING_RADIUS_M * (1 - EDGE_FADE_FRAC);
+    for (let i = 0; i < vn; i++) {
+      for (let j = 0; j < vn; j++) {
+        const x = -half + j * cell;
+        const z = -half + i * cell;
+        const k = i * vn + j;
+        pos[k * 3] = x;
+        pos[k * 3 + 1] = sampleH(x, z) * VEX + MASK_LIFT_M;
+        pos[k * 3 + 2] = z;
+        const rr = Math.hypot(x, z);
+        let a = 0;
+        if (rr >= RING_RADIUS_M) a = 1;
+        else if (rr > inner) {
+          const u = (rr - inner) / (RING_RADIUS_M - inner);
+          a = u * u * (3 - 2 * u);
+        }
+        col[k * 4] = mc.r;
+        col[k * 4 + 1] = mc.g;
+        col[k * 4 + 2] = mc.b;
+        col[k * 4 + 3] = a;
+      }
+    }
+    const idx = [];
+    for (let i = 0; i < MASK_SEG; i++) {
+      for (let j = 0; j < MASK_SEG; j++) {
+        const k00 = i * vn + j;
+        const k10 = k00 + 1;
+        const k01 = k00 + vn;
+        const k11 = k01 + 1;
+        idx.push(k00, k01, k10, k10, k01, k11);
+      }
+    }
+    const g = track(new THREE.BufferGeometry());
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+    g.setIndex(idx);
+    const m = track(new THREE.MeshBasicMaterial({
+      color: 0xffffff, vertexColors: true, transparent: true, opacity: 1,
+      depthWrite: false, side: THREE.DoubleSide,
+    }));
+    const mesh = new THREE.Mesh(g, m);
+    mesh.name = 'ring2-mask';
+    mesh.renderOrder = -10;
+    mesh.frustumCulled = false;
+    group.add(mesh);
+  }
+
   let lastInfo = null;
   function rebuild() {
     group.traverse((o) => {
@@ -603,13 +670,15 @@ function edgeFade(x, z) {
     buildSchematic();
     const c = buildContours(src);
     const waterCells = buildWater();
+    buildMask();
     buildCountPill(); // last: +N covers ring + pin + schematic + contour labels
-    // Ring-clip + periphery fade: every overlay EXCEPT the ring itself +
-    // label sprites dissolves over the outer ~10% of the disc instead of
-    // hitting a hard edge (the old razor cut read as a coverage boundary).
+    // Ring-clip + periphery fade: every overlay EXCEPT the ring itself, the
+    // mask (it IS the clipper), + label sprites dissolves over the outer
+    // ~10% of the disc instead of hitting a hard edge (the old razor cut
+    // read as a coverage boundary).
     // Sprites (pills/labels) stay unclipped by design.
     group.traverse((o) => {
-      if (!o.material || o.isSprite || o.name === 'ring2-ring') return;
+      if (!o.material || o.isSprite || o.name === 'ring2-ring' || o.name === 'ring2-mask') return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       for (const m of mats) {
         if (!m || m.userData.ringClipped) continue;
@@ -659,7 +728,7 @@ function edgeFade(x, z) {
   let lastT = 0.5;
   function applyEmphasis(t) {
     lastT = Math.min(1, Math.max(0, t));
-    const k = 0.25 + 0.75 * lastT;
+    const k = lastT; // full range: mix 0 melts overlays into the satellite, mix 100 full analysis
     for (const m of emphasisMats) m.opacity = (m.userData.baseOpacity ?? m.opacity) * k;
   }
   function setEmphasis(t) {
