@@ -49,11 +49,24 @@ const MAPLIBRE_CSS_URL = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/ma
 
 // Free, keyless tile sources. Esri tile order is {z}/{y}/{x}.
 const ESRI_WORLD_IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+// Ring-2 parity: transparent backup host (services.*) under the primary
+// (server.*). Some Safari content-blockers kill one hostname while the page
+// loads; the backup sits UNDER the primary — failed primary tiles are
+// transparent so the backup shows through the gaps with zero JS swapping.
+export const ESRI_WORLD_IMAGERY_BACKUP = 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 // Keyless Esri reference overlay (boundaries + places + roads) — what makes
 // satellite read as Google-like instead of a bare photo. Same host as the
 // imagery, attribution below.
 const ESRI_REFERENCE = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 const TERRARIUM_TERRAIN = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+
+// Ring-2 layer-id parity (satellite ground visibility toggle owns these).
+export const SAT_LAYER_ID = 'sat';
+export const SAT_BACKUP_LAYER_ID = 'sat-backup';
+export const SAT_HILLSHADE_LAYER_ID = 'sat-hillshade';
+export const SAT_REF_LAYER_ID = 'sat-ref';
+export const TERRAIN_SOURCE_ID = 'terrain';
+export const HILL_SOURCE_ID = 'terrain-hill';
 
 export const TILE_ATTRIBUTION = {
   imagery: 'Imagery © Esri, Maxar, Earthstar Geographics',
@@ -206,7 +219,6 @@ export function lensMaskGeoJSON(site = SITE, radiusKm = SCOPE_R_KM) {
     features: [band(world, lensCirclePts(site, R), 1, 1)],
   };
 }
-
 export function isNetworkLevel(level) {
   return level === 'network';
 }
@@ -491,6 +503,13 @@ function satStyle(site = SITE) {
         maxzoom: 19,
         attribution: TILE_ATTRIBUTION.imagery,
       },
+      'esri-sat-backup': {
+        type: 'raster',
+        tiles: [ESRI_WORLD_IMAGERY_BACKUP],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution: TILE_ATTRIBUTION.imagery,
+      },
       'esri-ref': {
         type: 'raster',
         tiles: [ESRI_REFERENCE],
@@ -508,6 +527,14 @@ function satStyle(site = SITE) {
         maxzoom: 13,
         attribution: TILE_ATTRIBUTION.terrain,
       },
+      [HILL_SOURCE_ID]: {
+        type: 'raster-dem',
+        tiles: [TERRARIUM_TERRAIN],
+        encoding: 'terrarium',
+        tileSize: 256,
+        maxzoom: 13,
+        attribution: TILE_ATTRIBUTION.terrain,
+      },
       'lens-mask-src': {
         type: 'geojson',
         data: lensMaskGeoJSON(site, scopeRadiusForSite(site)),
@@ -518,15 +545,20 @@ function satStyle(site = SITE) {
       // failed tile load reads as dark base — never a black hole. Covered
       // by imagery wherever tiles resolve.
       { id: 'void', type: 'background', paint: { 'background-color': '#0e141b' } },
+      // Backup FIRST (bottom): identical pixels when both hosts live; failed
+      // primary tiles are transparent, so the backup shows through the gaps —
+      // same transparent gap-through as ring2/mapbase.js.
+      { id: SAT_BACKUP_LAYER_ID, type: 'raster', source: 'esri-sat-backup', paint: { 'raster-opacity': 1 } },
       {
-        id: 'sat',
+        id: SAT_LAYER_ID,
         type: 'raster',
         source: 'esri-sat',
+        paint: { 'raster-opacity': 1 },
       },
       {
-        id: 'sat-hillshade',
+        id: SAT_HILLSHADE_LAYER_ID,
         type: 'hillshade',
-        source: 'terrain',
+        source: HILL_SOURCE_ID,
         paint: {
           // Gentle neutral relief only — default black/white shading keeps
           // the imagery true-color; tinted shadows/highlights here once
@@ -535,7 +567,7 @@ function satStyle(site = SITE) {
         },
       },
       {
-        id: 'sat-ref',
+        id: SAT_REF_LAYER_ID,
         type: 'raster',
         source: 'esri-ref',
         paint: {
@@ -561,7 +593,7 @@ function satStyle(site = SITE) {
 // float/sink) + atmosphere sky at oblique angles. Best-effort, swallowed.
 function moodMap(map) {
   try {
-    map.setTerrain?.({ source: 'terrain', exaggeration: TERRAIN_EXAGGERATION });
+    map.setTerrain?.({ source: TERRAIN_SOURCE_ID, exaggeration: TERRAIN_EXAGGERATION });
   } catch {
     /* satellite + hillshade alone is still a fine base */
   }
@@ -820,7 +852,7 @@ export function initSatBase(container, opts = {}) {
           tileErrs = 0;
           tileOks = 0;
           try {
-            if (!terrainBad) map.setTerrain?.({ source: 'terrain', exaggeration: TERRAIN_EXAGGERATION });
+            if (!terrainBad) map.setTerrain?.({ source: TERRAIN_SOURCE_ID, exaggeration: TERRAIN_EXAGGERATION });
           } catch {
             /* satellite alone is still a fine base */
           }
