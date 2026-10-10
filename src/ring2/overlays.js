@@ -584,19 +584,22 @@ function edgeFade(x, z) {
   /* Ring mask: an opaque page-background drape OUTSIDE the 10 km ring that
    * clips the satellite to a disc at every pitch (map tiles are square and
    * full-bleed; oblique without this shows a planet-limb of satellite the
-   * overlays can't superimpose on). Alpha is the inverse of edgeFade: 0
-   * inside 0.9R feathering to 1 at R. Never registered for emphasis (must
-   * survive mix 0) and skipped by the ring-clip pass below (it IS the
-   * clipper). depthWrite off — nothing in this scene writes depth, so
-   * paint order alone composites mask-first, overlays-over. */
+   * overlays can't superimpose on). Hard world-circular clip at exactly R
+   * via onBeforeCompile fragment injection: discard inside R (alpha 0),
+   * opaque outside (alpha 1) — same begin_vertex plus opaque_fragment
+   * anchor pattern as the rebuild() ring-clip pass. Fragment-space, so the
+   * edge is pixel-crisp regardless of the coarse drape grid (the old
+   * vertex-alpha feather 0.9R->R interpolated across 3 km cells and
+   * rendered chunky). Own customProgramCacheKey so three never confuses
+   * this program with the overlay clip-fade program. Never registered for
+   * emphasis (must survive mix 0) and skipped by the ring-clip pass below
+   * (it IS the clipper). depthWrite off — nothing in this scene writes
+   * depth, so paint order alone composites mask-first, overlays-over. */
   function buildMask() {
     const half = MASK_SIZE_M / 2;
     const cell = MASK_SIZE_M / MASK_SEG;
     const vn = MASK_SEG + 1;
-    const mc = new THREE.Color(MASK_COL);
     const pos = new Float32Array(vn * vn * 3);
-    const col = new Float32Array(vn * vn * 4);
-    const inner = RING_RADIUS_M * (1 - EDGE_FADE_FRAC);
     for (let i = 0; i < vn; i++) {
       for (let j = 0; j < vn; j++) {
         const x = -half + j * cell;
@@ -605,17 +608,6 @@ function edgeFade(x, z) {
         pos[k * 3] = x;
         pos[k * 3 + 1] = sampleH(x, z) * VEX + MASK_LIFT_M;
         pos[k * 3 + 2] = z;
-        const rr = Math.hypot(x, z);
-        let a = 0;
-        if (rr >= RING_RADIUS_M) a = 1;
-        else if (rr > inner) {
-          const u = (rr - inner) / (RING_RADIUS_M - inner);
-          a = u * u * (3 - 2 * u);
-        }
-        col[k * 4] = mc.r;
-        col[k * 4 + 1] = mc.g;
-        col[k * 4 + 2] = mc.b;
-        col[k * 4 + 3] = a;
       }
     }
     const idx = [];
@@ -630,12 +622,30 @@ function edgeFade(x, z) {
     }
     const g = track(new THREE.BufferGeometry());
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(col, 4));
     g.setIndex(idx);
     const m = track(new THREE.MeshBasicMaterial({
-      color: 0xffffff, vertexColors: true, transparent: true, opacity: 1,
+      color: MASK_COL,
       depthWrite: false, side: THREE.DoubleSide,
     }));
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uMaskR = { value: RING_RADIUS_M };
+      sh.vertexShader =
+        'varying vec3 vMaskW;\n' +
+        sh.vertexShader.replace(
+          '#include <begin_vertex>',
+          '#include <begin_vertex>\n vMaskW = (modelMatrix * vec4(position, 1.0)).xyz;',
+        );
+      sh.fragmentShader =
+        'varying vec3 vMaskW;\nuniform float uMaskR;\n' +
+        sh.fragmentShader.replace(
+          // NOTE: anchored on opaque_fragment (end of main), NOT
+          // clipping_planes_fragment — diffuseColor is only declared
+          // mid-main, so an early inject would not compile.
+          '#include <opaque_fragment>',
+          '{ float rr = length(vMaskW.xz); if (rr < uMaskR) discard; }\n#include <opaque_fragment>',
+        );
+    };
+    m.customProgramCacheKey = () => 'ring2-maskclip';
     const mesh = new THREE.Mesh(g, m);
     mesh.name = 'ring2-mask';
     mesh.renderOrder = -10;

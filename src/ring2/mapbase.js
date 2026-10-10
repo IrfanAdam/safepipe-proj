@@ -44,9 +44,11 @@ export const MASK_FILL_COL = '#101418'; // page bg: clipped ground reads as vign
  * misregisters against the MapLibre mercator camera by tens of px at
  * oblique pitch — map photo leaked past it with square tile corners. A
  * fill layer conforms to map terrain in map space BY CONSTRUCTION, so its
- * edge is always a world circle under every projection: 3 stepped bands
- * fade the photo out across 0.75R–0.95R, opaque beyond. Topmost layer, so
- * labels clip to the disc too. */
+ * edge is always a world circle under every projection: ONE hard-edged
+ * band, photo full inside R, opaque cover outside R. No stepped feather
+ * (0.75/0.85/0.95 dropped per the owner no-feather call — a single edge
+ * shared with the twin-side hard clip, so both sides agree at exactly R).
+ * Topmost layer, so labels clip to the disc too. */
 function circleRing(rM, seg = 72) {
   const ring = [];
   for (let i = 0; i < seg; i++) {
@@ -76,14 +78,12 @@ function maskGeoJSON() {
   return {
     type: 'FeatureCollection',
     features: [
-      band(square, circleRing(R * 0.95), 1),
-      band(circleRing(R * 0.95), circleRing(R * 0.85), 2),
-      band(circleRing(R * 0.85), circleRing(R * 0.75), 3),
+      band(square, circleRing(R), 1),
     ],
   };
 }
-export const MASK_BAND_LAYER_IDS = ['ring2-mask-1', 'ring2-mask-2', 'ring2-mask-3'];
-const MASK_BAND_OPACITY = [1, 0.55, 0.25];
+export const MASK_BAND_LAYER_IDS = ['ring2-mask-1'];
+const MASK_BAND_OPACITY = [1];
 
 const ESRI_ATTRIB =
   'Imagery &copy; Esri, Maxar, Earthstar Geographics | Terrain: AWS Terrarium (Mapzen)';
@@ -159,7 +159,7 @@ export function mapStyle() {
         source: 'esri-reference-src',
         paint: { 'raster-opacity': 0.85 },
       },
-      // Map-side ring clip, topmost: world-circular stepped fade (see above).
+      // Map-side ring clip, topmost: single hard world-circular edge at R (see above).
       ...MASK_BAND_LAYER_IDS.map((id, i) => ({
         id,
         type: 'fill',
