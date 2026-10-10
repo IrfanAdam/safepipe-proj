@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T20:17:49.798Z",
+  "generated": "2026-10-10T20:19:47.355Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,24 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "2fd8fc7",
+      "full": "2fd8fc7bb1193db9b5f7e6679bc7476425f4e96c",
+      "date": "2026-10-11",
+      "time": "01:49",
+      "subject": "fix(v1): dual-host imagery backup under primary, layer-id constants [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "ccabc3b",
+      "full": "ccabc3b563da7e931efcae2c06f31def3da0a80f",
+      "date": "2026-10-11",
+      "time": "01:47",
+      "subject": "docs(plan): track refresh [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "23b1009",
       "full": "23b1009e8f802aea1696eb7c531e8d52fe1d0d28",
@@ -1904,7 +1922,5 @@
       "anchor": null
     }
   ],
-  "wip": [
-    "src/ops3d/sat-base.js"
-  ]
+  "wip": []
 }
