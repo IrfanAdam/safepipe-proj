@@ -20,17 +20,17 @@
 | 2 | `src/ring2/field.js`: Terrarium PNG sampler (center-out, concurrency 6, `maxTiles:16` coarse) + SRTM fallback + procedural fallback; `sampleH(x,z)` single field fn; status bus on `globalThis.__ring2dem` | `getStatus()` per stage; cold swap ≤60 s, warm ≤5 s |
 | 3 | Ground-truth gate `tests/ring2-field.test.js`: 5×5 Open-Meteo grid values pinned as constants; assert relief/std-dev ≥60% of real; regression bands | `node --test tests/ring2-*` green |
 
-### Task 1: site constant + mapping
+### Task 1: site constant + mapping ✓ done
 **Objective:** Exact Sangachal pin + world↔geo math every later module copies verbatim.
 **Files:** Create `src/ring2/site.js`. Test: `tests/ring2-site.test.js`.
 **Verify:** `node --test tests/ring2-site.test.js` — coords exact, round-trip <1 m, ring radius 10 km.
 
-### Task 2: elevation field
+### Task 2: elevation field ✓ done
 **Objective:** Real Terrarium sampler with staged budgets; single `sampleH` all overlays drape on.
 **Files:** Create `src/ring2/field.js`.
 **Verify:** status bus transitions idle→coarse→live; offline → procedural fallback, no throw.
 
-### Task 3: ground-truth test
+### Task 3: ground-truth test ✓ done
 **Objective:** Procedural fallback can never silently pose as surveyed (v1 apron-streak class).
 **Files:** Create `tests/ring2-field.test.js` (Open-Meteo 5×5 grid pinned).
 **Verify:** green; relief ratio reported in output.
@@ -47,17 +47,17 @@
 | 5 | `src/ring2/sync.js`: center-follows-target, zoom from ground resolution (512-px convention `78271.51696·cos(lat)/2^z`, NO slant factor), bearing `atan2(-dx,dz)` for +x-east/+z-south, VEX assert | numeric probe: central-ring grid rms ≤2 px at TOP + 45° yaw poses |
 | 6 | Registration probe `scripts/ring2-probe.cjs` (pose sweep + yaw sweep, dBear 0.00°) | probe passes; method per interactive-3d-views registration-probe ref |
 
-### Task 4: map base
+### Task 4: map base ✓ done
 **Objective:** MapLibre owns the ground — satellite, 3D terrain, sky, controls.
 **Files:** Create `src/ring2/mapbase.js`.
 **Verify:** temp-server capture shows 3D terrain + satellite at 40.2012N 49.4813E.
 
-### Task 5: camera sync
+### Task 5: camera sync ✓ done
 **Objective:** Twin pan/orbit and map pan/zoom never slide apart (v1's 2×-zoom + mirror classes).
 **Files:** Create `src/ring2/sync.js`.
 **Verify:** probe rms ≤2 px; yaw sweep dBear 0.00° at every azimuth.
 
-### Task 6: probe script
+### Task 6: probe script ✓ done
 **Objective:** Repeatable numeric proof, runnable by any later lane.
 **Files:** Create `scripts/ring2-probe.cjs`.
 **Verify:** `node scripts/ring2-probe.cjs` exits 0 with rms table.
@@ -74,17 +74,17 @@
 | 8 | `src/ring2/mix.js`: single slider 0–100 (map↔twin), drives twin-canvas opacity + overlay emphasis; TOP-only satellite rule (satellite full at TOP, twin takes over oblique); canvas-identity watch re-applies mix on remount | slider 0 = pure map photo, 100 = pure twin, mid = registered blend |
 | 9 | `ops3d-ring2.html` harness + `vite.config.js` entry + gallery `RING-2` tab (lazy mount) + v1 deprecation banner on `ops3d.html` | new tab live; old tab shows "deprecated — use RING-2" note |
 
-### Task 7: overlays
+### Task 7: overlays ✓ done
 **Objective:** Twin visual language, zero ground competition with the map.
 **Files:** Create `src/ring2/overlays.js`.
 **Verify:** capture at 3 slider stops; contours close rings; WATER_COL only on water.
 
-### Task 8: mix slider
+### Task 8: mix slider ✓ done
 **Objective:** The seamless transition — one control, no popovers, no stale state.
 **Files:** Create `src/ring2/mix.js`.
 **Verify:** drag 0→100→0 live; remount keeps mix value.
 
-### Task 9: harness + entry + deprecate
+### Task 9: harness + entry + deprecate ✓ done
 **Objective:** Shippable tab + v1 clearly marked legacy.
 **Files:** Create `ops3d-ring2.html`; Modify `vite.config.js`, `gallery.html`, `ops3d.html` (banner only).
 **Verify:** `/ops3d-ring2.html` 200 on temp port; v1 untouched behaviorally.
