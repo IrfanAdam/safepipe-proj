@@ -88,6 +88,19 @@ export const TERRARIUM_COARSE_MAX_PX = 1100;
 export const TERRARIUM_FINE_MAX_PX = 1200;
 export const TERRARIUM_FINE_MAX_TILES = 48;
 export const TERRARIUM_FINE_RADIUS_KM = 6;
+/* Twin ground mesh spans ±22 km (terrain SIZE 44): the coarse Terrarium
+ * footprint must cover the whole mesh, or the apron renders the procedural
+ * fallback (or a clamped mosaic edge) as surveyed terrain — the edge-streak
+ * mechanism. [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-2] */
+export const TWIN_MESH_EXTENT_KM = 44;
+/* Site-scoped Terrarium stage cache key: two gallery tabs (or two sites)
+ * must never share a stage entry — a foreign payload would clamp-sample
+ * as finite "real" terrain. Pure. [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-2] */
+export function terrStageCacheKey(prefix, z, site = SITE) {
+  const lat = Number(site?.lat), lon = Number(site?.lon);
+  const c = Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : SITE;
+  return `${prefix}${z}-${c.lat.toFixed(2)},${c.lon.toFixed(2)}`;
+}
 /* Seam feather half-width each side of the 57°N tile edge (~2 px @30 m). */
 export const SEAM_BLEND_DEG = 2 / 3600;
 /* Delivery stages, in progression order (status bus + meta.stage). */
@@ -951,7 +964,7 @@ export async function loadTerrariumStage(z, opts = {}) {
     const res = [(bbox.lonRight - bbox.lonLeft) / ww, -(bbox.latTop - bbox.latBot) / hh];
     const payload = {
       origin, res, win: { left: 0, top: 0, right: ww, bottom: hh },
-      data, ww, hh, noData: -32768,
+      data, ww, hh, noData: -32768, crop: true, // windowed crop: strict sampling, never edge-smear
       latTop: bbox.latTop, latBot: bbox.latBot,
       lonLeft: bbox.lonLeft, dx: res[0], resM: TERRARIUM_EFFECTIVE_RES_M,
       src: `terrarium-z${z}`, terrTiles: landed.length, terrTotal: picked.length,
@@ -1059,7 +1072,7 @@ export async function loadDEM(opts = {}) {
   const site = resolveSite(opts.site);
   // Single-URL override (tests): treat as a one-tile mosaic.
   const tiles = opts.url ? ['__override__'] : srtmTileNames(site.lat, site.lon, site.extentKm);
-  const terrCoarseKey = `terr-z${terrCoarseZoom}`;
+  const terrCoarseKey = terrStageCacheKey('terr-z', terrCoarseZoom, site);
   const tileUrls = (t) => (t === '__override__' ? [opts.url] : demTileUrls(t));
   const t0 = Date.now();
   const timings = {};
@@ -1096,14 +1109,15 @@ export async function loadDEM(opts = {}) {
       // the same store under distinct keys (DEM_CACHE_VERSION untouched).
       const tCache = Date.now();
       const preHits = await Promise.all(tiles.map((t) => _cacheRead(t)));
+      const terrFineKey = terrStageCacheKey('terr-f', terrFineZoom, site);
       const terrCachedHits = skipTerrarium ? [] : await Promise.all(
-        [terrCoarseKey, `terr-f${terrFineZoom}`].map((k) => _cacheRead(k).catch(() => ({ payload: null, fromCache: null }))),
+        [terrCoarseKey, terrFineKey].map((k) => _cacheRead(k).catch(() => ({ payload: null, fromCache: null }))),
       );
       timings.cacheMs = Date.now() - tCache;
       const missing = tiles.filter((_, i) => !preHits[i].payload);
       const cached = tiles.map((t, i) => (preHits[i].payload ? { ...preHits[i].payload, name: t, _fromCache: preHits[i].fromCache } : null)).filter(Boolean);
       const terrCached = terrCachedHits
-        .map((h, k) => (h.payload ? { ...h.payload, name: k === 0 ? terrCoarseKey : `terr-f${terrFineZoom}`, _fromCache: h.fromCache } : null))
+        .map((h, k) => (h.payload ? { ...h.payload, name: k === 0 ? terrCoarseKey : terrFineKey, _fromCache: h.fromCache } : null))
         .filter(Boolean);
       if (!missing.length) {
         // Warm path: everything from cache, one 'cache' stage.
@@ -1138,8 +1152,11 @@ export async function loadDEM(opts = {}) {
       const terrCoarseP = skipTerrarium
         ? Promise.resolve(null)
         : loadTerrariumStage(terrCoarseZoom, {
-          center: site, extentKm: site.extentKm, maxPx: TERRARIUM_COARSE_MAX_PX,
-          maxTiles: 16,
+          // Mesh-covering footprint: a small-extent site must still resolve
+          // real terrain to the mesh rim (see TWIN_MESH_EXTENT_KM); maxTiles
+          // fits the 44 km z12 window at every latitude (FM spans 81).
+          center: site, extentKm: Math.max(site.extentKm, TWIN_MESH_EXTENT_KM), maxPx: TERRARIUM_COARSE_MAX_PX,
+          maxTiles: 96,
           budgetMs: terrariumBudgetMs, cacheName: terrCoarseKey, signal: pipelineCtl.signal,
         });
       const mod = await _geotiffMod();
@@ -1211,7 +1228,7 @@ export async function loadDEM(opts = {}) {
         : loadTerrariumStage(terrFineZoom, {
           center: site, extentKm: Math.min(site.extentKm, terrFineRadiusKm * 2), maxPx: TERRARIUM_FINE_MAX_PX,
           budgetMs: terrariumBudgetMs, maxTiles: terrFineMaxTiles,
-          cacheName: `terr-f${terrFineZoom}`, signal: pipelineCtl.signal,
+          cacheName: terrStageCacheKey('terr-f', terrFineZoom, site), signal: pipelineCtl.signal,
         });
       const settled = await fineP;
       const terrFine = await terrFineP;

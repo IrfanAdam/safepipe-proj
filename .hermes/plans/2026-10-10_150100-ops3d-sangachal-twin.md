@@ -61,3 +61,17 @@
 **Files:** `dist/` (generated)
 
 **Verify:** `npm run build` ✓; two captures vision-checked.
+
+---
+
+## Phase 2 — edge-streak fix (apron renders fake terrain) {#phase-2}
+
+*Root cause: coarse Terrarium covered only the site window (Sangachal ±10 km, ragged on slow links), SRTM underlay timed out, edge queries clamp-smeared — procedural swells rendered as surveyed terrain (NE streaks). Previous terrain was right at center; only the ring edges were wrong.*
+
+| # | Task | Done when |
+|---|---|---|
+| 1 | Coarse footprint covers the 44 km mesh (`TWIN_MESH_EXTENT_KM`, maxTiles 96), strict crop edges, site-scoped stage keys | Apron plateau test + key test green |
+| 2 | Fan-out verify: Sangachal cold/warm + FM regression | 116–118/121 real, streaks gone, mid-fade + scope aligned, FM 121/121 same |
+| 3 | Commit + close | Build green, 93/93 tests pass |
+
+### Task 1 ✓ done · Task 2 ✓ done · Task 3 ✓ done

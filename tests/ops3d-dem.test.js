@@ -1,6 +1,6 @@
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { SITE, DEM_TILES, levelsForRange, loadDEM, sampleProcedural, geoWindowForSite, sampleGrid, demCacheKey, DEM_CACHE_VERSION, _cacheMemSeed, _cacheMemClear, mosaicSample, downsampleGrid, detailStepForRange, copernicusTileUrl, demTileUrls, getDemStatus, onDemStatus, DEM_NATIVE_RES_M, DEM_STAGES, SEAM_BLEND_DEG, coarseCropForSite, COARSE_EXTENT_PX, GLOBAL_BUDGET_MS, TERRARIUM_MAXZOOM, TERRARIUM_TILE_PX, TERRARIUM_EFFECTIVE_RES_M, TERRARIUM_COARSE_ZOOM, terrariumTileUrl, latLonToTile, terrariumResM, terrariumDecodePixel, terrariumElevationsFromRGBA, terrariumWindowTiles, terrariumTileCount, lonLatToTilePixel, tilePixelToLonLat, stitchTerrariumGrid, loadTerrariumStage, _injectTerrariumFetcher, parseSiteParam, resolveSite, srtmTileName, srtmTileNames, reliefPassesGate, DEM_RELIEF_MIN_KM, TERRARIUM_RELIEF_MIN_KM } from '../src/ops3d/dem.js';
+import { SITE, DEM_TILES, levelsForRange, loadDEM, sampleProcedural, geoWindowForSite, sampleGrid, demCacheKey, DEM_CACHE_VERSION, _cacheMemSeed, _cacheMemClear, mosaicSample, downsampleGrid, detailStepForRange, copernicusTileUrl, demTileUrls, getDemStatus, onDemStatus, DEM_NATIVE_RES_M, DEM_STAGES, SEAM_BLEND_DEG, coarseCropForSite, COARSE_EXTENT_PX, GLOBAL_BUDGET_MS, TERRARIUM_MAXZOOM, TERRARIUM_TILE_PX, TERRARIUM_EFFECTIVE_RES_M, TERRARIUM_COARSE_ZOOM, TWIN_MESH_EXTENT_KM, terrStageCacheKey, terrariumTileUrl, latLonToTile, terrariumResM, terrariumDecodePixel, terrariumElevationsFromRGBA, terrariumWindowTiles, terrariumTileCount, lonLatToTilePixel, tilePixelToLonLat, stitchTerrariumGrid, loadTerrariumStage, _injectTerrariumFetcher, parseSiteParam, resolveSite, srtmTileName, srtmTileNames, reliefPassesGate, DEM_RELIEF_MIN_KM, TERRARIUM_RELIEF_MIN_KM } from '../src/ops3d/dem.js';
 
 describe('ops3d DEM seam (phase 1)', () => {
   it('SITE pin is Fort McMurray', () => {
@@ -532,6 +532,44 @@ describe('ops3d DEM site parametrization (?site=<lat>,<lon> / opts.site)', () =>
     assert.deepEqual(r.meta.site, { lat: 57.03, lon: -111.68 });
   });
 
+  it('apron samples follow real relief, never edge-clamped plateaus', async () => {
+    assert.equal(TWIN_MESH_EXTENT_KM, 44, 'coarse footprint contract = terrain mesh size');
+    _injectTerrariumFetcher(terrariumGradientFetcher());
+    const r = await loadDEM({
+      site: { lat: 40.20, lon: 49.48, extentKm: 20 }, fetchTimeoutMs: 300, coarseBudgetMs: 300,
+    });
+    assert.equal(r.terrainSource, 'dem');
+    // ±18–22 km: inside the 44 km twin mesh, outside the 20 km site window.
+    // A clamped mosaic edge returns the SAME pixel twice (the streak
+    // mechanism); real relief differs between the two points.
+    for (const [a, b] of [[ [18, 0], [22, 0] ], [ [-18, 0], [-22, 0] ], [ [0, 18], [0, 22] ]]) {
+      const va = r.sample(a[0], a[1]);
+      const vb = r.sample(b[0], b[1]);
+      assert.ok(Math.abs(va - vb) > 1e-9, `apron ${a}→${b} is a clamped plateau (${va})`);
+    }
+  }, { timeout: 30000 });
+
+  it('Terrarium stage cache keys are site-scoped', async () => {
+    const { terrStageCacheKey } = await import('../src/ops3d/dem.js');
+    const fm = { lat: 57.03, lon: -111.68, extentKm: 44 };
+    const sang = { lat: 40.20, lon: 49.48, extentKm: 20 };
+    assert.notEqual(
+      terrStageCacheKey('terr-z', 12, fm),
+      terrStageCacheKey('terr-z', 12, sang),
+      'two gallery tabs must never share a stage entry',
+    );
+    assert.equal(
+      terrStageCacheKey('terr-z', 12, sang),
+      terrStageCacheKey('terr-z', 12, { lat: 40.20, lon: 49.48 }),
+      'same site + zoom is a stable key',
+    );
+    assert.notEqual(
+      terrStageCacheKey('terr-z', 12, sang),
+      terrStageCacheKey('terr-z', 15, sang),
+      'zoom is part of the key',
+    );
+  });
+
   it('reliefPassesGate: 80 m SRTM bar, 25 m Terrarium bar (CDEM ~38 m here)', () => {
     assert.equal(DEM_RELIEF_MIN_KM, 0.08);
     assert.equal(TERRARIUM_RELIEF_MIN_KM, 0.025);
@@ -545,8 +583,8 @@ describe('ops3d DEM site parametrization (?site=<lat>,<lon> / opts.site)', () =>
 
   it('low-relief Terrarium (~30 m) resolves dem (SRTM bar would reject)', async () => {
     _injectTerrariumFetcher(terrariumGradientFetcher(0.038));
-    const c = await loadTerrariumStage(12, { extentKm: 44, maxPx: 1100, budgetMs: 10000, cacheName: 'terr-z12' });
-    const f = await loadTerrariumStage(15, { extentKm: 12, maxPx: 1200, maxTiles: 48, budgetMs: 10000, cacheName: 'terr-f15' });
+    const c = await loadTerrariumStage(12, { extentKm: 44, maxPx: 1100, budgetMs: 10000, cacheName: terrStageCacheKey('terr-z', 12, SITE) });
+    const f = await loadTerrariumStage(15, { extentKm: 12, maxPx: 1200, maxTiles: 48, budgetMs: 10000, cacheName: terrStageCacheKey('terr-f', 15, SITE) });
     assert.ok(c && f, 'stages seed the cache');
     _injectTerrariumFetcher(null);
     const prog = [];
