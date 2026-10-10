@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T20:04:24.174Z",
+  "generated": "2026-10-10T20:08:06.359Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,33 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "f0fb4f1",
+      "full": "f0fb4f1d5a879a81f87df200652cc3a78148b092",
+      "date": "2026-10-11",
+      "time": "01:38",
+      "subject": "chore: stamp BUILD_ID [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "e84dbcf",
+      "full": "e84dbcfff8893e6694f8c1f736905cb6119a7f82",
+      "date": "2026-10-11",
+      "time": "01:37",
+      "subject": "fix(ring2): hard world-circular clip both sides, stepped feather dropped [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "3bcbab5",
+      "full": "3bcbab52b95895f3893122462115ff3e16a94fad",
+      "date": "2026-10-11",
+      "time": "01:34",
+      "subject": "docs(plan): track refresh [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "0a51a85",
       "full": "0a51a852898185ec01c8c3d5d8e6b1abe66ee8d8",
@@ -1823,8 +1850,5 @@
       "anchor": null
     }
   ],
-  "wip": [
-    "src/ring2/mapbase.js",
-    "src/ring2/overlays.js"
-  ]
+  "wip": []
 }
