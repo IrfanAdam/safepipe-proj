@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T12:56:39.404Z",
+  "generated": "2026-10-10T14:48:24.532Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -9,9 +9,64 @@
     "2026-10-07_120000-safepipe-production-ready.md",
     "2026-10-07_130000-safepipe-changelog.md",
     "2026-10-07_153000-ops3d-realworld-twin.md",
-    "2026-10-10_150100-ops3d-sangachal-twin.md"
+    "2026-10-10_150100-ops3d-sangachal-twin.md",
+    "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "cbf8a1b",
+      "full": "cbf8a1b246a4acb6d85007c79e1919c7e6726f40",
+      "date": "2026-10-10",
+      "time": "20:18",
+      "subject": "fix(ring2): feathered water, true mix-100 takeover, pill declutter, edge fade [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "e871ef6",
+      "full": "e871ef6ac1b0329ae8e9caaefa63f6d986f0226f",
+      "date": "2026-10-10",
+      "time": "20:07",
+      "subject": "feat(ring2): overlays + mix slider + RING-2 tab, v1 deprecated [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-3]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-3"
+    },
+    {
+      "sha": "cdf376b",
+      "full": "cdf376b8b3b4d141096114950cb6ed624cddb246",
+      "date": "2026-10-10",
+      "time": "19:48",
+      "subject": "feat(ring2): MapLibre 3D ground + camera parity probe green [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-2]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-2"
+    },
+    {
+      "sha": "d9e675d",
+      "full": "d9e675d3e8257363e9ee18ad309ada186a3477a4",
+      "date": "2026-10-10",
+      "time": "19:48",
+      "subject": "feat(ring2): site pin + live-DEM field with ground-truth gate [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-1]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "6c85591",
+      "full": "6c85591517ef9509aec9a44cd9204150a8c189da",
+      "date": "2026-10-10",
+      "time": "19:07",
+      "subject": "feat(ops3d): satellite is TOP-only, oblique goes pure twin [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-5]",
+      "plan": "2026-10-10_150100-ops3d-sangachal-twin.md",
+      "anchor": "phase-5"
+    },
+    {
+      "sha": "b2c4fe7",
+      "full": "b2c4fe791a35ca6660171003dddec9af98add33a",
+      "date": "2026-10-10",
+      "time": "18:45",
+      "subject": "fix(ops3d): true scope crossfade + full-ring lens + named Caspian Sea [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-4]",
+      "plan": "2026-10-10_150100-ops3d-sangachal-twin.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "a2f3373",
       "full": "a2f3373bc49abe921772b28c6f32a708652a1895",
@@ -1183,9 +1238,5 @@
       "anchor": null
     }
   ],
-  "wip": [
-    "src/ops3d/labels.js",
-    "src/ops3d/sat-base.js",
-    "src/ops3d/terrain.js"
-  ]
+  "wip": []
 }

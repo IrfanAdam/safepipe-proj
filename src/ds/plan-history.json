@@ -1185,6 +1185,94 @@
      "state": "1/1"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-10",
+   "hash": "156fdaaa",
+   "sections": [
+    {
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
+     "hash": "4daccbf5",
+     "state": "5/5"
+    },
+    {
+     "head": "Phase 2 — edge-streak fix (apron renders fake terrain) {#phase-2}",
+     "hash": "d1f29061",
+     "state": "1/1"
+    },
+    {
+     "head": "Phase 3 — true-scale landmass parity {#phase-3}",
+     "hash": "e175c986",
+     "state": "1/1"
+    },
+    {
+     "head": "Phase 4 — scope-lens parity (mix snap, disc size, sea read) {#phase-4}",
+     "hash": "c3994f95",
+     "state": "1/1"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-10",
+   "hash": "3bfb5180",
+   "sections": [
+    {
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
+     "hash": "4daccbf5",
+     "state": "5/5"
+    },
+    {
+     "head": "Phase 2 — edge-streak fix (apron renders fake terrain) {#phase-2}",
+     "hash": "d1f29061",
+     "state": "1/1"
+    },
+    {
+     "head": "Phase 3 — true-scale landmass parity {#phase-3}",
+     "hash": "e175c986",
+     "state": "1/1"
+    },
+    {
+     "head": "Phase 4 — scope-lens parity (mix snap, disc size, sea read) {#phase-4}",
+     "hash": "1517ac74",
+     "state": "1/1"
+    },
+    {
+     "head": "Phase 5 — TOP-only satellite {#phase-5}",
+     "hash": "fe82d406",
+     "state": "1/1"
+    }
+   ]
+  }
+ ],
+ "2026-10-10_191500-ops3d-ring2-seamless-redo.md": [
+  {
+   "sha": null,
+   "date": "2026-10-10",
+   "hash": "93cd8d95",
+   "sections": [
+    {
+     "head": "Phase 1 — Site + field truth (fresh seam) {#phase-1}",
+     "hash": "58da56e9",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 2 — MapLibre ground + camera parity {#phase-2}",
+     "hash": "806d0fc8",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 3 — Twin overlays + seamless slider {#phase-3}",
+     "hash": "ce155bdd",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 4 — Prove + ship {#phase-4}",
+     "hash": "d78f64ec",
+     "state": ""
+    }
+   ]
   }
  ]
 }
