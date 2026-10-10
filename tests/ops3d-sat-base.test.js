@@ -548,11 +548,11 @@ describe('ops3d maplibre-terrain redo — real ground, ground seam, showcase', (
     assert.equal(sat.TERRAIN_EXAGGERATION, 1, 'map exaggeration is true-scale');
   });
 
-  it('satellite is TOP-only: hidden at oblique tilt (no sphere/blur drape off-nadir)', () => {
+  it('satellite visible at every tilt (TOP-only retired — superimpose at all angles)', () => {
     assert.equal(sat.satVisibleAtTilt(90), true, 'nadir shows satellite');
-    assert.equal(sat.satVisibleAtTilt(70), true, 'near-nadir boundary shows satellite');
-    assert.equal(sat.satVisibleAtTilt(69.9), false, 'just off-nadir hides satellite');
-    assert.equal(sat.satVisibleAtTilt(45), false, 'oblique hides satellite');
+    assert.equal(sat.satVisibleAtTilt(70), true, 'near-nadir shows satellite');
+    assert.equal(sat.satVisibleAtTilt(69.9), true, 'off-nadir keeps satellite');
+    assert.equal(sat.satVisibleAtTilt(45), true, 'oblique keeps satellite');
     assert.equal(sat.satVisibleAtTilt(NaN), true, 'unknown camera fails visible (legacy)');
   });
 

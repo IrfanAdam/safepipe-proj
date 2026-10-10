@@ -278,15 +278,14 @@ export function scopeFeatherPx(elevDeg) {
   return 1.5 + ((70 - e) / 50) * (28 - 1.5);
 }
 
-// Satellite is a TOP instrument: off-nadir the imagery drape reads as a
-// sphere/blur and tile seams show, so the base layer hides below 70°
-// elevation (same TOP boundary as scopeFeatherPx). Unknown camera fails
-// visible (legacy). Pure.
-export const SAT_TOP_MIN_ELEV = 70;
+// Satellite stays visible at EVERY tilt (user call — TOP-only retired):
+// MapLibre 3D terrain superimposes under the twin at all angles, so the
+// base layer never hides. Unknown camera fails visible (legacy). Pure.
+export const SAT_TOP_MIN_ELEV = 70; // retired gate boundary (kept for API compat)
 export function satVisibleAtTilt(elevDeg) {
   const e = Number(elevDeg);
   if (!Number.isFinite(e)) return true;
-  return e >= SAT_TOP_MIN_ELEV;
+  return true;
 }
 // CSS mask that punches the same disc out of the twin canvas: satellite
 // shows through inside, custom twin stays opaque outside. `inside` is the
@@ -883,12 +882,11 @@ export function initSatBase(container, opts = {}) {
   // toggle/resize). Shown only at TOP/network — drill-ins auto-hide and
   // the user's crossfade mix is restored untouched.
   const refreshScope = (force = false) => {
-    // TOP-only satellite (user call): the base imagery hides off-nadir so
-    // oblique views are pure twin — no sphere read, no drape blur. Runs
-    // ahead of the paint throttle so orbit drags gate promptly. When the
-    // base hides, the twin canvas is forced opaque: at the SAT end of the
-    // slider its opacity is ~0 (nothing underneath) which would leave a
-    // black void — oblique is twin territory regardless of mix.
+    // Base stays visible at every tilt (TOP-only retired — user call):
+    // MapLibre 3D terrain superimposes under the twin at all angles, so
+    // oblique views keep their satellite instead of dropping to a forced
+    // opaque twin (which read as a black hole whenever the twin itself
+    // failed to paint). The crossfade mix alone drives twin opacity now.
     try {
       const satVis = satVisibleAtTilt(twinElevDeg());
       if (base && base.style) base.style.display = satVis ? '' : 'none';
