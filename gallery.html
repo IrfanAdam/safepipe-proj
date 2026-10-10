@@ -163,9 +163,35 @@
 </div>
 <script type="module" src="./src/ds/gallery-shell.js"></script>
 <script type="module">
-  import { createTwin } from './src/ops3d/twin.js';
-  import { initSatBase, LS_MIX_KEY, LS_SCOPE_KEY } from './src/ops3d/sat-base.js';
-  import { SANGACHAL } from './src/ops3d/dem.js';
+  /* Ring-2 mount FIRST, zero imports: the iframe must get its src even if
+   * the legacy twin stack below fails to import (a dead import used to
+   * black out all three tabs with no message). */
+  function maybeMountRing2() {
+    const panel = document.querySelector('[data-panel="ops3d-ring2"]');
+    if (!panel || panel.hidden) return;
+    const frame = document.getElementById('ops3d-ring2-frame');
+    if (frame && !frame.getAttribute('src')) frame.src = frame.dataset.src;
+  }
+  function paintMountError(msg) {
+    for (const sel of ['#ops3d-specimen', '#ops3d-sangachal']) {
+      const host = document.querySelector(sel);
+      if (host && !host.querySelector('canvas')) {
+        host.innerHTML = '<div style="padding:24px;font:12px/1.7 ui-monospace,monospace;color:#ffd9a0">3D mount failed: ' +
+          String(msg).slice(0, 300) + '</div>';
+      }
+    }
+  }
+  document.querySelector('[data-tab="ops3d-ring2"]')?.addEventListener('click', () => requestAnimationFrame(maybeMountRing2));
+  window.addEventListener('hashchange', maybeMountRing2);
+  maybeMountRing2();
+  /* Legacy v1 twin stack: dynamic import so a failure here can never take
+   * Ring-2 down with it; errors paint into the v1 panels as text. */
+  try {
+    const [{ createTwin }, { initSatBase, LS_MIX_KEY, LS_SCOPE_KEY }, { SANGACHAL }] = await Promise.all([
+      import('./src/ops3d/twin.js'),
+      import('./src/ops3d/sat-base.js'),
+      import('./src/ops3d/dem.js'),
+    ]);
   const el = document.getElementById('ops3d-specimen');
   if (el) {
     window.__twin = createTwin(el, {});
@@ -233,17 +259,9 @@
   document.querySelector('[data-tab="ops3d-sangachal"]')?.addEventListener('click', maybeMountSangachal);
   window.addEventListener('hashchange', maybeMountSangachal);
   maybeMountSangachal();
-  /* RING-2 — fresh Sangachal redo (seamless map↔twin). Isolated iframe so the
-   * legacy twin stacks above are untouched; lazy src on first show. */
-  function maybeMountRing2() {
-    const panel = document.querySelector('[data-panel="ops3d-ring2"]');
-    if (!panel || panel.hidden) return;
-    const frame = document.getElementById('ops3d-ring2-frame');
-    if (frame && !frame.src) frame.src = frame.dataset.src;
+  } catch (err) {
+    paintMountError(err?.message ?? err);
   }
-  document.querySelector('[data-tab="ops3d-ring2"]')?.addEventListener('click', () => requestAnimationFrame(maybeMountRing2));
-  window.addEventListener('hashchange', maybeMountRing2);
-  maybeMountRing2();
 </script>
 </body>
 </html>
