@@ -182,15 +182,17 @@ export async function mountMapBase(el, opts = {}) {
   map.addControl(new maplibregl.TerrainControl({ source: TERRAIN_SOURCE_ID, exaggeration }), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
-  await new Promise((resolve, reject) => {
-    map.once('load', resolve);
-    map.once('error', (e) => reject(new Error(`mountMapBase: map error: ${e?.error?.message ?? e}`)));
-  });
-  // Persistent diagnostics: tile/source failures after load + GPU context
-  // loss otherwise render as an unexplained black map. Surfaced in status.
+  // Capture every source/tile error from the start (surfaced in status).
   map.on('error', (e) => {
     const msg = e?.error?.message ?? e?.error ?? e;
     window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), String(msg)].slice(-5);
+  });
+  // Resolve on load ONLY. Tile/source errors are per-tile and must never
+  // abort the mount: reject-on-first-error used to kill the whole map on a
+  // single 404, leaving the SAT side permanently empty with the twin fading
+  // over nothing. A hung style is still caught by the caller's timeout.
+  await new Promise((resolve) => {
+    map.once('load', resolve);
   });
   map.getCanvas()?.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
