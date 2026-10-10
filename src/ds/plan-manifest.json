@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-09T14:29:26.173Z",
+  "generated": "2026-10-10T07:50:48.039Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,6 +11,15 @@
     "2026-10-07_153000-ops3d-realworld-twin.md"
   ],
   "commits": [
+    {
+      "sha": "8b94752",
+      "full": "8b94752a77ad15ecf0a8de3e827b0c308c4c5fe7",
+      "date": "2026-10-09",
+      "time": "23:55",
+      "subject": "feat(ops3d): DEM-surveyed water — Viterbi river channel + measured lake basins, synthetic fallback",
+      "plan": null,
+      "anchor": null
+    },
     {
       "sha": "d371f08",
       "full": "d371f082301b599b7114298e53e495b6e71c568e",
@@ -1120,6 +1129,7 @@
     }
   ],
   "wip": [
-    "src/ops3d/terrain.js"
+    "src/ops3d/sat-base.js",
+    "src/ops3d/twin.js"
   ]
 }

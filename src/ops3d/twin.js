@@ -581,6 +581,7 @@ export function createTwin(container, opts = {}) {
         `wall ${((r.meta.wallMs ?? 0) / 1000).toFixed(1)}s`,
       );
       const keep = selected;
+      const keepMode = api.terrainMode;
       let keepPos = null, keepTgt = null;
       try {
         keepPos = api.debug.camera.position.clone();
@@ -592,6 +593,15 @@ export function createTwin(container, opts = {}) {
       if (!container.isConnected) return;
       const fresh = createTwin(container, { ...opts, _dem: true });
       Object.assign(api, fresh);
+      // Ground-ownership survives the swap: Object.assign copies fresh's
+      // default 'twin' flag onto the live handle, so re-assert the kept mode
+      // (sat-base also re-drives it on the canvas swap it sees).
+      try {
+        if (keepMode && keepMode !== 'twin') api.setTerrainMode?.(keepMode);
+        api.terrainMode = keepMode ?? 'twin';
+      } catch {
+        /* mode restore is cosmetic */
+      }
       if (keepPos && keepTgt) api.setView?.(keepPos, keepTgt);
       if (keep) api.setSelection?.(keep);
     });
@@ -601,6 +611,23 @@ export function createTwin(container, opts = {}) {
     site,
     rollup: () => healthRollup(current),
     debug: { camera: rig.camera, scene, target: () => rig.getTarget() },
+    // Ground ownership seam (MapLibre-terrain redo): 'twin' renders the
+    // custom holographic ground (today, default); 'maplibre' hides the
+    // synthetic terrain mesh so the real MapLibre 3D terrain + satellite
+    // show through — overlays (network/structures/beacons/labels) stay.
+    // Driven by sat-base.js from the SAT/TWIN crossfade mix. Additive,
+    // never throws. [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]
+    terrainMode: 'twin',
+    setTerrainMode(mode) {
+      const m = mode === 'maplibre' ? 'maplibre' : 'twin';
+      api.terrainMode = m;
+      try {
+        if (terrain?.mesh) terrain.mesh.visible = m !== 'maplibre';
+      } catch {
+        /* visibility is cosmetic */
+      }
+      return m;
+    },
     // DEM staged swap-in restores the exact pre-swap viewpoint (dur 0 =
     // instant copy, no visible flight). Internal seam, not a camera feature.
     setView(pos, tgt) {

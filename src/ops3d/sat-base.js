@@ -1,10 +1,18 @@
 /* Safepipe Ops 3D — src/ops3d/sat-base.js · open-source satellite base + crossfade.
  *
- * Owns a MapLibre GL JS satellite map (Esri World Imagery XYZ true-color +
- * AWS Terrarium terrain + neutral hillshade) in a div mounted BEHIND the
- * three.js canvas centred on the site (57.03N 111.68W). Every
+ * Owns a MapLibre GL JS satellite map (Esri World Imagery true-color +
+ * Esri reference places/roads overlay + AWS Terrarium hillshade) in a div
+ * mounted BEHIND the three.js canvas centred on the site (57.03N 111.68W).
+ * MapLibre ALSO owns the ground in 3D: real Terrarium DEM terrain at the
+ * twin VEX (TERRAIN_EXAGGERATION), so relief, valleys, and water sit where
+ * the real world puts them — the twin's synthetic terrain mesh yields via
+ * the ground-ownership seam (twin.setTerrainMode, driven by the crossfade
+ * mix + SCOPE disc) and the twin renders overlays only (pipes, structures,
+ * beacons, labels) on SAT. Every
  * frame the map center/bearing/pitch/zoom follows the twin orbit rig (one
  * way, twin → map), so the crossfade feels seamless instead of sliding.
+ * First visit (no stored/?sat= choice) glides to SAT on map load so the
+ * real terrain is the opening frame; any explicit choice retires that.
  *
  * Tokenless by design: every tile source is keyless (no tokens, no keys,
  * no accounts anywhere — see TILE_ATTRIBUTION below). When the MapLibre
@@ -41,12 +49,30 @@ const MAPLIBRE_CSS_URL = 'https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/ma
 
 // Free, keyless tile sources. Esri tile order is {z}/{y}/{x}.
 const ESRI_WORLD_IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+// Keyless Esri reference overlay (boundaries + places + roads) — what makes
+// satellite read as Google-like instead of a bare photo. Same host as the
+// imagery, attribution below.
+const ESRI_REFERENCE = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 const TERRARIUM_TERRAIN = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 
 export const TILE_ATTRIBUTION = {
   imagery: 'Imagery © Esri, Maxar, Earthstar Geographics',
+  reference: 'Reference © Esri, HERE, Garmin, OpenStreetMap contributors',
   terrain: 'Terrain © AWS Terrain Tiles (Terrarium; SRTM/ETOPO/GMTED sources)',
 };
+
+// MapLibre 3D terrain exaggeration. Matches the twin VEX (terrain.js) so
+// draped overlays (pipes sample field() at VEX heights) sit ON the real
+// terrain instead of floating above / sinking below it. Single source here;
+// the test suite asserts numeric equality with terrain.js VEX.
+export const TERRAIN_EXAGGERATION = 4.5;
+
+// First-visit showcase: when the map loads and the user never chose a mix
+// (no ?sat=/?mix=, nothing persisted), glide to SAT so the first thing
+// seen is real 3D terrain + satellite. Pure + unit-tested.
+export function shouldAutoShowcase({ hasParam = false, hasStored = false, level = 'network' } = {}) {
+  return !hasParam && !hasStored && level === 'network';
+}
 
 // Clamp a base-mix value to [0, 1]; non-finite input means "today's opaque".
 export function clampMix(m) {
@@ -289,6 +315,13 @@ function satStyle(site = SITE) {
         maxzoom: 19,
         attribution: TILE_ATTRIBUTION.imagery,
       },
+      'esri-ref': {
+        type: 'raster',
+        tiles: [ESRI_REFERENCE],
+        tileSize: 256,
+        maxzoom: 19,
+        attribution: TILE_ATTRIBUTION.reference,
+      },
       terrain: {
         type: 'raster-dem',
         tiles: [TERRARIUM_TERRAIN],
@@ -321,17 +354,44 @@ function satStyle(site = SITE) {
           'hillshade-exaggeration': 0.25,
         },
       },
+      {
+        id: 'sat-ref',
+        type: 'raster',
+        source: 'esri-ref',
+        paint: {
+          // Reference labels over the photo, kept quiet so imagery leads.
+          'raster-opacity': 0.85,
+        },
+      },
     ],
   };
 }
 
-// Dusk-mood the satellite: 3D terrain + hillshade already in the style;
-// terrain exaggeration is best-effort. Everything swallowed.
+// MapLibre OWNS the ground: real Terrarium DEM 3D terrain at the twin VEX
+// (overlays drape at VEX heights, so exaggeration must match or pipes
+// float/sink) + atmosphere sky at oblique angles. Best-effort, swallowed.
 function moodMap(map) {
   try {
-    map.setTerrain?.({ source: 'terrain', exaggeration: 1.2 });
+    map.setTerrain?.({ source: 'terrain', exaggeration: TERRAIN_EXAGGERATION });
   } catch {
     /* satellite + hillshade alone is still a fine base */
+  }
+  try {
+    map.setSky?.({
+      'sky-color': '#0e141b',
+      'horizon-color': 'rgba(146, 160, 175, 0.35)',
+      'fog-color': '#0e141b',
+      'fog-ground-blend': 0.5,
+      'horizon-fog-blend': 0.5,
+      'sky-horizon-blend': 0.5,
+    });
+  } catch {
+    /* sky is cosmetic (older CDN) */
+  }
+  try {
+    if (typeof map.setMaxPitch === 'function') map.setMaxPitch(70);
+  } catch {
+    /* pitch cap is cosmetic */
   }
 }
 
@@ -376,17 +436,21 @@ export function initSatBase(container, opts = {}) {
   })();
 
   let startMix = 1;
+  let hasParam = false;
+  let hasStored = false;
   try {
     const q = new URLSearchParams(search || '');
-    if (q.get('sat') != null) startMix = clampMix(Number(q.get('sat')));
-    else if (q.get('mix') != null) startMix = clampMix(Number(q.get('mix')));
+    if (q.get('sat') != null) { startMix = clampMix(Number(q.get('sat'))); hasParam = true; }
+    else if (q.get('mix') != null) { startMix = clampMix(Number(q.get('mix'))); hasParam = true; }
     else {
       const saved = storage?.getItem?.(LS_MIX_KEY);
-      if (saved != null && saved !== '') startMix = clampMix(Number(saved));
+      if (saved != null && saved !== '') { startMix = clampMix(Number(saved)); hasStored = true; }
     }
   } catch {
     startMix = 1;
   }
+  // Any explicit mix choice (UI or API) retires the first-visit showcase.
+  let userChoseMix = hasParam || hasStored;
 
   // Circular monitor toggle: default OFF. ?scope=1 seeds ON (screenshot /
   // deep-link path), else the persisted choice.
@@ -481,6 +545,16 @@ export function initSatBase(container, opts = {}) {
         hideLoadingTag();
         moodMap(map);
         syncFromTwin(true);
+        // First-visit showcase: no explicit choice + TOP/network → glide to
+        // the real 3D terrain + satellite (cinematic 1000 ms). A failed map
+        // never moves the twin; a stored/?sat= choice always wins.
+        try {
+          if (!userChoseMix && shouldAutoShowcase({ hasParam, hasStored, level: resolveLevel() })) {
+            fadeTo(0);
+          }
+        } catch {
+          /* showcase is cosmetic */
+        }
       });
       map.on?.('error', (e) => {
         /* stay silent: fallback gradient shows through map gaps. When tiles
@@ -496,7 +570,7 @@ export function initSatBase(container, opts = {}) {
         } catch {
           /* ignore */
         }
-        for (const id of ['sat-hillshade', 'sat']) {
+        for (const id of ['sat-hillshade', 'sat-ref', 'sat']) {
           try {
             if (map.getLayer?.(id)) map.removeLayer(id);
           } catch {
@@ -632,6 +706,12 @@ export function initSatBase(container, opts = {}) {
         /* ignore */
       }
     }
+    // Scoped disc shows satellite: yield the ground to MapLibre here too.
+    try {
+      driveGroundMode();
+    } catch {
+      /* ground mode is cosmetic */
+    }
     try {
       sceneSetBaseMix(1);
     } catch {
@@ -672,7 +752,7 @@ export function initSatBase(container, opts = {}) {
         }
         scopeShown = false;
         scopeDisc = null;
-        applyMix(mix);
+        applyMix(mix, { auto: true });
       }
       return false;
     }
@@ -715,8 +795,29 @@ export function initSatBase(container, opts = {}) {
     refreshScope(true);
     return scopeOn;
   };
-  const applyMix = (v) => {
+  // Ground ownership: the crossfade decides who renders the ground. SAT
+  // side → MapLibre real 3D terrain (hide the synthetic mesh so two
+  // terrains never fight); TWIN side → custom holographic ground. Scoped
+  // disc → maplibre (satellite shows through the punch). Guarded: a twin
+  // without the seam (or none yet) keeps today's look. Never throws.
+  const driveGroundMode = () => {
+    try {
+      const twin = getTwin?.();
+      const fn = twin?.setTerrainMode;
+      if (typeof fn !== 'function') return;
+      if (scopeShown) fn.call(twin, 'maplibre');
+      else fn.call(twin, mix < 0.5 ? 'maplibre' : 'twin');
+    } catch {
+      /* ground mode is cosmetic */
+    }
+  };
+  const applyMix = (v, opts = {}) => {
     mix = clampMix(v);
+    // Internal re-applies (seed, remount heal, fade steps) are not choices;
+    // only the slider / SAT-TWIN buttons / external setMix retire the
+    // first-visit showcase.
+    if (!opts.auto) userChoseMix = true;
+    driveGroundMode();
     pinCanvas();
     const c = canvasOf();
     // Canvas-element fade carries the post chain (opaque composite) while
@@ -759,7 +860,8 @@ export function initSatBase(container, opts = {}) {
     return mix;
   };
 
-  // Auto-fade animator: SAT/TWIN jumps glide ~600 ms when AUTO is on.
+  // Auto-fade animator: SAT/TWIN jumps glide ~1000 ms (cinematic ease) when
+  // AUTO is on — the crossfade reads as one camera move, not a layer swap.
   let anim = 0;
   const fadeTo = (target) => {
     const v = clampMix(target);
@@ -774,7 +876,7 @@ export function initSatBase(container, opts = {}) {
     const t0 =
       typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
     const step = (now) => {
-      const k = Math.min((now - t0) / 600, 1);
+      const k = Math.min((now - t0) / 1000, 1);
       const e = k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
       applyMix(from + (v - from) * e);
       if (k < 1) {
@@ -852,8 +954,21 @@ export function initSatBase(container, opts = {}) {
   // the fade never slides. —
   let lastSync = 0;
   let lastCamKey = null;
+  // DEM-swap remounts replace the twin canvas (fresh element, no opacity,
+  // no scope mask, synthetic mesh back to visible): re-apply the full mix
+  // the moment the element changes so the crossfade survives the swap.
+  let lastCanvas = null;
   const syncFromTwin = (force = false) => {
     pinCanvas();
+    try {
+      const cur = canvasOf();
+      if (cur && cur !== lastCanvas) {
+        lastCanvas = cur;
+        applyMix(mix, { auto: true });
+      }
+    } catch {
+      /* re-apply is best-effort */
+    }
     // Scope overlay reconciles every tick (throttled inside): the disc
     // follows orbit/pan/zoom and auto-hides on drill-in.
     try {
@@ -917,7 +1032,15 @@ export function initSatBase(container, opts = {}) {
     }
   };
 
-  applyMix(startMix);
+  applyMix(startMix, { auto: true });
+  // The seed call above is not a user choice (auto), and the live canvas is
+  // baselined here so only a genuine DEM-remount element swap re-applies.
+  userChoseMix = hasParam || hasStored;
+  try {
+    lastCanvas = canvasOf();
+  } catch {
+    /* healed on the first sync tick */
+  }
   refreshScope(true);
 
   // Keep the disc glued to the scope ring across window resizes.

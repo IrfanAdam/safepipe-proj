@@ -10,6 +10,8 @@ const ADAPTER_SRC = readFileSync(resolve(ROOT, 'src/ops3d/mapbox-base.js'), 'utf
 const MAIN_SRC = readFileSync(resolve(ROOT, 'src/ops3d/main.js'), 'utf8');
 const HTML_SRC = readFileSync(resolve(ROOT, 'ops3d.html'), 'utf8');
 const SCENE_SRC = readFileSync(resolve(ROOT, 'src/ops3d/scene.js'), 'utf8');
+const TERRAIN_SRC = readFileSync(resolve(ROOT, 'src/ops3d/terrain.js'), 'utf8');
+const TWIN_SRC = readFileSync(resolve(ROOT, 'src/ops3d/twin.js'), 'utf8');
 const PKG = readFileSync(resolve(ROOT, 'package.json'), 'utf8');
 
 /* Minimal fake DOM for initSatBase (offline path only — no maplibre,
@@ -453,5 +455,76 @@ describe('ops3d satellite base — site parametrization (?site= / opts.site)', (
     assert.ok(Math.abs(v.center.lat + 23.95) < 1e-6 && Math.abs(v.center.lon + 46.63) < 1e-6, `site center ${v.center.lat},${v.center.lon}`);
     const d = sat.twinViewToMap({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 });
     assert.ok(Math.abs(d.center.lat - 57.03) < 1e-9 && Math.abs(d.center.lon + 111.68) < 1e-9, 'default pin unchanged');
+  });
+});
+
+describe('ops3d maplibre-terrain redo — real ground, ground seam, showcase', () => {
+  it('3D terrain exaggeration equals the twin VEX (overlays drape at VEX heights)', () => {
+    const m = TERRAIN_SRC.match(/export const VEX = ([\d.]+)/);
+    assert.ok(m, 'terrain.js exports VEX');
+    assert.equal(sat.TERRAIN_EXAGGERATION, Number(m[1]), `exaggeration ${sat.TERRAIN_EXAGGERATION} vs VEX ${m[1]}`);
+    assert.ok(SRC.includes('exaggeration: TERRAIN_EXAGGERATION'), 'moodMap uses the shared constant');
+    assert.ok(SRC.includes('setSky'), 'atmosphere sky at oblique angles');
+  });
+
+  it('reference overlay: keyless Esri places/roads over the imagery, attributed', () => {
+    assert.ok(SRC.includes('Reference/World_Boundaries_and_Places'), 'Esri reference tiles');
+    assert.ok(SRC.includes("'sat-ref'") || SRC.includes('"sat-ref"'), 'sat-ref layer');
+    assert.ok(SRC.includes('HERE, Garmin, OpenStreetMap'), 'reference attribution');
+    assert.ok(!SRC.includes('mapbox-gl') && !SRC.includes('api.mapbox.com'), 'still tokenless, no mapbox');
+  });
+
+  it('cinematic crossfade: ~1000 ms ease, not a layer snap', () => {
+    assert.ok(SRC.includes('(now - t0) / 1000'), 'fade duration 1000 ms');
+  });
+
+  it('showcase decision: first visit at TOP only; any choice retires it', () => {
+    assert.equal(sat.shouldAutoShowcase({ hasParam: false, hasStored: false, level: 'network' }), true);
+    assert.equal(sat.shouldAutoShowcase({ hasParam: true, hasStored: false, level: 'network' }), false);
+    assert.equal(sat.shouldAutoShowcase({ hasParam: false, hasStored: true, level: 'network' }), false);
+    assert.equal(sat.shouldAutoShowcase({ hasParam: false, hasStored: false, level: 'segment' }), false);
+    assert.equal(sat.shouldAutoShowcase({}), true, 'defaults read as first-visit TOP');
+    assert.equal(sat.shouldAutoShowcase(), true);
+  });
+
+  it('twin exposes the ground-ownership seam (twin renders overlays only on SAT)', () => {
+    assert.ok(TWIN_SRC.includes('setTerrainMode'), 'twin.setTerrainMode exists');
+    assert.ok(TWIN_SRC.includes("terrainMode: 'twin'"), 'default twin (today unchanged)');
+    assert.ok(TWIN_SRC.includes('maplibre'), 'maplibre mode hides the synthetic mesh');
+  });
+
+  it('crossfade drives ground ownership; missing seam never throws (fake DOM)', () => {
+    const calls = [];
+    const twin = { setTerrainMode: (m) => { calls.push(m); return m; } };
+    const container = new FakeEl('div');
+    container._canvas = new FakeEl('canvas');
+    const api = sat.initSatBase(container, { search: '?sat=1', storage: memStore(), getTwin: () => twin });
+    assert.deepEqual(calls, ['twin'], 'seed at TWIN keeps the custom ground');
+    api.setMix(0);
+    assert.equal(calls[calls.length - 1], 'maplibre', 'SAT yields the ground to MapLibre');
+    api.setMix(1);
+    assert.equal(calls[calls.length - 1], 'twin', 'TWIN restores the custom ground');
+    api.dispose();
+    // No seam at all: silent no-op, twin untouched.
+    const c2 = new FakeEl('div');
+    c2._canvas = new FakeEl('canvas');
+    const api2 = sat.initSatBase(c2, { search: '', storage: memStore(), getTwin: () => ({}) });
+    assert.doesNotThrow(() => api2.setMix(0));
+    api2.dispose();
+  });
+
+  it('DEM-remount heals the crossfade when the twin canvas element swaps', () => {
+    const calls = [];
+    const twin = { setTerrainMode: (m) => { calls.push(m); return m; } };
+    const container = new FakeEl('div');
+    container._canvas = new FakeEl('canvas');
+    const api = sat.initSatBase(container, { search: '?sat=0', storage: memStore(), getTwin: () => twin });
+    assert.equal(container._canvas.style.opacity, '0', 'seed hides the twin canvas');
+    // DEM staged swap-in replaces the canvas: fresh element, no opacity.
+    container._canvas = new FakeEl('canvas');
+    api.syncFromTwin();
+    assert.equal(container._canvas.style.opacity, '0', 'mix re-applied after remount');
+    assert.equal(calls[calls.length - 1], 'maplibre', 'ground still yielded to MapLibre');
+    api.dispose();
   });
 });
