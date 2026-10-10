@@ -51,6 +51,29 @@
 </head>
 <body>
 <div id="ring2-dev"></div>
+<div id="ring2-fatal" style="display:none;position:fixed;left:12px;bottom:12px;z-index:99;max-width:80vw;padding:8px 14px;background:rgba(80,10,10,.94);color:#ffd9a0;font:11px/1.6 ui-monospace,monospace;white-space:pre-wrap;"></div>
+<script>
+/* Boot/error overlay: classic script, runs even if the module below fails.
+ * Any screenshot of a black box now carries the exact failure instead. */
+(function () {
+  var box = document.getElementById('ring2-fatal');
+  function show(msg) {
+    box.style.display = 'block';
+    box.textContent += msg + '\n';
+  }
+  window.addEventListener('error', function (e) {
+    show('ERR: ' + (e.message || e.error) + (e.filename ? ' @ ' + String(e.filename).split('/').pop() + ':' + e.lineno : ''));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    show('REJECT: ' + (r && (r.message || r)) );
+  });
+  setTimeout(function () {
+    if (!document.querySelector('#ring2-dev canvas')) show('STILL LOADING @ +10s: module or map mount hung (no canvas yet).');
+  }, 10000);
+  window.__ring2fatal = show;
+})();
+</script>
 <script type="module" src="./src/ring2/main.js"></script>
 </body>
 </html>

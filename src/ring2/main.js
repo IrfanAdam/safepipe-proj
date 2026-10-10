@@ -58,21 +58,17 @@ function paintStatus() {
 }
 
 async function boot() {
+  // Chrome first, map second: the status chip + mix bar are plain DOM and
+  // must paint even if the map/tiles hang — a black box with no message is
+  // the failure mode we're eliminating. Every stage is visible in a
+  // screenshot, so a user report always carries the diagnosis.
+  statusDiv.textContent = 'RING-2 · boot: dom ✓ · map: loading…';
   // Field loads in the background; overlays start on procedural and
   // re-drape live via the status bus (no await — first paint is fast).
   ensureField().catch(() => {}).finally(() => paintStatus());
 
-  const { map: m } = await mountMapBase(mapDiv, { zoom: 11, pitch: 0, bearing: 0 });
-  map = m;
-  try {
-    assertTerrainOn(map);
-  } catch (err) {
-    vexWarned = true;
-    statusDiv.textContent = `RING-2 · terrain FAILED: ${err?.message ?? err}`;
-    throw err;
-  }
-
   twin = createOverlayTwin(twinDiv, { fovDeg: FOV_DEG, startRange: 26000 });
+  statusDiv.textContent = 'RING-2 · boot: twin ✓ · map: loading…';
 
   mixCtl = mountMixBar(barDiv, {
     getTwinCanvas: () => twinDiv.querySelector('[data-ring2="twin"]'),
@@ -81,6 +77,28 @@ async function boot() {
     applyEmphasis: (t) => twin.setEmphasis(t),
     getPitchDeg: () => 0,
   });
+  paintStatus();
+
+  const MAP_TIMEOUT_MS = 30000;
+  try {
+    const { map: m } = await Promise.race([
+      mountMapBase(mapDiv, { zoom: 11, pitch: 0, bearing: 0 }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`map mount timed out after ${MAP_TIMEOUT_MS / 1000}s (tiles/worker blocked?)`)), MAP_TIMEOUT_MS)),
+    ]);
+    map = m;
+  } catch (err) {
+    vexWarned = true;
+    statusDiv.textContent = `RING-2 · boot: twin ✓ · map FAILED: ${err?.message ?? err}`;
+    throw err;
+  }
+  try {
+    assertTerrainOn(map);
+  } catch (err) {
+    vexWarned = true;
+    statusDiv.textContent = `RING-2 · terrain FAILED: ${err?.message ?? err}`;
+    throw err;
+  }
 
   window.__ring2 = {
     map,
