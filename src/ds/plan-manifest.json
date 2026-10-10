@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T20:08:06.359Z",
+  "generated": "2026-10-10T20:12:56.284Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,33 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "b39dad2",
+      "full": "b39dad21a3264ec57ac3b4d0428942c620d7ead4",
+      "date": "2026-10-11",
+      "time": "01:42",
+      "subject": "chore: stamp builds [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "4874830",
+      "full": "4874830ece8fddbc2b0bd129e4a1137cb7f2a276",
+      "date": "2026-10-11",
+      "time": "01:42",
+      "subject": "fix(lens): world-shell mask, no photo past the lens at any zoom/pitch [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "3a06db5",
+      "full": "3a06db5386a218c3b0b84c822757f156048cfd8b",
+      "date": "2026-10-11",
+      "time": "01:38",
+      "subject": "docs(plan): track refresh [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "f0fb4f1",
       "full": "f0fb4f1d5a879a81f87df200652cc3a78148b092",
