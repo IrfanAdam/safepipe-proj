@@ -45,6 +45,10 @@ let map = null;
 let twin = null;
 let mixCtl = null;
 let vexWarned = false;
+// Frame heartbeat (module scope so paintStatus can read it): counts twin
+// frames, keeps the first frame error. -1 = loop not started yet.
+let twinFrames = -1;
+let twinErr = null;
 
 function canvasDims() {
   let mapSize = 'map:-';
@@ -74,7 +78,10 @@ function paintStatus() {
       ? ` · relief:${(info.max - info.min).toFixed(0)}m idx:${info.indexCount ?? 0} src:${info.source ?? '?'}`
       : '') +
     (vexWarned ? ' · VEX-WARN' : '') +
-    (mapErr ? ` · MAPERR:${String(mapErr).slice(0, 120)}` : '');
+    (mapErr ? ` · MAPERR:${String(mapErr).slice(0, 120)}` : '') +
+    (twinFrames >= 0
+      ? ` · frames:${twinFrames}${twinErr ? ` TWINERR:${String(twinErr).slice(0, 120)}` : ''}`
+      : '');
 }
 
 async function boot() {
@@ -131,15 +138,22 @@ async function boot() {
     diag: () => ({
       build: BUILD_ID,
       canvases: canvasDims(),
+      frames: twinFrames,
+      twinErr,
       status: statusDiv?.textContent ?? null,
       mapErrors: globalThis.__ring2mapErrors ?? [],
       dem: getStatus(),
     }),
   };
 
+  // Frame heartbeat: a silently-throwing update() renders as an
+  // unexplained black twin. Count frames, keep the first error, and paint
+  // both into the status line — a screenshot then proves loop alive/dead.
+  twinFrames = 0;
   const loop = () => {
     try {
       twin.update();
+      twinFrames++;
       const pose = twin.getPose();
       const viewportPx = Math.max(twinDiv.clientHeight || window.innerHeight, 1);
       try {
@@ -153,8 +167,14 @@ async function boot() {
       }
       const pitch = pitchForPose(pose.eye, pose.target, pose.target.y ?? 0);
       mixCtl.updateForCamera(pitch);
-    } catch {
-      /* a torn-down frame never kills the loop */
+    } catch (err) {
+      /* a torn-down frame never kills the loop — but the first failure is
+       * kept and surfaced so a dead twin names its cause. */
+      if (!twinErr) {
+        twinErr = err?.message ?? String(err);
+        // eslint-disable-next-line no-console
+        console.error('[ring2] twin frame failed:', twinErr);
+      }
     }
     requestAnimationFrame(loop);
   };
