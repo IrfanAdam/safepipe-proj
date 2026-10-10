@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T20:12:56.284Z",
+  "generated": "2026-10-10T20:17:49.798Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,33 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "23b1009",
+      "full": "23b1009e8f802aea1696eb7c531e8d52fe1d0d28",
+      "date": "2026-10-11",
+      "time": "01:47",
+      "subject": "chore: stamp V1_BUILD [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "b97e805",
+      "full": "b97e80528269d4c42212c51de1c1930c3586f647",
+      "date": "2026-10-11",
+      "time": "01:47",
+      "subject": "fix(v1): cap orbit distance at 40km, presets match [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "79e170d",
+      "full": "79e170d8090f91b039490ac71b834071ff3663cb",
+      "date": "2026-10-11",
+      "time": "01:42",
+      "subject": "docs(plan): track refresh [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "b39dad2",
       "full": "b39dad21a3264ec57ac3b4d0428942c620d7ead4",
@@ -1877,5 +1904,7 @@
       "anchor": null
     }
   ],
-  "wip": []
+  "wip": [
+    "src/ops3d/sat-base.js"
+  ]
 }
