@@ -17,14 +17,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const FOV = 40;
 const DIST_MIN = 0.5; // near cage: zooming onto the skin rasterizes every blip — hold off
-const DIST_MAX = 70; // matches the camera cage below — zooming past it snapped back every frame
+const DIST_MAX = 40; // user call: no deep zoom-out — the 20 km lens fills the frame at 40, past it is only fade + void
 const MAX_POLAR = (80 * Math.PI) / 180;
 const FLY_MS = 600;
 
 const PRESETS = {
   sector: { yaw: 4, pitch: 25, dist: 9 },
-  plan: { yaw: 4, pitch: 78, dist: 62 },
-  wide: { yaw: 4, pitch: 36, dist: 60 },
+  plan: { yaw: 4, pitch: 78, dist: 40 },
+  wide: { yaw: 4, pitch: 36, dist: 40 },
 };
 
 const _v = () => new THREE.Vector3();
