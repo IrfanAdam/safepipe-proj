@@ -173,9 +173,13 @@
     if (frame && !frame.getAttribute('src')) frame.src = frame.dataset.src;
   }
   function paintMountError(msg) {
+    // Always paint: a dead canvas may already sit in the host (canvas is
+    // appended before the renderer constructor can throw), and a black
+    // panel with zero message is the failure mode being eliminated.
+    // Only called on the failure path, so live tabs are untouched.
     for (const sel of ['#ops3d-specimen', '#ops3d-sangachal']) {
       const host = document.querySelector(sel);
-      if (host && !host.querySelector('canvas')) {
+      if (host) {
         host.innerHTML = '<div style="padding:24px;font:12px/1.7 ui-monospace,monospace;color:#ffd9a0">3D mount failed: ' +
           String(msg).slice(0, 300) + '</div>';
       }
@@ -260,6 +264,19 @@
   document.querySelector('[data-tab="ops3d-sangachal"]')?.addEventListener('click', maybeMountSangachal);
   window.addEventListener('hashchange', maybeMountSangachal);
   maybeMountSangachal();
+  /* First tab was mounted while hidden: its map initialized 0×0 and never
+   * recovers on its own (twin heals via RO, map needs resize). Re-fire on
+   * every show so a hidden mount + late CDN resolve still ends visible. */
+  function resizeOps3d() {
+    const panel = document.querySelector('[data-panel="ops3d"]');
+    if (panel && !panel.hidden) {
+      requestAnimationFrame(() => {
+        try { window.__satbase?.resize?.(); } catch { /* pre-mount */ }
+      });
+    }
+  }
+  document.querySelector('[data-tab="ops3d"]')?.addEventListener('click', resizeOps3d);
+  window.addEventListener('hashchange', resizeOps3d);
   } catch (err) {
     paintMountError(err?.message ?? err);
   }

@@ -1199,6 +1199,16 @@ export function initSatBase(container, opts = {}) {
     setMix: applyMix,
     fadeTo,
     syncFromTwin,
+    // Resize recovery: the gallery mounts v1 while its panel is hidden
+    // (0×0); the twin self-heals via RO on unhide but the map needs an
+    // explicit resize when its tab is shown. Called from gallery.html.
+    resize: () => {
+      try {
+        map?.resize();
+      } catch {
+        /* pre-mount: nothing to resize yet */
+      }
+    },
     setScope,
     get available() {
       return !!map;

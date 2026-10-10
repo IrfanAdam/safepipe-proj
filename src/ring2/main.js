@@ -197,5 +197,8 @@ async function boot() {
 boot().catch((err) => {
   // eslint-disable-next-line no-console
   console.error('[ring2] boot failed:', err);
-  if (statusDiv && !statusDiv.textContent) statusDiv.textContent = `RING-2 boot failed: ${err?.message ?? err}`;
+  // Overwrite unconditionally: the status line is never empty by the time a
+  // twin/mix constructor throws, and the old if-empty guard turned that
+  // into eternal "map: loading…" with no error (audit finding).
+  if (statusDiv) statusDiv.textContent = `RING-2 boot failed: ${err?.message ?? err}`;
 });
