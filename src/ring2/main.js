@@ -48,13 +48,15 @@ function paintStatus() {
   const s = getStatus();
   const mix = mixCtl?.getMix() ?? loadMix(50);
   const info = twin?.getInfo?.();
+  const mapErr = globalThis.__ring2mapErrors?.at(-1);
   statusDiv.textContent =
     `RING-2 · dem:${s.stage}/${s.source} tiles:${s.tilesLoaded}/${s.tilesTotal}` +
     ` · mix:${mix}` +
     (info && info.min !== undefined
       ? ` · relief:${(info.max - info.min).toFixed(0)}m idx:${info.indexCount ?? 0} src:${info.source ?? '?'}`
       : '') +
-    (vexWarned ? ' · VEX-WARN' : '');
+    (vexWarned ? ' · VEX-WARN' : '') +
+    (mapErr ? ` · MAPERR:${String(mapErr).slice(0, 120)}` : '');
 }
 
 async function boot() {

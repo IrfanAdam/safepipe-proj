@@ -204,6 +204,15 @@ export function createOverlayTwin(container, opts = {}) {
   canvas.style.height = '100%';
   canvas.style.display = 'block';
   canvas.dataset.ring2 = 'twin';
+  canvas.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    const d = document.createElement('div');
+    d.style.cssText =
+      'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
+      'font:12px/1.7 ui-monospace,monospace;color:#ffd9a0;text-align:center;padding:24px;';
+    d.textContent = 'TWIN: WebGL context LOST mid-render (GPU/driver). Reload the tab.';
+    container.appendChild(d);
+  });
   container.appendChild(canvas);
 
   const scene = new THREE.Scene();

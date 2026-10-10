@@ -186,6 +186,16 @@ export async function mountMapBase(el, opts = {}) {
     map.once('load', resolve);
     map.once('error', (e) => reject(new Error(`mountMapBase: map error: ${e?.error?.message ?? e}`)));
   });
+  // Persistent diagnostics: tile/source failures after load + GPU context
+  // loss otherwise render as an unexplained black map. Surfaced in status.
+  map.on('error', (e) => {
+    const msg = e?.error?.message ?? e?.error ?? e;
+    window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), String(msg)].slice(-5);
+  });
+  map.getCanvas()?.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), 'map WebGL context LOST (GPU)'].slice(-5);
+  });
   map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration });
   assertTerrainOn(map);
   applyGroundFlag(map);
