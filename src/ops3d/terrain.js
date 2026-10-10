@@ -53,7 +53,7 @@ function await_import_layout() {
 }
 
 const SIZE = 44; // map extent, km (1 unit = 1 km)
-const R_MAP = 20; // boundary ring radius, km
+const R_MAP = 20; // mapped-circle radius, km (lens clip edge; the drawn ring is removed)
 const N = 160; // marching-squares grid cells per side (128→160 for tighter high rings)
 const LEVELS = 32; // contour levels (20→32 so slope reads as density)
 export const VEX = 1; // true-scale landmass parity — twin matches satellite/map terrain 1:1, no exaggeration
@@ -80,7 +80,6 @@ const SLOPE_MIN = 0.0028; // skip contour cells flatter than ~2.8 m/km — flats
 const BASE_COL = new THREE.Color(0x8b949a); // dim cool-grey hairline base — whispers under alarms
 const INDEX_COL = new THREE.Color(0x9fabb3); // cool-grey index, never white — alarms own the top luminance
 const BELOW_COL = new THREE.Color(0x7e8d95); // below-datum muted blue-grey, dimmed to match
-const RING_COL = 0x848b90; // boundary ring: neutral survey grey, never an accent
 const LAKE_X = -9; // playa lake center, km (flat spot, away from center + draw)
 const LAKE_Z = 6;
 const LAKE_R = 1.3; // mean radius; shoreline modulated below, ~2.6 km across
@@ -1100,40 +1099,9 @@ export function buildTerrain(scene) {
     group.add(fill);
   }
 
-  // Boundary ring: thin neutral survey line marking the mapped 20 km
-  // circle — matte, no glow, so it never competes with live data. No lip
-  // echo; ticks stay faint.
-  const ringPos = [];
-  for (let i = 0; i < 160; i++) {
-    const a0 = (i / 160) * Math.PI * 2, a1 = ((i + 1) / 160) * Math.PI * 2;
-    ringPos.push(Math.cos(a0) * R_MAP, 0.02, Math.sin(a0) * R_MAP,
-      Math.cos(a1) * R_MAP, 0.02, Math.sin(a1) * R_MAP);
-  }
-  const ringGeo = new LineGeometry();
-  ringGeo.setPositions(ringPos);
-  const ringMat = new LineMaterial({
-    color: RING_COL,
-    linewidth: 1.0,
-    transparent: true,
-    opacity: 0.25,
-    depthWrite: false,
-    fog: false,
-  });
-  ringMat.resolution.set(1280, 720);
-  group.add(new Line2(ringGeo, ringMat));
-  const tickPos = [];
-  for (let i = 0; i < 24; i++) {
-    const a = (i / 24) * Math.PI * 2;
-    const c = Math.cos(a), s = Math.sin(a);
-    tickPos.push(c * (R_MAP - 0.7), 0.02, s * (R_MAP - 0.7), c * R_MAP, 0.02, s * R_MAP);
-  }
-  const tickGeo = new THREE.BufferGeometry();
-  tickGeo.setAttribute('position', new THREE.Float32BufferAttribute(tickPos, 3));
-  const tickMat = new THREE.LineBasicMaterial({
-    color: RING_COL, transparent: true, opacity: 0.15,
-    depthWrite: false, fog: false,
-  });
-  group.add(new THREE.LineSegments(tickGeo, tickMat));
+  // Boundary ring REMOVED (user call): the lens limb is the radius now — a
+  // survey line drawn exactly on the clip edge double-draws mid-orbit and
+  // reads as shimmer. No ring, no ticks; just clipping.
 
   // Standing water: one flat fill + isobaths + shoreline per placed lake
   // body — the synthetic playa in fallback, DEM-measured basins when live
@@ -1317,7 +1285,6 @@ export function buildTerrain(scene) {
       baseMat.resolution.set(w, h);
       indexMat.resolution.set(w, h);
       summitMat.resolution.set(w, h);
-      ringMat.resolution.set(w, h);
       shoreMat?.resolution.set(w, h);
       drainMat.resolution.set(w, h);
     },
@@ -1328,7 +1295,6 @@ export function buildTerrain(scene) {
       baseMat.opacity = 0.16 * dimF;
       indexMat.opacity = 0.32 * dimF;
       summitMat.opacity = 0.32 * dimF; // dimmed summit emphasis — alarms lead
-      ringMat.opacity = 0.25;
     },
     dispose() {
       scene.remove(group);

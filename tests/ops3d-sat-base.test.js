@@ -77,6 +77,39 @@ const memStore = () => {
   };
 };
 const tick = () => new Promise((r) => setImmediate(r));
+/* Fake maplibre map: style-free layer registry + plate-carree project. */
+class FakeMap {
+  constructor() {
+    this.layers = {};
+    this.layout = {};
+    this.handlers = {};
+  }
+  on(ev, fn) {
+    (this.handlers[ev] ??= []).push(fn);
+    return this;
+  }
+  fire(ev, arg) {
+    for (const fn of this.handlers[ev] ?? []) fn(arg);
+  }
+  getLayer(id) {
+    return this.layers[id] ?? null;
+  }
+  setLayoutProperty(id, k, v) {
+    (this.layout[id] ??= {})[k] = v;
+  }
+  getLayoutProperty(id, k) {
+    return this.layout[id]?.[k];
+  }
+  project([lon, lat]) {
+    return { x: (lon + 180) * 100, y: (90 - lat) * 100 };
+  }
+  setTerrain() {}
+  remove() {}
+}
+const withLensLayers = (map) => {
+  for (const id of sat.LENS_BAND_LAYER_IDS) map.layers[id] = {};
+  return map;
+};
 
 let sat;
 before(async () => {
@@ -398,6 +431,22 @@ describe('ops3d satellite monitor — clip math (pure)', () => {
     assert.equal(sat.rimEllipsePx({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 }, 40, 0, 900), null);
   });
 
+  it('ringEllipseFromProject: map-pose disc follows the rendered frame', () => {
+    // Fake map: 1000 px per degree equirectangular. A 20 km ring at the
+    // equator spans ±0.1797° → ±179.7 px each axis (near-circle).
+    const fake = ([lon, lat]) => ({ x: (lon + 180) * 1000, y: (90 - lat) * 1000 });
+    const d = sat.ringEllipseFromProject(fake, { lat: 0, lon: 0 }, 20);
+    assert.ok(d, 'disc computed from map pose');
+    assert.ok(Math.abs(d.rx - 179.7) < 1 && Math.abs(d.ry - 179.7) < 1, `rx=${d.rx} ry=${d.ry}`);
+    // Anamorphic map projection (2:1) yields a 2:1 ellipse.
+    const wide = ([lon, lat]) => ({ x: (lon + 180) * 2000, y: (90 - lat) * 1000 });
+    const e = sat.ringEllipseFromProject(wide, { lat: 0, lon: 0 }, 20);
+    assert.ok(e && Math.abs(e.rx / e.ry - 2) < 0.1, `wide ellipse rx=${e?.rx} ry=${e?.ry}`);
+    assert.equal(sat.ringEllipseFromProject(null), null, 'no project → null');
+    assert.equal(sat.ringEllipseFromProject(() => { throw new Error('x'); }), null, 'throwing project → null');
+    assert.equal(sat.ringEllipseFromProject(fake, { lat: 0, lon: 0 }, 0), null, 'zero radius → null');
+  });
+
   it('scopeClipCss/scopeMaskCss ellipse form confines imagery to the flat ring', () => {
     assert.equal(sat.scopeClipCss(720, 450, 398.5), 'circle(398.5px at 720px 450px)', '3-arg stays circular');
     assert.equal(
@@ -459,27 +508,31 @@ describe('ops3d satellite monitor — toggle wiring + fallback (fake DOM)', () =
     api2.dispose();
   });
 
-  it('armed at TOP paints the disc; drill-in hides it and restores the mix', () => {
+  it('armed at TOP shows the world-space lens; drill-in hides it and restores the mix', async () => {
     let level = 'network';
     const container = sized();
+    const map = withLensLayers(new FakeMap());
     const api = sat.initSatBase(container, {
       search: '',
       storage: memStore(),
       getTwin: twinFar,
       getLevel: () => level,
+      map,
     });
+    await tick(); // injected map lands on the mount microtask
     api.setMix(0.4);
     assert.equal(api.setScope(true), true);
     assert.equal(api.scopeShown, true, 'shown at TOP');
-    const base = container.children.find((c) => c.className === 'sat-base');
-    assert.ok(base.style.clipPath.startsWith('circle('), `clip ${base.style.clipPath}`);
-    assert.ok(container._canvas.style.maskImage.includes('radial-gradient'), 'canvas punched');
+    for (const id of sat.LENS_BAND_LAYER_IDS) {
+      assert.equal(map.getLayoutProperty(id, 'visibility'), 'visible', `${id} lens on`);
+    }
     // Drill-in: overlay auto-hides, user mix restored untouched.
     level = 'segment';
     api.syncFromTwin(true);
     assert.equal(api.scopeShown, false, 'hidden on drill-in');
-    assert.equal(base.style.clipPath, '', 'clip cleared');
-    assert.equal(container._canvas.style.maskImage, '', 'mask cleared');
+    for (const id of sat.LENS_BAND_LAYER_IDS) {
+      assert.equal(map.getLayoutProperty(id, 'visibility'), 'none', `${id} lens off`);
+    }
     assert.equal(container._canvas.style.opacity, '0.4', 'user mix restored');
     const chip = container.children
       .find((c) => c.className === 'sat-xfade')
@@ -488,24 +541,51 @@ describe('ops3d satellite monitor — toggle wiring + fallback (fake DOM)', () =
     api.dispose();
   });
 
-  it('mid-blend ghosts the twin over the satellite inside the lens (no snap)', () => {
+  it('mid-blend keeps the lens bands up; twin canvas follows the mix (no punch)', async () => {
     let level = 'network';
     const container = sized();
+    const map = withLensLayers(new FakeMap());
     const api = sat.initSatBase(container, {
       search: '?sat=0',
       storage: memStore(),
       getTwin: twinFar,
       getLevel: () => level,
+      map,
     });
+    await tick();
     assert.equal(api.setScope(true), true);
     assert.equal(api.scopeShown, true, 'lens armed at TOP');
     api.setMix(0.55);
-    const mask = container._canvas.style.maskImage ?? '';
-    assert.ok(mask.includes('radial-gradient'), 'lens mask painted');
-    assert.ok(mask.includes('0.55'), `mid mix rides inside the disc, got ${mask.slice(0, 120)}`);
+    assert.equal(container._canvas.style.opacity, '0.55', 'twin canvas follows the mix');
+    for (const id of sat.LENS_BAND_LAYER_IDS) {
+      assert.equal(map.getLayoutProperty(id, 'visibility'), 'visible', `${id} stays up mid-blend`);
+    }
     api.setMix(0);
-    assert.ok((container._canvas.style.maskImage ?? '').includes('rgba(0,0,0,0)'), 'SAT end stays clean');
+    for (const id of sat.LENS_BAND_LAYER_IDS) {
+      assert.equal(map.getLayoutProperty(id, 'visibility'), 'visible', `${id} stays up at SAT end`);
+    }
     api.dispose();
+  });
+
+  it('lensMaskGeoJSON: one hard world-circular clip around the site', () => {
+    const site = { lat: 57.03, lon: -111.68 };
+    const g = sat.lensMaskGeoJSON(site, 20);
+    assert.equal(g.type, 'FeatureCollection');
+    assert.equal(g.features.length, 1, 'single band');
+    assert.deepEqual(g.features.map((f) => f.properties.band), [1]);
+    // The band: square shell with an R=20 km hole (≈0.1797° latitude).
+    const [outer, hole] = g.features[0].geometry.coordinates;
+    assert.equal(outer.length, 5, 'square shell closed');
+    assert.ok(hole.length > 60, 'circular hole');
+    assert.deepEqual(hole[0], hole[hole.length - 1], 'hole ring closed');
+    let maxDLat = 0;
+    for (const [lon, lat] of hole) {
+      maxDLat = Math.max(maxDLat, Math.abs(lat - site.lat));
+      assert.ok(Math.abs(lon - site.lon) < 0.5, 'hole near site lon');
+    }
+    assert.ok(Math.abs(maxDLat - 20 / 111.32) < 0.005, `hole radius ${maxDLat}`);
+    assert.equal(sat.LENS_BAND_LAYER_IDS.length, 1, 'one layer id');
+    assert.deepEqual(sat.LENS_BAND_OPACITY, [1], 'opaque');
   });
 
   it('level resolution falls back through HUD-less, throwing, and distance paths', () => {

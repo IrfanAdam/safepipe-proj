@@ -164,6 +164,48 @@ export function scopeRadiusForSite(_site = {}) {
   return SCOPE_R_KM;
 }
 
+// World-space lens clip (user call — no ring, just clipping): a single
+// opaque fill band (map-bg color) covering everything outside the mapped
+// circle R. It lives INSIDE the map style, so the lens rides the map render
+// at every pitch with zero JS per tick — real-time follow that cannot
+// flicker, and a single hard world-circular edge that cannot band. Same
+// pattern as Ring-2.
+export const LENS_MASK_COL = '#0b0c0c'; // container bg: clipped ground reads as vignette
+export const LENS_BAND_LAYER_IDS = ['lens-band'];
+export const LENS_BAND_OPACITY = [1];
+export function lensCirclePts(site = SITE, rKm = SCOPE_R_KM, seg = 72) {
+  const pts = [];
+  const count = Math.max(8, Math.min(256, Math.floor(Number(seg) || 72)));
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2;
+    const g = twinTargetToLatLon({ x: Math.cos(a) * rKm, y: 0, z: Math.sin(a) * rKm }, site);
+    pts.push([g.lon, g.lat]);
+  }
+  pts.push(pts[0].slice());
+  return pts;
+}
+export function lensMaskGeoJSON(site = SITE, radiusKm = SCOPE_R_KM) {
+  const R = Number(radiusKm) > 0 ? Number(radiusKm) : SCOPE_R_KM;
+  const c = [site.lon, site.lat];
+  const half = 1.5; // degrees: past any in-ring view, sky/fog melts the edge
+  const square = [
+    [c[0] - half, c[1] - half],
+    [c[0] + half, c[1] - half],
+    [c[0] + half, c[1] + half],
+    [c[0] - half, c[1] + half],
+    [c[0] - half, c[1] - half],
+  ];
+  const band = (outer, hole, id, op) => ({
+    type: 'Feature',
+    properties: { band: id, 'fill-opacity': op },
+    geometry: { type: 'Polygon', coordinates: hole ? [outer, hole] : [outer] },
+  });
+  return {
+    type: 'FeatureCollection',
+    features: [band(square, lensCirclePts(site, R), 1, 1)],
+  };
+}
+
 export function isNetworkLevel(level) {
   return level === 'network';
 }
@@ -227,10 +269,52 @@ export function projectPinhole(camPos, target, fovDeg, w, h, p) {
   return { x: (xNdc * 0.5 + 0.5) * w, y: (1 - (yNdc * 0.5 + 0.5)) * h };
 }
 
-// Screen ellipse of the mapped circle as seen by the twin camera: same
-// projection loop as rimCirclePx, but x/y spans stay separate so the clip
-// conforms to the foreshortened disc at oblique tilt (a flat ring, not a
-// full-bleed square). Returns {cx, cy, rx, ry} px or null. At nadir rx≈ry.
+// Screen ellipse of the mapped circle derived from the MAP's own rendered
+// pose (not the twin camera): ring points go twin-km → lon/lat →
+// map.project() → screen px. The clip is painted onto the map element, so
+// deriving it from the map frame keeps lens and photo on the same cadence —
+// seamless real-time follow with no rim shimmer mid-orbit. Pure (project is
+// injected, so unit tests use a fake).
+export function ringEllipseFromProject(project, site = SITE, radiusKm = SCOPE_R_KM, n = 48) {
+  if (typeof project !== 'function') return null;
+  if (!(radiusKm > 0)) return null;
+  const count = Math.max(8, Math.min(128, Math.floor(Number(n) || 48)));
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let valid = 0;
+  for (let i = 0; i < count; i++) {
+    const a = (2 * Math.PI * i) / count;
+    let s = null;
+    try {
+      const ll = twinTargetToLatLon(
+        { x: radiusKm * Math.cos(a), y: 0, z: radiusKm * Math.sin(a) },
+        site,
+      );
+      s = project([ll.lon, ll.lat]);
+    } catch {
+      s = null;
+    }
+    const x = Number(s?.x);
+    const y = Number(s?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    valid++;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+  if (valid < 8) return null;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const rx = (maxX - minX) / 2;
+  const ry = (maxY - minY) / 2;
+  if (!(rx >= 2) || !(ry >= 2) || !Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+  const q = (v) => Math.round(v * 10) / 10;
+  return { cx: q(cx), cy: q(cy), rx: q(rx), ry: q(ry) };
+}
+// Twin-camera variant (fallback when the map pose is unreadable).
 export function rimEllipsePx(camPos, target, fovDeg, w, h, radiusKm = SCOPE_R_KM, n = 48) {
   if (!(w > 0) || !(h > 0) || !(radiusKm > 0)) return null;
   const count = Math.max(8, Math.min(128, Math.floor(Number(n) || 48)));
@@ -423,6 +507,10 @@ function satStyle(site = SITE) {
         maxzoom: 13,
         attribution: TILE_ATTRIBUTION.terrain,
       },
+      'lens-mask-src': {
+        type: 'geojson',
+        data: lensMaskGeoJSON(site, scopeRadiusForSite(site)),
+      },
     },
     layers: [
       // Opaque floor: the canvas is never transparent, so a slow or
@@ -454,6 +542,15 @@ function satStyle(site = SITE) {
           'raster-opacity': 0.85,
         },
       },
+      // World-space lens clip, topmost: stepped world-circular fade (see
+      // lensMaskGeoJSON). Labels clip to the lens too.
+      ...LENS_BAND_LAYER_IDS.map((id, i) => ({
+        id,
+        type: 'fill',
+        source: 'lens-mask-src',
+        filter: ['==', ['get', 'band'], i + 1],
+        paint: { 'fill-color': LENS_MASK_COL, 'fill-opacity': LENS_BAND_OPACITY[i] ?? 1 },
+      })),
     ],
   };
 }
@@ -617,14 +714,18 @@ export function initSatBase(container, opts = {}) {
     /* timer is cosmetic */
   }
   loadMaplibre().then((ml) => {
-    if (!ml || !base.isConnected) {
-      // In jsdom/fake-DOM unit tests base.isConnected is undefined — only
-      // tag when we are sure there is no live document to mount into.
-      if (!ml) showOfflineTag();
-      return;
-    }
-    try {
-      map = new ml.Map({
+    // opts.map injects a ready map (unit tests): same wiring, no CDN.
+    if (opts.map) {
+      map = opts.map;
+    } else {
+      if (!ml || !base.isConnected) {
+        // In jsdom/fake-DOM unit tests base.isConnected is undefined — only
+        // tag when we are sure there is no live document to mount into.
+        if (!ml) showOfflineTag();
+        return;
+      }
+      try {
+        map = new ml.Map({
         container: base,
         style: satStyle(site),
         center: [site.lon, site.lat],
@@ -735,6 +836,7 @@ export function initSatBase(container, opts = {}) {
       map = null;
       showOfflineTag();
     }
+    }
   });
 
   const canvasOf = () => {
@@ -764,7 +866,6 @@ export function initSatBase(container, opts = {}) {
   let scopeOn = startScope;
   let scopeShown = false;
   let scopeMiss = 0; // consecutive gated ticks before the lens actually hides
-  let scopeDisc = null;
   let lastScope = 0;
   let btnScope = null; // assigned when the crossfade bar is built below
 
@@ -806,161 +907,55 @@ export function initSatBase(container, opts = {}) {
     return 'network';
   };
 
-  // Screen lens of the TOP scope ring through the live twin camera — an
-  // ellipse conforming to the foreshortened disc (flat ring at every tilt);
-  // falls back to a centered disc when the camera is unreadable.
-  const scopeDiscFromTwin = () => {
-    let w = 0;
-    let h = 0;
-    try {
-      w = container.clientWidth || 0;
-      h = container.clientHeight || 0;
-    } catch {
-      w = 0;
-      h = 0;
-    }
-    if (!(w > 0) || !(h > 0)) return null;
-    try {
-      const twin = getTwin();
-      const cam = twin?.debug?.camera;
-      let tgt = null;
-      try {
-        tgt = twin?.debug?.target?.();
-      } catch {
-        tgt = null;
-      }
-      if (cam?.position && tgt) {
-        const disc = rimEllipsePx(cam.position, tgt, cam.fov ?? 40, w, h, scopeRadiusForSite(site));
-        if (disc) return disc;
-      }
-    } catch {
-      /* fallback below */
-    }
-    const q = (v) => Math.round(v * 10) / 10;
-    const r = q(Math.min(w, h) * 0.42);
-    return { cx: q(w / 2), cy: q(h / 2), rx: r, ry: r };
-  };
-
-  // Paint the shown-scope look: sat layer clipped to the lens ellipse, twin
-  // canvas punched open inside it (satellite through) and forced opaque
-  // outside (custom twin). The punch carries the live crossfade mix —
-  // mid-blend ghosts twin contours/pipes over the satellite instead of
-  // snapping SAT-only — and the limb feather melts at oblique tilt so the
-  // lens never reads as a planet sphere. Never throws.
-  const paintScope = (disc) => {
-    let feather = 1.5;
-    try {
-      const twin = getTwin();
-      const cam = twin?.debug?.camera;
-      let tgt = null;
-      try {
-        tgt = twin?.debug?.target?.();
-      } catch {
-        tgt = null;
-      }
-      if (cam?.position && tgt) {
-        const dx = cam.position.x - tgt.x;
-        const dy = cam.position.y - tgt.y;
-        const dz = cam.position.z - tgt.z;
-        const dist = Math.hypot(dx, dy, dz);
-        if (dist > 1e-9) {
-          feather = scopeFeatherPx((Math.asin(Math.min(1, Math.max(-1, dy / dist))) * 180) / Math.PI);
-        }
-      }
-    } catch {
-      feather = 1.5;
-    }
-    try {
-      const ry = disc.ry === undefined ? disc.r : disc.ry;
-      const rx = disc.rx === undefined ? disc.r : disc.rx;
-      base.style.clipPath = scopeClipCss(disc.cx, disc.cy, rx, ry);
-    } catch {
-      /* ignore */
-    }
-    const c = canvasOf();
-    if (c && c.style) {
-      try {
-        const ry = disc.ry === undefined ? disc.r : disc.ry;
-        const rx = disc.rx === undefined ? disc.r : disc.rx;
-        const mask = scopeMaskCss(disc.cx, disc.cy, rx, mix, feather, ry);
-        c.style.maskImage = mask;
-        c.style.webkitMaskImage = mask;
-        c.style.opacity = '';
-      } catch {
-        /* ignore */
-      }
-    }
-    // Lens punch only — ground ownership stays mix-driven (driveGroundMode),
-    // so the twin mesh outside the disc survives at TWIN side.
-    try {
-      driveGroundMode();
-    } catch {
-      /* ground mode is cosmetic */
-    }
-    try {
-      sceneSetBaseMix(1);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  // Twin camera elevation (deg above horizon) for tilt gates; NaN when the
-  // twin API is unavailable (gates fail visible — legacy).
-  const twinElevDeg = () => {
-    try {
-      const twin = getTwin();
-      const cam = twin?.debug?.camera;
-      let tgt = null;
-      try {
-        tgt = twin?.debug?.target?.();
-      } catch {
-        tgt = null;
-      }
-      if (!cam?.position || !tgt) return NaN;
-      const dx = cam.position.x - tgt.x;
-      const dy = cam.position.y - tgt.y;
-      const dz = cam.position.z - tgt.z;
-      const dist = Math.hypot(dx, dy, dz);
-      if (!(dist > 1e-9)) return NaN;
-      return (Math.asin(Math.min(1, Math.max(-1, dy / dist))) * 180) / Math.PI;
-    } catch {
-      return NaN;
-    }
-  };
-
   // Reconcile the scope overlay with toggle + level (throttled; force on
   // toggle/resize). Shown only at TOP/network — drill-ins auto-hide and
   // the user's crossfade mix is restored untouched.
+  // Lens visibility drives the WORLD-SPACE bands (lens-band-1..3, topmost
+  // in the style): show = clipped satellite lens, hide = full-bleed map.
+  // Static layers ride the map render — no per-tick paint, no flicker.
+  // Guarded: pre-mount (or a map without the bands) keeps today's look.
+  const setLensVisible = (on) => {
+    try {
+      if (!map) return false;
+      for (const id of LENS_BAND_LAYER_IDS) {
+        try {
+          if (typeof map.getLayer === 'function' && !map.getLayer(id)) continue;
+          map.setLayoutProperty?.(id, 'visibility', on ? 'visible' : 'none');
+        } catch {
+          /* one band never breaks the lens */
+        }
+      }
+      return !!on;
+    } catch {
+      return false;
+    }
+  };
+
   const refreshScope = (force = false) => {
     // Base stays visible at every tilt (TOP-only retired — user call):
-    // MapLibre 3D terrain superimposes under the twin at all angles, so
-    // oblique views keep their satellite instead of dropping to a forced
-    // opaque twin (which read as a black hole whenever the twin itself
-    // failed to paint). The crossfade mix alone drives twin opacity now.
+    // MapLibre 3D terrain superimposes under the twin at all angles. The
+    // crossfade mix alone drives twin opacity now.
     try {
-      const satVis = satVisibleAtTilt(twinElevDeg());
-      if (base && base.style) base.style.display = satVis ? '' : 'none';
-      if (!satVis) {
-        const c = canvasOf();
-        if (c && c.style) c.style.opacity = '';
-        try {
-          const twin = getTwin();
-          if (typeof twin?.setTerrainMode === 'function') twin.setTerrainMode('twin');
-        } catch {
-          /* ground mode is cosmetic */
-        }
-      } else {
-        // Back at TOP: restore the mix-driven twin fade so SAT shows through.
-        const c = canvasOf();
-        if (c && c.style) c.style.opacity = mix >= 0.999 ? '' : String(mix);
-      }
+      if (base && base.style) base.style.display = '';
+      const c = canvasOf();
+      if (c && c.style) c.style.opacity = mix >= 0.999 ? '' : String(mix);
     } catch {
       /* base stays as-is */
     }
     const now =
       typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
-    if (!force && now - lastScope < 150) return scopeShown;
+    if (!force && now - lastScope < 50) return scopeShown;
     lastScope = now;
+    // No sized container (gallery hidden-mount): cannot show, never throws.
+    try {
+      if (!(container.clientWidth > 0) || !(container.clientHeight > 0)) {
+        scopeShown = false;
+        return false;
+      }
+    } catch {
+      scopeShown = false;
+      return false;
+    }
     const level = resolveLevel();
     const show = shouldShowScope({ scopeOn, level, mix });
     try {
@@ -970,53 +965,23 @@ export function initSatBase(container, opts = {}) {
     }
     if (!show) {
       // Debounced hide (anti-flicker): a single gated tick — level-distance
-      // heuristic mid push-in, a transient null disc — must not snap the
-      // lens off and on. Five consecutive misses (~0.75 s) before clearing.
+      // heuristic mid push-in — must not snap the lens off and on. Five
+      // consecutive misses before clearing.
       scopeMiss = (scopeMiss || 0) + 1;
       // A forced sync is deliberate (drill-in, toggle) — hide now. Only
       // unforced throttle ticks debounce, where a miss is likely transient.
       if (scopeMiss < 5 && !force) return scopeShown;
       scopeMiss = 0;
       if (scopeShown) {
-        try {
-          base.style.clipPath = '';
-        } catch {
-          /* ignore */
-        }
-        const c = canvasOf();
-        try {
-          if (c && c.style) {
-            c.style.maskImage = '';
-            c.style.webkitMaskImage = '';
-          }
-        } catch {
-          /* ignore */
-        }
+        setLensVisible(false);
         scopeShown = false;
-        scopeDisc = null;
         applyMix(mix, { auto: true });
       }
       return false;
     }
-    const disc = scopeDiscFromTwin();
-    if (!disc) {
-      // Transient projection miss: hold the last good lens instead of
-      // flashing unclipped for a tick.
-      if (scopeDisc) {
-        try {
-          paintScope(scopeDisc);
-        } catch {
-          /* ignore */
-        }
-        return scopeShown;
-      }
-      scopeShown = false;
-      return false;
-    }
     scopeMiss = 0;
-    scopeDisc = disc;
+    setLensVisible(true);
     scopeShown = true;
-    paintScope(disc);
     return true;
   };
 
@@ -1032,18 +997,9 @@ export function initSatBase(container, opts = {}) {
     } catch {
       /* ignore */
     }
-    if (scopeOn) {
-      // Toggling SCOPE on always drops the camera to TOP/network first, so
-      // the disc overlay has a level to show in — same path as the HUD `1`
-      // key / network button, no twin.js contract change.
-      try {
-        document
-          .querySelector('.ops-hud__level-btn[data-level="network"]')
-          ?.click();
-      } catch {
-        /* HUD not mounted yet — overlay appears when network is active */
-      }
-    }
+    // No camera yank on enable: the world-space lens is valid at every
+    // pitch, so SCOPE keeps the current orbit (it used to drop to TOP for
+    // the screen-space disc). The network level gate still applies.
     refreshScope(true);
     return scopeOn;
   };
@@ -1100,15 +1056,9 @@ export function initSatBase(container, opts = {}) {
         /* ignore */
       }
     }
-    // Scope overlay owns the canvas look while shown (sat inside the disc,
-    // twin outside): re-force it so a mid-scope slider drag can't smear it.
-    if (scopeShown && scopeDisc) {
-      try {
-        paintScope(scopeDisc);
-      } catch {
-        /* ignore */
-      }
-    }
+    // World-space lens needs no re-force: static bands ride the map render,
+    // so a mid-scope slider drag can't smear anything. Mix alone drives
+    // the twin canvas (reconciled at the top of refreshScope).
     return mix;
   };
 
@@ -1310,6 +1260,23 @@ export function initSatBase(container, opts = {}) {
   } catch {
     /* ignore */
   }
+  // Reseat-on-release: the motion-hold freezes the lens mid-drag, so a
+  // release would visibly lag one throttle tick behind. Repaint the lens
+  // from the settled camera the moment the pointer lifts (forced sync
+  // bypasses the hold; the repaint-skip keeps it cheap when parked).
+  const onPointerUp = () => {
+    try {
+      refreshScope(true);
+    } catch {
+      /* lens never breaks input */
+    }
+  };
+  try {
+    container.addEventListener?.('pointerup', onPointerUp);
+    container.addEventListener?.('pointercancel', onPointerUp);
+  } catch {
+    /* container is a fake in tests */
+  }
 
   return {
     setMix: applyMix,
@@ -1354,6 +1321,12 @@ export function initSatBase(container, opts = {}) {
         if (typeof window !== 'undefined' && window.removeEventListener) {
           window.removeEventListener('resize', onResize);
         }
+      } catch {
+        /* ignore */
+      }
+      try {
+        container.removeEventListener?.('pointerup', onPointerUp);
+        container.removeEventListener?.('pointercancel', onPointerUp);
       } catch {
         /* ignore */
       }
