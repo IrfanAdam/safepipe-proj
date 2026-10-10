@@ -179,7 +179,22 @@ export function createOverlayTwin(container, opts = {}) {
   if (!container) throw new Error('createOverlayTwin: container required');
   const fovDeg = opts.fovDeg ?? 60;
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  } catch (err) {
+    // No WebGL (blocked GPU, old browser): leave a readable verdict in the
+    // container instead of a silent transparent canvas. Plain DOM survives.
+    const d = document.createElement('div');
+    d.style.cssText =
+      'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
+      'font:12px/1.7 ui-monospace,monospace;color:#ffd9a0;text-align:center;padding:24px;';
+    d.textContent =
+      'TWIN unavailable: this browser gave no WebGL context (' +
+      (err?.message ?? err) + '). The map layer above still works — drag the mix to SAT.';
+    container.appendChild(d);
+    throw err;
+  }
   renderer.setClearColor(0x000000, 0); // transparent: map shows through
   renderer.setPixelRatio(Math.min(window.devicePixelRatio ?? 1, 2));
   const canvas = renderer.domElement;
