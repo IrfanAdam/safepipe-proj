@@ -501,16 +501,17 @@ export function createOverlayTwin(container, opts = {}) {
     return { min: mn, max: mx, indexCount };
   }
 
-/* Outer-10% DEM-window fade: 1 inside, smoothstepping to 0 at the
- * extent edge, so overlays never end in a razor line. The 10 km ring
- * itself is exempt (it is the mapped radius, not DEM coverage). */
+/* Radial rim fade: 1 inside, smoothstepping to 0 at the 10 km ring, so
+ * overlays dissolve concentrically — never a square curtain with a corner
+ * wedge. (Was a max-norm "outer 10% of the square" fade; its straight N-S /
+ * E-W bands and 90° corner showed through over flat water.) The ring line
+ * itself is exempt (it is the mapped radius, not coverage). */
 function edgeFade(x, z) {
-  const half = EXTENT_M / 2;
-  const m = Math.max(Math.abs(x), Math.abs(z));
-  const inner = half * (1 - EDGE_FADE_FRAC);
-  if (m <= inner) return 1;
-  if (m >= half) return 0;
-  const u = (m - inner) / (half - inner);
+  const rr = Math.hypot(x, z);
+  const inner = RING_RADIUS_M * (1 - EDGE_FADE_FRAC);
+  if (rr <= inner) return 1;
+  if (rr >= RING_RADIUS_M) return 0;
+  const u = (rr - inner) / (RING_RADIUS_M - inner);
   return 1 - u * u * (3 - 2 * u);
 }
 
