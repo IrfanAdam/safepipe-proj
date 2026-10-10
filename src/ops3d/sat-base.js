@@ -594,6 +594,17 @@ export function initSatBase(container, opts = {}) {
         fadeDuration: 0,
       });
       map.on?.('load', () => {
+        // Shed map wins over late load: error-tiles count as complete, so a
+        // dead-layer map still fires load — it must not strip the offline
+        // tag, re-apply terrain churn, or showcase-fade over a layerless map.
+        if (degraded) {
+          try {
+            hideLoadingTag();
+          } catch {
+            /* tag is cosmetic */
+          }
+          return;
+        }
         mapReady = true;
         hideLoadingTag();
         // Late load after the watchdog fired: drop the stale offline tag so
@@ -1224,6 +1235,9 @@ export function initSatBase(container, opts = {}) {
     },
     get degraded() {
       return degraded;
+    },
+    get mapReady() {
+      return mapReady;
     },
     get mix() {
       return mix;

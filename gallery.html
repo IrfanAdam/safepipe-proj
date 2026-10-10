@@ -296,7 +296,7 @@
     try {
       const sat = window[satKey];
       const cvs = [...host.querySelectorAll('canvas')].map((c) => `${c.width}x${c.height}`).join(' ');
-      cap.textContent = `V1 [${V1_BUILD}] · mix:${sat?.mix?.toFixed?.(2) ?? '-'} · map:${sat ? (sat.available ? (sat.degraded ? 'deg' : 'on') : 'off') : 'no-sat'} · cv:${cvs || 'none'}`;
+      cap.textContent = `V1 [${V1_BUILD}] · mix:${sat?.mix?.toFixed?.(2) ?? '-'} · map:${sat ? (sat.available ? (sat.degraded ? 'deg' : (sat.mapReady ? 'on' : 'wait')) : 'off') : 'no-sat'} · cv:${cvs || 'none'}`;
     } catch {
       /* caption never breaks the tab */
     }

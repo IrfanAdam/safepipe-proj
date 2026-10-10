@@ -191,17 +191,37 @@ export async function mountMapBase(el, opts = {}) {
   // abort the mount: reject-on-first-error used to kill the whole map on a
   // single 404, leaving the SAT side permanently empty with the twin fading
   // over nothing. A hung style is still caught by the caller's timeout.
-  await new Promise((resolve) => {
-    map.once('load', resolve);
-  });
+  // (No await on 'load' here — the soft race below is the only gate.)
   map.getCanvas()?.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
     window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), 'map WebGL context LOST (GPU)'].slice(-5);
   });
-  map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration });
-  assertTerrainOn(map);
+  // Resolve on load — but NEVER gate the mount on it. A hung tile host
+  // holds 'load' forever (proven by fault injection: one hanging host =
+  // permanent map:- with the twin fading over nothing). Soft 8 s resolve
+  // hands the live map to the loop; terrain engages best-effort now and
+  // again on load. The outer 30 s timeout stays for worker catastrophe.
+  let loadedClean = false;
+  map.once('load', () => {
+    loadedClean = true;
+    try {
+      map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration });
+    } catch {
+      /* style still settling — retry below is harmless */
+    }
+    applyGroundFlag(map);
+  });
+  await Promise.race([
+    new Promise((res) => map.once('load', res)),
+    new Promise((res) => setTimeout(res, 8000)),
+  ]);
+  try {
+    map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration });
+  } catch {
+    /* style pending — the load handler above applies it when ready */
+  }
   applyGroundFlag(map);
   _map = map;
   window.__ring2map = map;
-  return { map };
+  return { map, loadedClean };
 }

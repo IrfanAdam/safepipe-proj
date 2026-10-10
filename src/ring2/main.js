@@ -141,22 +141,30 @@ async function boot() {
     new Promise((_, reject) =>
       setTimeout(() => reject(new Error(`map mount timed out after ${MAP_TIMEOUT_MS / 1000}s (tiles/worker blocked?)`)), MAP_TIMEOUT_MS)),
   ]).then(
-    ({ map: m }) => {
+    ({ map: m, loadedClean }) => {
       map = m;
       window.__ring2.map = m;
       try {
         assertTerrainOn(map);
       } catch (err) {
-        vexWarned = true;
-        mapFatal = `terrain: ${err?.message ?? err}`;
-        paintStatus();
-        return;
+        // Best-effort terrain: a slow style resolves 'hasty' before terrain
+        // engages — satellite + twin run regardless, noted not fatal.
+        // loadedClean false just means the 8 s soft resolve fired first.
+        window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), `terrain pending${loadedClean ? '' : ' (hasty mount)'}: ${err?.message ?? err}`].slice(-5);
       }
       paintStatus();
     },
     (err) => {
       vexWarned = true;
       mapFatal = `${err?.message ?? err}`.slice(0, 140);
+      // Dead-end guard: map hard-failed with twin faded out = permanently
+      // empty viewport. Pull mix to the live side (twin) so something
+      // always paints; the failure stays sticky in status.
+      try {
+        if ((mixCtl?.getMix?.() ?? 50) < 50) mixCtl.setMix(50);
+      } catch {
+        /* mix bar drives on without us */
+      }
       paintStatus();
     },
   );

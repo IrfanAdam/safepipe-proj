@@ -13,7 +13,7 @@
  *     (v1 remount-opacity class). Mix also persists to localStorage.
  * [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-3]
  */
-import { setGroundOwns, getGroundOwns, IMAGERY_LAYER_ID, HILLSHADE_LAYER_ID } from './mapbase.js';
+import { setGroundOwns, getGroundOwns, IMAGERY_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID } from './mapbase.js';
 
 export const MIX_STORE_KEY = 'ring2.mix';
 export const TOP_PITCH_DEG = 20;
@@ -95,7 +95,7 @@ export function mountMixBar(el, opts = {}) {
     const m = getMap();
     if (!m || typeof m.setLayoutProperty !== 'function') return;
     const vis = getGroundOwns() ? 'visible' : 'none';
-    for (const id of [IMAGERY_LAYER_ID, HILLSHADE_LAYER_ID]) {
+    for (const id of [IMAGERY_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID]) {
       try {
         m.setLayoutProperty(id, 'visibility', vis);
       } catch { /* layer absent — mapbase flag covers the next mount */ }
@@ -103,7 +103,13 @@ export function mountMixBar(el, opts = {}) {
   }
 
   function reapply() {
-    const t = mix / 100;
+    // Dead-end guard: stored mix 0 + map still mounting = empty viewport
+    // with orbit going nowhere. While the map object doesn't exist, floor
+    // the EFFECTIVE mix at 50 so the live twin stays visible and
+    // interactive; the stored value (pill) is untouched and takes over the
+    // moment the map lands.
+    const effMix = (!getMap?.() && mix < 50) ? 50 : mix;
+    const t = effMix / 100;
     const canvas = getTwinCanvas();
     lastCanvas = canvas ?? lastCanvas;
     if (canvas) {
