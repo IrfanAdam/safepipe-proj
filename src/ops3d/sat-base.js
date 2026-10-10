@@ -113,25 +113,29 @@ export function twinViewToMap(camPos, target, view = {}) {
   const dy = camPos.y - target.y;
   const dz = camPos.z - target.z;
   const dist = Math.hypot(dx, dy, dz) || 1;
-  const bearing = ((Math.atan2(dx, dz) * 180) / Math.PI + 360) % 360;
+  // Mirrored bearing: twin +x runs opposite the map's east at the same
+  // yaw, so the map must turn with atan2(-dx, dz) — plain atan2(dx, dz)
+  // spins the imagery opposite the orbit drag (invisible only at yaw
+  // 0/180 where dx ≈ 0). Measured: mirrored bearing wins at every yaw.
+  const bearing = ((Math.atan2(-dx, dz) * 180) / Math.PI + 360) % 360;
   const elev = (Math.asin(Math.min(1, Math.max(-1, dy / dist))) * 180) / Math.PI;
   const pitch = Math.min(70, Math.max(0, 90 - elev));
   const heightPx = Number(view.heightPx) > 0 ? Number(view.heightPx) : 900;
   const fovDeg = Number(view.fovDeg) > 0 ? Number(view.fovDeg) : 40;
   const spanKm = 2 * dist * Math.tan(((fovDeg * Math.PI) / 180) / 2);
-  // Oblique stretch: the centre-pixel ray meets the ground at a slant, so
-  // ground-per-pixel grows by 1/sin(elevation). Without this the map sits
-  // ~2-3× too tight at ISO and the crossfade double-visions mid-fade.
-  // Top-down is unaffected (sin 90° = 1). Factor clamped to 3 (twin camera
-  // floor is 16° elevation) so grazing views never over-zoom out.
-  const slant = Math.min(3, 1 / Math.max(Math.sin((Math.max(elev, 5) * Math.PI) / 180), 1 / 3));
-  const mpp = ((spanKm * 1000) / heightPx) * slant; // twin metres per pixel
+  // No slant factor: zoom is dist/fov-driven only (slant is handled by
+  // pitch). The zoom constant is the 512-px-tile convention
+  // (78271.51696 = 156543.03392/2): feeding MapLibre the 256-px value
+  // rendered imagery at 2× magnification vs the twin.
+  const mpp = (spanKm * 1000) / heightPx; // twin metres per pixel
   // Site follows the twin: view.site (or the default pin) so a
   // ?site=<lat>,<lon> twin pans the map around the same ground.
   const center = twinTargetToLatLon(target, view.site ?? SITE);
+  // Floor 8.5 (not 10): the corrected plan zoom at H=800 is ~9.5 — a
+  // min-10 clamp would re-break the scope on typical windows.
   const zoom = Math.min(
     16,
-    Math.max(10, Math.log2((156543.03392 * Math.cos((center.lat * Math.PI) / 180)) / Math.max(mpp, 1e-6))),
+    Math.max(8.5, Math.log2((78271.51696 * Math.cos((center.lat * Math.PI) / 180)) / Math.max(mpp, 1e-6))),
   );
   return { bearing, pitch, zoom, center };
 }
@@ -147,6 +151,16 @@ export const twinViewToMapbox = twinViewToMap;
 // projectPinhole, rimCirclePx, scopeClipCss, scopeMaskCss.
 export const SCOPE_R_KM = 20;
 export const LS_SCOPE_KEY = 'ops3d.satScope';
+
+// Per-site TOP scope disc radius: the 20 km Fort McMurray disc scaled by the
+// site window (Sangachal extentKm 20 → ~9.09 km). Default (no extentKm) is
+// exactly SCOPE_R_KM, so Fort McMurray behavior is unchanged.
+// [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-1]
+export function scopeRadiusForSite(site = {}) {
+  const raw = Number(site?.extentKm ?? 44);
+  const extent = Number.isFinite(raw) && raw > 0 ? raw : 44;
+  return 20 * (extent / 44);
+}
 
 export function isNetworkLevel(level) {
   return level === 'network';
@@ -540,7 +554,11 @@ export function initSatBase(container, opts = {}) {
         container: base,
         style: satStyle(site),
         center: [site.lon, site.lat],
-        zoom: 13,
+        // Extent-scaled initial zoom: a 20 km window opens ~1.14 closer than
+        // the 44 km Fort McMurray default (13 + log2(44/extent)); default
+        // extent keeps exactly 13.
+        // [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-1]
+        zoom: 13 + Math.log2(44 / (Number(site?.extentKm) > 0 ? Number(site.extentKm) : 44)),
         attributionControl: { compact: true },
         interactive: false,
         fadeDuration: 0,
@@ -688,7 +706,7 @@ export function initSatBase(container, opts = {}) {
         tgt = null;
       }
       if (cam?.position && tgt) {
-        const disc = rimCirclePx(cam.position, tgt, cam.fov ?? 40, w, h);
+        const disc = rimCirclePx(cam.position, tgt, cam.fov ?? 40, w, h, scopeRadiusForSite(site));
         if (disc) return disc;
       }
     } catch {

@@ -180,18 +180,19 @@ describe('ops3d satellite base — camera sync math (pure)', () => {
     assert.ok(Math.abs(v.pitch) < 1, `pitch ${v.pitch}`);
     assert.ok(v.bearing >= 0 && v.bearing < 360, `bearing ${v.bearing}`);
   });
-  it('low-elevation twin → high map pitch; bearing tracks azimuth', () => {
+  it('low-elevation twin → high map pitch; mirrored bearing tracks azimuth', () => {
     const v = sat.twinViewToMap({ x: 9, y: 1, z: 0 }, { x: 0, y: 0, z: 0 });
     assert.ok(v.pitch > 45 && v.pitch <= 70, `pitch ${v.pitch}`);
-    assert.ok(Math.abs(v.bearing - 90) < 1, `bearing ${v.bearing}`);
+    // Twin +x runs opposite map east: bearing is mirrored (270, not 90).
+    assert.ok(Math.abs(v.bearing - 270) < 1, `bearing ${v.bearing}`);
   });
-  it('zoom tracks orbit distance, clamped [10,16]', () => {
+  it('zoom tracks orbit distance, clamped [8.5,16]', () => {
     const near = sat.twinViewToMap({ x: 0, y: 9, z: 0 }, { x: 0, y: 0, z: 0 });
     const far = sat.twinViewToMap({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 });
     assert.ok(near.zoom > far.zoom, `near ${near.zoom} > far ${far.zoom}`);
-    for (const v of [near, far]) assert.ok(v.zoom >= 10 && v.zoom <= 16, `zoom ${v.zoom}`);
+    for (const v of [near, far]) assert.ok(v.zoom >= 8.5 && v.zoom <= 16, `zoom ${v.zoom}`);
     const huge = sat.twinViewToMap({ x: 0, y: 900, z: 0 }, { x: 0, y: 0, z: 0 });
-    assert.equal(huge.zoom, 10);
+    assert.equal(huge.zoom, 8.5);
   });
   it('legacy twinViewToMapbox alias is the same function', () => {
     assert.equal(sat.twinViewToMapbox, sat.twinViewToMap);
@@ -207,18 +208,18 @@ describe('ops3d satellite base — camera sync math (pure)', () => {
     const panned = sat.twinViewToMap({ x: 5, y: 62, z: -8 }, { x: 5, y: 0, z: -8 }).center;
     assert.ok(panned.lon > -111.68 && panned.lat > 57.03, `pan tracks ${panned.lat},${panned.lon}`);
   });
-  it('zoom holds ground scale (TOP 40 km span ≈ z10.7, not the old ~4×-tight fit)', () => {
+  it('zoom holds ground scale (512-px convention: TOP 40 km span ≈ z9.7)', () => {
     const top = sat.twinViewToMap({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 });
-    assert.ok(top.zoom > 10.4 && top.zoom < 11.1, `TOP zoom ${top.zoom}`);
+    assert.ok(top.zoom > 9.5 && top.zoom < 10.0, `TOP zoom ${top.zoom}`);
     const near = sat.twinViewToMap({ x: 0, y: 9, z: 0 }, { x: 0, y: 0, z: 0 });
-    assert.ok(near.zoom > 13.2 && near.zoom < 13.8, `segment zoom ${near.zoom}`);
+    assert.ok(near.zoom > 12.3 && near.zoom < 12.8, `segment zoom ${near.zoom}`);
   });
-  it('oblique views widen the map (slant-corrected, no ISO double-vision)', () => {
+  it('oblique views keep dist/fov zoom (no slant factor, pitch handles tilt)', () => {
     const tgt = { x: 0, y: 0, z: 0 };
     const top = sat.twinViewToMap({ x: 0, y: 30, z: 0.1 }, tgt);
     const iso = sat.twinViewToMap({ x: 0, y: 30 * Math.sin((25 * Math.PI) / 180), z: 30 * Math.cos((25 * Math.PI) / 180) }, tgt);
-    assert.ok(iso.zoom < top.zoom - 0.8, `iso ${iso.zoom} vs top ${top.zoom}`);
-    assert.ok(iso.zoom >= 10, 'still clamped');
+    assert.ok(Math.abs(iso.zoom - top.zoom) < 0.01, `iso ${iso.zoom} vs top ${top.zoom}`);
+    assert.ok(iso.zoom >= 8.5, 'still clamped');
   });
   it('natural satellite colors: no dimming or tinted hillshade (thermal look)', () => {
     assert.ok(!SRC.includes('raster-brightness-max'), 'no brightness dimming');
@@ -300,6 +301,12 @@ describe('ops3d satellite base — offline fallback (fake DOM)', () => {
 describe('ops3d satellite monitor — clip math (pure)', () => {
   it('SCOPE_R_KM matches the mapped circle (20 km)', () => {
     assert.equal(sat.SCOPE_R_KM, 20);
+  });
+
+  it('scopeRadiusForSite scales the TOP disc by site window', () => {
+    assert.equal(sat.scopeRadiusForSite({}), 20, 'no extent → Fort McMurray disc');
+    assert.equal(sat.scopeRadiusForSite({ extentKm: 44 }), 20);
+    assert.ok(Math.abs(sat.scopeRadiusForSite({ extentKm: 20 }) - (20 * 20) / 44) < 1e-9, 'Sangachal ≈ 9.09 km');
   });
 
   it('projectPinhole centers the look target', () => {

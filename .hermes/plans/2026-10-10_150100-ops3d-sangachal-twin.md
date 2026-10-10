@@ -1,0 +1,63 @@
+# Ops3D — Sangachal Terminal twin (10 km radius, real terrain + satellite)
+
+**Goal:** A second gallery twin pinned on Sangachal Terminal, Azerbaijan (40.20N 49.48E, 10 km radius) with real Terrarium 3D terrain + Esri satellite underneath the existing twin visual language — same SAT/TWIN/SCOPE bar, same overlays, assets untouched.
+
+**Architecture:** Reuse the `?site=` seam: twin (DEM tiles) + sat-base (MapLibre center/follow) both derive from one site object. New `SANGACHAL` pin carries `extentKm: 20`; `resolveSite` preserves extent; scope-disc radius + initial zoom scale with extent. Gallery mounts a second lazy specimen tab.
+
+**Tech Stack:** MapLibre GL JS (raster-dem Terrarium, `setTerrain`), Esri World Imagery + Reference, AWS Terrarium PNG (DEM sampler), three.js overlays only.
+
+**Tags:** Function
+
+---
+
+## Phase 1 — Sangachal site + gallery tab {#phase-1}
+
+*Second Ops 3D tab: Sangachal 20 km window, real ground, same twin language.*
+
+| # | Task | Done when |
+|---|---|---|
+| 1 | Site plumbing: `SANGACHAL` pin + extent-preserving `resolveSite`/`parseSiteParam` | `?site=40.20,49.48,20` resolves `{lat:40.20, lon:49.48, extentKm:20}`; default still Fort McMurray 44 km |
+| 2 | sat-base per-site scope + zoom (`scopeRadiusForSite`, extent-scaled initial zoom) | Sangachal disc ≈ 9 km, FM disc stays 20 km; map opens one zoom closer on the 20 km window |
+| 3 | Gallery: `ops3d-sangachal` tab + lazy second twin (`site: SANGACHAL`, namespaced storage) | New nav item shows a fresh twin; first tab byte-identical behavior |
+| 4 | Tests: extent + Sangachal pins (dem + sat-base suites) | `node --test` green on both suites, old 3-part-reject assertion updated |
+| 5 | Build + visual verify (both panels screenshotted) | `npm run build` green, captures show satellite ground + twin overlays |
+
+### Task 1 ✓ done: site plumbing
+
+**Objective:** `dem.js` gains `SANGACHAL = {name, lat: 40.20, lon: 49.48, extentKm: 20}`; `parseSiteParam` accepts optional `,extentKm` (5–100); `resolveSite` preserves object/param extent instead of forcing 44.
+
+**Files:** `src/ops3d/dem.js`
+
+**Verify:** `resolveSite('40.20,49.48,20')` → 20 km; `srtmTileNames(40.20, 49.48, 20)` → `['N40E049']` single tile.
+
+### Task 2 ✓ done: sat-base per-site scope + zoom
+
+**Objective:** `scopeRadiusForSite(site)` scales the TOP scope disc (`20 × extent/44`); `initSatBase` initial zoom gains `+log2(44/extent)` so the 20 km window opens at the same framing.
+
+**Files:** `src/ops3d/sat-base.js`
+
+**Verify:** unit asserts (20 km → ≈9.1 km disc, zoom 14); FM values unchanged.
+
+### Task 3 ✓ done: gallery second tab
+
+**Objective:** `#ops3d-specimen` CSS generalizes to `.ops3d-specimen`; new `Ops 3D — Sangachal` nav item + frame; lazy mount on first show with `site: SANGACHAL`, `search: ''`, namespaced mix/scope storage; per-specimen RAF sync.
+
+**Files:** `gallery.html`
+
+**Verify:** `#ops3d` panel unchanged; `#ops3d-sangachal` mounts twin + satellite on first open.
+
+### Task 4 ✓ done: tests
+
+**Objective:** Update `parseSiteParam` 3-part assertion; add extent-preservation, SANGACHAL tile, scope-radius asserts.
+
+**Files:** `tests/ops3d-dem.test.js`, `tests/ops3d-sat-base.test.js`
+
+**Verify:** `node --test tests/ops3d-dem.test.js tests/ops3d-sat-base.test.js` green.
+
+### Task 5 ✓ done: build + visual verify
+
+**Objective:** Full build green; serve on a non-dev port; screenshot both gallery panels; confirm satellite ground + overlays, no console errors.
+
+**Files:** `dist/` (generated)
+
+**Verify:** `npm run build` ✓; two captures vision-checked.

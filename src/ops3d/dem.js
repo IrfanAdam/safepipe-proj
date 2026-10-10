@@ -42,6 +42,13 @@ export const SITE = Object.freeze({
   valleyCutM: 130, // Athabasca W-wall cut ~115-150 m at the site — windowed DEM must show real relief or fallback wins
 });
 
+export const SANGACHAL = Object.freeze({ // [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-1]
+  name: 'Sangachal Terminal',
+  lat: 40.20,
+  lon: 49.48,
+  extentKm: 20,
+});
+
 /* Pinned tiles: the 44 km site window straddles the 57°N parallel — north
  * tile N57W112 covers lat 57–58 (site center + north), south tile N56W112
  * covers lat 56–57 (site south). Single-tile decode smeared the whole
@@ -103,30 +110,40 @@ export function demTileUrls(name) {
   return [demTileUrl(name), copernicusTileUrl(name)].filter(Boolean);
 }
 
-/* ---- Location parametrization (?site=<lat>,<lon> / opts.site) ----
+/* ---- Location parametrization (?site=<lat>,<lon>[,extentKm] / opts.site) ----
  * Default when absent: Fort McMurray 57.03,-111.68 (zero behavior change).
  * SRTM GL1 spans lat -60..60 — inputs outside that (or unparseable) fall
- * back to the default with a console note. Terrain extent stays 44 km. */
-export function parseSiteParam(raw) {
+ * back to the default with a console note. Terrain extent stays 44 km
+ * unless a valid extent (5..100 km) rides along as the optional third part
+ * or on the opts.site object — Sangachal resolves 20 km this way.
+ * [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-1] */
+export function parseSiteParam(raw) { // [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-1]
   if (raw == null) return null;
   const parts = String(raw).split(/[,\s;]+/).map((s) => s.trim()).filter(Boolean);
-  if (parts.length !== 2) return null;
+  if (parts.length !== 2 && parts.length !== 3) return null;
   const lat = Number(parts[0]), lon = Number(parts[1]);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   if (!(lat >= -60 && lat <= 60 && lon >= -180 && lon <= 180)) return null;
-  return { lat, lon };
+  if (parts.length === 2) return { lat, lon };
+  const extentKm = Number(parts[2]);
+  if (!Number.isFinite(extentKm) || !(extentKm >= 5 && extentKm <= 100)) return null;
+  return { lat, lon, extentKm };
 }
-/* Resolve the working site: explicit opts.site ({lat,lon} or "lat,lon")
- * wins, then the ?site= param value, then the default pin. Never throws. */
+/* Resolve the working site: explicit opts.site ({lat,lon[,extentKm]} or
+ * "lat,lon[,extentKm]") wins, then the ?site= param value, then the
+ * default pin. Extent rides along when valid (5..100 km), else 44.
+ * Never throws. [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-1] */
 export function resolveSite(input = null, searchRaw = null) {
   const fallback = { lat: SITE.lat, lon: SITE.lon, extentKm: SITE.extentKm };
+  const extentOf = (cand) => (cand && Number.isFinite(cand.extentKm)
+    && cand.extentKm >= 5 && cand.extentKm <= 100 ? cand.extentKm : SITE.extentKm);
   const cand = typeof input === 'string' ? parseSiteParam(input) : input;
   if (cand && Number.isFinite(cand.lat) && Number.isFinite(cand.lon)
     && cand.lat >= -60 && cand.lat <= 60 && cand.lon >= -180 && cand.lon <= 180) {
-    return { lat: cand.lat, lon: cand.lon, extentKm: SITE.extentKm };
+    return { lat: cand.lat, lon: cand.lon, extentKm: extentOf(cand) };
   }
   const fromParam = parseSiteParam(searchRaw);
-  if (fromParam) return { ...fromParam, extentKm: SITE.extentKm };
+  if (fromParam) return { lat: fromParam.lat, lon: fromParam.lon, extentKm: extentOf(fromParam) };
   const dirty = input != null || (searchRaw != null && String(searchRaw).trim() !== '');
   if (dirty) {
     try {

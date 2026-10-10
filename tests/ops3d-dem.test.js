@@ -471,7 +471,9 @@ describe('ops3d DEM site parametrization (?site=<lat>,<lon> / opts.site)', () =>
     assert.equal(parseSiteParam(''), null);
     assert.equal(parseSiteParam('abc,def'), null);
     assert.equal(parseSiteParam('57.03'), null);
-    assert.equal(parseSiteParam('57.03,-111.68,5'), null);
+    assert.equal(parseSiteParam('57.03,-111.68,4'), null, 'extent below 5 km rejected');
+    assert.deepEqual(parseSiteParam('57.03,-111.68,5'), { lat: 57.03, lon: -111.68, extentKm: 5 });
+    assert.deepEqual(parseSiteParam('40.20,49.48,20'), { lat: 40.20, lon: 49.48, extentKm: 20 });
     assert.equal(parseSiteParam('61,-111.68'), null, 'lat > 60 outside SRTM GL1');
     assert.equal(parseSiteParam('-61,0'), null, 'lat < -60 outside SRTM GL1');
     assert.equal(parseSiteParam('0,181'), null, 'lon > 180');
@@ -486,6 +488,7 @@ describe('ops3d DEM site parametrization (?site=<lat>,<lon> / opts.site)', () =>
       'explicit opts.site beats the param',
     );
     assert.deepEqual(resolveSite('garbage', 'also-bad'), { lat: 57.03, lon: -111.68, extentKm: 44 });
+    assert.deepEqual(resolveSite('40.20,49.48,20'), { lat: 40.20, lon: 49.48, extentKm: 20 }, 'Sangachal keeps 20 km');
     assert.deepEqual(resolveSite({ lat: 75, lon: 0 }), { lat: 57.03, lon: -111.68, extentKm: 44 }, 'out-of-range → default');
   });
 
