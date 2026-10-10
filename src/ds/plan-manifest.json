@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T16:47:44.431Z",
+  "generated": "2026-10-10T16:51:56.419Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,24 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "c669550",
+      "full": "c6695507c0d38b37c8ff3a22ee2734219fd46b2d",
+      "date": "2026-10-10",
+      "time": "22:21",
+      "subject": "fix(ring2): tile errors no longer abort map mount; SAT survives single-host failure [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "cc58c91",
+      "full": "cc58c91ccbad4c70ff9fd0262f424fa8322e2ec4",
+      "date": "2026-10-10",
+      "time": "22:17",
+      "subject": "docs(plan): track refresh [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "3371738",
       "full": "33717385804c3a471fee7634bd04227637b1d43b",
