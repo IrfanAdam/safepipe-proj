@@ -49,6 +49,10 @@ let vexWarned = false;
 // frames, keeps the first frame error. -1 = loop not started yet.
 let twinFrames = -1;
 let twinErr = null;
+// Sticky map failure: the 500ms paintStatus interval rebuilds the status
+// line, so a one-shot map FAILED write would be erased within a blink.
+// Kept here, painted every tick until the map lands.
+let mapFatal = null;
 
 function canvasDims() {
   let mapSize = 'map:-';
@@ -79,6 +83,7 @@ function paintStatus() {
       : '') +
     (vexWarned ? ' · VEX-WARN' : '') +
     (mapErr ? ` · MAPERR:${String(mapErr).slice(0, 120)}` : '') +
+    (mapFatal ? ` · MAPFAILED:${mapFatal}` : '') +
     (twinFrames >= 0
       ? ` · frames:${twinFrames}${twinErr ? ` TWINERR:${String(twinErr).slice(0, 120)}` : ''}`
       : '');
@@ -143,14 +148,16 @@ async function boot() {
         assertTerrainOn(map);
       } catch (err) {
         vexWarned = true;
-        statusDiv.textContent = `RING-2 · terrain FAILED: ${err?.message ?? err}`;
+        mapFatal = `terrain: ${err?.message ?? err}`;
+        paintStatus();
         return;
       }
       paintStatus();
     },
     (err) => {
       vexWarned = true;
-      statusDiv.textContent = `RING-2 · twin ✓ · map FAILED: ${err?.message ?? err}`;
+      mapFatal = `${err?.message ?? err}`.slice(0, 140);
+      paintStatus();
     },
   );
 
