@@ -227,10 +227,42 @@ export function projectPinhole(camPos, target, fovDeg, w, h, p) {
   return { x: (xNdc * 0.5 + 0.5) * w, y: (1 - (yNdc * 0.5 + 0.5)) * h };
 }
 
-// Screen disc of the mapped circle (rim at the target ground plane) as
-// seen by the twin camera. Returns {cx, cy, r} px or null when the rim is
-// unusable (behind camera / degenerate). Bounding-box circle: exact for
-// the near-top-down TOP view, conservative otherwise.
+// Screen ellipse of the mapped circle as seen by the twin camera: same
+// projection loop as rimCirclePx, but x/y spans stay separate so the clip
+// conforms to the foreshortened disc at oblique tilt (a flat ring, not a
+// full-bleed square). Returns {cx, cy, rx, ry} px or null. At nadir rx≈ry.
+export function rimEllipsePx(camPos, target, fovDeg, w, h, radiusKm = SCOPE_R_KM, n = 48) {
+  if (!(w > 0) || !(h > 0) || !(radiusKm > 0)) return null;
+  const count = Math.max(8, Math.min(128, Math.floor(Number(n) || 48)));
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let valid = 0;
+  for (let i = 0; i < count; i++) {
+    const a = (2 * Math.PI * i) / count;
+    const s = projectPinhole(camPos, target, fovDeg, w, h, {
+      x: target.x + radiusKm * Math.cos(a),
+      y: target.y,
+      z: target.z + radiusKm * Math.sin(a),
+    });
+    if (!s || !Number.isFinite(s.x) || !Number.isFinite(s.y)) continue;
+    valid++;
+    if (s.x < minX) minX = s.x;
+    if (s.y < minY) minY = s.y;
+    if (s.x > maxX) maxX = s.x;
+    if (s.y > maxY) maxY = s.y;
+  }
+  if (valid < 8) return null;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const rx = (maxX - minX) / 2;
+  const ry = (maxY - minY) / 2;
+  if (!(rx >= 2) || !(ry >= 2) || !Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+  const q = (v) => Math.round(v * 10) / 10;
+  return { cx: q(cx), cy: q(cy), rx: q(rx), ry: q(ry) };
+}
+// Bounding-box circle variant (kept for API compat + centered fallback).
 export function rimCirclePx(camPos, target, fovDeg, w, h, radiusKm = SCOPE_R_KM, n = 48) {
   if (!(w > 0) || !(h > 0) || !(radiusKm > 0)) return null;
   const count = Math.max(8, Math.min(128, Math.floor(Number(n) || 48)));
@@ -262,9 +294,13 @@ export function rimCirclePx(camPos, target, fovDeg, w, h, radiusKm = SCOPE_R_KM,
   return { cx: q(cx), cy: q(cy), r: q(r) };
 }
 
-// CSS that confines the satellite layer to the disc (applied to .sat-base).
-export function scopeClipCss(cx, cy, r) {
-  return `circle(${r}px at ${cx}px ${cy}px)`;
+// CSS that confines the satellite layer to the lens (applied to .sat-base).
+// Ellipse form conforms to the foreshortened disc at oblique tilt; when
+// ry is omitted it equals rx (circle, top-down look).
+export function scopeClipCss(cx, cy, rx, ry = null) {
+  const yy = ry === null || ry === undefined ? rx : ry;
+  if (yy === rx) return `circle(${rx}px at ${cx}px ${cy}px)`;
+  return `ellipse(${rx}px ${yy}px at ${cx}px ${cy}px)`;
 }
 
 // Lens-limb feather (px) by camera elevation: crisp hairline up top where
@@ -293,14 +329,21 @@ export function satVisibleAtTilt(elevDeg) {
 // twin (contours/pipes) over the satellite instead of snapping SAT-only.
 // `featherPx` softens the limb (see scopeFeatherPx). Transparent
 // inside → black outside with a feathered rim. Pure.
-export function scopeMaskCss(cx, cy, r, inside = 0, featherPx = 1.5) {
+export function scopeMaskCss(cx, cy, rx, inside = 0, featherPx = 1.5, ry = null) {
   const a = Number(inside);
   const inner = `rgba(0,0,0,${Number.isFinite(a) ? Math.min(1, Math.max(0, a)) : 0})`;
   const f = Number(featherPx);
   const feather = Number.isFinite(f) ? Math.min(64, Math.max(0.5, f)) : 1.5;
+  const yy = ry === null || ry === undefined ? rx : ry;
+  if (yy === rx) {
+    return (
+      `radial-gradient(circle ${rx}px at ${cx}px ${cy}px, ` +
+      `${inner} 0, ${inner} ${rx}px, #000 calc(${rx}px + ${feather}px))`
+    );
+  }
   return (
-    `radial-gradient(circle ${r}px at ${cx}px ${cy}px, ` +
-    `${inner} 0, ${inner} ${r}px, #000 calc(${r}px + ${feather}px))`
+    `radial-gradient(ellipse ${rx}px ${yy}px at ${cx}px ${cy}px, ` +
+    `${inner} 0, ${inner} 100%, #000 calc(100% + ${feather}px))`
   );
 }
 
@@ -720,6 +763,7 @@ export function initSatBase(container, opts = {}) {
   // — Circular satellite monitor (TOP scope overlay) state. —
   let scopeOn = startScope;
   let scopeShown = false;
+  let scopeMiss = 0; // consecutive gated ticks before the lens actually hides
   let scopeDisc = null;
   let lastScope = 0;
   let btnScope = null; // assigned when the crossfade bar is built below
@@ -762,8 +806,9 @@ export function initSatBase(container, opts = {}) {
     return 'network';
   };
 
-  // Screen disc of the TOP scope ring through the live twin camera; falls
-  // back to a centered disc when the camera is unreadable (never throws).
+  // Screen lens of the TOP scope ring through the live twin camera — an
+  // ellipse conforming to the foreshortened disc (flat ring at every tilt);
+  // falls back to a centered disc when the camera is unreadable.
   const scopeDiscFromTwin = () => {
     let w = 0;
     let h = 0;
@@ -785,22 +830,23 @@ export function initSatBase(container, opts = {}) {
         tgt = null;
       }
       if (cam?.position && tgt) {
-        const disc = rimCirclePx(cam.position, tgt, cam.fov ?? 40, w, h, scopeRadiusForSite(site));
+        const disc = rimEllipsePx(cam.position, tgt, cam.fov ?? 40, w, h, scopeRadiusForSite(site));
         if (disc) return disc;
       }
     } catch {
       /* fallback below */
     }
     const q = (v) => Math.round(v * 10) / 10;
-    return { cx: q(w / 2), cy: q(h / 2), r: q(Math.min(w, h) * 0.42) };
+    const r = q(Math.min(w, h) * 0.42);
+    return { cx: q(w / 2), cy: q(h / 2), rx: r, ry: r };
   };
 
-  // Paint the shown-scope look: sat layer clipped to the disc, twin canvas
-  // punched open inside it (satellite through) and forced opaque outside
-  // (custom twin). The punch carries the live crossfade mix — mid-blend
-  // ghosts twin contours/pipes over the satellite instead of snapping
-  // SAT-only — and the limb feather melts at oblique tilt so the lens never
-  // reads as a planet sphere. Never throws.
+  // Paint the shown-scope look: sat layer clipped to the lens ellipse, twin
+  // canvas punched open inside it (satellite through) and forced opaque
+  // outside (custom twin). The punch carries the live crossfade mix —
+  // mid-blend ghosts twin contours/pipes over the satellite instead of
+  // snapping SAT-only — and the limb feather melts at oblique tilt so the
+  // lens never reads as a planet sphere. Never throws.
   const paintScope = (disc) => {
     let feather = 1.5;
     try {
@@ -825,14 +871,18 @@ export function initSatBase(container, opts = {}) {
       feather = 1.5;
     }
     try {
-      base.style.clipPath = scopeClipCss(disc.cx, disc.cy, disc.r);
+      const ry = disc.ry === undefined ? disc.r : disc.ry;
+      const rx = disc.rx === undefined ? disc.r : disc.rx;
+      base.style.clipPath = scopeClipCss(disc.cx, disc.cy, rx, ry);
     } catch {
       /* ignore */
     }
     const c = canvasOf();
     if (c && c.style) {
       try {
-        const mask = scopeMaskCss(disc.cx, disc.cy, disc.r, mix, feather);
+        const ry = disc.ry === undefined ? disc.r : disc.ry;
+        const rx = disc.rx === undefined ? disc.r : disc.rx;
+        const mask = scopeMaskCss(disc.cx, disc.cy, rx, mix, feather, ry);
         c.style.maskImage = mask;
         c.style.webkitMaskImage = mask;
         c.style.opacity = '';
@@ -919,6 +969,14 @@ export function initSatBase(container, opts = {}) {
       /* ignore */
     }
     if (!show) {
+      // Debounced hide (anti-flicker): a single gated tick — level-distance
+      // heuristic mid push-in, a transient null disc — must not snap the
+      // lens off and on. Five consecutive misses (~0.75 s) before clearing.
+      scopeMiss = (scopeMiss || 0) + 1;
+      // A forced sync is deliberate (drill-in, toggle) — hide now. Only
+      // unforced throttle ticks debounce, where a miss is likely transient.
+      if (scopeMiss < 5 && !force) return scopeShown;
+      scopeMiss = 0;
       if (scopeShown) {
         try {
           base.style.clipPath = '';
@@ -942,10 +1000,20 @@ export function initSatBase(container, opts = {}) {
     }
     const disc = scopeDiscFromTwin();
     if (!disc) {
+      // Transient projection miss: hold the last good lens instead of
+      // flashing unclipped for a tick.
+      if (scopeDisc) {
+        try {
+          paintScope(scopeDisc);
+        } catch {
+          /* ignore */
+        }
+        return scopeShown;
+      }
       scopeShown = false;
-      scopeDisc = null;
       return false;
     }
+    scopeMiss = 0;
     scopeDisc = disc;
     scopeShown = true;
     paintScope(disc);

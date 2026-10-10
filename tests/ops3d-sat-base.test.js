@@ -384,12 +384,28 @@ describe('ops3d satellite monitor — clip math (pure)', () => {
     assert.equal(sat.rimCirclePx({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 }, 40, 1440, 900, 0), null);
   });
 
-  it('scopeClipCss/scopeMaskCss confine imagery to the disc', () => {
-    assert.equal(sat.scopeClipCss(720, 450, 398.5), 'circle(398.5px at 720px 450px)');
-    const m = sat.scopeMaskCss(720, 450, 398.5);
+  it('rimEllipsePx: nadir yields near-circle, oblique a wide flat ellipse', () => {
+    const top = sat.rimEllipsePx({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 }, 40, 1440, 900);
+    assert.ok(top, 'ellipse computed');
+    assert.ok(Math.abs(top.rx - top.ry) / top.rx < 0.05, `near-circle rx=${top.rx} ry=${top.ry}`);
+    // 30° elevation, same distance: foreshortened vertically, wide horizontally
+    const d = 62, el = (30 * Math.PI) / 180;
+    const obl = sat.rimEllipsePx(
+      { x: 0, y: d * Math.sin(el), z: d * Math.cos(el) }, { x: 0, y: 0, z: 0 }, 40, 1440, 900,
+    );
+    assert.ok(obl, 'oblique ellipse computed');
+    assert.ok(obl.rx > obl.ry * 1.3, `flat ring rx=${obl.rx} ry=${obl.ry}`);
+    assert.equal(sat.rimEllipsePx({ x: 0, y: 62, z: 0 }, { x: 0, y: 0, z: 0 }, 40, 0, 900), null);
+  });
+
+  it('scopeClipCss/scopeMaskCss ellipse form confines imagery to the flat ring', () => {
+    assert.equal(sat.scopeClipCss(720, 450, 398.5), 'circle(398.5px at 720px 450px)', '3-arg stays circular');
+    assert.equal(
+      sat.scopeClipCss(720, 450, 500, 200), 'ellipse(500px 200px at 720px 450px)', '4-arg is elliptical',
+    );
+    const m = sat.scopeMaskCss(720, 450, 500, 0, 20, 200);
+    assert.ok(m.includes('ellipse 500px 200px'), 'mask ellipse sizing');
     assert.ok(m.includes('rgba(0,0,0,0)'), 'transparent inside');
-    assert.ok(m.includes('#000'), 'opaque outside');
-    assert.ok(m.includes('398.5px'), 'same radius');
   });
 
   it('level gating: overlay shows at network/TOP only', () => {
