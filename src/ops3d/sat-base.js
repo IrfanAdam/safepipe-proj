@@ -638,6 +638,15 @@ export function initSatBase(container, opts = {}) {
           }
         }
         showOfflineTag();
+        // Showcase may have auto-faded the twin to transparent over this
+        // map: with the sat layers shed, bring the twin back so the tab is
+        // twin-over-gradient instead of black. An explicit user mix choice
+        // always wins — only the auto-showcase is reclaimed.
+        try {
+          if (!userChoseMix) fadeTo(1);
+        } catch {
+          /* twin stays as-is */
+        }
       });
     } catch {
       map = null;

@@ -110,8 +110,20 @@ export function createScene(canvas) {
 
   // Guarded precision: Safari on some GPUs returns null from
   // getShaderPrecisionFormat(), which three dereferences unguarded at
-  // construction (mount failed → black tab). Probe first, pass explicitly.
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance', precision: pickGLPrecision() });
+  // construction (mount failed → black tab). Probe first, pass explicitly;
+  // if the probe's answer doesn't survive this exact context (attrs differ),
+  // step down the chain — same canvas, three-side precision only, no leak.
+  let renderer = null;
+  let lastErr = null;
+  for (const p of [pickGLPrecision(), 'mediump', 'lowp']) {
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance', precision: p });
+      break;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  if (!renderer) throw lastErr ?? new Error('createScene: WebGL unavailable');
   renderer.setClearColor(CLEAR_COLOR, 1);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
