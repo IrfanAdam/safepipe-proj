@@ -14,9 +14,16 @@ import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { SANGACHAL, VEX } from './site.js';
 
-/* Keyless tile endpoints. */
+/* Keyless tile endpoints. Imagery has TWO hosts for the same Esri
+ * service: some Safari setups (content blockers) kill tile subresources on
+ * one hostname while the address-bar page loads fine. The backup layer sits
+ * UNDER the primary — failed primary tiles are transparent, so the backup
+ * shows through the gaps with zero runtime swapping logic. */
 export const ESRI_IMAGERY_TILES = [
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+];
+export const ESRI_IMAGERY_TILES_BACKUP = [
+  'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
 ];
 export const ESRI_REFERENCE_TILES = [
   'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
@@ -27,6 +34,7 @@ export const TERRARIUM_TILES = [
 export const TERRAIN_SOURCE_ID = 'terrarium';
 export const HILL_SOURCE_ID = 'terrarium-hill'; // same tiles, separate source id (maplibre warns if hillshade shares the terrain source)
 export const IMAGERY_LAYER_ID = 'esri-imagery';
+export const IMAGERY_BACKUP_LAYER_ID = 'esri-imagery-backup';
 export const HILLSHADE_LAYER_ID = 'ring2-hillshade';
 export const REFERENCE_LAYER_ID = 'esri-reference';
 
@@ -61,6 +69,13 @@ export function mapStyle() {
         maxzoom: 19,
         attribution: ESRI_ATTRIB,
       },
+      'esri-imagery-backup-src': {
+        type: 'raster',
+        tiles: ESRI_IMAGERY_TILES_BACKUP,
+        tileSize: 256,
+        maxzoom: 19,
+        attribution: ESRI_ATTRIB,
+      },
       'esri-reference-src': {
         type: 'raster',
         tiles: ESRI_REFERENCE_TILES,
@@ -70,6 +85,9 @@ export function mapStyle() {
       },
     },
     layers: [
+      // Backup FIRST (bottom): identical pixels when both hosts live; failed
+      // primary tiles are transparent, so the backup shows through the gaps.
+      { id: IMAGERY_BACKUP_LAYER_ID, type: 'raster', source: 'esri-imagery-backup-src', paint: { 'raster-opacity': 1 } },
       { id: IMAGERY_LAYER_ID, type: 'raster', source: 'esri-imagery-src', paint: { 'raster-opacity': 1 } },
       {
         id: HILLSHADE_LAYER_ID,
@@ -131,7 +149,7 @@ export function setGroundOwns(on) {
   const m = _map;
   if (m && m.loaded()) {
     const vis = _groundOwns ? 'visible' : 'none';
-    for (const id of [IMAGERY_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID]) {
+    for (const id of [IMAGERY_LAYER_ID, IMAGERY_BACKUP_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID]) {
       try {
         m.setLayoutProperty(id, 'visibility', vis);
       } catch {
@@ -144,7 +162,7 @@ export function setGroundOwns(on) {
 
 function applyGroundFlag(m) {
   if (!_groundOwns) {
-    for (const id of [IMAGERY_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID]) {
+    for (const id of [IMAGERY_LAYER_ID, IMAGERY_BACKUP_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID]) {
       try {
         m.setLayoutProperty(id, 'visibility', 'none');
       } catch {
