@@ -93,6 +93,7 @@
       <summary class="gnav__heading">Special</summary>
       <button class="gnav__item" data-tab="ops3d" type="button">Ops 3D</button>
       <button class="gnav__item" data-tab="ops3d-sangachal" type="button">Ops 3D — Sangachal</button>
+      <button class="gnav__item" data-tab="ops3d-ring2" type="button">Ops 3D — Ring-2 · fresh</button>
     </details>
   </nav>
   <main class="gstage" id="stage">
@@ -154,6 +155,9 @@
     </div>
     <div class="frame" data-panel="ops3d-sangachal" hidden>
       <div class="pad"><div id="ops3d-sangachal" class="ops3d-specimen" style="height:70vh;min-height:420px;position:relative;background:#0b0c0c;"></div></div>
+    </div>
+    <div class="frame" data-panel="ops3d-ring2" hidden>
+      <div class="pad"><iframe id="ops3d-ring2-frame" data-src="./ops3d-ring2.html" title="Ops 3D Ring-2 — Sangachal seamless redo" style="width:100%;height:70vh;min-height:420px;border:0;background:#0b0c0c;"></iframe></div>
     </div>
   </main>
 </div>
@@ -229,6 +233,17 @@
   document.querySelector('[data-tab="ops3d-sangachal"]')?.addEventListener('click', maybeMountSangachal);
   window.addEventListener('hashchange', maybeMountSangachal);
   maybeMountSangachal();
+  /* RING-2 — fresh Sangachal redo (seamless map↔twin). Isolated iframe so the
+   * legacy twin stacks above are untouched; lazy src on first show. */
+  function maybeMountRing2() {
+    const panel = document.querySelector('[data-panel="ops3d-ring2"]');
+    if (!panel || panel.hidden) return;
+    const frame = document.getElementById('ops3d-ring2-frame');
+    if (frame && !frame.src) frame.src = frame.dataset.src;
+  }
+  document.querySelector('[data-tab="ops3d-ring2"]')?.addEventListener('click', () => requestAnimationFrame(maybeMountRing2));
+  window.addEventListener('hashchange', maybeMountRing2);
+  maybeMountRing2();
 </script>
 </body>
 </html>

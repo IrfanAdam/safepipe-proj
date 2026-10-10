@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ops 3D Ring-2 — Sangachal seamless map↔twin</title>
+<link rel="icon" href="data:," />
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0c0c; }
+  #ring2-dev { position: fixed; inset: 0; overflow: hidden; }
+  /* MapLibre ground base (bottom) + transparent twin overlay canvas (top). */
+  #ring2-dev .ring2-map { position: absolute; inset: 0; z-index: 0; background: #101418; }
+  #ring2-dev .ring2-map .maplibregl-canvas { position: absolute; inset: 0; }
+  #ring2-dev .ring2-twin { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  #ring2-dev .ring2-twin canvas { pointer-events: auto; }
+  /* Diagonal-cut mix bar: SAT [slider] TWIN. Built by src/ring2/mix.js. */
+  #ring2-dev .ring2-bar { position: absolute; right: 12px; bottom: 64px; z-index: 2; }
+  #ring2-dev .ring2-mix {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 18px;
+    background: rgba(10, 14, 18, 0.88);
+    border: 1px solid rgba(207, 212, 214, 0.18);
+    clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+    font: 10px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.12em; color: #cfd4d6;
+  }
+  #ring2-dev .ring2-mix__end {
+    background: none; border: 0; padding: 4px 2px; cursor: pointer;
+    font: inherit; letter-spacing: inherit; color: rgba(207, 212, 214, 0.65);
+  }
+  #ring2-dev .ring2-mix__end:hover { color: #ffd9a0; }
+  #ring2-dev .ring2-mix__slider { width: 130px; accent-color: #e8a33d; }
+  #ring2-dev .ring2-mix__val {
+    min-width: 3ch; text-align: right; color: #ffd9a0;
+    border: 1px solid rgba(232, 163, 61, 0.45);
+    padding: 3px 8px;
+    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+  }
+  #ring2-dev .ring2-mix[data-ground="twin"] .ring2-mix__val { background: rgba(232, 163, 61, 0.12); }
+  /* Status chip: same diagonal-cut language, top-left. */
+  #ring2-dev .ring2-status {
+    position: absolute; left: 12px; top: 12px; z-index: 2;
+    padding: 6px 16px;
+    background: rgba(10, 14, 18, 0.88);
+    border: 1px solid rgba(207, 212, 214, 0.18);
+    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+    font: 10px/1.6 ui-monospace, Menlo, monospace; letter-spacing: 0.1em;
+    color: rgba(207, 212, 214, 0.8); pointer-events: none;
+    max-width: 70vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+</style>
+</head>
+<body>
+<div id="ring2-dev"></div>
+<script type="module" src="./src/ring2/main.js"></script>
+</body>
+</html>
