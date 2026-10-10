@@ -68,6 +68,37 @@
     var r = e.reason;
     show('REJECT: ' + (r && (r.message || r)) );
   });
+  /* GPU self-test: proves the full WebGL pipeline (context + draw +
+   * readback) and rAF ticking, as DOM text. One screenshot settles
+   * "black canvas" debates without needing the console. */
+  try {
+    var lines = ['SELFTEST ua=' + navigator.userAgent.match(/Version\/[\d.]+|Chrome\/[\d.]+|Safari\/[\d.]+/g).join(' ')];
+    var t = document.createElement('canvas');
+    var gl2 = t.getContext('webgl2');
+    var gl1 = t.getContext('webgl');
+    lines.push('SELFTEST ctx webgl2=' + !!gl2 + ' webgl=' + !!gl1);
+    var gl = gl2 || gl1;
+    if (gl) {
+      lines.push('SELFTEST renderer=' + gl.getParameter(gl.RENDERER));
+      gl.clearColor(1, 0.5, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      var px = new Uint8Array(4);
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      lines.push('SELFTEST readback=' + px[0] + ',' + px[1] + ',' + px[2] + ' (want 255,128,0)');
+    } else {
+      lines.push('SELFTEST readback=SKIP (no context)');
+    }
+    var ticks = 0;
+    var t0 = performance.now();
+    (function tick() {
+      ticks++;
+      if (performance.now() - t0 < 2000) requestAnimationFrame(tick);
+      else lines.push('SELFTEST raf=' + ticks + ' ticks/2s');
+    })();
+    setTimeout(function () { show(lines.join('\n')); }, 2200);
+  } catch (e) {
+    show('SELFTEST failed: ' + (e.message || e));
+  }
   setTimeout(function () {
     if (!document.querySelector('#ring2-dev canvas')) show('STILL LOADING @ +10s: module or map mount hung (no canvas yet).');
   }, 10000);
