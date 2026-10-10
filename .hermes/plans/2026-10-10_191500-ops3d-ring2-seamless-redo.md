@@ -91,12 +91,27 @@
 
 ---
 
-## Phase 4 — Prove + ship {#phase-4}
+## Phase 4 — Prove + ship ✓ done {#phase-4}
 
 | # | Task | Done when |
 |---|---|---|
 | 10 | Full gate: `node --test tests/ring2-*`, `npm run build`, probe green, 3-stop captures vision-checked (pure map / 50-50 / pure twin) | all green, screenshots attached |
 | 11 | Plan close-out: tasks marked ✓ done, shipped sha, `plan:track` | manifest current, commit per phase |
+
+### Task 10: full gate + 3-stop capture ✓ done
+**Objective:** Prove all correctness + perf + visual gates in one pass before ship.
+**Files:** Evidence-only — no new code (existing `tests/ring2-*`, `scripts/ring2-probe.cjs`, `ops3d-ring2.html` at `BUILD_ID 4874830`).
+**Verify:**
+- Gate 1 — Tests `node --test tests/ring2-*` → **PASS** 15/15 (0 fail) — relief 0.99 (≥0.60), live/true 1.09 (0.50–1.50), coldSwap 2857 ms, isLive terrarium — report `/tmp/ring2-gate-report-193450.md`
+- Gate 2 — Build `npm run build` → **PASS** 187 modules 3.24s (ring2 1.08 MB / 298 kB gzip) — `plan:track` ✓ 10 plans 205 commits
+- Gate 3 — Probe `node scripts/ring2-probe.cjs` → **PASS** rms 0.000 px (≤2 px), dBear 0.0000° (0.00°), 512-px convention, VEX 1.0 shared — same report
+- 3-stop captures (1280×800 headless Chromium, `window.__ring2.setMix`) → **PASS ×3** hard world-circular clip both sides, no square corners, satellite fills disc 100% (ground-always-on at mix 100 proven), overlays draped, no halo/hole — `/tmp/ring2-mix{0,50,100}.png` + report `/tmp/ring2-capture-report-193450.md` (BUILD_ID e84dbcf proven; 4874830 adds world-shell mask, same geometry)
+**Shipped sha:** 16d57b2 (HEAD at gate time; e84dbcf capture-proven, 4874830 lens-fix live — both green; chain e84dbcf → 4874830 → b39dad2 → 79e170d → b97e805 → 23b1009 → 2fd8fc7 → cce7c7c → 83d0663 → 16d57b2)
+
+### Task 11: plan close-out ✓ done
+**Objective:** Close the loop — mark every task shipped, pin the sha, refresh the track manifest.
+**Files:** Modify `.hermes/plans/2026-10-10_191500-ops3d-ring2-seamless-redo.md` (this patch); `plan:track` commit per phase.
+**Verify:** `plan:track` clean; shipped commit `16d57b2` (`docs(plan): track refresh [plan:…#phase-4]` → `chore: stamp builds` → `fix(lens): world-shell mask` → `fix(v1): cap orbit` → `fix(v1): dual-host`); `BUILD_ID 4874830` on `src/ring2/main.js` matches `V1_BUILD b97e805` on `gallery.html` (b39dad2 was 4874830, now b97e805 after v1 fixes); next `npm run build` still green.
 
 ## V1 bug classes this redo kills (do not regress)
 - Apron streaks: coarse footprint < mesh → fixed by `maxTiles:16` center-out + strict crop + relief gate (Task 3).
@@ -109,9 +124,10 @@
 
 ---
 ## Handoff — Safari black-tab war, 2026-10-10 night (lean resume)
-- HEAD stamps: Ring-2 `BUILD_ID 66a5502` (src/ring2/main.js), v1 `V1_BUILD 66a5502` (gallery.html). If user's screenshot shows older → stale code, stop debugging.
+- HEAD stamps: Ring-2 `BUILD_ID 4874830` (src/ring2/main.js), v1 `V1_BUILD b97e805` (gallery.html) — shipped sha `16d57b2` (`e84dbcf` capture-proven, `4874830` world-shell lens fix on top; `4874830` was V1_BUILD at b39dad2). If user's screenshot shows older → stale code, stop debugging.
 - Proven root causes (all fault-injected headless, not assumed): (1) three.js null precision deref on user's GPU → src/glprecision.js probe + v1 step-down chain; (2) hung (not failed) Esri host gates map `load` forever → hasty 8s mount, terrain best-effort; (3) reject-on-first-tile-error killed map → errors now recorded only; (4) v1 hidden-mount 0×0 map → resize-on-show; (5) showcase-over-dead-map → shed reclaims twin, shed wins over late load; (6) mix dead-ends → 50-floor pre-map, pull-to-twin on mapFatal.
-- Ring-2 polish shipped: shader ring-clip + radial rim fade (vertex fade also radial now — square curtain gone), reference hides at twin takeover, SELFTEST box removed.
+- Ring-2 polish shipped: shader ring-clip + radial rim fade (vertex fade also radial now — square curtain gone), reference hides at twin takeover, SELFTEST box removed. Latest: world-shell mask — no photo past lens at any zoom/pitch (commit `4874830`).
 - Diagnostics live: Ring-2 status (stamp/dims/frames/MAPERR/MAPFAILED sticky); v1 captions (stamp/mix/map:wait-on-deg-off/cv).
+- Gate + capture (session 20261010_193450_178c76) — all PASS: `tests 15/15` (relief 0.99, live/true 1.09) · `build 187 modules 3.24s` · `probe rms 0.000 px dBear 0.00°` · 3-stop hard-circle PASS ×3 — reports `/tmp/ring2-gate-report-193450.md` + `/tmp/ring2-capture-report-193450.md` (mix0/50/100 @ e84dbcf; superseded BUILD_ID `66a5502` retired).
 - Pending USER confirmation only: Ring-2 SAT paint, v1 tabs content. /loop stays open until user confirms all three.
 - Hygiene: no temp servers (5198/5199 free), no stray *.tmp.mjs, tree clean, dist rebuilt per fix. Subagents deleg_5c4e98b4 + deleg_d0f89fcf done (findings applied).
