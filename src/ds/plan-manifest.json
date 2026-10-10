@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-10T17:39:40.681Z",
+  "generated": "2026-10-10T17:56:57.949Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,33 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "3c7021b",
+      "full": "3c7021bcc2c81f1244fb522a5f44a790ded96253",
+      "date": "2026-10-10",
+      "time": "23:26",
+      "subject": "chore: stamp BUILD_ID [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "26af437",
+      "full": "26af4370587f0a1dc471cfe4942201249a5b05b9",
+      "date": "2026-10-10",
+      "time": "23:26",
+      "subject": "fix(ring2): map-side world-circular clip kills square corners; release pre-map mix floor [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "be49903",
+      "full": "be49903874e742d556310ddd1c538e9bbd76781e",
+      "date": "2026-10-10",
+      "time": "23:09",
+      "subject": "docs(plan): track refresh [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "018b16d",
       "full": "018b16dbdcdecba4060155e3a8ac4e24a10d5ada",
