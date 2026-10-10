@@ -603,18 +603,20 @@ function edgeFade(x, z) {
     const c = buildContours(src);
     const waterCells = buildWater();
     buildCountPill(); // last: +N covers ring + pin + schematic + contour labels
-    // Ring-clip: every overlay EXCEPT the ring itself + label sprites is
-    // cut to the 10km disc in-shader. Without this the square extent's
-    // corners (up to 41% past R) poke out as a rotated quad with a hard
-    // diagonal edge. Sprites (pills/labels) stay unclipped by design.
+    // Ring-clip + periphery fade: every overlay EXCEPT the ring itself +
+    // label sprites dissolves over the outer ~10% of the disc instead of
+    // hitting a hard edge (the old razor cut read as a coverage boundary).
+    // Sprites (pills/labels) stay unclipped by design.
     group.traverse((o) => {
       if (!o.material || o.isSprite || o.name === 'ring2-ring') return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       for (const m of mats) {
         if (!m || m.userData.ringClipped) continue;
         m.userData.ringClipped = true;
+        m.transparent = true;
         m.onBeforeCompile = (sh) => {
           sh.uniforms.uRingR = { value: RING_RADIUS_M };
+          sh.uniforms.uFadeIn = { value: 0.9 };
           sh.vertexShader =
             'varying vec3 vRingW;\n' +
             sh.vertexShader.replace(
@@ -622,13 +624,16 @@ function edgeFade(x, z) {
               '#include <begin_vertex>\n vRingW = (modelMatrix * vec4(position, 1.0)).xyz;',
             );
           sh.fragmentShader =
-            'varying vec3 vRingW;\nuniform float uRingR;\n' +
+            'varying vec3 vRingW;\nuniform float uRingR;\nuniform float uFadeIn;\n' +
             sh.fragmentShader.replace(
-              '#include <clipping_planes_fragment>',
-              '#include <clipping_planes_fragment>\n if (length(vRingW.xz) > uRingR) discard;',
+              // NOTE: anchored on opaque_fragment (end of main), NOT
+              // clipping_planes_fragment — diffuseColor is only declared
+              // mid-main, so an early inject would not compile.
+              '#include <opaque_fragment>',
+              '{ float rr = length(vRingW.xz); float fade = 1.0 - smoothstep(uRingR * uFadeIn, uRingR, rr); if (fade <= 0.004) discard; diffuseColor.a *= fade; }\n#include <opaque_fragment>',
             );
         };
-        m.customProgramCacheKey = () => 'ring2-clip';
+        m.customProgramCacheKey = () => 'ring2-clipfade';
         m.needsUpdate = true;
       }
     });
