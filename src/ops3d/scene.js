@@ -108,16 +108,15 @@ export function setBaseMix(m) {
 export function createScene(canvas) {
   if (!canvas) throw new Error('createScene: canvas required');
 
-  // Guarded precision: Safari on some GPUs returns null from
-  // getShaderPrecisionFormat(), which three dereferences unguarded at
-  // construction (mount failed → black tab). Probe first, pass explicitly;
-  // if the probe's answer doesn't survive this exact context (attrs differ),
-  // step down the chain — same canvas, three-side precision only, no leak.
+  // NOTE: no powerPreference hint — 'high-performance' requests a separate
+  // GPU context flavor that has reported null shader precision on some
+  // Safari setups (mount crash); the default context survives everywhere
+  // Ring-2's identical three version renders (proven headed-WebKit).
   let renderer = null;
   let lastErr = null;
   for (const p of [pickGLPrecision(), 'mediump', 'lowp']) {
     try {
-      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance', precision: p });
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, precision: p });
       break;
     } catch (err) {
       lastErr = err;
