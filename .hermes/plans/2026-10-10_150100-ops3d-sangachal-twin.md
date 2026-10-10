@@ -75,3 +75,17 @@
 | 3 | Commit + close | Build green, 93/93 tests pass |
 
 ### Task 1 ✓ done · Task 2 ✓ done · Task 3 ✓ done
+
+---
+
+## Phase 3 — true-scale landmass parity {#phase-3}
+
+*VEX 4.5→1 (twin + MapLibre exaggeration), sea-level fill: sub-0 m fill verts tint WATER_COL so the Caspian coastline reads; bathymetry kept.*
+
+| # | Task | Done when |
+|---|---|---|
+| 1 | VEX + TERRAIN_EXAGGERATION = 1, parity test | RED→GREEN, 330/330 suite green |
+| 2 | Sea fill + capture | Coastline legible, contours clean, no streaks |
+| 3 | Commit + close | Build green |
+
+### Task 1 ✓ done · Task 2 ✓ done · Task 3 ✓ done

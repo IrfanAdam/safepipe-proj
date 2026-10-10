@@ -151,6 +151,13 @@ describe('ops3d mood — charcoal relief, blue-only water, capped glow', () => {
     assert.ok(waterFill < lum(0xff4545), `water ${waterFill.toFixed(3)} stays below lamp-red flow/alarm`);
   });
 
+  it('open water reads as water: sub-sea-level fill verts tint WATER_COL (landmass parity)', async () => {
+    const src = await loadTerrainSrc();
+    const m = src.match(/const fillVert = \(x, z\) => \{([\s\S]*?)\n    \};/);
+    assert.ok(m, 'fillVert builder present');
+    assert.ok(m[1].includes('WATER_COL'), 'below-sea-level fill vertices tint water-blue, not land charcoal');
+  });
+
   it('hillshade rig is declared exactly once (no dupes, no missing SUN)', async () => {
     const src = await loadTerrainSrc();
     for (const decl of ['const SUN =', 'const _sn =', 'let _shadeAt =', 'const shadeToBright =']) {

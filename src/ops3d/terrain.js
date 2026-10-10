@@ -55,7 +55,7 @@ const SIZE = 44; // map extent, km (1 unit = 1 km)
 const R_MAP = 20; // boundary ring radius, km
 const N = 160; // marching-squares grid cells per side (128→160 for tighter high rings)
 const LEVELS = 32; // contour levels (20→32 so slope reads as density)
-export const VEX = 4.5; // vertical exaggeration — single source; network/gridfloor import this
+export const VEX = 1; // true-scale landmass parity — twin matches satellite/map terrain 1:1, no exaggeration
 const SLOPE_MIN = 0.0028; // skip contour cells flatter than ~2.8 m/km — flats go truly clean
 const BASE_COL = new THREE.Color(0x8b949a); // dim cool-grey hairline base — whispers under alarms
 const INDEX_COL = new THREE.Color(0x9fabb3); // cool-grey index, never white — alarms own the top luminance
@@ -1001,11 +1001,16 @@ export function buildTerrain(scene) {
     const clr = [0, 0, 0];
     const idx = [];
     const tmpC = new THREE.Color();
+    const SEA = new THREE.Color(WATER_COL); // open water (Caspian Sea): blue fill, never land charcoal
     const fillVert = (x, z) => {
       const h = _heightAt(x, z);
       const te = Math.min(1, Math.max(0, (h - _fillLo) / Math.max(1e-6, _fillHi - _fillLo)));
       const rim = 1 - 0.55 * smooth(18.5, 20, Math.hypot(x, z));
-      tmpC.copy(LO).lerp(HI, te).multiplyScalar((0.42 + 0.78 * _shadeAt(x, z)) * rim);
+      // Landmass parity: sub-sea-level verts read as WATER_COL water so the
+      // coastline tells land from sea at a glance; bathymetry contours stay.
+      // [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-3]
+      if (h < 0) tmpC.copy(SEA).multiplyScalar((0.35 + 0.45 * _shadeAt(x, z)) * rim);
+      else tmpC.copy(LO).lerp(HI, te).multiplyScalar((0.42 + 0.78 * _shadeAt(x, z)) * rim);
       pos.push(x, h * VEX - 0.02, z);
       clr.push(tmpC.r, tmpC.g, tmpC.b);
       return pos.length / 3 - 1;
@@ -1013,7 +1018,8 @@ export function buildTerrain(scene) {
     // center vertex (average height, mid shade) then ring verts
     {
       const h = _heightAt(0, 0);
-      tmpC.copy(LO).lerp(HI, 0.5).multiplyScalar(0.42 + 0.78 * _shadeAt(0, 0));
+      if (h < 0) tmpC.copy(SEA).multiplyScalar(0.35 + 0.45 * _shadeAt(0, 0));
+      else tmpC.copy(LO).lerp(HI, 0.5).multiplyScalar(0.42 + 0.78 * _shadeAt(0, 0));
       pos[1] = h * VEX - 0.02;
       clr[0] = tmpC.r; clr[1] = tmpC.g; clr[2] = tmpC.b;
     }

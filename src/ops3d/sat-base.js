@@ -65,7 +65,7 @@ export const TILE_ATTRIBUTION = {
 // draped overlays (pipes sample field() at VEX heights) sit ON the real
 // terrain instead of floating above / sinking below it. Single source here;
 // the test suite asserts numeric equality with terrain.js VEX.
-export const TERRAIN_EXAGGERATION = 4.5;
+export const TERRAIN_EXAGGERATION = 1;
 
 // First-visit showcase: when the map loads and the user never chose a mix
 // (no ?sat=/?mix=, nothing persisted), glide to SAT so the first thing

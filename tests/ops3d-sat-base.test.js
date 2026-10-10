@@ -475,6 +475,13 @@ describe('ops3d satellite base — site parametrization (?site= / opts.site)', (
 });
 
 describe('ops3d maplibre-terrain redo — real ground, ground seam, showcase', () => {
+  it('landmass parity: twin + map terrain render true-scale (VEX 1, no exaggeration)', () => {
+    const m = TERRAIN_SRC.match(/export const VEX = ([\d.]+)/);
+    assert.ok(m, 'terrain.js exports VEX');
+    assert.equal(Number(m[1]), 1, `twin VEX is true-scale, got ${m[1]}`);
+    assert.equal(sat.TERRAIN_EXAGGERATION, 1, 'map exaggeration is true-scale');
+  });
+
   it('3D terrain exaggeration equals the twin VEX (overlays drape at VEX heights)', () => {
     const m = TERRAIN_SRC.match(/export const VEX = ([\d.]+)/);
     assert.ok(m, 'terrain.js exports VEX');
