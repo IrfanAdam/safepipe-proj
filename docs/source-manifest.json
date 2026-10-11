@@ -1,0 +1,54 @@
+{
+  "generated": "2026-10-11T15:24:55.263Z",
+  "datasets": [
+    {
+      "name": "OpenStreetMap Sangachal AOI vectors (roads/tracks/paths/coastline/terminal)",
+      "source": "Overpass API (https://overpass-turbo.eu/, api overpass-api.de)",
+      "query_bbox": "S40.111431 N40.291093 W49.363656 E49.598884",
+      "osm_base_timestamp": "2026-10-11T15:20:59Z",
+      "processed": "2026-10-11",
+      "crs": "EPSG:4326",
+      "units": "degrees in, metres out",
+      "resolution": "vector (node geometry as returned by Overpass)",
+      "license": "Open Database License (ODbL) 1.0 — https://opendatacommons.org/licenses/odbl/",
+      "attribution": "© OpenStreetMap contributors",
+      "counts": {
+        "roads": {
+          "elements": 680,
+          "vertices": 6225
+        },
+        "tracks": {
+          "elements": 61,
+          "vertices": 895
+        },
+        "paths": {
+          "elements": 113,
+          "vertices": 948
+        },
+        "coastline": {
+          "elements": 1,
+          "vertices": 832
+        },
+        "terminal": {
+          "elements": 91,
+          "vertices": 959
+        }
+      },
+      "counts_total": {
+        "elements": 946,
+        "vertices": 9859
+      },
+      "steps": [
+        "read cached Overpass JSON (/tmp/phase01-<layer>.json, geometry per way)",
+        "clip each vertex to AOI rect (clamp + clipped flag, features preserved)",
+        "project lon/lat -> world metres via src/ring2/site.js geoToWorld",
+        "round to 0.1 m, emit compact JSON public/data/sangachal-vectors.json"
+      ],
+      "limitations": [
+        "33 of 946 features extend past the AOI edge; edge vertices are clamped to the AOI rect (flagged c:1), not surveyed continuations",
+        "terminal layer carries OSM tags only — no verified facility layout (binding spec §1A: ESIA layout is historical)",
+        "no elevation in source; twin drape samples the DEM field at render time"
+      ]
+    }
+  ]
+}
