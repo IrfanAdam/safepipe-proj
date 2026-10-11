@@ -1,14 +1,16 @@
 # OPS 3D V3 — REAL-WORLD SA… (Ring-2 chassis iteration)
 
-> Status: 🟡 BUILDING v3 — Phase 00 pending owner's go. Awaiting owner's real-world-assets / terrain-accuracy prompt as binding optimization input (more to follow).
-> Continues: `2026-10-07_153000-ops3d-realworld-twin.md` (Phases 00–01 done — foundation + real terrain in `src/ops3d/`, carried over, not rebuilt).
-> Replaces as active plan: `2026-10-10_191500-ops3d-ring2-seamless-redo.md` (COMPLETE — pushed `c36d8d1`). Ring-2 @ Sangachal stays live as the shipped reference build.
-> Chassis: `src/ring2/` + `ops3d-ring2.html` (gate-mount, context-loss recovery + telemetry, takeover endpoints, same-frame zoom sync, tilt-aware rim fade). v3 site constants already in `src/ops3d/sat-base.js` (SITE 57.03N −111.68W).
-> Site: Fort McMurray 57.03N −111.68W (153000 ground truth: Copernicus 30 m 25-pt grid, 44 km window, relief 277 m / sd 65 m / W-wall ~130 m).
+> Status: 🟡 BUILDING v3 — Phase 00 pending owner's go. Owner's Sangachal real-world spec (attached 2026-10-11) is BINDING for Phases 01–02; more optimization input to follow.
+> Continues method of: `2026-10-07_153000-ops3d-realworld-twin.md` (Phases 00–01 done — foundation + real-terrain workflow in `src/ops3d/`, carried over as method, not site).
+> Replaces as active plan: `2026-10-10_191500-ops3d-ring2-seamless-redo.md` (COMPLETE — pushed `c36d8d1`). Ring-2 @ Sangachal stays live as the shipped reference build AND the v3 work site.
+> Chassis: `src/ring2/` + `ops3d-ring2.html` (gate-mount, context-loss recovery + telemetry, takeover endpoints, same-frame zoom sync, tilt-aware rim fade).
+> Site: **Sangachal Terminal, Azerbaijan — 40.201262N 49.481270E** (the Ring-2 ring center). 153000's Fort McMurray ground truth (Copernicus 25-pt grid) does NOT transfer — Sangachal ground truth is established by this plan's own source workflow below.
 
 ## TLDR
 
-Rebuild the real-world twin on the shipped Ring-2 chassis: Phase 00 ports the v1 control panels + map markers (parity first); Phase 01 resumes the real terrain and optimizes accuracy at the Fort McMurray site; Phases 02–06 carry the 153000 scope (assets → launcher map → time+sim → ops → lock) adapted to the new chassis. Every phase ends at a **REF GATE** — owner drops a reference/screenshot before the next builds.
+Build the geographically grounded twin of the REAL Sangachal Terminal on the shipped Ring-2 chassis: Phase 00 ports v1 panels + markers (parity first); Phase 01 researches/acquires/processes real Sangachal source data and builds real-DEM terrain with aligned imagery; Phase 02 reconstructs the visible terminal (tanks, structures, pipe racks, roads) with honest 3-tier provenance; Phases 03–06 carry the 153000 scope (launcher map → time+sim → ops → lock). Every phase ends at a **REF GATE**.
+
+**Non-negotiable (from spec):** real place from real data — never a generic facility. Implement end-to-end, don't stop at a research report. Never invent files, coverage, coordinates, or findings: if a dataset can't be obtained, name the exact missing file + its official download page, use the best alternative, and document the limitation.
 
 ---
 
@@ -25,31 +27,33 @@ Rebuild the real-world twin on the shipped Ring-2 chassis: Phase 00 ports the v1
 
 - REF GATE 0: owner confirms panels + markers feel like v1 on real Safari.
 
-## Phase 01 — Real terrain (resume + optimize)
+## Phase 01 — Real Sangachal terrain (source → DEM → imagery)
 <!-- {#phase-01} -->
-*The optimization site. Owner's terrain-accuracy prompt overrides details below.*
+*Spec §§1–4, 7. Bootstrap: Ring-2's live Esri + Terrarium stays up until the real DEM + aligned imagery replace it — never a black/void regression.*
 
 | # | Task | Done when |
 |---|---|---|
-| 5 | Accuracy audit (live DEM vs Copernicus grid: relief/sd/W-wall/asymmetry) | scored 25-pt report; only sub-7 scores become work |
-| 6 | Safari DEM decode pass (browser decode + fetch latency, real device) | closes 153000 −2; decode time in telemetry |
-| 7 | Variance lift (sd −26% → ≥90% of real 65 m, valley+lake masked) | re-score ≥8; top-down pixel-check vs Phase-00 baseline |
-| 8 | Contour conformance on live decoded band (±2% endpoints) | accuracy gate green on live band, not constants |
+| 5 | Source research — geography (BP Azerbaijan site; BP ACG ESIA PDF: topo maps, hills, coastline, coords/elevations/distances; treat facility layout as HISTORICAL, not current) | source manifest started; usable figures/coords extracted or gaps named |
+| 6 | Source research — elevation (Copernicus Data Space vs OpenTopography vs NASA Earthdata over Sangachal; coverage + resolution + CRS + license compared) | best dataset chosen + documented; limitations written down |
+| 7 | Source research — imagery/features (Google Earth, Copernicus, OSM, Overpass Turbo: footprint, hills, Caspian coastline, roads, tanks, buildings; check resolution + acquisition dates; respect licenses, no scraping) | reference set pinned with dates/licenses; area of interest bounded (whole terminal + hills + coastline, no arbitrary mega-tile) |
+| 8 | Source research — 3D models/tech docs (GLB/GLTF/OBJ/FBX/IFC/STEP hunt; verify downloadable + usable before depending on anything) | verdict per format; procedural fallback confirmed if empty |
+| 9 | DEM → Three.js terrain mesh (real elevations; true horizontal proportions + units; missing-value handling; geo→local coords, never raw lat/lon as positions; Caspian water separated; coastline matches imagery; normals + materials; tiles/LOD for perf; TOO-COARSE acknowledged, never invented detail) | mesh from real band; water/coastline consistent; bounds+CRS recorded |
+| 10 | Geographically aligned imagery drape (bounds+projection honored, no stretch-to-fit; else best-permitted reference + clearly-labeled alternative material; source/resolution/date/license documented) | photo and DEM agree at control points; manifest entry complete |
+| 11 | Processing workflow + metadata (GDAL/Rasterio/GeoPandas/GeoJSON scripts; compact browser outputs; per-dataset: name, URL, date, resolution, CRS, units, license, steps, limitations — metadata never silently dropped) | rerunnable scripts; source manifest covers every external file |
 
-- REF GATE 1: owner picks terrain mood (photo/map capture) + confirms scores.
+- REF GATE 1: owner confirms the terrain reads as the real Sangachal coast (screenshot vs reference imagery).
 
-## Phase 02 — Real inspectable assets
+## Phase 02 — Reconstruct the terminal (honest provenance)
 <!-- {#phase-02} -->
-*Import, don't scaffold. (153000 Phase 2, new chassis.)*
+*Spec §§5–6. Procedural Three.js for the facility; reusable components (tank cylinder+roof, parametric buildings, road curves/extrusions, pipe-rack repeats, paved polys). Clean hierarchy: terrain / water / roads / buildings / industrial.*
 
 | # | Task | Done when |
 |---|---|---|
-| 9 | Overpass import run (cached, under budget; provenance per asset) | corridors + pads + plants load; every asset shows `osm\|parametric\|indicated` |
-| 10 | CC0 kit mount (Poly Haven pipes GLB → parametric mount, DRACO/KTX2) | valve/flange/tee render; health lamp overlays work |
-| 11 | Bolt-level LOD (instanced rings/dials/handwheels; NEAR only) | NEAR holds without shimmer; part count logged |
-| 12 | HUD provenance + part readout per asset | every selectable asset shows provenance + count |
+| 12 | Major structures from evidence (tanks, processing structures, frameworks, roads/paved, pipe racks — placed by geographic reference; NO fabricated hidden details or verified-claims on inferred dims/routes) | every object carries tier: **derived** (geo/tech data) / **reconstructed** (visible imagery) / **approximated** (visual fill, recorded as such) |
+| 13 | Scene capabilities (orbit/pan/zoom; initial camera = facility + landscape; terrain materials + light; water + atmosphere; selection on major structures; efficient browser rendering) | interaction parity with Ring-2 feel; selection round-trips to panel |
+| 14 | CC0 kit + Overpass where they help (Poly Haven pipes GLB → mounts; OSM corridors/roads; provenance per asset `osm\|parametric\|indicated`) | kit parts render on mounts; imports cached under budget |
 
-- REF GATE 2: owner approves detail level (toy / noisy / just right).
+- REF GATE 2: owner approves reconstruction honesty (toy / noisy / just right) + tier labels visible.
 
 ## Phase 03 — Hotspot launcher map
 <!-- {#phase-03} -->
@@ -57,10 +61,10 @@ Rebuild the real-world twin on the shipped Ring-2 chassis: Phase 00 ports the v1
 
 | # | Task | Done when |
 |---|---|---|
-| 13 | Map landing (MapLibre + deck.gl, Dark Matter vector; Esri satellite toggle) | loads keyless-ish; satellite toggle works |
-| 14 | Circular hotspot rings (health-divided arcs, H3-hex sized) + pin fallback | ring matches feed worst-health per sector |
-| 15 | Click → full-screen twin overlay (`?sector=<h3>`) | twin opens pre-selected on sector's worst asset |
-| 16 | Close round-trip (X/Esc/back keeps hex + selection) | Esc mid-orbit returns to map, selection kept |
+| 15 | Map landing (MapLibre + deck.gl, Dark Matter vector; Esri satellite toggle) | loads keyless-ish; satellite toggle works |
+| 16 | Circular hotspot rings (health-divided arcs, H3-hex sized) + pin fallback | ring matches feed worst-health per sector |
+| 17 | Click → full-screen twin overlay (`?sector=<h3>`) | twin opens pre-selected on sector's worst asset |
+| 18 | Close round-trip (X/Esc/back keeps hex + selection) | Esc mid-orbit returns to map, selection kept |
 
 - REF GATE 3: owner picks map look + confirms ring reads right.
 
@@ -70,10 +74,10 @@ Rebuild the real-world twin on the shipped Ring-2 chassis: Phase 00 ports the v1
 
 | # | Task | Done when |
 |---|---|---|
-| 17 | `feedAt(t)` + time slider (30 d history, live tick, +72 h sim) | scrub moves infra + weather + WOs + sim together |
-| 18 | Open-Meteo weather overlays (rain tint, wind, temp shift) | cached fixtures offline; live fetch keyless |
-| 19 | USGS seismic markers + risk-gated pulse | pulse fires only above threshold; markers match feed |
-| 20 | Subsidence field (seeded now, labeled modeled) + sim presets + SIM watermark | same seed → same outcome; watermark whenever sim time active |
+| 19 | `feedAt(t)` + time slider (30 d history, live tick, +72 h sim) | scrub moves infra + weather + WOs + sim together |
+| 20 | Open-Meteo weather overlays (rain tint, wind, temp shift) | cached fixtures offline; live fetch keyless |
+| 21 | USGS seismic markers + risk-gated pulse | pulse fires only above threshold; markers match feed |
+| 22 | Subsidence field (seeded now, labeled modeled) + sim presets + SIM watermark | same seed → same outcome; watermark whenever sim time active |
 
 - REF GATE 4: owner approves slider feel + sim honesty.
 
@@ -83,24 +87,24 @@ Rebuild the real-world twin on the shipped Ring-2 chassis: Phase 00 ports the v1
 
 | # | Task | Done when |
 |---|---|---|
-| 21 | WO fixtures + spatial markers/trails (survive map↔twin trip) | markers match fixtures; list survives trip |
-| 22 | Field crews + activity (live pos, heading, ping age) | crews move; stale pings visibly age |
-| 23 | Approval-gated actions (request → approve → execute → audit) | unapproved action never executes; audit entry each |
-| 24 | Sonic + tactile (confirms, chime, pulse; `M` mutes) | all sounds post-gesture; mute covers all |
+| 23 | WO fixtures + spatial markers/trails (survive map↔twin trip) | markers match fixtures; list survives trip |
+| 24 | Field crews + activity (live pos, heading, ping age) | crews move; stale pings visibly age |
+| 25 | Approval-gated actions (request → approve → execute → audit) | unapproved action never executes; audit entry each |
+| 26 | Sonic + tactile (confirms, chime, pulse; `M` mutes) | all sounds post-gesture; mute covers all |
 
 - REF GATE 5: owner approves the gate flow.
 
 ## Phase 06 — Lock
 <!-- {#phase-06} -->
-*Ships clean, stays clean. (153000 Phase 6.)*
+*Ships clean, stays clean. (153000 Phase 6.) Spec §9 deliverables land here.*
 
 | # | Task | Done when |
 |---|---|---|
-| 25 | Perf budgets (pixel cap, instance counts, `?post=0`, reduced-motion) | budgets logged at boot; Safari holds |
-| 26 | Docs + captures (tokens, knobs, sim honesty, DEM swap, key setup) | fresh reader swaps DEM + sets keys from docs alone |
-| 27 | Track-close (phases marked ✓ + sha, 0 wip) | every phase closed with sha; final walkthrough signed |
+| 27 | Perf budgets (pixel cap, instance counts, `?post=0`, reduced-motion) | budgets logged at boot; Safari holds |
+| 28 | Docs + captures (README: setup, processing, architecture, accuracy limits; source manifest with licensing; captures TOP/ISO/NEAR + map) | fresh reader reproduces data pipeline from docs alone |
+| 29 | Track-close (phases marked ✓ + sha, 0 wip) | every phase closed with sha; final walkthrough signed |
 
-- REF GATE 6 (final): full walkthrough sign-off.
+- REF GATE 6 (final): full walkthrough sign-off. **Success = recognisably the real Sangachal landscape** (real-DEM terrain, plausible coastline, evidence-placed structures) — accuracy + coherence over decoration.
 
 ---
 
@@ -108,6 +112,6 @@ Rebuild the real-world twin on the shipped Ring-2 chassis: Phase 00 ports the v1
 
 - Ports: agents on `:5198`/`:5199` only — NEVER `:5173`/`:5175` (owner's). Reuse live `:5198`, never start/kill servers.
 - Every fix via subagents; read-only audits write to `/tmp` only.
-- `node --test tests/ring2-*` + `npm run build` green before every commit; commit carries `[plan:<this-file>#<phase>]`; no push without owner's `y`.
+- Tests + `npm run build` green before every commit; commit carries `[plan:<this-file>#<phase>]`; no push without owner's `y`.
 - Every phase ends at its REF GATE before the next starts. Phases never restart silently.
 - Headless-WebKit green ≠ real-Safari proven: Safari proof is an owner-device screenshot with readable telemetry bar.

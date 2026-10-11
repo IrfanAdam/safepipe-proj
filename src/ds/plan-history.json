@@ -1398,6 +1398,48 @@
      "state": ""
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-11",
+   "hash": "56b7ab69",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "5c41b72c",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "86c1de4e",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Reconstruct the terminal (honest provenance)",
+     "hash": "f4326a07",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "a3c26bfa",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "fb99d686",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "e2779592",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "072ee2ca",
+     "state": ""
+    }
+   ]
   }
  ]
 }
