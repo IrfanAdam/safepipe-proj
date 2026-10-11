@@ -27,6 +27,7 @@ import { pickGLPrecision } from '../glprecision.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { SANGACHAL, VEX, RING_RADIUS_M, EXTENT_M } from './site.js';
 import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
+import { DRAPE_LIFTS, RIM_FADE_IN, rimFadeAlpha } from './drape.js';
 
 /** Blue reserved EXCLUSIVELY for water (sampleH < 0). */
 export const WATER_COL = 0x2f6fd8;
@@ -39,10 +40,14 @@ export const SCHEMATIC_EDGE_COL = 0xe8a33d;
 const MINOR_INTERVAL_M = 20;
 const INDEX_EVERY = 5; // every 5th minor line is a numbered index ring
 const GRID_N = 140; // marching-squares grid across the full extent
-const LIFT_RING = 25;
-const LIFT_MINOR = 12;
-const LIFT_MAJOR = 18;
-const LIFT_WATER = 8;
+/* Superimpose budget (drape.js): every lift is the vertical offset between
+ * the twin drape (sampleH*VEX+lift) and the map photo (h*VEX, same DEM).
+ * Nothing writes depth so paint order composites — lifts stay a hair to
+ * keep oblique parallax subpixel while top-down stays pixel-identical. */
+const LIFT_RING = DRAPE_LIFTS.RING;
+const LIFT_MINOR = DRAPE_LIFTS.MINOR;
+const LIFT_MAJOR = DRAPE_LIFTS.MAJOR;
+const LIFT_WATER = DRAPE_LIFTS.WATER;
 
 /* Defect-fix tuning (verified against mix0/50/100 TOP captures). */
 const WATER_FEATHER_M = 8; // shoreline feather band: alpha ramps 0->full over this depth
@@ -50,7 +55,7 @@ const WATER_MAX_OPACITY = 0.55;
 const EDGE_FADE_FRAC = 0.10; // outer 10% of the DEM window fades to 0 (no razor edge)
 const PILL_COLLAPSE_RANGE_M = 12000; // above: max 3 pills + count; below: full set
 const MASK_COL = 0x0b0c0c; // page/map background: masked ground reads as vignette, not void
-const MASK_LIFT_M = 30; // hugs terrain outside the ring, hides satellite beneath
+const MASK_LIFT_M = DRAPE_LIFTS.MASK; // hugs terrain outside the ring, hides satellite beneath
 const MASK_SIZE_M = 300000; // covers the oblique horizon (far plane raised to match)
 const MASK_SEG = 100;
 const PILL_MAX_MAP_RANGE = 3;
@@ -58,7 +63,7 @@ const PILL_MAX_MAP_RANGE = 3;
  * shown only at the top of the slider. Neutral hypsometric Lambert (own
  * lights, overlay Basic materials ignore lights) so mix 100 reads as a
  * rendered twin, not satellite. Lift sits under every overlay lift. */
-const LIFT_GROUND_M = 5;
+const LIFT_GROUND_M = DRAPE_LIFTS.GROUND;
 const TAKEOVER_SEG = 128; // sectors
 const TAKEOVER_RINGS = 26;
 
@@ -558,7 +563,11 @@ function edgeFade(x, z) {
         const z = -half + i * cell;
         const k = i * vn + j;
         pos[k * 3] = x;
-        pos[k * 3 + 1] = LIFT_WATER; // flat sea plane: sea level 0 + lift
+        // Draped sea surface: rides the DEM (flat over flat sea) a hair
+        // above the map photo instead of floating at a fixed height — the
+        // old flat 0+lift plane stood ~28 m off the Caspian DEM surface and
+        // separated from the photo at oblique pitch.
+        pos[k * 3 + 1] = sampleH(x, z) * VEX + LIFT_WATER;
         pos[k * 3 + 2] = z;
         col[k * 4] = wc.r;
         col[k * 4 + 1] = wc.g;
@@ -630,6 +639,48 @@ function edgeFade(x, z) {
     const mesh = new THREE.Mesh(g, m);
     mesh.name = 'ring2-mask';
     mesh.renderOrder = -10;
+    mesh.frustumCulled = false;
+    group.add(mesh);
+  }
+
+  /* Periphery vignette: a MASK_COL annulus INSIDE the disc (RIM_FADE_IN*R
+   * -> R) with per-vertex alpha 0 -> 1, draped on the DEM like everything
+   * else. The twin canvas sits above the map photo, so one mesh dissolves
+   * BOTH the photo and the overlays into the dark surround — no cut photo
+   * edge, no hard ring-line stop against black. Alpha reaches 1 exactly at
+   * R where the opaque outside mask takes over: one continuous falloff.
+   * renderOrder 5 draws it over every overlay (paint order composites,
+   * nothing writes depth). Never registered for emphasis: the rim must
+   * dissolve at mix 0 too. Skipped by the ring-clip pass (it IS a fade).
+   * [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4] */
+  function buildRimFade() {
+    const THETA = 220, PHI = 6;
+    const g = track(new THREE.RingGeometry(RING_RADIUS_M * RIM_FADE_IN, RING_RADIUS_M, THETA, PHI));
+    g.rotateX(-Math.PI / 2);
+    const p = g.getAttribute('position');
+    const n = p.count;
+    const col = new Float32Array(n * 4);
+    const mc = new THREE.Color(MASK_COL);
+    for (let i = 0; i < n; i++) {
+      const x = p.getX(i);
+      const z = p.getZ(i);
+      p.setY(i, sampleH(x, z) * VEX + DRAPE_LIFTS.RIM);
+      const a = rimFadeAlpha(Math.hypot(x, z));
+      col[i * 4] = mc.r;
+      col[i * 4 + 1] = mc.g;
+      col[i * 4 + 2] = mc.b;
+      col[i * 4 + 3] = a;
+    }
+    p.needsUpdate = true;
+    g.setAttribute('color', new THREE.BufferAttribute(col, 4)); // RGBA: radial falloff
+    g.computeVertexNormals();
+    const m = track(new THREE.MeshBasicMaterial({
+      color: 0xffffff, vertexColors: true, transparent: true, opacity: 1,
+      depthWrite: false, side: THREE.DoubleSide,
+    }));
+    const mesh = new THREE.Mesh(g, m);
+    mesh.name = 'ring2-rimfade';
+    mesh.renderOrder = 5;
     mesh.frustumCulled = false;
     group.add(mesh);
   }
@@ -742,6 +793,7 @@ function edgeFade(x, z) {
     const waterCells = buildWater();
     buildTwinGround();
     buildMask();
+    buildRimFade();
     buildCountPill(); // last: +N covers ring + pin + schematic + contour labels
     // Ring-clip + periphery fade: every overlay EXCEPT the ring itself, the
     // mask (it IS the clipper), + label sprites dissolves over the outer
@@ -749,7 +801,7 @@ function edgeFade(x, z) {
     // read as a coverage boundary).
     // Sprites (pills/labels) stay unclipped by design.
     group.traverse((o) => {
-      if (!o.material || o.isSprite || o.name === 'ring2-ring' || o.name === 'ring2-mask' || o.name === 'ring2-ground') return;
+      if (!o.material || o.isSprite || o.name === 'ring2-ring' || o.name === 'ring2-mask' || o.name === 'ring2-rimfade' || o.name === 'ring2-ground') return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       for (const m of mats) {
         if (!m || m.userData.ringClipped) continue;
@@ -757,7 +809,7 @@ function edgeFade(x, z) {
         m.transparent = true;
         m.onBeforeCompile = (sh) => {
           sh.uniforms.uRingR = { value: RING_RADIUS_M };
-          sh.uniforms.uFadeIn = { value: 0.9 };
+          sh.uniforms.uFadeIn = { value: RIM_FADE_IN }; // same radius as the rim vignette
           sh.vertexShader =
             'varying vec3 vRingW;\n' +
             sh.vertexShader.replace(
