@@ -40,7 +40,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = 60;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = '3d51ca7';
+const BUILD_ID = 'e62c668';
 let map = null;
 let twin = null;
 let mixCtl = null;
@@ -70,6 +70,16 @@ function canvasDims() {
 
 function paintStatus() {
   if (!statusDiv) return;
+  // Self-heal: map canvas 0x0 while its container has size (hidden-at-mount
+  // gallery iframe). Cheap, runs on the existing 500ms tick; twin path needs
+  // no help. Without this, mix:0 (pure SAT) is a permanent black hole.
+  try {
+    const c = map?.getCanvas?.();
+    if (c && ((c.width | 0) === 0 || (c.height | 0) === 0)) {
+      const w = mapDiv?.clientWidth | 0, h = mapDiv?.clientHeight | 0;
+      if (w > 0 && h > 0 && typeof map.resize === 'function') map.resize();
+    }
+  } catch { /* heal is best-effort */ }
   const s = getStatus();
   const mix = mixCtl?.getMix() ?? loadMix(50);
   const info = twin?.getInfo?.();

@@ -322,16 +322,46 @@ export async function mountMapBase(el, opts = {}) {
     /* style pending — the load handler above applies it when ready */
   }
   applyGroundFlag(map);
-  // 0x0 fix: Safari/container may be 0 at mount, twin self-corrects but map stays 0 until resize().
+  // 0x0 fix: Safari/gallery-iframe mounts while hidden (container 0x0 at
+  // construction). Twin self-corrects via renderer.setSize but MapLibre
+  // keeps its construction size until resize(). Event-timing races (tab
+  // shown before listeners attach) beat one-shot kicks, so self-heal:
+  // poll until the canvas is non-zero, plus every visibility/window signal.
   const kickResize = () => { try { map.resize(); } catch {} };
+  const needsKick = () => {
+    try {
+      const c = map.getCanvas?.();
+      if (!c) return true;
+      if ((c.width | 0) === 0 || (c.height | 0) === 0) return true;
+      // Stale-size guard: container grew after mount (hidden -> shown).
+      const elW = el?.clientWidth | 0, elH = el?.clientHeight | 0;
+      if (elW > 0 && elH > 0 && (Math.abs(c.width - elW) > 2 || Math.abs(c.height - elH) > 2)) {
+        // devicePixelRatio scaling means width != clientWidth; only kick
+        // when the canvas is clearly stale (half size or less of container
+        // times dpr) to avoid resize loops on hidpi.
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        if (c.width < (elW * dpr) / 2 || c.height < (elH * dpr) / 2) return true;
+      }
+      return false;
+    } catch { return false; }
+  };
   requestAnimationFrame(() => requestAnimationFrame(kickResize));
   setTimeout(kickResize, 400);
   setTimeout(kickResize, 1200);
+  let healTicks = 0;
+  const healTimer = setInterval(() => {
+    healTicks++;
+    try { if (needsKick()) kickResize(); } catch {}
+    if (healTicks > 60) clearInterval(healTimer); // 30s max
+  }, 500);
   try {
-    const ro = new ResizeObserver(kickResize);
+    const ro = new ResizeObserver(() => { try { if (needsKick()) kickResize(); } catch {} });
     ro.observe(el);
   } catch { window.addEventListener('resize', kickResize); }
   window.addEventListener('resize', kickResize);
+  window.addEventListener('orientationchange', kickResize);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) kickResize(); });
+  try { window.__ring2resizeMap = kickResize; } catch {}
   _map = map;
   window.__ring2map = map;
   return { map, loadedClean };
