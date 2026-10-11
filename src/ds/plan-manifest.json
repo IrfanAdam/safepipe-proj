@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-11T04:35:53.962Z",
+  "generated": "2026-10-11T04:36:31.301Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,15 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "74c42c9",
+      "full": "74c42c962bf77f1a899e6b60c38e625054c995dc",
+      "date": "2026-10-11",
+      "time": "10:06",
+      "subject": "fix(ring2): map 0x0 resize — Safari retina canvas stuck at 0x0, satellite blank at mix 100 [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "d59372b",
       "full": "d59372ba7adddebc9355e8dfe5247b66289a2892",
@@ -2030,8 +2039,5 @@
       "anchor": null
     }
   ],
-  "wip": [
-    "src/ring2/main.js",
-    "src/ring2/mapbase.js"
-  ]
+  "wip": []
 }
