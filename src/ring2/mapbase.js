@@ -256,8 +256,6 @@ export async function mountMapBase(el, opts = {}) {
     attributionControl: { compact: true },
     fadeDuration: 0,
   });
-  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
-  map.addControl(new maplibregl.TerrainControl({ source: TERRAIN_SOURCE_ID, exaggeration }), 'top-right');
   map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
   // Flat-earth pin: projection stays mercator — any globe/perspective flavor

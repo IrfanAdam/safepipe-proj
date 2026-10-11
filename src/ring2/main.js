@@ -40,7 +40,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = 60;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'e62c668';
+const BUILD_ID = '48f07d7';
 let map = null;
 let twin = null;
 let mixCtl = null;
@@ -53,12 +53,29 @@ let twinErr = null;
 // line, so a one-shot map FAILED write would be erased within a blink.
 // Kept here, painted every tick until the map lands.
 let mapFatal = null;
+// Zero-canvas escalation state (see paintStatus heal): counts consecutive
+// 500ms ticks where resize() can't unstick a 0x0 canvas.
+let mapZeroTicks = 0;
+let remounts = 0;
+let remounting = false;
+// Bridge: remountMap lives in boot() closure (needs mapDiv/mixCtl);
+// paintStatus is module scope, so boot hands it a callable here.
+let requestRemount = null;
 
 function canvasDims() {
   let mapSize = 'map:-';
   try {
     const c = map?.getCanvas?.();
-    if (c) mapSize = `map:${c.width}x${c.height}`;
+    if (c) {
+      mapSize = `map:${c.width}x${c.height}`;
+      if ((c.width | 0) === 0 || (c.height | 0) === 0) {
+        // Zero-canvas diagnosis straight from any screenshot: container size
+        // tells resize-vs-collapse apart (c:0x0 = layout collapse, no amount
+        // of map.resize() can fix that; c:WxH = resize() misfiring).
+        const w = mapDiv?.clientWidth | 0, h = mapDiv?.clientHeight | 0;
+        mapSize += `(c:${w}x${h})`;
+      }
+    }
   } catch { /* pre-mount */ }
   let twinSize = 'twin:-';
   try {
@@ -73,12 +90,24 @@ function paintStatus() {
   // Self-heal: map canvas 0x0 while its container has size (hidden-at-mount
   // gallery iframe). Cheap, runs on the existing 500ms tick; twin path needs
   // no help. Without this, mix:0 (pure SAT) is a permanent black hole.
+  // Escalation: if resize() fires for 10 straight ticks (5s) with a sized
+  // container and the canvas is STILL zero (observed live on Safari despite
+  // the fixed build string in the bar), the map instance itself is wedged —
+  // tear it down and construct a fresh one into the now-sized container.
+  // Capped at 2 remounts so a truly broken environment can't loop forever.
   try {
     const c = map?.getCanvas?.();
     if (c && ((c.width | 0) === 0 || (c.height | 0) === 0)) {
       const w = mapDiv?.clientWidth | 0, h = mapDiv?.clientHeight | 0;
-      if (w > 0 && h > 0 && typeof map.resize === 'function') map.resize();
-    }
+      if (w > 0 && h > 0 && typeof map.resize === 'function') {
+        try { map.resize(); } catch { /* counted below */ }
+        const c2 = map.getCanvas?.();
+        if (c2 && ((c2.width | 0) === 0 || (c2.height | 0) === 0)) {
+          mapZeroTicks++;
+          if (mapZeroTicks >= 10 && remounts < 2 && !remounting && typeof requestRemount === 'function') requestRemount();
+        } else mapZeroTicks = 0;
+      }
+    } else mapZeroTicks = 0;
   } catch { /* heal is best-effort */ }
   const s = getStatus();
   const mix = mixCtl?.getMix() ?? loadMix(50);
@@ -146,46 +175,67 @@ async function boot() {
   // black twin until the 30s timeout). The map resolves in the background
   // and sync engages when it lands (guarded per-frame).
   const MAP_TIMEOUT_MS = 30000;
-  Promise.race([
-    mountMapBase(mapDiv, { zoom: 11, pitch: 0, bearing: 0 }),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error(`map mount timed out after ${MAP_TIMEOUT_MS / 1000}s (tiles/worker blocked?)`)), MAP_TIMEOUT_MS)),
-  ]).then(
-    ({ map: m, loadedClean }) => {
-      map = m;
-      window.__ring2.map = m;
-      // Release the pre-map mix floor: reapply() floored the EFFECTIVE mix
-      // at 50 while getMap() was null (dead-end guard). The map is here now —
-      // re-apply so the stored mix (e.g. persisted 0) actually drives
-      // emphasis. Without this, overlays render stuck at half-fade.
-      try {
-        mixCtl.reapply();
-      } catch {
-        /* mix bar drives on without us */
-      }
-      try {
-        assertTerrainOn(map);
-      } catch (err) {
-        // Best-effort terrain: a slow style resolves 'hasty' before terrain
-        // engages — satellite + twin run regardless, noted not fatal.
-        // loadedClean false just means the 8 s soft resolve fired first.
-        window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), `terrain pending${loadedClean ? '' : ' (hasty mount)'}: ${err?.message ?? err}`].slice(-5);
-      }
-      paintStatus();
-    },
-    (err) => {
-      vexWarned = true;
-      mapFatal = `${err?.message ?? err}`.slice(0, 140);
-      // Dead-end guard: map hard-failed with twin faded out = permanently
-      // empty viewport. Pull mix to the live side (twin) so something
-      // always paints; the failure stays sticky in status.
-      try {
-        if ((mixCtl?.getMix?.() ?? 50) < 50) mixCtl.setMix(50);
-      } catch {
-        /* mix bar drives on without us */
-      }
-      paintStatus();
-    },
+  function mapRace() {
+    return Promise.race([
+      mountMapBase(mapDiv, { zoom: 11, pitch: 0, bearing: 0 }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`map mount timed out after ${MAP_TIMEOUT_MS / 1000}s (tiles/worker blocked?)`)), MAP_TIMEOUT_MS)),
+    ]);
+  }
+  function adoptMap(m, loadedClean) {
+    map = m;
+    window.__ring2.map = m;
+    // Release the pre-map mix floor: reapply() floored the EFFECTIVE mix
+    // at 50 while getMap() was null (dead-end guard). The map is here now —
+    // re-apply so the stored mix (e.g. persisted 0) actually drives
+    // emphasis. Without this, overlays render stuck at half-fade.
+    try {
+      mixCtl.reapply();
+    } catch {
+      /* mix bar drives on without us */
+    }
+    try {
+      assertTerrainOn(map);
+    } catch (err) {
+      // Best-effort terrain: a slow style resolves 'hasty' before terrain
+      // engages — satellite + twin run regardless, noted not fatal.
+      // loadedClean false just means the 8 s soft resolve fired first.
+      window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), `terrain pending${loadedClean ? '' : ' (hasty mount)'}: ${err?.message ?? err}`].slice(-5);
+    }
+    paintStatus();
+  }
+  function failMap(err) {
+    vexWarned = true;
+    mapFatal = `${err?.message ?? err}`.slice(0, 140);
+    // Dead-end guard: map hard-failed with twin faded out = permanently
+    // empty viewport. Pull mix to the live side (twin) so something
+    // always paints; the failure stays sticky in status.
+    try {
+      if ((mixCtl?.getMix?.() ?? 50) < 50) mixCtl.setMix(50);
+    } catch {
+      /* mix bar drives on without us */
+    }
+    paintStatus();
+  }
+  // Wedged-instance recovery: the old map was constructed into a 0x0
+  // container and resize() can't unstick it. Tear down and construct fresh
+  // into the live-sized container; adoptMap re-engages mix + terrain.
+  function remountMap() {
+    remounting = true;
+    remounts++;
+    try { map?.remove?.(); } catch { /* already dead */ }
+    map = null;
+    window.__ring2.map = null;
+    mapRace().then(
+      ({ map: m, loadedClean }) => { adoptMap(m, loadedClean); remounting = false; mapZeroTicks = 0; },
+      (err) => { failMap(err); remounting = false; mapZeroTicks = 0; },
+    );
+  }
+  try { window.__ring2remountMap = () => remountMap(); } catch { /* diag hook */ }
+  requestRemount = () => remountMap();
+  mapRace().then(
+    ({ map: m, loadedClean }) => adoptMap(m, loadedClean),
+    (err) => failMap(err),
   );
 
   // Frame heartbeat: a silently-throwing update() renders as an
