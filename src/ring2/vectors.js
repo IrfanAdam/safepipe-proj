@@ -18,11 +18,28 @@
 //   mountVectorsFromData(twin.scene).catch(() => {});
 // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
 
-import { VEX } from './site.js';
+import { VEX, RING_RADIUS_M } from './site.js';
 import { sampleH } from './field.js';
 import { DRAPE_LIFTS } from './drape.js';
 
 export const VECTORS_URL = '/data/sangachal-vectors.json';
+
+/*
+ * Belt-and-braces rim fade: the asset is CPU-clipped to the twin disc at
+ * build time (scripts/process-osm.mjs DISC_R), so no vertex should reach
+ * this band — but a stale/unclipped asset still dissolves to transparent at
+ * the ring line instead of spilling past it. Mirrors the DISC_R formula
+ * (RING_RADIUS_M single source of truth, 150 m inset), never a literal.
+ */
+export const VECTORS_DISC_R = RING_RADIUS_M - 150;
+
+/** Per-vertex alpha: 1 inside the disc, smoothstep to 0 at the ring line. */
+export function vectorFadeAlpha(rr, discR = VECTORS_DISC_R, ringR = RING_RADIUS_M) {
+  if (!(rr > discR)) return 1;
+  if (rr >= ringR) return 0;
+  const u = (rr - discR) / (ringR - discR);
+  return 1 - u * u * (3 - 2 * u);
+}
 
 /** Provenance tier per layer id. */
 export const PROVENANCE = Object.freeze({
@@ -82,6 +99,7 @@ export async function mountVectors(scene, data, opts = {}) {
     coastline: 0x4fb3ff, terminal: 0xffc46b,
   };
   const segs = [];
+  const hexRgb = (hex) => [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
   for (const id of LAYER_ORDER) {
     const arr = [];
     for (const f of data?.layers?.[id] ?? []) {
@@ -92,12 +110,26 @@ export async function mountVectors(scene, data, opts = {}) {
     }
     if (!arr.length) continue;
     const pos = new Float32Array((arr.length / 4) * 6);
+    // RGBA vertex colors: layer RGB baked in, alpha dissolves across the
+    // disc->ring band so even an unclipped asset can't spill past the ring
+    // at full brightness. (three honors a 4-component color attribute as
+    // per-vertex alpha; the build-time disc clip remains the real fix.)
+    const col = new Float32Array((arr.length / 4) * 8);
+    const [cr, cg, cb] = hexRgb(colors[id] ?? 0xffffff);
+    for (let s = 0; s < arr.length; s += 4) {
+      const v = (s / 4) * 2;
+      col[v * 4] = cr; col[v * 4 + 1] = cg; col[v * 4 + 2] = cb;
+      col[v * 4 + 3] = vectorFadeAlpha(Math.hypot(arr[s], arr[s + 1]));
+      col[(v + 1) * 4] = cr; col[(v + 1) * 4 + 1] = cg; col[(v + 1) * 4 + 2] = cb;
+      col[(v + 1) * 4 + 3] = vectorFadeAlpha(Math.hypot(arr[s + 2], arr[s + 3]));
+    }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 4));
     g.userData.flat = arr;
     g.userData.lift = lift(id);
     const m = new THREE.LineBasicMaterial({
-      color: colors[id] ?? 0xffffff, transparent: true, opacity: 0.85,
+      color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.85,
       depthWrite: false,
     });
     const lines = new THREE.LineSegments(g, m);
