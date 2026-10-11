@@ -13,6 +13,7 @@
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { SANGACHAL, VEX, worldToGeo } from './site.js';
+import { waitForSized } from './sizeGate.js';
 
 /* Keyless tile endpoints. Imagery has TWO hosts for the same Esri
  * service: some Safari setups (content blockers) kill tile subresources on
@@ -196,6 +197,13 @@ export function getMap() {
   return _map;
 }
 
+/** Drop a dead instance from the singleton (called on remove). Stale refs
+ * made ground-flag writes hit a removed map (silently caught) while the
+ * status line blamed the live one. */
+export function releaseMap(m) {
+  if (m && _map === m) _map = null;
+}
+
 /** Current ground-ownership flag. */
 export function getGroundOwns() {
   return _groundOwns;
@@ -243,6 +251,13 @@ export async function mountMapBase(el, opts = {}) {
     interactive = true,
   } = opts;
   if (!el) throw new Error('mountMapBase: container element required');
+
+  // Birth-defect guard (Safari-black): MapLibre snapshots container size
+  // AT CONSTRUCTION — a map born into a hidden (0x0) gallery iframe can
+  // keep a zero canvas past every resize() on real Safari. Wait briefly
+  // for a sized box before building; the caller (main.js) additionally
+  // defers the mount call itself until visible, so this is the inner net.
+  await waitForSized(() => el, { timeoutMs: 8000 });
 
   const map = new maplibregl.Map({
     container: el,
@@ -347,10 +362,15 @@ export async function mountMapBase(el, opts = {}) {
   setTimeout(kickResize, 400);
   setTimeout(kickResize, 1200);
   let healTicks = 0;
+  let sawNonZero = false; // heal runs until the first non-zero canvas, not just 30 s
   const healTimer = setInterval(() => {
     healTicks++;
-    try { if (needsKick()) kickResize(); } catch {}
-    if (healTicks > 60) clearInterval(healTimer); // 30s max
+    try {
+      const c = map.getCanvas?.();
+      if (c && (c.width | 0) > 0 && (c.height | 0) > 0) sawNonZero = true;
+      if (needsKick()) kickResize();
+    } catch {}
+    if ((healTicks > 60 && sawNonZero) || healTicks >= 240) clearInterval(healTimer);
   }, 500);
   try {
     const ro = new ResizeObserver(() => { try { if (needsKick()) kickResize(); } catch {} });
@@ -360,6 +380,26 @@ export async function mountMapBase(el, opts = {}) {
   window.addEventListener('orientationchange', kickResize);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) kickResize(); });
   try { window.__ring2resizeMap = kickResize; } catch {}
+  // Stale-ref clear: main.js tears instances down via remove() on remount.
+  // Null the singleton when THIS instance is removed so ground-flag writes
+  // can't hit a dead map while the status line blames the live one.
+  try {
+    const origRemove = map.remove.bind(map);
+    map.remove = () => {
+      try {
+        origRemove();
+      } finally {
+        releaseMap(map);
+        try {
+          if (window.__ring2map === map) window.__ring2map = null;
+        } catch {
+          /* diag ref only */
+        }
+      }
+    };
+  } catch {
+    /* remove stays stock — main.js nulls its own ref */
+  }
   _map = map;
   window.__ring2map = map;
   return { map, loadedClean };

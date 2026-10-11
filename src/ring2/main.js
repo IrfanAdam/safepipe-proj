@@ -13,10 +13,11 @@ import * as maplibregl from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { VEX } from './site.js';
 import { ensureField, getStatus } from './field.js';
-import { mountMapBase, assertTerrainOn } from './mapbase.js';
+import { mountMapBase, assertTerrainOn, releaseMap } from './mapbase.js';
 import { applyTwinToMap, assertTerrainVex, pitchForPose } from './sync.js';
 import { createOverlayTwin } from './overlays.js';
 import { mountMixBar, loadMix } from './mix.js';
+import { isSizedWH, waitForSized } from './sizeGate.js';
 
 const el = document.getElementById('ring2-dev');
 if (!el) throw new Error('ring2 harness: #ring2-dev missing');
@@ -40,7 +41,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = 60;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'ca7f010';
+const BUILD_ID = 'b3220cc';
 let map = null;
 let twin = null;
 let mixCtl = null;
@@ -67,6 +68,21 @@ let freshContainerTried = false;
 // paintStatus is module scope, so boot hands it a callable here.
 let requestRemount = null;
 let requestFreshContainer = null;
+// Hidden->sized budget re-arm: a gallery iframe flickering hidden again
+// burns the old budget on a 0x0-born instance. When the container comes
+// back sized after having been hidden, the escalation counters reset so a
+// fresh ladder is available for the fresh visibility.
+let wasHidden = false;
+let rearmed = 0;
+// First-mount gate: true while boot waits for a non-zero container.
+let waitingViewport = false;
+// Post-remount verify tokens: each adopt bumps adoptSeq so a stale verify
+// tick can't fire against a newer instance.
+let adoptSeq = 0;
+
+function containerWH() {
+  return [(mapDiv?.clientWidth | 0) || 0, (mapDiv?.clientHeight | 0) || 0];
+}
 
 // True while the map canvas exists but has zero pixels (stuck, not mounting:
 // a mounting map has no canvas yet and reads map:-).
@@ -104,6 +120,27 @@ function canvasDims() {
 
 function paintStatus() {
   if (!statusDiv) return;
+  // Hidden->sized re-arm runs first: a container that was hidden and is
+  // sized again gets a fresh escalation budget (the old one may have been
+  // spent on a 0x0-born instance while hidden).
+  try {
+    const [rw, rh] = containerWH();
+    if (!isSizedWH(rw, rh)) {
+      wasHidden = true;
+    } else if (wasHidden) {
+      wasHidden = false;
+      if (remounts > 0 || freshContainerTried || mapZeroTicks > 0) {
+        remounts = 0;
+        freshContainerTried = false;
+        mapZeroTicks = 0;
+        mapResizes = 0;
+        mapResizeErr = null;
+        rearmed++;
+      }
+    }
+  } catch {
+    /* re-arm is best-effort */
+  }
   // Self-heal: map canvas 0x0 while its container has size (hidden-at-mount
   // gallery iframe). Cheap, runs on the existing 500ms tick; twin path needs
   // no help. Without this, mix:0 (pure SAT) is a permanent black hole.
@@ -149,6 +186,8 @@ function paintStatus() {
     (vexWarned ? ' · VEX-WARN' : '') +
     (mapErr ? ` · MAPERR:${String(mapErr).slice(0, 120)}` : '') +
     (mapFatal ? ` · MAPFAILED:${mapFatal}` : '') +
+    (waitingViewport ? ' · map:waiting-viewport' : '') +
+    (rearmed ? ` · rearm:${rearmed}` : '') +
     (isMapStuckZero() ? ` · STUCK0 rs:${mapResizes} rm:${remounts}${freshContainerTried ? ' newdiv:1' : ''}${mapResizeErr ? ` rserr:${mapResizeErr}` : ''}` : '') +
     (twinFrames >= 0
       ? ` · frames:${twinFrames}${twinErr ? ` TWINERR:${String(twinErr).slice(0, 120)}` : ''}`
@@ -209,9 +248,10 @@ async function boot() {
         setTimeout(() => reject(new Error(`map mount timed out after ${MAP_TIMEOUT_MS / 1000}s (tiles/worker blocked?)`)), MAP_TIMEOUT_MS)),
     ]);
   }
-  function adoptMap(m, loadedClean) {
+  function adoptMap(m, loadedClean, isRemount = false) {
     map = m;
     window.__ring2.map = m;
+    adoptSeq++;
     // A remount leaves the previous instance's death rattle (e.g. a headless
     // GPU 'context LOST' from the torn-down canvas) in the error ring — prune
     // entries that belong to the old instance so the bar doesn't cry MAPERR
@@ -238,6 +278,23 @@ async function boot() {
       // engages — satellite + twin run regardless, noted not fatal.
       // loadedClean false just means the 8 s soft resolve fired first.
       window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), `terrain pending${loadedClean ? '' : ' (hasty mount)'}: ${err?.message ?? err}`].slice(-5);
+    }
+    // Post-remount verify (one shot per adopt): if the fresh instance is
+    // STILL a zero canvas in a sized container 1.5 s later, force the
+    // escalation tick so the ladder advances without waiting another 5 s.
+    // Bounded by the existing budget (2 remounts + 1 fresh div), and the
+    // adoptSeq token keeps a stale tick off a newer instance.
+    if (isRemount) {
+      const tok = adoptSeq;
+      setTimeout(() => {
+        try {
+          if (tok !== adoptSeq || remounting) return;
+          const [vw, vh] = containerWH();
+          if (isMapStuckZero() && isSizedWH(vw, vh)) mapZeroTicks = 10;
+        } catch {
+          /* verify is best-effort */
+        }
+      }, 1500);
     }
     paintStatus();
   }
@@ -273,10 +330,11 @@ async function boot() {
       try { gl?.getExtension?.('WEBGL_lose_context')?.loseContext(); } catch { /* already lost */ }
       map?.remove?.();
     } catch { /* already dead */ }
+    try { releaseMap(map); } catch { /* singleton already clear */ }
     map = null;
     window.__ring2.map = null;
     mapRace().then(
-      ({ map: m, loadedClean }) => { adoptMap(m, loadedClean); remounting = false; mapZeroTicks = 0; },
+      ({ map: m, loadedClean }) => { adoptMap(m, loadedClean, true); remounting = false; mapZeroTicks = 0; },
       (err) => { failMap(err); remounting = false; mapZeroTicks = 0; },
     );
   }
@@ -295,6 +353,7 @@ async function boot() {
       try { gl?.getExtension?.('WEBGL_lose_context')?.loseContext(); } catch { /* already lost */ }
       map?.remove?.();
     } catch { /* already dead */ }
+    try { releaseMap(map); } catch { /* singleton already clear */ }
     map = null;
     window.__ring2.map = null;
     try {
@@ -312,12 +371,28 @@ async function boot() {
       return;
     }
     mapRace().then(
-      ({ map: m, loadedClean }) => { adoptMap(m, loadedClean); remounting = false; mapZeroTicks = 0; },
+      ({ map: m, loadedClean }) => { adoptMap(m, loadedClean, true); remounting = false; mapZeroTicks = 0; },
       (err) => { failMap(err); remounting = false; mapZeroTicks = 0; },
     );
   }
   try { window.__ring2freshContainer = () => freshContainer(); } catch { /* diag hook */ }
   requestFreshContainer = () => freshContainer();
+  // First-mount gate (Safari-black birth defect): don't construct the map
+  // into a 0x0 box. Defer until the container is visible with size; the
+  // status line says waiting-viewport meanwhile and the twin loop below
+  // still starts only after the mount kicks off (unchanged order when the
+  // page loads visible — the wait resolves immediately).
+  {
+    const [gw, gh] = containerWH();
+    if (!isSizedWH(gw, gh)) {
+      waitingViewport = true;
+      statusDiv.textContent += ' · map:waiting-viewport';
+      paintStatus();
+      await waitForSized(() => mapDiv, { timeoutMs: 0 });
+      waitingViewport = false;
+      paintStatus();
+    }
+  }
   mapRace().then(
     ({ map: m, loadedClean }) => adoptMap(m, loadedClean),
     (err) => failMap(err),
