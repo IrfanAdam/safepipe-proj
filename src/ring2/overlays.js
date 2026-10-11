@@ -29,6 +29,7 @@ import * as THREE from 'three';
 import { pickGLPrecision } from '../glprecision.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { SANGACHAL, VEX, RING_RADIUS_M, EXTENT_M } from './site.js';
+import { MAP_MAX_PITCH_DEG, MAP_TRUE_FOV_DEG } from './sync.js';
 import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
 import { DRAPE_LIFTS, RIM_FADE_IN, RIM_TILT_GAIN } from './drape.js';
 
@@ -204,7 +205,11 @@ function joinSegments(flat, tol = 60) {
 
 export function createOverlayTwin(container, opts = {}) {
   if (!container) throw new Error('createOverlayTwin: container required');
-  const fovDeg = opts.fovDeg ?? 60;
+  /* Phase 00 camera parity: default twin fov === map true fov (sync.js
+   * MAP_TRUE_FOV_DEG). main.js passes it explicitly; the default keeps
+   * standalone callers paritied too.
+   * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-00] */
+  const fovDeg = opts.fovDeg ?? MAP_TRUE_FOV_DEG;
 
   let renderer;
   try {
@@ -266,7 +271,9 @@ export function createOverlayTwin(container, opts = {}) {
   controls.target.set(0, 0, 0);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.maxPolarAngle = (85 * Math.PI) / 180;
+  // Tilt clamp === map maxPitch (sync.js MAP_MAX_PITCH_DEG): the twin can
+  // never orbit past where the map clamps, or the mix fade shears there.
+  controls.maxPolarAngle = (MAP_MAX_PITCH_DEG * Math.PI) / 180;
   controls.minDistance = 800;
   controls.maxDistance = 32000; // user call: a touch past the lens frame, never deep void
 

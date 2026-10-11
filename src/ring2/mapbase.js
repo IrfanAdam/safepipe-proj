@@ -13,6 +13,7 @@
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { SANGACHAL, VEX, worldToGeo } from './site.js';
+import { MAP_MAX_PITCH_DEG } from './sync.js';
 import { waitForSized } from './sizeGate.js';
 import { ctxLive, ctxLost, ctxRestored, noteTileErr, noteTileOk } from './ctxmon.js';
 
@@ -279,7 +280,9 @@ export async function mountMapBase(el, opts = {}) {
     zoom,
     pitch,
     bearing,
-    maxPitch: 85,
+    // Tilt ceiling === twin maxPolarAngle (sync.js MAP_MAX_PITCH_DEG, Phase
+    // 00): both sides clamp at the same pitch so the mix fade never shears.
+    maxPitch: MAP_MAX_PITCH_DEG,
     interactive,
     attributionControl: { compact: true },
     fadeDuration: 0,

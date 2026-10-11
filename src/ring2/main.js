@@ -19,7 +19,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { VEX } from './site.js';
 import { ensureField, getStatus } from './field.js';
 import { mountMapBase, assertTerrainOn, releaseMap } from './mapbase.js';
-import { applyTwinToMap, assertTerrainVex, pitchForPose } from './sync.js';
+import { applyTwinToMap, assertTerrainVex, pitchForPose, MAP_TRUE_FOV_DEG, aspectMismatch } from './sync.js';
 import { createOverlayTwin } from './overlays.js';
 import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
@@ -60,10 +60,16 @@ const twinDiv = el.querySelector('[data-ring2="twin-wrap"]');
 const barDiv = el.querySelector('[data-ring2="bar"]');
 const statusDiv = el.querySelector('[data-ring2="status"]');
 
-const FOV_DEG = 60;
+/* Twin vertical fov === the MapLibre camera's true fov (sync.js
+ * MAP_TRUE_FOV_DEG, pinned to maplibre-gl 6.13.0 transform_helper.ts
+ * _fovInRadians 0.6435011087932844 ≈36.87°). The Map class has no public
+ * fov setter, so the twin adopts the map — FOV 60 agreed with the map only
+ * at nadir and drifted tens of px oblique (owner rotate/tilt finding).
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-00] */
+const FOV_DEG = MAP_TRUE_FOV_DEG;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'e4a91c7';
+const BUILD_ID = 'b36f091';
 // Shared GL-context + tile telemetry registry (see ctxmon.js: one
 // real-Safari screenshot of the six tokens discriminates every hypothesis
 // in the defect-hunt report).
@@ -75,6 +81,7 @@ let map = null;
 let twin = null;
 let mixCtl = null;
 let vexWarned = false;
+let aspectWarned = false;
 // Frame heartbeat (module scope so paintStatus can read it): counts twin
 // frames, keeps the first frame error. -1 = loop not started yet.
 let twinFrames = -1;
@@ -705,6 +712,22 @@ async function boot() {
       twinFrames++;
       const pose = twin.getPose();
       const viewportPx = Math.max(twinDiv.clientHeight || window.innerHeight, 1);
+      // Aspect parity (Phase 00): twin + map containers fill the same box,
+      // but if layout ever splits them the equal-fov cameras still shear.
+      // Warn once per session; the node suite pins the pure helper.
+      if (!aspectWarned) {
+        try {
+          const m = aspectMismatch(
+            twinDiv.clientWidth || 1, viewportPx,
+            mapDiv.clientWidth || 1, Math.max(mapDiv.clientHeight || 0, 1),
+          );
+          if (m > 0.01) {
+            aspectWarned = true;
+            // eslint-disable-next-line no-console
+            console.warn(`[ring2] twin/map aspect mismatch ${m} — mix fade will shear`);
+          }
+        } catch { /* telemetry never breaks the frame */ }
+      }
       // Twin owns the camera at every mix — sync always runs, so orbit
       // input on the twin canvas moves the map with it (satellite mode
       // included). The map is non-interactive and can never fight this.

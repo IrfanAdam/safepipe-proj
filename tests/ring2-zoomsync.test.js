@@ -17,8 +17,9 @@ import {
   rangeForZoom,
 } from '../src/ring2/sync.js';
 import { VEX } from '../src/ring2/site.js';
+import { MAP_TRUE_FOV_DEG } from '../src/ring2/sync.js';
 
-const FOV = 60;
+const FOV = MAP_TRUE_FOV_DEG;
 const VPX = 600;
 
 function fakeMap(log) {

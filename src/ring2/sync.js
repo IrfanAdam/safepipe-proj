@@ -7,6 +7,21 @@
  */
 import { SANGACHAL, VEX, worldToGeo, geoToWorld } from './site.js';
 
+/* Camera-parity anchor (Phase 00 chassis fix): the MapLibre camera's TRUE
+ * vertical fov. Pinned to maplibre-gl 6.13.0
+ * node_modules/maplibre-gl/src/geo/transform_helper.ts
+ * (`this._fovInRadians = 0.6435011087932844`) — the Map class exposes only
+ * getVerticalFieldOfView() with NO public setter, so the TWIN adopts the
+ * map's fov, never the reverse (no private _transform hacks). Same
+ * center+zoom+bearing+pitch under different fovs can only agree at nadir;
+ * every oblique view drifts — the owner-reported rotate/tilt misalignment.
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-00] */
+export const MAP_FOV_RAD = 0.6435011087932844;
+export const MAP_TRUE_FOV_DEG = (MAP_FOV_RAD * 180) / Math.PI; // ≈36.8699
+/* Twin tilt clamp: OrbitControls maxPolarAngle and the map maxPitch must be
+ * the SAME number or the twin can tilt past where the map clamps and the
+ * mix fade shears at the extreme. mapbase.js + overlays.js both use this. */
+export const MAP_MAX_PITCH_DEG = 85;
 /* 512-px tile convention (MapLibre default tileSize 512): metres per pixel
  * at zoom 0 on the equator. The 256-px constant (156543.03392) is WRONG
  * here — using it halves every zoom (v1's 2x-zoom class). */
@@ -32,14 +47,14 @@ export function zoomForGroundRes(resMpx, latDeg = SANGACHAL.lat) {
  * tilted — map zoom must not depend on pitch. viewportPx is the screen
  * height the twin's vertical footprint maps to; fovDeg is the twin's
  * vertical fov. Both must match the twin camera for scale parity. */
-export function zoomForRange(rangeM, latDeg = SANGACHAL.lat, { viewportPx = 600, fovDeg = 60 } = {}) {
+export function zoomForRange(rangeM, latDeg = SANGACHAL.lat, { viewportPx = 600, fovDeg = MAP_TRUE_FOV_DEG } = {}) {
   if (!Number.isFinite(rangeM) || rangeM <= 0) throw new Error(`zoomForRange: bad range ${rangeM}`);
   const footprintM = 2 * rangeM * Math.tan(rad(fovDeg) / 2);
   return zoomForGroundRes(footprintM / viewportPx, latDeg);
 }
 
 /** Inverse of zoomForRange (same opts required). */
-export function rangeForZoom(z, latDeg = SANGACHAL.lat, { viewportPx = 600, fovDeg = 60 } = {}) {
+export function rangeForZoom(z, latDeg = SANGACHAL.lat, { viewportPx = 600, fovDeg = MAP_TRUE_FOV_DEG } = {}) {
   return (groundResForZoom(z, latDeg) * viewportPx) / (2 * Math.tan(rad(fovDeg) / 2));
 }
 
@@ -74,7 +89,7 @@ export function targetForCenter(lon, lat) {
 /* Full twin pose -> MapLibre camera. pose = { eye:{x,y,z}, target:{x,z} }.
  * Returns { center:[lon,lat], zoom, bearing, pitch }. */
 export function mapPoseForTwin(pose, opts = {}) {
-  const { latDeg = SANGACHAL.lat, viewportPx = 600, fovDeg = 60 } = opts;
+  const { latDeg = SANGACHAL.lat, viewportPx = 600, fovDeg = MAP_TRUE_FOV_DEG } = opts;
   const rangeM = Math.hypot(
     pose.eye.x - pose.target.x,
     pose.eye.y - (pose.target.y ?? 0),
@@ -153,4 +168,25 @@ export function applyTwinToMap(map, pose, opts = {}) {
 /** CSS pointer-events for the twin canvas at any effective mix: always 'auto'. */
 export function twinPointerEvents(_effMix) {
   return 'auto';
+}
+
+/* Aspect parity: the twin PerspectiveCamera aspect (twin container w/h)
+ * and the map canvas aspect (map container w/h) must be EQUAL — same fov
+ * with different aspects still shears the mix fade horizontally. Returns
+ * the relative aspect mismatch |a-b|/max(a,b) (0 = identical). Callers
+ * fail closed above tolerance; main.js warns once per session live.
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-00] */
+export function aspectMismatch(twinW, twinH, mapW, mapH) {
+  const a = twinW / Math.max(twinH, 1);
+  const b = mapW / Math.max(mapH, 1);
+  return Math.abs(a - b) / Math.max(a, b, 1e-12);
+}
+
+/** Throw unless twin/map aspects agree within tol (default 1%). */
+export function assertAspectParity(twinW, twinH, mapW, mapH, tol = 0.01) {
+  const m = aspectMismatch(twinW, twinH, mapW, mapH);
+  if (!(m <= tol)) {
+    throw new Error(`assertAspectParity: twin ${twinW}x${twinH} vs map ${mapW}x${mapH} mismatch ${m}`);
+  }
+  return true;
 }
