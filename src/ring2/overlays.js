@@ -15,7 +15,10 @@
  *   3. Contours from sampleH — 2-tier (minor + major index), index rings
  *      numbered with elevation labels sourced from the live field status.
  *      Contour alpha fades to 0 across the outer 10% of the DEM window.
- *   4. Water tint — WATER_COL blue ONLY where sampleH < 0 (sea level), as a
+ *   4. Water tint — WATER_COL blue ONLY where sampleH < CASPIAN_SHORE_H
+ *      (Caspian shoreline datum, -24 m: Terrarium clamps near-shore water
+ *      at ~-27, so a 0 m key would flood the coastal plain while a -28 m
+ *      key would erase the sea), as a
  *      per-sample feathered-alpha mesh (never an opaque fill quad or box).
  *      WATER_COL must not be used for any non-water overlay.
  *
@@ -29,7 +32,13 @@ import { SANGACHAL, VEX, RING_RADIUS_M, EXTENT_M } from './site.js';
 import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
 import { DRAPE_LIFTS, RIM_FADE_IN, RIM_TILT_GAIN } from './drape.js';
 
-/** Blue reserved EXCLUSIVELY for water (sampleH < 0). */
+/** Blue reserved EXCLUSIVELY for water (sampleH < CASPIAN_SHORE_H). */
+/* Caspian shoreline datum: the Caspian surface sits at -28 m but Terrarium
+ * clamps near-shore water at ~-27, so keying water at 0 floods the coastal
+ * plain and keying at -28 erases the sea. -24 m splits the difference.
+ * field.js proceduralH keeps its own -28 anchor (real-world datum); this
+ * is the RENDER key only. [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+export const CASPIAN_SHORE_H = -24;
 export const WATER_COL = 0x2f6fd8;
 export const RING_COL = 0xe8a33d;
 export const CONTOUR_MINOR_COL = 0xd7dde2;
@@ -547,12 +556,12 @@ function edgeFade(x, z) {
     // Shared vertices (not per-cell quads): per-vertex alpha interpolates,
     // so the shoreline feathers instead of stair-stepping, and the DEM
     // window edge fades instead of clipping to a box. Water ONLY where
-    // sampleH < 0 — no fill quad is ever emitted for land.
+    // sampleH < CASPIAN_SHORE_H — no fill quad is ever emitted for land.
     const wc = new THREE.Color(WATER_COL);
     const pos = new Float32Array(vn * vn * 3);
     const col = new Float32Array(vn * vn * 4);
     const alphaAt = (x, z) => {
-      const depth = -sampleH(x, z);
+      const depth = CASPIAN_SHORE_H - sampleH(x, z);
       if (!(depth > 0)) return 0;
       const u = Math.min(1, depth / WATER_FEATHER_M);
       return (u * u * (3 - 2 * u)) * edgeFade(x, z);
@@ -577,6 +586,8 @@ function edgeFade(x, z) {
     }
     const idx = [];
     let wet = 0;
+    // All-dry skip inherits the CASPIAN_SHORE_H key via alphaAt: a cell is
+    // emitted only if at least one corner is wet (h < CASPIAN_SHORE_H).
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
         const k00 = i * vn + j;
@@ -755,7 +766,7 @@ function edgeFade(x, z) {
     const cHigh = new THREE.Color(0x6f7069);
     const tmp = new THREE.Color();
     const colAt = (h) => {
-      if (!(h >= 0)) return tmp.copy(cSea);
+      if (!(h >= CASPIAN_SHORE_H)) return tmp.copy(cSea);
       const u = Math.min(1, Math.max(0, h / 450));
       return tmp.copy(cLow).lerp(cHigh, u);
     };
