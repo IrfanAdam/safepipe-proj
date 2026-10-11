@@ -3,7 +3,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { VEX, RING_RADIUS_M } from '../src/ring2/site.js';
-import { DRAPE_LIFTS, maxDrapeLift, drapeY, RIM_FADE_IN, rimFadeAlpha } from '../src/ring2/drape.js';
+import { DRAPE_LIFTS, maxDrapeLift, drapeY, RIM_FADE_IN, rimFadeAlpha, RIM_TILT_GAIN, rimWidthMult } from '../src/ring2/drape.js';
 
 describe('superimpose budget: twin drapes hug the photo plane', () => {
   it('twin ground sits a hair over the photo (photo drapes just under)', () => {
@@ -53,5 +53,28 @@ describe('periphery rim fade: disc dissolves, no cut edge', () => {
     }
     assert.ok(rimFadeAlpha(R * 0.99) > 0.9, 'nearly opaque just inside the rim');
     assert.ok(rimFadeAlpha(R * 0.91) < 0.1, 'barely started just outside the fade start');
+  });
+});
+
+describe('rim tilt compensation: near/far screen softness matches at tilt', () => {
+  it('nadir is exactly the uniform band whatever the alignment', () => {
+    for (const s of [-1, -0.3, 0, 0.5, 1]) assert.equal(rimWidthMult(s, 0), 1);
+  });
+  it('tilt widens the camera side and narrows the far side', () => {
+    assert.ok(rimWidthMult(1, 0.5) > 1);
+    assert.ok(rimWidthMult(-1, 0.5) < 1);
+    assert.equal(rimWidthMult(0, 0.5), 1);
+  });
+  it('calibration meets near/far in the middle at 60° pitch', () => {
+    // Pixel-measured pre-fix: far ~7 px, near ~3.5 px for the same band.
+    const t = 1 - Math.cos((60 * Math.PI) / 180);
+    const q = rimWidthMult(1, t) / rimWidthMult(-1, t);
+    assert.ok(Math.abs(q - 2) < 0.05, `near/far width ratio ${q}`);
+  });
+  it('width never collapses: clamped floor survives extreme tilt', () => {
+    assert.ok(rimWidthMult(-1, 1, 10) === 0.15);
+  });
+  it('gain is the calibrated constant', () => {
+    assert.equal(RIM_TILT_GAIN, 0.67);
   });
 });

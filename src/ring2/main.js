@@ -62,7 +62,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = 60;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = '13b04e0';
+const BUILD_ID = '0a14ecf';
 // Shared GL-context + tile telemetry registry (see ctxmon.js: one
 // real-Safari screenshot of the six tokens discriminates every hypothesis
 // in the defect-hunt report).
@@ -683,9 +683,18 @@ async function boot() {
   // unexplained black twin. Count frames, keep the first error, and paint
   // both into the status line — a screenshot then proves loop alive/dead.
   twinFrames = 0;
+  /* Sync-first frame order (zoom catch-up fix): the damped controls settle
+   * FIRST, the fresh post-damping twin pose drives the map via jumpTo, and
+   * only then does EITHER side paint. jumpTo applies synchronously with no
+   * easing and the map runs fadeDuration 0, so the map side adds no
+   * smoothing of its own — one twin delta reaches the map in the same
+   * frame, before both GL paints, and photo + twin scale as one. The old
+   * order (twin.update() painted, THEN jumpTo) left the map exactly one
+   * frame behind every twin move: the satellite visibly chased the twin
+   * through every zoom. */
   const loop = () => {
     try {
-      twin.update();
+      twin.updateControls();
       twinFrames++;
       const pose = twin.getPose();
       const viewportPx = Math.max(twinDiv.clientHeight || window.innerHeight, 1);
@@ -705,6 +714,9 @@ async function boot() {
       }
       const pitch = pitchForPose(pose.eye, pose.target, pose.target.y ?? 0);
       mixCtl.updateForCamera(pitch);
+      // Paint LAST: the map already holds this frame's pose (jumpTo above),
+      // so both GL paints land in the same frame — no catch-up lag.
+      twin.renderTwin();
     } catch (err) {
       /* a torn-down frame never kills the loop — but the first failure is
        * kept and surfaced so a dead twin names its cause. */

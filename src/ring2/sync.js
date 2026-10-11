@@ -99,13 +99,46 @@ export function assertTerrainVex(map) {
   return true;
 }
 
+/* Per-map last-applied camera: redraw() is forced only while the pose is
+ * actually moving, so an idle map keeps its own tile-refinement pace. */
+const _lastApplied = new WeakMap();
+function poseMovedSinceLast(map, mp) {
+  const prev = _lastApplied.get(map);
+  _lastApplied.set(map, { center: [...mp.center], zoom: mp.zoom, bearing: mp.bearing, pitch: mp.pitch });
+  if (!prev) return true;
+  // Bearing wraps 360->0: compare on the circle, not the raw number.
+  const circ = (a, b) => Math.abs((((a - b + 540) % 360) + 360) % 360 - 180);
+  return (
+    Math.abs(mp.center[0] - prev.center[0]) > 1e-12 ||
+    Math.abs(mp.center[1] - prev.center[1]) > 1e-12 ||
+    Math.abs(mp.zoom - prev.zoom) > 1e-9 ||
+    circ(mp.bearing, prev.bearing) > 1e-9 ||
+    Math.abs(mp.pitch - prev.pitch) > 1e-9
+  );
+}
+
 /* Drive a live MapLibre map from a twin pose (jumpTo: sync, no animation
- * fight). Asserts VEX first so a mis-exaggerated map can never silently
- * receive a synced camera. Returns the applied { center, zoom, bearing, pitch }. */
+ * fight). jumpTo applies synchronously with zero easing, and redraw()
+ * forces the map's GL paint in the SAME task — so when the caller runs
+ * controls-update -> applyTwinToMap -> twin paint (see main.js loop), the
+ * twin delta reaches the map before EITHER side paints and photo + twin
+ * scale as one. Without the forced redraw the map paints on its own async
+ * rAF — exactly one frame behind every twin move (the visible catch-up).
+ * redraw() runs only while the pose is actually moving, so an idle map
+ * keeps its own tile-refinement pace. Asserts VEX first so a
+ * mis-exaggerated map can never silently receive a synced camera. Returns
+ * the applied { center, zoom, bearing, pitch }. */
 export function applyTwinToMap(map, pose, opts = {}) {
   assertTerrainVex(map);
   const mp = mapPoseForTwin(pose, opts);
   map.jumpTo({ center: mp.center, zoom: mp.zoom, bearing: mp.bearing, pitch: mp.pitch });
+  if (poseMovedSinceLast(map, mp)) {
+    try {
+      if (typeof map.redraw === 'function') map.redraw();
+    } catch {
+      /* the map's own async loop still paints — parity degrades one frame, nothing breaks */
+    }
+  }
   return mp;
 }
 

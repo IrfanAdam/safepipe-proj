@@ -27,7 +27,7 @@ import { pickGLPrecision } from '../glprecision.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { SANGACHAL, VEX, RING_RADIUS_M, EXTENT_M } from './site.js';
 import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
-import { DRAPE_LIFTS, RIM_FADE_IN, rimFadeAlpha } from './drape.js';
+import { DRAPE_LIFTS, RIM_FADE_IN, RIM_TILT_GAIN } from './drape.js';
 
 /** Blue reserved EXCLUSIVELY for water (sampleH < 0). */
 export const WATER_COL = 0x2f6fd8;
@@ -643,46 +643,98 @@ function edgeFade(x, z) {
     group.add(mesh);
   }
 
-  /* Periphery vignette: a MASK_COL annulus INSIDE the disc (RIM_FADE_IN*R
-   * -> R) with per-vertex alpha 0 -> 1, draped on the DEM like everything
-   * else. The twin canvas sits above the map photo, so one mesh dissolves
-   * BOTH the photo and the overlays into the dark surround — no cut photo
-   * edge, no hard ring-line stop against black. Alpha reaches 1 exactly at
-   * R where the opaque outside mask takes over: one continuous falloff.
+  /* Rim-fade material handle: refreshed by every buildRimFade() so the
+   * per-frame tilt feed below always hits the live program. */
+  let rimFadeMat = null;
+
+  /* Periphery vignette: a MASK_COL annulus INSIDE the disc, DEM-draped
+   * like the ground, with the falloff evaluated PER PIXEL in the fragment
+   * shader as smoothstep(inner, R, |world.xz|) — a pure function of
+   * ground-plane distance from the disc center, base curve identical to
+   * rimFadeAlpha() in drape.js (GLSL smoothstep is the same cubic, pinned
+   * by tests/ring2-drape.test.js).
+   *
+   * Why fragment, not vertex alpha: the old mesh baked alpha per VERTEX
+   * on a coarse annulus and let the GPU linearly interpolate across ~170 m
+   * cells, which skewed per side under perspective. A per-pixel
+   * length(vWorld.xz) falloff is radially symmetric by construction;
+   * tilt can't skew it because only the VERTICES ride the DEM (y), while
+   * the fade reads the ground-plane radius (x, z).
+   *
+   * Tilt compensation (owner call): top-down the uniform band is even, but
+   * at tilt the near (camera-side) rim compressed to a hard cut while the
+   * far rim stayed soft (pixel-measured ~3.5 px vs ~7 px at 60° pitch).
+   * The INNER radius therefore breathes with view alignment: the band
+   * widens on the camera side and narrows opposite, scaled by pitch
+   * (uTiltT = 0 at nadir, so top-down is exactly the uniform band), which
+   * equalizes on-screen softness all around at every tilt. Gain lives in
+   * drape.js RIM_TILT_GAIN; the width law mirrors rimWidthMult() there.
+   * The annulus runs in to 0.8 R for headroom (the widened inner edge
+   * never exceeds it); fragments below alpha 0.004 discard, so the extra
+   * ring is invisible. Alpha still reaches 1 exactly at R where the opaque
+   * outside mask takes over: one continuous dissolve.
+   *
    * renderOrder 5 draws it over every overlay (paint order composites,
    * nothing writes depth). Never registered for emphasis: the rim must
    * dissolve at mix 0 too. Skipped by the ring-clip pass (it IS a fade).
+   * userData.rimRadial marks the fragment implementation for the probe
+   * lane; userData.rimShader carries the compiled uniforms so updateControls
+   * can feed the per-frame tilt (pan-aware: measured off the orbit target).
    * [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4] */
   function buildRimFade() {
-    const THETA = 220, PHI = 6;
-    const g = track(new THREE.RingGeometry(RING_RADIUS_M * RIM_FADE_IN, RING_RADIUS_M, THETA, PHI));
+    const THETA = 220, PHI = 8;
+    const g = track(new THREE.RingGeometry(RING_RADIUS_M * 0.8, RING_RADIUS_M, THETA, PHI));
     g.rotateX(-Math.PI / 2);
     const p = g.getAttribute('position');
     const n = p.count;
-    const col = new Float32Array(n * 4);
-    const mc = new THREE.Color(MASK_COL);
     for (let i = 0; i < n; i++) {
       const x = p.getX(i);
       const z = p.getZ(i);
       p.setY(i, sampleH(x, z) * VEX + DRAPE_LIFTS.RIM);
-      const a = rimFadeAlpha(Math.hypot(x, z));
-      col[i * 4] = mc.r;
-      col[i * 4 + 1] = mc.g;
-      col[i * 4 + 2] = mc.b;
-      col[i * 4 + 3] = a;
     }
     p.needsUpdate = true;
-    g.setAttribute('color', new THREE.BufferAttribute(col, 4)); // RGBA: radial falloff
     g.computeVertexNormals();
     const m = track(new THREE.MeshBasicMaterial({
-      color: 0xffffff, vertexColors: true, transparent: true, opacity: 1,
+      color: MASK_COL,
+      transparent: true,
       depthWrite: false, side: THREE.DoubleSide,
     }));
+    m.userData.rimRadial = true;
+    m.userData.rimFadeIn = RIM_FADE_IN;
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uRimR = { value: RING_RADIUS_M };
+      sh.uniforms.uRimW0 = { value: RING_RADIUS_M * (1 - RIM_FADE_IN) };
+      sh.uniforms.uTiltGain = { value: RIM_TILT_GAIN };
+      sh.uniforms.uTiltT = { value: 0 };
+      sh.uniforms.uCamDir = { value: new THREE.Vector2(0, 1) };
+      sh.vertexShader =
+        'varying vec3 vRimW;\n' +
+        sh.vertexShader.replace(
+          '#include <begin_vertex>',
+          '#include <begin_vertex>\n vRimW = (modelMatrix * vec4(position, 1.0)).xyz;',
+        );
+      sh.fragmentShader =
+        'varying vec3 vRimW;\nuniform float uRimR;\nuniform float uRimW0;\nuniform float uTiltGain;\nuniform float uTiltT;\nuniform vec2 uCamDir;\n' +
+        sh.fragmentShader.replace(
+          // Same anchor as the ring-clip pass: opaque_fragment (end of
+          // main) — diffuseColor is only declared mid-main.
+          '#include <opaque_fragment>',
+          '{ float rr = length(vRimW.xz);' +
+          ' float s = dot(vRimW.xz / max(rr, 1e-3), uCamDir);' +
+          ' float wmul = max(1.0 + uTiltGain * uTiltT * s, 0.15);' +
+          ' float a = smoothstep(uRimR - uRimW0 * wmul, uRimR, rr);' +
+          ' if (a <= 0.004) discard; diffuseColor.a *= a; }\n#include <opaque_fragment>',
+        );
+      m.userData.rimShader = sh;
+    };
+    m.customProgramCacheKey = () => 'ring2-rimfade';
+    m.needsUpdate = true;
     const mesh = new THREE.Mesh(g, m);
     mesh.name = 'ring2-rimfade';
     mesh.renderOrder = 5;
     mesh.frustumCulled = false;
     group.add(mesh);
+    rimFadeMat = m;
   }
 
   /* Takeover ground (Issue 2): opaque DEM-draped twin terrain filling the
@@ -866,16 +918,44 @@ function edgeFade(x, z) {
     };
   }
 
-  function update() {
+  /* Split-phase frame (zoom catch-up fix): updateControls() settles the
+   * damped orbit + CPU scene state WITHOUT painting; renderTwin() paints.
+   * main.js runs controls -> map jumpTo -> render so the map receives the
+   * fresh post-damping pose before EITHER side paints (same-frame parity).
+   * update() stays as the both-phases shortcut for external callers. */
+  function updateControls() {
     controls.update();
     updatePills();
+    // Rim tilt feed (pan-aware): pitch off the orbit target, azimuth off
+    // the camera-to-target ground direction. uTiltT is 0 at nadir, so the
+    // top-down fade is exactly the uniform band.
+    try {
+      const sh = rimFadeMat?.userData?.rimShader;
+      if (sh?.uniforms?.uTiltT) {
+        const dx = camera.position.x - controls.target.x;
+        const dz = camera.position.z - controls.target.z;
+        const dy = camera.position.y - (controls.target.y || 0);
+        const h = Math.hypot(dx, dz);
+        const tilt = 1 - Math.min(1, Math.max(0, dy / (Math.hypot(h, dy) || 1)));
+        sh.uniforms.uTiltT.value = tilt;
+        if (h > 1e-6) sh.uniforms.uCamDir.value.set(dx / h, dz / h);
+      }
+    } catch { /* rim drives on without us */ }
     const t = perfClock.getElapsedTime();
     const flare = group.getObjectByName('flare-tip');
     if (flare) {
       const s = 1 + 0.06 * Math.sin(t * 7.3) + 0.03 * Math.sin(t * 17.7);
       flare.scale.set(s, 1, 1);
     }
+  }
+
+  function renderTwin() {
     renderer.render(scene, camera);
+  }
+
+  function update() {
+    updateControls();
+    renderTwin();
   }
 
   function onResize() {
@@ -902,7 +982,8 @@ function edgeFade(x, z) {
 
   return {
     renderer, scene, camera, controls, canvas,
-    rebuild, setEmphasis, setTakeover, update, getPose, dispose, onResize,
+    rebuild, setEmphasis, setTakeover, update, updateControls, renderTwin,
+    getPose, dispose, onResize,
     getInfo: () => ({ ...(lastInfo ?? {}), takeoverU: lastU, status: getStatus(), pills: getPillState() }),
   };
 }
