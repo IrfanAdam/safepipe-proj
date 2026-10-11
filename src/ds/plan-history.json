@@ -1355,5 +1355,49 @@
     }
    ]
   }
+ ],
+ "2026-10-11_202541-ops3d-v3-realworld-iteration.md": [
+  {
+   "sha": null,
+   "date": "2026-10-11",
+   "hash": "8e661e20",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "5c41b72c",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real terrain (resume + optimize)",
+     "hash": "07a226a3",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Real inspectable assets",
+     "hash": "eea84d2d",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "dc3518ca",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "78f5f0f8",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "8ff6b022",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "ad69b686",
+     "state": ""
+    }
+   ]
+  }
  ]
 }
