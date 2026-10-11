@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-11T04:59:10.448Z",
+  "generated": "2026-10-11T05:07:34.052Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,15 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "27a0b23",
+      "full": "27a0b234ae30eff592b11b7485680eafac6262d8",
+      "date": "2026-10-11",
+      "time": "10:29",
+      "subject": "fix(ring2): free GL before remount, prune stale MAPERR, drop zoom menu [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "4e761d3",
       "full": "4e761d3bbe824f2d8ba87795bb703a5d0b93d8f6",

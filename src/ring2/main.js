@@ -40,7 +40,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = 60;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = '4e761d3';
+const BUILD_ID = '27a0b23';
 let map = null;
 let twin = null;
 let mixCtl = null;
@@ -231,6 +231,9 @@ async function boot() {
   // container and resize() can't unstick it. Tear down and construct fresh
   // into the live-sized container; adoptMap re-engages mix + terrain.
   function remountMap() {
+    if (remounting) return; // audit: manual double-call (diag hook) interleaved two mounts
+    const cw = mapDiv?.clientWidth | 0, ch = mapDiv?.clientHeight | 0;
+    if (cw === 0 || ch === 0) { mapZeroTicks = 0; return; } // hidden again — wait for visibility
     remounting = true;
     remounts++;
     try {
