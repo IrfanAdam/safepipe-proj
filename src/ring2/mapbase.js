@@ -322,6 +322,16 @@ export async function mountMapBase(el, opts = {}) {
     /* style pending — the load handler above applies it when ready */
   }
   applyGroundFlag(map);
+  // 0x0 fix: Safari/container may be 0 at mount, twin self-corrects but map stays 0 until resize().
+  const kickResize = () => { try { map.resize(); } catch {} };
+  requestAnimationFrame(() => requestAnimationFrame(kickResize));
+  setTimeout(kickResize, 400);
+  setTimeout(kickResize, 1200);
+  try {
+    const ro = new ResizeObserver(kickResize);
+    ro.observe(el);
+  } catch { window.addEventListener('resize', kickResize); }
+  window.addEventListener('resize', kickResize);
   _map = map;
   window.__ring2map = map;
   return { map, loadedClean };
