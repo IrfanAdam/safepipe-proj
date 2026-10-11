@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-11T15:03:51.450Z",
+  "generated": "2026-10-11T15:07:13.984Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,15 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "a81ee0a",
+      "full": "a81ee0a1b7268e6f48430d989b1df177262dfa7d",
+      "date": "2026-10-11",
+      "time": "20:33",
+      "subject": "docs(plan): embed Sangachal real-world spec into Phase 01-02, site 40.201262N [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
     {
       "sha": "9af021f",
       "full": "9af021fb0b436c9b7e2239cfc61833b955bf24da",

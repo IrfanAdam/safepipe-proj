@@ -1,6 +1,6 @@
 # OPS 3D V3 — REAL-WORLD SA… (Ring-2 chassis iteration)
 
-> Status: 🟡 BUILDING v3 — Phase 00 pending owner's go. Owner's Sangachal real-world spec (attached 2026-10-11) is BINDING for Phases 01–02; more optimization input to follow.
+> Status: 🟡 BUILDING v3 — Phase 00 pending owner's go. Binding spec: `/Users/irfan/.hermes/attachments/pasted_content_2026-10-11_15-02-15-677_1a4c96.txt` (owner's Sangachal outline, 277 lines, verbatim — more optimization input to follow).
 > Continues method of: `2026-10-07_153000-ops3d-realworld-twin.md` (Phases 00–01 done — foundation + real-terrain workflow in `src/ops3d/`, carried over as method, not site).
 > Replaces as active plan: `2026-10-10_191500-ops3d-ring2-seamless-redo.md` (COMPLETE — pushed `c36d8d1`). Ring-2 @ Sangachal stays live as the shipped reference build AND the v3 work site.
 > Chassis: `src/ring2/` + `ops3d-ring2.html` (gate-mount, context-loss recovery + telemetry, takeover endpoints, same-frame zoom sync, tilt-aware rim fade).
@@ -115,3 +115,4 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 - Tests + `npm run build` green before every commit; commit carries `[plan:<this-file>#<phase>]`; no push without owner's `y`.
 - Every phase ends at its REF GATE before the next starts. Phases never restart silently.
 - Headless-WebKit green ≠ real-Safari proven: Safari proof is an owner-device screenshot with readable telemetry bar.
+- The binding spec (attachment path in the header) MUST be passed in-context to every Phase 01–02 task delegation, and each task's verify step checks its spec section (§§1–9) — the plan tables are the index, the attachment is the text.
