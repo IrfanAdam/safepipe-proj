@@ -21,6 +21,7 @@ import { ensureField, getStatus } from './field.js';
 import { mountMapBase, assertTerrainOn, releaseMap } from './mapbase.js';
 import { applyTwinToMap, assertTerrainVex, pitchForPose } from './sync.js';
 import { createOverlayTwin } from './overlays.js';
+import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import {
@@ -62,7 +63,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = 60;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = '0a14ecf';
+const BUILD_ID = 'fcbba51';
 // Shared GL-context + tile telemetry registry (see ctxmon.js: one
 // real-Safari screenshot of the six tokens discriminates every hypothesis
 // in the defect-hunt report).
@@ -369,6 +370,12 @@ async function boot() {
   ensureField().catch(() => {}).finally(() => paintStatus());
 
   twin = createOverlayTwin(twinDiv, { fovDeg: FOV_DEG, startRange: 26000 });
+  // Phase-01 OSM vectors: draped roads/tracks/paths/coastline/terminal (osm
+  // provenance). Best-effort — a missing asset never breaks boot.
+  // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
+  try {
+    mountVectorsFromData(twin.scene).catch(() => {});
+  } catch { /* vectors never break boot */ }
   statusDiv.textContent = 'RING-2 · boot: twin ✓ · map: loading…';
   // Twin GL census + context wiring: the twin canvas is the second context
   // in the budget. Lost → stamp (cxl:twin:lost); restored → re-size into
