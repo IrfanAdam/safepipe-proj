@@ -32,7 +32,7 @@ el.innerHTML =
   '<div class="ring2-bar" data-ring2="bar"></div>' +
   '<div class="ring2-status" data-ring2="status" aria-live="polite"></div>';
 
-const mapDiv = el.querySelector('[data-ring2="map"]');
+let mapDiv = el.querySelector('[data-ring2="map"]');
 const twinDiv = el.querySelector('[data-ring2="twin-wrap"]');
 const barDiv = el.querySelector('[data-ring2="bar"]');
 const statusDiv = el.querySelector('[data-ring2="status"]');
@@ -40,7 +40,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = 60;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = '5189a73';
+const BUILD_ID = 'ca7f010';
 let map = null;
 let twin = null;
 let mixCtl = null;
@@ -58,9 +58,26 @@ let mapFatal = null;
 let mapZeroTicks = 0;
 let remounts = 0;
 let remounting = false;
+// Stuck-at-zero forensics: resize attempts, last resize() error, and whether
+// the fresh-container last resort has fired — all surfaced in the status bar.
+let mapResizes = 0;
+let mapResizeErr = null;
+let freshContainerTried = false;
 // Bridge: remountMap lives in boot() closure (needs mapDiv/mixCtl);
 // paintStatus is module scope, so boot hands it a callable here.
 let requestRemount = null;
+let requestFreshContainer = null;
+
+// True while the map canvas exists but has zero pixels (stuck, not mounting:
+// a mounting map has no canvas yet and reads map:-).
+function isMapStuckZero() {
+  try {
+    const c = map?.getCanvas?.();
+    return !!c && (((c.width | 0) === 0 || (c.height | 0) === 0));
+  } catch {
+    return false;
+  }
+}
 
 function canvasDims() {
   let mapSize = 'map:-';
@@ -91,20 +108,29 @@ function paintStatus() {
   // gallery iframe). Cheap, runs on the existing 500ms tick; twin path needs
   // no help. Without this, mix:0 (pure SAT) is a permanent black hole.
   // Escalation: if resize() fires for 10 straight ticks (5s) with a sized
-  // container and the canvas is STILL zero (observed live on Safari despite
-  // the fixed build string in the bar), the map instance itself is wedged —
-  // tear it down and construct a fresh one into the now-sized container.
-  // Capped at 2 remounts so a truly broken environment can't loop forever.
+  // container and the canvas is STILL zero (observed live on real Safari —
+  // resize() a permanent no-op there, fresh mounts also 0x0), the map
+  // instance itself is wedged — tear it down and construct a fresh one into
+  // the now-sized container. Capped at 2 remounts. Past that, the poison may
+  // be the DIV itself (it lived through display:none; Safari can hold a stale
+  // layout object on it) — swap in a brand-new container (1 shot) and mount
+  // there. Counters ride in the status bar so a screenshot always diagnoses.
   try {
     const c = map?.getCanvas?.();
     if (c && ((c.width | 0) === 0 || (c.height | 0) === 0)) {
       const w = mapDiv?.clientWidth | 0, h = mapDiv?.clientHeight | 0;
       if (w > 0 && h > 0 && typeof map.resize === 'function') {
-        try { map.resize(); } catch { /* counted below */ }
+        mapResizes++;
+        try { map.resize(); } catch (err) {
+          mapResizeErr = `${err?.message ?? err}`.slice(0, 80);
+        }
         const c2 = map.getCanvas?.();
         if (c2 && ((c2.width | 0) === 0 || (c2.height | 0) === 0)) {
           mapZeroTicks++;
-          if (mapZeroTicks >= 10 && remounts < 2 && !remounting && typeof requestRemount === 'function') requestRemount();
+          if (mapZeroTicks >= 10 && !remounting && typeof requestRemount === 'function') {
+            if (remounts < 2) requestRemount();
+            else if (!freshContainerTried) requestFreshContainer();
+          }
         } else mapZeroTicks = 0;
       }
     } else mapZeroTicks = 0;
@@ -123,6 +149,7 @@ function paintStatus() {
     (vexWarned ? ' · VEX-WARN' : '') +
     (mapErr ? ` · MAPERR:${String(mapErr).slice(0, 120)}` : '') +
     (mapFatal ? ` · MAPFAILED:${mapFatal}` : '') +
+    (isMapStuckZero() ? ` · STUCK0 rs:${mapResizes} rm:${remounts}${freshContainerTried ? ' newdiv:1' : ''}${mapResizeErr ? ` rserr:${mapResizeErr}` : ''}` : '') +
     (twinFrames >= 0
       ? ` · frames:${twinFrames}${twinErr ? ` TWINERR:${String(twinErr).slice(0, 120)}` : ''}`
       : '');
@@ -255,6 +282,42 @@ async function boot() {
   }
   try { window.__ring2remountMap = () => remountMap(); } catch { /* diag hook */ }
   requestRemount = () => remountMap();
+  // Last resort (1 shot): the DIV itself may carry a stale layout object in
+  // Safari after living through display:none — no remount into it will ever
+  // size. Swap in a brand-new div (same id/class/style) and mount there.
+  function freshContainer() {
+    if (remounting || freshContainerTried) return;
+    freshContainerTried = true;
+    remounting = true;
+    try {
+      const oldCanvas = map?.getCanvas?.();
+      const gl = oldCanvas?.getContext?.('webgl2') ?? oldCanvas?.getContext?.('webgl');
+      try { gl?.getExtension?.('WEBGL_lose_context')?.loseContext(); } catch { /* already lost */ }
+      map?.remove?.();
+    } catch { /* already dead */ }
+    map = null;
+    window.__ring2.map = null;
+    try {
+      const fresh = document.createElement('div');
+      fresh.id = mapDiv.id || '';
+      fresh.className = mapDiv.className || '';
+      fresh.setAttribute('style', mapDiv.getAttribute('style') || '');
+      fresh.setAttribute('data-ring2', 'map');
+      mapDiv.replaceWith(fresh);
+      mapDiv = fresh;
+    } catch (err) {
+      failMap(err);
+      remounting = false;
+      mapZeroTicks = 0;
+      return;
+    }
+    mapRace().then(
+      ({ map: m, loadedClean }) => { adoptMap(m, loadedClean); remounting = false; mapZeroTicks = 0; },
+      (err) => { failMap(err); remounting = false; mapZeroTicks = 0; },
+    );
+  }
+  try { window.__ring2freshContainer = () => freshContainer(); } catch { /* diag hook */ }
+  requestFreshContainer = () => freshContainer();
   mapRace().then(
     ({ map: m, loadedClean }) => adoptMap(m, loadedClean),
     (err) => failMap(err),
