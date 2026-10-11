@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-11T15:24:55.263Z",
+  "generated": "2026-10-11T15:44:42.449Z",
   "datasets": [
     {
       "name": "OpenStreetMap Sangachal AOI vectors (roads/tracks/paths/coastline/terminal)",
@@ -14,38 +14,39 @@
       "attribution": "© OpenStreetMap contributors",
       "counts": {
         "roads": {
-          "elements": 680,
-          "vertices": 6225
+          "elements": 638,
+          "vertices": 5340
         },
         "tracks": {
-          "elements": 61,
-          "vertices": 895
+          "elements": 46,
+          "vertices": 570
         },
         "paths": {
-          "elements": 113,
-          "vertices": 948
+          "elements": 97,
+          "vertices": 649
         },
         "coastline": {
-          "elements": 1,
-          "vertices": 832
+          "elements": 2,
+          "vertices": 284
         },
         "terminal": {
-          "elements": 91,
-          "vertices": 959
+          "elements": 89,
+          "vertices": 878
         }
       },
       "counts_total": {
-        "elements": 946,
-        "vertices": 9859
+        "elements": 872,
+        "vertices": 7721
       },
       "steps": [
         "read cached Overpass JSON (/tmp/phase01-<layer>.json, geometry per way)",
         "clip each vertex to AOI rect (clamp + clipped flag, features preserved)",
         "project lon/lat -> world metres via src/ring2/site.js geoToWorld",
+        "clip every segment to the twin disc (DISC_R = RING_RADIUS_M - 150 = 9850 m; split at crossings, drop fully-outside runs)",
         "round to 0.1 m, emit compact JSON public/data/sangachal-vectors.json"
       ],
       "limitations": [
-        "33 of 946 features extend past the AOI edge; edge vertices are clamped to the AOI rect (flagged c:1), not surveyed continuations",
+        "946 source ways / 9859 source vertices; 74 fully-outside-disc ways dropped, split ways emit one feature per inside run (flagged c:1 when AOI-clamped)",
         "terminal layer carries OSM tags only — no verified facility layout (binding spec §1A: ESIA layout is historical)",
         "no elevation in source; twin drape samples the DEM field at render time"
       ]
