@@ -269,6 +269,12 @@ export function createOverlayTwin(container, opts = {}) {
 
   const controls = new OrbitControls(camera, canvas);
   controls.target.set(0, 0, 0);
+  // Input-ownership note: touches stay at the OrbitControls default
+  // (ONE-finger ROTATE, TWO-finger DOLLY_PAN). Pan MUST keep working
+  // through the twin — the map is non-interactive and follows via the
+  // per-frame twin->map sync, so a twin pan is the only pan. Never set
+  // enablePan=false or override touches here.
+  // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   // Tilt clamp === map maxPitch (sync.js MAP_MAX_PITCH_DEG): the twin can

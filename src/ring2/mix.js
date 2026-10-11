@@ -5,18 +5,21 @@
  * twin ground in, satellite ground hidden under it).
  *
  *   - Drives the twin canvas opacity + overlay emphasis (setEmphasis) +
- *     takeover-ground opacity (setTakeover, see takeover.js thresholds).
- *   - Minimal takeover rule: the satellite hides ONLY at mix 100, the
- *     exact step the twin ground reaches opaque (same condition both
- *     sides — the old anytime-takeover black hole can't recur).
+ *     takeover-ground opacity (setTakeover, see takeover.js thresholds) +
+ *     satellite-base fade (setGroundFade, same smoothstep band).
+ *   - Endpoint rule: the satellite hides ONLY at mix 100, the exact step
+ *     the twin ground reaches opaque (same condition both sides — the old
+ *     anytime-takeover black hole can't recur); across mix 62->100 the
+ *     photo base dissolves out as paint opacity while the twin ground
+ *     dissolves in, so the base swap never jumps.
  *   - Canvas-identity watch: a MutationObserver on the twin container
  *     re-applies the full mix (opacity + pointer-events + emphasis) whenever
  *     the canvas remounts, so a remount can never reset to a stale look
  *     (v1 remount-opacity class). Mix also persists to localStorage.
  * [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-3]
  */
-import { setGroundOwns, getGroundOwns, IMAGERY_LAYER_ID, IMAGERY_BACKUP_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID } from './mapbase.js';
-import { takeoverU, groundHidden } from './takeover.js';
+import { setGroundOwns, getGroundOwns, setGroundFade } from './mapbase.js';
+import { takeoverU, satBaseV, groundHidden } from './takeover.js';
 import { twinPointerEvents } from './sync.js';
 
 export const MIX_STORE_KEY = 'ring2.mix';
@@ -90,23 +93,9 @@ export function mountMixBar(el, opts = {}) {
     bar.dataset.ground = getGroundOwns() ? 'sat' : 'twin';
   }
 
-  /* Full mix application: canvas opacity + events + emphasis + ground rule. */
-  function forceGroundLayers() {
-    // mapbase.setGroundOwns owns the flag but only applies it while the map
-    // reports loaded() — and our per-frame jumpTo sync keeps loaded() false
-    // forever, so apply the flagged state directly to the live layers here.
-    // setLayoutProperty works on idle-or-busy maps; missing layers are
-    // skipped (flag still reapplies on mount inside mapbase).
-    const m = getMap();
-    if (!m || typeof m.setLayoutProperty !== 'function') return;
-    const vis = getGroundOwns() ? 'visible' : 'none';
-    for (const id of [IMAGERY_LAYER_ID, IMAGERY_BACKUP_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID]) {
-      try {
-        m.setLayoutProperty(id, 'visibility', vis);
-      } catch { /* layer absent — mapbase flag covers the next mount */ }
-    }
-  }
-
+  /* Full mix application: canvas opacity + events + emphasis + takeover
+   * pair (twin-ground ramp in overlays + satellite-base fade in mapbase,
+   * same smoothstep band both sides) + ground endpoint rule. */
   function reapply() {
     // Dead-end guard: stored mix 0 + map still mounting = empty viewport
     // with orbit going nowhere. While the map object doesn't exist, floor
@@ -135,7 +124,6 @@ export function mountMixBar(el, opts = {}) {
       setTakeover(takeoverU(effMix));
     } catch { /* takeover ground is cosmetic */ }
     applyGroundRule(lastPitch);
-    forceGroundLayers();
     paintLabel();
   }
 
@@ -146,14 +134,22 @@ export function mountMixBar(el, opts = {}) {
     return (!getMap?.() && mix < 50) ? 50 : mix;
   }
 
-  /* Minimal takeover rule (was: ground always on at every mix). The
-   * satellite hides ONLY at mix 100 — the exact step takeoverU() reaches
-   * opaque — and stays fully visible everywhere below (mix 0 included, with
-   * reference labels allowed). Mid-range is the same smooth composite. */
+  /* Smooth base crossfade (was: binary satellite hide at mix 100). Every
+   * reapply drives BOTH sides of the dissolve over the same smoothstep
+   * band: the twin ground ramps 0->1 via setTakeover(takeoverU) in
+   * reapply, and here the satellite base fades 1->0 via
+   * setGroundFade(satBaseV) as raster-opacity / hillshade-exaggeration
+   * paint. setGroundOwns keeps the ENDPOINT only: layers stay
+   * layout-visible through the band and hide exactly at mix 100, the step
+   * the twin ground reaches opaque (a black hole stays impossible).
+   * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
   function applyGroundRule(pitchDeg) {
     lastPitch = pitchDeg;
-    setGroundOwns(!groundHidden(effMixNow()));
-    forceGroundLayers();
+    const eff = effMixNow();
+    try {
+      setGroundFade(satBaseV(eff));
+    } catch { /* base fade is cosmetic */ }
+    setGroundOwns(!groundHidden(eff));
     paintLabel();
   }
 

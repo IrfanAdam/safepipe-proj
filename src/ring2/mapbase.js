@@ -13,7 +13,9 @@
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { SANGACHAL, VEX, worldToGeo } from './site.js';
-import { MAP_MAX_PITCH_DEG } from './sync.js';
+import { MAP_MAX_PITCH_DEG, MAP_INPUT_HANDLERS, assertMapNonInteractive } from './sync.js';
+/* Re-exported for callers that already reach the map through mapbase. */
+export { MAP_INPUT_HANDLERS, assertMapNonInteractive };
 import { waitForSized } from './sizeGate.js';
 import { ctxLive, ctxLost, ctxRestored, noteTileErr, noteTileOk } from './ctxmon.js';
 
@@ -41,6 +43,13 @@ export const IMAGERY_BACKUP_LAYER_ID = 'esri-imagery-backup';
 export const HILLSHADE_LAYER_ID = 'ring2-hillshade';
 export const REFERENCE_LAYER_ID = 'esri-reference';
 export const MASK_FILL_COL = '#0b0c0c'; // page bg: clipped ground reads as vignette, not void
+/* Base-crossfade paint anchors (mix.js fades these across the takeover
+ * band via setGroundFade; mapStyle below is the satV=1 endpoint).
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+export const REFERENCE_BASE_OPACITY = 0.85;
+export const HILLSHADE_BASE_EXAG = 0.25;
+/* Every layer the satellite ground owns (visibility endpoint). */
+export const GROUND_LAYER_IDS = [IMAGERY_LAYER_ID, IMAGERY_BACKUP_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID];
 
 /* Map-side ring clip (world-space, projection-proof). The twin-side mask
  * (overlays.js) is drawn through the twin perspective camera, which
@@ -150,8 +159,10 @@ export function mapStyle() {
         source: HILL_SOURCE_ID,
         paint: {
           /* Neutral relief shading: low exaggeration, mid-gray ramp so it
-           * reads as shade, not tint, under the satellite imagery. */
-          'hillshade-exaggeration': 0.25,
+           * reads as shade, not tint, under the satellite imagery. Anchored
+           * at HILLSHADE_BASE_EXAG (setGroundFade scales it across the
+           * takeover band). */
+          'hillshade-exaggeration': HILLSHADE_BASE_EXAG,
           'hillshade-highlight-color': '#ffffff',
           'hillshade-shadow-color': '#8a8a8a',
           'hillshade-accent-color': '#6e6e6e',
@@ -161,7 +172,7 @@ export function mapStyle() {
         id: REFERENCE_LAYER_ID,
         type: 'raster',
         source: 'esri-reference-src',
-        paint: { 'raster-opacity': 0.85 },
+        paint: { 'raster-opacity': REFERENCE_BASE_OPACITY },
       },
       // Map-side ring clip, topmost: single hard world-circular edge at R (see above).
       ...MASK_BAND_LAYER_IDS.map((id, i) => ({
@@ -193,6 +204,11 @@ export function assertTerrainOn(map) {
 
 let _map = null;
 let _groundOwns = true;
+/* Last satellite-base fade factor (1 = full photo, 0 = gone). Re-applied
+ * to every fresh mount so a remount inside the takeover band never flashes
+ * full satellite for a frame.
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+let _groundFade = 1;
 
 /** Live MapLibre instance (null before mount resolves). */
 export function getMap() {
@@ -213,13 +229,17 @@ export function getGroundOwns() {
 
 /* Phase-3 mix-slider hook. true = satellite ground visible; false = ground
  * layers hidden so the twin canvas takes over (map keeps camera/terrain
- * state, just stops drawing ground — no remount, no camera jump). */
+ * state, just stops drawing ground — no remount, no camera jump).
+ * Endpoint API only: the smooth mid-band dissolve is setGroundFade (mix.js
+ * drives BOTH every reapply — visibility endpoint here, paint fade there).
+ * Applies directly to the live layers (no loaded() gate: the per-frame
+ * jumpTo sync can hold loaded() false while the map still paints). */
 export function setGroundOwns(on) {
   _groundOwns = !!on;
   const m = _map;
-  if (m && m.loaded()) {
+  if (m) {
     const vis = _groundOwns ? 'visible' : 'none';
-    for (const id of [IMAGERY_LAYER_ID, IMAGERY_BACKUP_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID]) {
+    for (const id of GROUND_LAYER_IDS) {
       try {
         m.setLayoutProperty(id, 'visibility', vis);
       } catch {
@@ -230,9 +250,56 @@ export function setGroundOwns(on) {
   return _groundOwns;
 }
 
+/* Smooth satellite-base fade across the takeover band. satV 1 = full
+ * photo (the style defaults), 0 = fully dissolved. Imagery + backup fade
+ * raster-opacity 1->0, reference labels 0.85->0, and the hillshade
+ * (which has no opacity paint) flattens exaggeration 0.25->0 so its
+ * relief dissolves with the photo instead of popping. Visibility is left
+ * to setGroundOwns — mid-band layers stay layout-visible at fading paint;
+ * only the mix-100 endpoint hides them. Remembered for the next mount. */
+export function setGroundFade(satV) {
+  const n = Number(satV);
+  const s = !Number.isFinite(n) ? 1 : Math.min(1, Math.max(0, n));
+  _groundFade = s;
+  const m = _map;
+  if (m) {
+    const paint = [
+      [IMAGERY_LAYER_ID, 'raster-opacity', s],
+      [IMAGERY_BACKUP_LAYER_ID, 'raster-opacity', s],
+      [REFERENCE_LAYER_ID, 'raster-opacity', s * REFERENCE_BASE_OPACITY],
+      [HILLSHADE_LAYER_ID, 'hillshade-exaggeration', s * HILLSHADE_BASE_EXAG],
+    ];
+    for (const [id, prop, val] of paint) {
+      try {
+        m.setPaintProperty(id, prop, val);
+      } catch {
+        /* layer not yet added — fade still applies on next mount */
+      }
+    }
+  }
+  return s;
+}
+
+/** Current satellite-base fade factor (1 = full photo, 0 = dissolved). */
+export function getGroundFade() {
+  return _groundFade;
+}
+
 function applyGroundFlag(m) {
+  for (const [id, prop, val] of [
+    [IMAGERY_LAYER_ID, 'raster-opacity', _groundFade],
+    [IMAGERY_BACKUP_LAYER_ID, 'raster-opacity', _groundFade],
+    [REFERENCE_LAYER_ID, 'raster-opacity', _groundFade * REFERENCE_BASE_OPACITY],
+    [HILLSHADE_LAYER_ID, 'hillshade-exaggeration', _groundFade * HILLSHADE_BASE_EXAG],
+  ]) {
+    try {
+      m.setPaintProperty(id, prop, val);
+    } catch {
+      /* ignore pre-style race */
+    }
+  }
   if (!_groundOwns) {
-    for (const id of [IMAGERY_LAYER_ID, IMAGERY_BACKUP_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID]) {
+    for (const id of GROUND_LAYER_IDS) {
       try {
         m.setLayoutProperty(id, 'visibility', 'none');
       } catch {
@@ -288,6 +355,19 @@ export async function mountMapBase(el, opts = {}) {
     fadeDuration: 0,
   });
   map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
+  // Defense-in-depth input ownership: the constructor arg above
+  // (interactive:false at the main.js call site) is the first net; every
+  // native handler is ALSO disabled explicitly here, then the probe below
+  // fails the mount closed if any handler still owns input. A live map
+  // gesture fighting the per-frame twin->map sync is what sheared
+  // pan/tilt alignment — belt, suspenders, and an alarm.
+  // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
+  for (const name of MAP_INPUT_HANDLERS) {
+    try {
+      map[name]?.disable?.();
+    } catch { /* a missing handler owns no input */ }
+  }
+  assertMapNonInteractive(map);
 
   // Flat-earth pin: projection stays mercator — any globe/perspective flavor
   // renders the ground as a convex sphere at oblique pitch, which the twin

@@ -190,3 +190,36 @@ export function assertAspectParity(twinW, twinH, mapW, mapH, tol = 0.01) {
   }
   return true;
 }
+
+/* Native map gesture handlers. ALL stay disabled for the life of the map:
+ * the twin orbit owns the camera at every mix and the map follows via the
+ * per-frame twin->map sync — a live map handler would fight the sync and
+ * shear pan/tilt alignment (owner pan-break finding). mapbase.mountMapBase
+ * disables each one post-construction AND probes with
+ * assertMapNonInteractive, so a future handler addition fails closed
+ * instead of silently fighting. Lives here (not mapbase.js) because this
+ * module is import-clean for node probes; mapbase re-exports both.
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+export const MAP_INPUT_HANDLERS = [
+  'dragPan',
+  'dragRotate',
+  'scrollZoom',
+  'boxZoom',
+  'doubleClickZoom',
+  'keyboard',
+  'touchZoomRotate',
+];
+
+/* Throws unless no native map handler owns input. Missing handlers pass
+ * (a handler that doesn't exist can't fight the sync); any enabled one
+ * fails closed with its name. */
+export function assertMapNonInteractive(map) {
+  if (!map) throw new Error('assertMapNonInteractive: no live map');
+  for (const name of MAP_INPUT_HANDLERS) {
+    const h = map[name];
+    if (h && typeof h.isEnabled === 'function' && h.isEnabled()) {
+      throw new Error(`assertMapNonInteractive: map.${name} owns input (fights twin->map sync)`);
+    }
+  }
+  return true;
+}
