@@ -2,9 +2,14 @@
  * Harness entry for /ops3d-ring2.html. Wires mapbase (ground) + overlays
  * (transparent twin) + mix (one slider) + per-frame sync (twin -> map).
  *
- * Camera authority is the twin orbit; every frame the twin pose drives the
- * map via applyTwinToMap with the twin's own viewport/fov so zoom parity
- * holds. Mix consumes the same pose's pitch for the TOP-only satellite rule.
+ * Camera authority is the twin orbit at EVERY mix: each frame the twin
+ * pose drives the map via applyTwinToMap with the twin's own viewport/fov
+ * so zoom parity holds. The map is constructed non-interactive and the
+ * twin canvas stays pointer-interactive at all mixes, so satellite mode
+ * (mix 0) orbits exactly like twin mode — OrbitControls always receives
+ * input and the map follows via sync, never fighting it with native
+ * handlers. Mix consumes the same pose's pitch for the TOP-only
+ * satellite rule.
  * Exposes window.__ring2 { map, twin, mix, getPose, setMix } for the probe
  * lane, screenshots, and console driving.
  * [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-3]
@@ -57,7 +62,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = 60;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'a5db08e';
+const BUILD_ID = 'f69fa87';
 // Shared GL-context + tile telemetry registry (see ctxmon.js: one
 // real-Safari screenshot of the six tokens discriminates every hypothesis
 // in the defect-hunt report).
@@ -470,6 +475,11 @@ async function boot() {
         zoom: 11,
         pitch: 0,
         bearing: 0,
+        // Twin owns the camera at every mix: native map handlers stay off
+        // so a map gesture can never fight the per-frame twin->map sync.
+        // All orbit/zoom input goes to the twin canvas (pointer-interactive
+        // at all mixes, mix 0 included).
+        interactive: false,
         ctxmon: mon,
         onCtxLost: onMapCtxLost,
         onCtxRestored: onMapCtxRestored,
@@ -679,6 +689,9 @@ async function boot() {
       twinFrames++;
       const pose = twin.getPose();
       const viewportPx = Math.max(twinDiv.clientHeight || window.innerHeight, 1);
+      // Twin owns the camera at every mix — sync always runs, so orbit
+      // input on the twin canvas moves the map with it (satellite mode
+      // included). The map is non-interactive and can never fight this.
       if (map) {
         try {
           applyTwinToMap(map, pose, { viewportPx, fovDeg: FOV_DEG });

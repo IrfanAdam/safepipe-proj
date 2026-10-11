@@ -108,3 +108,16 @@ export function applyTwinToMap(map, pose, opts = {}) {
   map.jumpTo({ center: mp.center, zoom: mp.zoom, bearing: mp.bearing, pitch: mp.pitch });
   return mp;
 }
+
+/* Input ownership: the twin canvas is the ONLY camera input at every mix.
+ * The twin orbit owns the camera from SAT (0) to TWIN (100) and the map
+ * follows via the per-frame twin->map sync (the map itself is constructed
+ * non-interactive, so it can never fight the sync). A previous revision
+ * set pointer-events:none here at effMix<2, which starved OrbitControls of
+ * all input in satellite mode — a frozen camera. This pins the rule the
+ * other way: satellite mode orbits exactly like twin mode.
+ * [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4] */
+/** CSS pointer-events for the twin canvas at any effective mix: always 'auto'. */
+export function twinPointerEvents(_effMix) {
+  return 'auto';
+}

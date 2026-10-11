@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-11T12:10:26.149Z",
+  "generated": "2026-10-11T13:03:20.625Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,8 +14,8 @@
   ],
   "commits": [
     {
-      "sha": "0c4c968",
-      "full": "0c4c9680143cdfc19f5fc26a756ad31457687c33",
+      "sha": "39bb2de",
+      "full": "39bb2deb8dbf02b6ddf475edbe5b077e498c374e",
       "date": "2026-10-11",
       "time": "17:40",
       "subject": "fix(ring2): context-loss remount recovery, six-token telemetry, twin takeover endpoints [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
@@ -2127,7 +2127,20 @@
       "subject": "safepipe v0 boilerplate: web-first Vite shell, ontology stub, DS tokens, twin placeholder",
       "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
       "anchor": null
+    },
+    {
+      "sha": "0c4c968",
+      "full": "0c4c9680143cdfc19f5fc26a756ad31457687c33",
+      "date": "2026-10-11",
+      "time": "17:40",
+      "subject": "fix(ring2): context-loss remount recovery, six-token telemetry, twin takeover endpoints [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "src/ring2/main.js",
+    "src/ring2/mix.js",
+    "src/ring2/sync.js"
+  ]
 }

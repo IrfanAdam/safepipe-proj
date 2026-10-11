@@ -17,6 +17,7 @@
  */
 import { setGroundOwns, getGroundOwns, IMAGERY_LAYER_ID, IMAGERY_BACKUP_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID } from './mapbase.js';
 import { takeoverU, groundHidden } from './takeover.js';
+import { twinPointerEvents } from './sync.js';
 
 export const MIX_STORE_KEY = 'ring2.mix';
 export const TOP_PITCH_DEG = 20; // retired: ground no longer pitch-gated (kept for API compat)
@@ -120,9 +121,12 @@ export function mountMixBar(el, opts = {}) {
       // Canvas stays opaque: the ring mask lives on this canvas and must
       // survive at every mix. Overlay fade rides on emphasis alone.
       canvas.style.opacity = '1';
-      // Pure-map end: twin gets out of the way so the map is directly
-      // interactive; any visible twin owns orbit (sync drives the map).
-      canvas.style.pointerEvents = t < 0.02 ? 'none' : 'auto';
+      // Twin owns the camera at EVERY mix (satellite mode included): the
+      // canvas stays pointer-interactive so OrbitControls always receives
+      // orbit input and the map follows via sync. pointer-events:none here
+      // used to freeze satellite mode (twin got no input AND the map was
+      // constructed interactive, fighting the sync).
+      canvas.style.pointerEvents = twinPointerEvents(effMix);
     }
     try {
       applyEmphasis(t);
