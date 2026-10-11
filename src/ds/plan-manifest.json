@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-11T15:07:13.984Z",
+  "generated": "2026-10-11T16:37:21.577Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,87 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "29b6a31",
+      "full": "29b6a3154af20d37324d682d00f427f76de59dd7",
+      "date": "2026-10-11",
+      "time": "22:05",
+      "subject": "feat(ring2): soft tile fade + versioned tile-only SW cache [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "f34d2d9",
+      "full": "f34d2d993d5e2f9365cd0eaf24e75f5f44642e32",
+      "date": "2026-10-11",
+      "time": "22:00",
+      "subject": "ring2: twin-only input + smooth 62-100 base dissolve [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "28536d2",
+      "full": "28536d20b57662cbaa4965a9712e394769f90157",
+      "date": "2026-10-11",
+      "time": "21:51",
+      "subject": "fix(ring2): unify twin/map perspective fov (36.87deg), shared tilt clamp, aspect guard [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "5978221",
+      "full": "5978221560341b90969c384780098f9fa3e97b8e",
+      "date": "2026-10-11",
+      "time": "21:15",
+      "subject": "docs(ring2): source manifest counts for disc-clipped OSM vectors [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "afe2666",
+      "full": "afe2666c24e356426177ab8c085813ed5e509212",
+      "date": "2026-10-11",
+      "time": "21:15",
+      "subject": "fix(ring2): disc-clip OSM vectors to the 10km ring, wire vertex rim fade [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "bfa5191",
+      "full": "bfa51914c5c10a3d6cecd703925473cc0fd9a70e",
+      "date": "2026-10-11",
+      "time": "20:57",
+      "subject": "feat(ring2): wire OSM vectors into twin boot, stamp fcbba51 [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "fcbba51",
+      "full": "fcbba51be74ded6a8e26cda02f56da8d57fe531c",
+      "date": "2026-10-11",
+      "time": "20:56",
+      "subject": "feat(ring2): OSM vector overlay pipeline, 946 el / 9859 vtx [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "b987047",
+      "full": "b987047e17e86c1df1452a6712fbdde2eb94402b",
+      "date": "2026-10-11",
+      "time": "20:55",
+      "subject": "fix(ring2): Caspian shoreline key CASPIAN_SHORE_H=-24, pin with shore test [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "1d94a97",
+      "full": "1d94a97e868d7db6649ab6cb2beba8da59a5d8fa",
+      "date": "2026-10-11",
+      "time": "20:37",
+      "subject": "docs(plan): binding-spec rule, attachment in every Phase 01-02 delegation [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
     {
       "sha": "a81ee0a",
       "full": "a81ee0a1b7268e6f48430d989b1df177262dfa7d",
@@ -2193,5 +2274,8 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "docs/source-manifest.json",
+    "src/ring2/field.js"
+  ]
 }
