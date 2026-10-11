@@ -461,11 +461,21 @@ function smoothstep(a, b, t) {
  * west-high coastal plain falling to the Caspian (-28 m) in the east, a
  * northern hill mass, a southwestern ridge, plus rolling detail. Exists so
  * overlays never float on NaN when offline — always labelled procedural.
+ *
+ * Shore calibration (accuracy audit 2026-10-11, site-parallel transect
+ * 40.201262N, Open-Meteo + Terrarium z12 evidence): the real 0 m contour
+ * sits at x≈-3.2 km and the -24 m render datum at x≈+3.3 km. A gentle
+ * 0.0035 plain gradient plus an elliptical N-hill (σz 1600 — its south tail
+ * dies before the shore while the 230 m peak stands) and a late sea ramp
+ * [2800, 4200] land both fallback contours within ~100 m of real. The -28
+ * sea anchor is the true Caspian datum; the -24 RENDER key lives in
+ * overlays.js (CASPIAN_SHORE_H) and is NOT repeated here.
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
  */
 export function proceduralH(x, z) {
-  const base = 30 - 0.006 * x + 0.0038 * z;
+  const base = -16 - 0.0035 * x + 0.0038 * z;
   const hillN =
-    230 * Math.exp(-(x * x + (z + 5000) * (z + 5000)) / (2 * 2800 * 2800));
+    230 * Math.exp(-(x * x / (2 * 2800 * 2800) + ((z + 5000) * (z + 5000)) / (2 * 1600 * 1600)));
   const ridgeSW =
     160 *
     Math.exp(
@@ -475,7 +485,7 @@ export function proceduralH(x, z) {
     12 * Math.sin(x * 0.0009) * Math.cos(z * 0.0011) +
     8 * Math.sin(x * 0.00037 + 1.7) * Math.sin(z * 0.00043 + 0.6);
   const h = base + hillN + ridgeSW + rolling;
-  const sea = smoothstep(4000, 9000, x);
+  const sea = smoothstep(2800, 4200, x);
   return h * (1 - sea) + -28 * sea;
 }
 
