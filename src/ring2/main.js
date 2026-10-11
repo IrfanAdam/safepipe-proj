@@ -69,7 +69,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = MAP_TRUE_FOV_DEG;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'b62fade';
+const BUILD_ID = 'b63tile';
 // Shared GL-context + tile telemetry registry (see ctxmon.js: one
 // real-Safari screenshot of the six tokens discriminates every hypothesis
 // in the defect-hunt report).
@@ -372,6 +372,16 @@ async function boot() {
   // the failure mode we're eliminating. Every stage is visible in a
   // screenshot, so a user report always carries the diagnosis.
   statusDiv.textContent = 'RING-2 · boot: dom ✓ · map: loading…';
+  // Tile cache (Phase 01): versioned Service Worker, CacheFirst, scoped to
+  // tile hosts ONLY (see tilecache.js / public/ring2-tile-sw.js). Purely
+  // best-effort — any failure, missing SW support, or non-secure context
+  // silently skips; boot NEVER breaks on this.
+  // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
+  try {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/ring2-tile-sw.js').catch(() => {});
+    }
+  } catch { /* tile cache never breaks boot */ }
   // Field loads in the background; overlays start on procedural and
   // re-drape live via the status bus (no await — first paint is fast).
   ensureField().catch(() => {}).finally(() => paintStatus());

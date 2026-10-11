@@ -352,7 +352,14 @@ export async function mountMapBase(el, opts = {}) {
     maxPitch: MAP_MAX_PITCH_DEG,
     interactive,
     attributionControl: { compact: true },
-    fadeDuration: 0,
+    // Soft per-tile dissolve (~250ms): satellite tiles arriving mid-pan pop
+    // in tile-by-tile at fadeDuration 0. The dissolve is per-TILE paint —
+    // the camera still applies via synchronous jumpTo + forced redraw
+    // (sync.js), so camera parity is untouched: redraw forces the paint,
+    // fade only softens each new tile's first frames. raster-opacity set by
+    // setGroundFade composes on top (independent paint property).
+    // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
+    fadeDuration: 250,
   });
   map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
   // Defense-in-depth input ownership: the constructor arg above

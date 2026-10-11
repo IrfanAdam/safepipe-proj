@@ -3,7 +3,10 @@
 //   1. Frame order: twin.update() painted FIRST, then jumpTo ran — the map
 //      painted the fresh pose on its own async rAF, exactly one frame behind.
 //   2. Map-side smoothing would re-lag even a same-frame jumpTo (easeTo/flyTo
-//      or tile fade). Sync must use jumpTo only; mapbase runs fadeDuration 0.
+//      or tile fade). Sync must use jumpTo only; mapbase runs a soft
+//      per-tile fadeDuration (250ms) — per-TILE paint dissolve, not camera
+//      easing: jumpTo+redraw still force the paint synchronously, the fade
+//      only softens each new tile's first frames (see mapbase.js).
 // The contract pinned here: damped controls settle -> jumpTo (+ redraw while
 // moving) -> twin paint, all in one frame, never easeTo/flyTo.
 // [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]
