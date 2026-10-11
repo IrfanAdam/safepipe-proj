@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-11T04:51:48.348Z",
+  "generated": "2026-10-11T04:59:10.448Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,15 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "4e761d3",
+      "full": "4e761d3bbe824f2d8ba87795bb703a5d0b93d8f6",
+      "date": "2026-10-11",
+      "time": "10:23",
+      "subject": "fix(ring2): remount wedged 0x0 map, drop zoom menu, container dims in status [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "48f07d7",
       "full": "48f07d72154b0c2253628a33567f5f0417b61179",
@@ -2058,7 +2067,6 @@
     }
   ],
   "wip": [
-    "src/ring2/main.js",
-    "src/ring2/mapbase.js"
+    "src/ring2/main.js"
   ]
 }

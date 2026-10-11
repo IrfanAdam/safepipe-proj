@@ -40,7 +40,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = 60;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = '48f07d7';
+const BUILD_ID = '4e761d3';
 let map = null;
 let twin = null;
 let mixCtl = null;
@@ -185,6 +185,16 @@ async function boot() {
   function adoptMap(m, loadedClean) {
     map = m;
     window.__ring2.map = m;
+    // A remount leaves the previous instance's death rattle (e.g. a headless
+    // GPU 'context LOST' from the torn-down canvas) in the error ring — prune
+    // entries that belong to the old instance so the bar doesn't cry MAPERR
+    // over a healthy map.
+    try {
+      const errs = window.__ring2mapErrors ?? [];
+      if (errs.length) {
+        window.__ring2mapErrors = errs.filter((e) => !/context lost/i.test(String(e)));
+      }
+    } catch { /* bar keeps history */ }
     // Release the pre-map mix floor: reapply() floored the EFFECTIVE mix
     // at 50 while getMap() was null (dead-end guard). The map is here now —
     // re-apply so the stored mix (e.g. persisted 0) actually drives
@@ -223,7 +233,16 @@ async function boot() {
   function remountMap() {
     remounting = true;
     remounts++;
-    try { map?.remove?.(); } catch { /* already dead */ }
+    try {
+      // Free the old GL context BEFORE constructing the new map: remove()
+      // alone can leave the context alive until GC, briefly holding 3 live
+      // contexts (twin + old + new) — enough to tip small-GPU browsers into
+      // a context loss on the new map.
+      const oldCanvas = map?.getCanvas?.();
+      const gl = oldCanvas?.getContext?.('webgl2') ?? oldCanvas?.getContext?.('webgl');
+      try { gl?.getExtension?.('WEBGL_lose_context')?.loseContext(); } catch { /* already lost */ }
+      map?.remove?.();
+    } catch { /* already dead */ }
     map = null;
     window.__ring2.map = null;
     mapRace().then(
