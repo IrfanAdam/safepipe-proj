@@ -187,7 +187,29 @@
   }
   document.querySelector('[data-tab="ops3d-ring2"]')?.addEventListener('click', () => requestAnimationFrame(maybeMountRing2));
   window.addEventListener('hashchange', maybeMountRing2);
-  maybeMountRing2();
+  /* Ring-2 tab-show kick (v1 resizeOps3d parity, hunt P5): Ring-2 relies on
+   * internal timers + RO, and WebKit drops RO notifications across
+   * display:none→block — so show fires the external kick v1 has always
+   * had. __ring2kick = twin.onResize + map kick + status repaint; falls
+   * back to the raw __ring2resizeMap hook on older builds. Same-origin
+   * iframe, so contentWindow access is fine; every step is guarded for
+   * pre-mount (src not yet set). */
+  function resizeRing2() {
+    const panel = document.querySelector('[data-panel="ops3d-ring2"]');
+    if (panel && !panel.hidden) {
+      requestAnimationFrame(() => {
+        try {
+          const frame = document.getElementById('ops3d-ring2-frame');
+          const w = frame?.contentWindow;
+          if (w?.__ring2kick) w.__ring2kick();
+          else if (w?.__ring2resizeMap) w.__ring2resizeMap();
+        } catch { /* pre-mount */ }
+      });
+    }
+  }
+  document.querySelector('[data-tab="ops3d-ring2"]')?.addEventListener('click', () => requestAnimationFrame(resizeRing2));
+  window.addEventListener('hashchange', () => requestAnimationFrame(resizeRing2));
+   maybeMountRing2();
   /* Legacy v1 twin stack: dynamic import so a failure here can never take
    * Ring-2 down with it; errors paint into the v1 panels as text. */
   (async () => {

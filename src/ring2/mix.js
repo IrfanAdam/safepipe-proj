@@ -1,15 +1,14 @@
 /* Safepipe Ops3D Ring-2 — src/ring2/mix.js (Phase 3, Task 8).
- * One slider owns the seamless crossfade. 0 = overlays off (quiet map),
- * 100 = overlays full (analysis look). The satellite ground itself stays
- * on at every mix — the slider fades overlay emphasis only. Mid = blend.
+ * One slider owns the seamless crossfade. 0 = bare satellite photo (twin
+ * ground gone, overlays at zero, all satellite layers visible); mid =
+ * overlay emphasis over live satellite; 100 = full twin takeover (opaque
+ * twin ground in, satellite ground hidden under it).
  *
- *   - Drives the twin canvas opacity + overlay emphasis (setEmphasis).
- *   - Ground-always-on: the satellite stays visible at EVERY mix and pitch,
- *     superimposed under the overlays and ring-clipped by the twin mask.
- *     Hiding ground at mix>=99 turned pure-twin into a black hole and is
- *     removed; the slider fades overlay emphasis only. The TOP-only rule is
- *     retired per owner direction — with ring clipping the superimpose
- *     holds at all angles.
+ *   - Drives the twin canvas opacity + overlay emphasis (setEmphasis) +
+ *     takeover-ground opacity (setTakeover, see takeover.js thresholds).
+ *   - Minimal takeover rule: the satellite hides ONLY at mix 100, the
+ *     exact step the twin ground reaches opaque (same condition both
+ *     sides — the old anytime-takeover black hole can't recur).
  *   - Canvas-identity watch: a MutationObserver on the twin container
  *     re-applies the full mix (opacity + pointer-events + emphasis) whenever
  *     the canvas remounts, so a remount can never reset to a stale look
@@ -17,6 +16,7 @@
  * [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-3]
  */
 import { setGroundOwns, getGroundOwns, IMAGERY_LAYER_ID, IMAGERY_BACKUP_LAYER_ID, HILLSHADE_LAYER_ID, REFERENCE_LAYER_ID } from './mapbase.js';
+import { takeoverU, groundHidden } from './takeover.js';
 
 export const MIX_STORE_KEY = 'ring2.mix';
 export const TOP_PITCH_DEG = 20; // retired: ground no longer pitch-gated (kept for API compat)
@@ -51,6 +51,7 @@ export function mountMixBar(el, opts = {}) {
     getTwinContainer = () => getTwinCanvas()?.parentElement ?? null,
     getMap = () => null,
     applyEmphasis = () => {},
+    setTakeover = () => {},
     getPitchDeg = () => 0,
     initial = loadMix(50),
   } = opts;
@@ -111,7 +112,7 @@ export function mountMixBar(el, opts = {}) {
     // the EFFECTIVE mix at 50 so the live twin stays visible and
     // interactive; the stored value (pill) is untouched and takes over the
     // moment the map lands.
-    const effMix = (!getMap?.() && mix < 50) ? 50 : mix;
+    const effMix = effMixNow();
     const t = effMix / 100;
     const canvas = getTwinCanvas();
     lastCanvas = canvas ?? lastCanvas;
@@ -126,17 +127,28 @@ export function mountMixBar(el, opts = {}) {
     try {
       applyEmphasis(t);
     } catch { /* emphasis is cosmetic */ }
+    try {
+      setTakeover(takeoverU(effMix));
+    } catch { /* takeover ground is cosmetic */ }
     applyGroundRule(lastPitch);
     forceGroundLayers();
     paintLabel();
   }
 
-  /* Takeover rule RETIRED (was: mix >= 99 hid all ground at any pitch —
-   * pure-twin became a black hole). Ground is always on now; the slider
-   * fades overlay emphasis only, satellite superimposes at all angles. */
+  /* Effective mix: the dead-end floor in one place so the ground rule and
+   * the takeover ramp always agree (no step where the satellite hides but
+   * the twin ground isn't opaque, and vice versa). */
+  function effMixNow() {
+    return (!getMap?.() && mix < 50) ? 50 : mix;
+  }
+
+  /* Minimal takeover rule (was: ground always on at every mix). The
+   * satellite hides ONLY at mix 100 — the exact step takeoverU() reaches
+   * opaque — and stays fully visible everywhere below (mix 0 included, with
+   * reference labels allowed). Mid-range is the same smooth composite. */
   function applyGroundRule(pitchDeg) {
     lastPitch = pitchDeg;
-    setGroundOwns(true);
+    setGroundOwns(!groundHidden(effMixNow()));
     forceGroundLayers();
     paintLabel();
   }
@@ -197,5 +209,9 @@ export function mountMixBar(el, opts = {}) {
     updateForCamera,
     onMix,
     dispose,
+    // Effective mix after the pre-map dead-end floor (mix < 50 with no map
+    // reads 50 so the live twin stays visible). Feeds the eff: telemetry
+    // token so the bar can show stored vs effective side by side.
+    getEffMix: () => effMixNow(),
   };
 }

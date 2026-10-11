@@ -1,7 +1,7 @@
 /* Safepipe Ops3D Ring-2 — src/ring2/overlays.js (Phase 3, Task 7).
- * Twin draws OVERLAYS ONLY on a transparent three.js canvas over the
- * MapLibre base. No ground mesh (except the ring mask that clips the map
- * to a disc), no sky, no satellite — the map owns all ground (mapbase.js).
+ * Twin draws OVERLAYS on a transparent three.js canvas over the
+ * MapLibre base, plus an opaque DEM-draped takeover ground inside the ring
+ * that exists ONLY at the top of the mix slider (mix 100 full twin).
  * Every overlay vertex is ground-sat via sampleH.
  *
  * Layers:
@@ -54,6 +54,13 @@ const MASK_LIFT_M = 30; // hugs terrain outside the ring, hides satellite beneat
 const MASK_SIZE_M = 300000; // covers the oblique horizon (far plane raised to match)
 const MASK_SEG = 100;
 const PILL_MAX_MAP_RANGE = 3;
+/* Takeover ground (Issue 2): opaque DEM-draped twin terrain INSIDE the ring,
+ * shown only at the top of the slider. Neutral hypsometric Lambert (own
+ * lights, overlay Basic materials ignore lights) so mix 100 reads as a
+ * rendered twin, not satellite. Lift sits under every overlay lift. */
+const LIFT_GROUND_M = 5;
+const TAKEOVER_SEG = 128; // sectors
+const TAKEOVER_RINGS = 26;
 
 /* Schematic terminal program (NOT surveyed — every block is labelled). */
 const SCHEMATIC_BLOCKS = [
@@ -225,6 +232,13 @@ export function createOverlayTwin(container, opts = {}) {
   container.appendChild(canvas);
 
   const scene = new THREE.Scene();
+  // Takeover-ground lights (Issue 2): the Lambert twin terrain is the only
+  // lit material in the scene — every overlay is MeshBasicMaterial and
+  // ignores lights. Added to the scene (not the rebuilt group) once.
+  scene.add(new THREE.AmbientLight(0xc4cacf, 0.85));
+  const takeSun = new THREE.DirectionalLight(0xfff1dc, 1.5);
+  takeSun.position.set(-35000, 52000, 22000);
+  scene.add(takeSun);
   const camera = new THREE.PerspectiveCamera(
     fovDeg,
     Math.max(container.clientWidth, 1) / Math.max(container.clientHeight, 1),
@@ -620,6 +634,85 @@ function edgeFade(x, z) {
     group.add(mesh);
   }
 
+  /* Takeover ground (Issue 2): opaque DEM-draped twin terrain filling the
+   * disc to exactly R. Polar grid with a true center vertex (no hole, no
+   * shader discard — Safari-safe). Neutral hypsometric vertex colors under
+   * the scene lights. renderOrder -5: after the outside mask (-10), before
+   * every overlay (0) — paint order alone composites, nothing writes depth.
+   * Never registered for emphasis and skipped by the ring-clip pass (it IS
+   * ground); visibility/opacity ride on setTakeover(u) only. */
+  let groundMesh = null;
+  let groundMat = null;
+  let lastU = 0;
+  function buildTwinGround() {
+    const NS = TAKEOVER_SEG;
+    const NR = TAKEOVER_RINGS;
+    const cSea = new THREE.Color(0x232f38);
+    const cLow = new THREE.Color(0x2a3036);
+    const cHigh = new THREE.Color(0x6f7069);
+    const tmp = new THREE.Color();
+    const colAt = (h) => {
+      if (!(h >= 0)) return tmp.copy(cSea);
+      const u = Math.min(1, Math.max(0, h / 450));
+      return tmp.copy(cLow).lerp(cHigh, u);
+    };
+    const positions = [];
+    const colors = [];
+    const h0 = sampleH(0, 0);
+    positions.push(0, h0 * VEX + LIFT_GROUND_M, 0);
+    let c = colAt(h0);
+    colors.push(c.r, c.g, c.b);
+    for (let r = 1; r <= NR; r++) {
+      const rr = (r / NR) * RING_RADIUS_M;
+      for (let s = 0; s < NS; s++) {
+        const a = (s / NS) * Math.PI * 2;
+        const x = Math.cos(a) * rr;
+        const z = Math.sin(a) * rr;
+        const h = sampleH(x, z);
+        positions.push(x, h * VEX + LIFT_GROUND_M, z);
+        c = colAt(h);
+        colors.push(c.r, c.g, c.b);
+      }
+    }
+    const ringStart = (r) => 1 + (r - 1) * NS;
+    const idx = [];
+    for (let s = 0; s < NS; s++) {
+      idx.push(0, ringStart(1) + ((s + 1) % NS), ringStart(1) + s);
+    }
+    for (let r = 1; r < NR; r++) {
+      for (let s = 0; s < NS; s++) {
+        const a0 = ringStart(r) + s;
+        const a1 = ringStart(r) + ((s + 1) % NS);
+        const b0 = ringStart(r + 1) + s;
+        const b1 = ringStart(r + 1) + ((s + 1) % NS);
+        idx.push(a0, b1, b0, a0, a1, b1);
+      }
+    }
+    const g = track(new THREE.BufferGeometry());
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    groundMat = track(new THREE.MeshLambertMaterial({
+      vertexColors: true, transparent: true, opacity: 0,
+      depthWrite: false, side: THREE.DoubleSide,
+    }));
+    groundMesh = new THREE.Mesh(g, groundMat);
+    groundMesh.name = 'ring2-ground';
+    groundMesh.renderOrder = -5;
+    groundMesh.frustumCulled = false;
+    groundMesh.visible = lastU > 0.003;
+    groundMat.opacity = lastU;
+    group.add(groundMesh);
+  }
+  /* Takeover control: u 0 = twin ground gone (satellite base), 1 = opaque
+   * twin terrain. Called by the mix slider; re-applied after every rebuild. */
+  function setTakeover(u) {
+    lastU = Math.min(1, Math.max(0, Number(u) || 0));
+    if (groundMesh) groundMesh.visible = lastU > 0.003;
+    if (groundMat) groundMat.opacity = lastU;
+  }
+
   let lastInfo = null;
   function rebuild() {
     group.traverse((o) => {
@@ -647,6 +740,7 @@ function edgeFade(x, z) {
     buildSchematic();
     const c = buildContours(src);
     const waterCells = buildWater();
+    buildTwinGround();
     buildMask();
     buildCountPill(); // last: +N covers ring + pin + schematic + contour labels
     // Ring-clip + periphery fade: every overlay EXCEPT the ring itself, the
@@ -655,7 +749,7 @@ function edgeFade(x, z) {
     // read as a coverage boundary).
     // Sprites (pills/labels) stay unclipped by design.
     group.traverse((o) => {
-      if (!o.material || o.isSprite || o.name === 'ring2-ring' || o.name === 'ring2-mask') return;
+      if (!o.material || o.isSprite || o.name === 'ring2-ring' || o.name === 'ring2-mask' || o.name === 'ring2-ground') return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       for (const m of mats) {
         if (!m || m.userData.ringClipped) continue;
@@ -756,7 +850,7 @@ function edgeFade(x, z) {
 
   return {
     renderer, scene, camera, controls, canvas,
-    rebuild, setEmphasis, update, getPose, dispose, onResize,
-    getInfo: () => ({ ...(lastInfo ?? {}), status: getStatus(), pills: getPillState() }),
+    rebuild, setEmphasis, setTakeover, update, getPose, dispose, onResize,
+    getInfo: () => ({ ...(lastInfo ?? {}), takeoverU: lastU, status: getStatus(), pills: getPillState() }),
   };
 }

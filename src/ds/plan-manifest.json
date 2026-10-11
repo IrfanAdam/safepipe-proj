@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-11T09:42:19.709Z",
+  "generated": "2026-10-11T12:10:26.149Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -13,6 +13,42 @@
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md"
   ],
   "commits": [
+    {
+      "sha": "0c4c968",
+      "full": "0c4c9680143cdfc19f5fc26a756ad31457687c33",
+      "date": "2026-10-11",
+      "time": "17:40",
+      "subject": "fix(ring2): context-loss remount recovery, six-token telemetry, twin takeover endpoints [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "4a82665",
+      "full": "4a82665370f3dceb7c03ddef553a134955474a06",
+      "date": "2026-10-11",
+      "time": "17:15",
+      "subject": "fix(ring2): gate map mount on sized container, re-arm remount budget, clear stale refs [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "8ed3e56",
+      "full": "8ed3e5602da67509f390ffb86ba1e53d6a6a219a",
+      "date": "2026-10-11",
+      "time": "15:39",
+      "subject": "fix(ops3d-v1): seed + follow map view from live twin pose pre-load — kills outer-disc flash on fast SAT slide (Safari)",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "befed0a",
+      "full": "befed0a0c84d26446bde5ad4ee86fb67f1cbcb98",
+      "date": "2026-10-11",
+      "time": "15:13",
+      "subject": "fix(ring2): fresh-container last resort + STUCK0 forensics for real-Safari 0x0 [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
     {
       "sha": "ca7f010",
       "full": "ca7f010b25f2c91253343519733cbd9764d188a0",
@@ -2093,7 +2129,5 @@
       "anchor": null
     }
   ],
-  "wip": [
-    "src/ring2/main.js"
-  ]
+  "wip": []
 }

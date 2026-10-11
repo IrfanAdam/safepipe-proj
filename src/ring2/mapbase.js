@@ -14,6 +14,7 @@ import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { SANGACHAL, VEX, worldToGeo } from './site.js';
 import { waitForSized } from './sizeGate.js';
+import { ctxLive, ctxLost, ctxRestored, noteTileErr, noteTileOk } from './ctxmon.js';
 
 /* Keyless tile endpoints. Imagery has TWO hosts for the same Esri
  * service: some Safari setups (content blockers) kill tile subresources on
@@ -240,8 +241,14 @@ function applyGroundFlag(m) {
   }
 }
 
-/* Mount the 3D map into el. Resolves { map } once loaded AND terrain
- * asserted on. Rejects (never half-mounts) if terrain cannot be set. */
+/* Mount the 3D map into el. Resolves { map, loadedClean, dispose, isCtxLost }
+ * once the soft load race settles. Rejects (never half-mounts) when the
+ * container never sizes (a 0x0-born instance can never heal on real
+ * Safari) or when terrain cannot be engaged.
+ * opts.ctxmon: shared ctxmon registry (live-count + loss stamps + tile
+ * counters). opts.onCtxLost('map') / opts.onCtxRestored('map'): recovery
+ * callbacks owned by main.js (full clean re-mount on restore — a resize
+ * through a lost context bricks the instance to ratio 0 permanently). */
 export async function mountMapBase(el, opts = {}) {
   const {
     zoom = 11,
@@ -249,15 +256,21 @@ export async function mountMapBase(el, opts = {}) {
     bearing = 0,
     exaggeration = VEX,
     interactive = true,
+    ctxmon = null,
+    onCtxLost = null,
+    onCtxRestored = null,
   } = opts;
   if (!el) throw new Error('mountMapBase: container element required');
 
   // Birth-defect guard (Safari-black): MapLibre snapshots container size
   // AT CONSTRUCTION — a map born into a hidden (0x0) gallery iframe can
   // keep a zero canvas past every resize() on real Safari. Wait briefly
-  // for a sized box before building; the caller (main.js) additionally
-  // defers the mount call itself until visible, so this is the inner net.
-  await waitForSized(() => el, { timeoutMs: 8000 });
+  // for a sized box before building; REFUSE to construct into 0x0 (the
+  // old code ignored this result and built the wedged instance anyway).
+  // The caller (main.js) additionally defers the mount call itself until
+  // visible, so this is the inner net.
+  const sizedOk = await waitForSized(() => el, { timeoutMs: 8000 });
+  if (!sizedOk) throw new Error('mountMapBase: container never sized (0x0) — refusing 0x0-born instance');
 
   const map = new maplibregl.Map({
     container: el,
@@ -295,20 +308,68 @@ export async function mountMapBase(el, opts = {}) {
   };
   applySky();
 
+  // Live-context census: up at construction, down exactly once at remove
+  // (see the remove wrap below). Rising `live` across screenshots proves
+  // remount churn is exhausting the GPU (P1/P4 family).
+  let counted = false;
+  try {
+    if (ctxmon) {
+      ctxLive(ctxmon, +1);
+      counted = true;
+    }
+  } catch { /* census never breaks the mount */ }
   // Capture every source/tile error from the start (surfaced in status).
   map.on('error', (e) => {
     const msg = e?.error?.message ?? e?.error ?? e;
+    try {
+      if (ctxmon) noteTileErr(ctxmon, String(msg));
+    } catch { /* census never breaks the handler */ }
     window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), String(msg)].slice(-5);
+  });
+  // Tile-success census: raster/vector tile data events carrying a tile and
+  // no error. Telemetry-grade (extends the error ring into tile:err/ok).
+  try {
+    map.on('data', (e) => {
+      try {
+        if (ctxmon && e && e.tile && !e.error) noteTileOk(ctxmon);
+      } catch { /* census never breaks the handler */ }
+    });
+  } catch { /* older maplibre without data tiles — error ring still covers */ }
+  // Per-instance context-loss flag. A resize() issued between loss and
+  // restore runs the L3 brick (_maxCanvasSize=[0,0] -> pixel-ratio 0) and
+  // permanently condemns the instance, so ALL resize kicks for a lost
+  // instance are suppressed (needsKick/kickResize below) and main.js does
+  // a FULL clean re-mount on restore instead of a resize.
+  let ctxLostFlag = false;
+  const mapCanvas = map.getCanvas?.();
+  mapCanvas?.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    ctxLostFlag = true;
+    try {
+      if (ctxmon) ctxLost(ctxmon, 'map');
+    } catch { /* stamp is best-effort */ }
+    window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), 'map WebGL context LOST (GPU)'].slice(-5);
+    try {
+      onCtxLost?.('map');
+    } catch { /* recovery is main.js-owned */ }
+  });
+  mapCanvas?.addEventListener('webglcontextrestored', () => {
+    try {
+      if (ctxmon) ctxRestored(ctxmon, 'map');
+    } catch { /* stamp is best-effort */ }
+    // The instance stays condemned (a resize already ran or ratio is 0):
+    // recovery is a full clean re-mount, never a resize of this canvas.
+    try {
+      onCtxRestored?.('map');
+    } catch { /* recovery is main.js-owned */ }
   });
   // Resolve on load ONLY. Tile/source errors are per-tile and must never
   // abort the mount: reject-on-first-error used to kill the whole map on a
   // single 404, leaving the SAT side permanently empty with the twin fading
   // over nothing. A hung style is still caught by the caller's timeout.
   // (No await on 'load' here — the soft race below is the only gate.)
-  map.getCanvas()?.addEventListener('webglcontextlost', (e) => {
-    e.preventDefault();
-    window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), 'map WebGL context LOST (GPU)'].slice(-5);
-  });
+  // NOTE: webglcontextlost/restored are wired once above (with the loss
+  // flag + census + recovery callbacks) — no second listener here.
   // Resolve on load — but NEVER gate the mount on it. A hung tile host
   // holds 'load' forever (proven by fault injection: one hanging host =
   // permanent map:- with the twin fading over nothing). Soft 8 s resolve
@@ -340,8 +401,20 @@ export async function mountMapBase(el, opts = {}) {
   // keeps its construction size until resize(). Event-timing races (tab
   // shown before listeners attach) beat one-shot kicks, so self-heal:
   // poll until the canvas is non-zero, plus every visibility/window signal.
-  const kickResize = () => { try { map.resize(); } catch {} };
+  // A LOST instance never kicks: resize() through a lost context is the L3
+  // brick (ratio 0, permanent) — recovery is a full re-mount via main.js.
+  // A DISPOSED (remounted-away) instance never kicks either (P9 leak: dead
+  // maps kept healTimers, ROs and window listeners calling resize() on a
+  // dead map while the status blamed the live one).
+  let disposed = false;
+  const kickResize = () => {
+    if (disposed || ctxLostFlag) return;
+    try {
+      map.resize();
+    } catch {}
+  };
   const needsKick = () => {
+    if (disposed || ctxLostFlag) return false;
     try {
       const c = map.getCanvas?.();
       if (!c) return true;
@@ -372,14 +445,55 @@ export async function mountMapBase(el, opts = {}) {
     } catch {}
     if ((healTicks > 60 && sawNonZero) || healTicks >= 240) clearInterval(healTimer);
   }, 500);
+  // Per-mount listeners with named refs so dispose() below can remove
+  // every one of them (P9: anonymous window listeners used to outlive the
+  // instance and resize() dead maps).
+  let ro = null;
+  const onRO = () => {
+    try {
+      if (needsKick()) kickResize();
+    } catch {}
+  };
   try {
-    const ro = new ResizeObserver(() => { try { if (needsKick()) kickResize(); } catch {} });
+    ro = new ResizeObserver(onRO);
     ro.observe(el);
-  } catch { window.addEventListener('resize', kickResize); }
+  } catch {
+    ro = null;
+    window.addEventListener('resize', kickResize);
+  }
   window.addEventListener('resize', kickResize);
   window.addEventListener('orientationchange', kickResize);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) kickResize(); });
-  try { window.__ring2resizeMap = kickResize; } catch {}
+  const onVis = () => {
+    if (!document.hidden) kickResize();
+  };
+  document.addEventListener('visibilitychange', onVis);
+  try {
+    window.__ring2resizeMap = kickResize;
+  } catch {}
+  // Per-mount dispose: stops the heal timer, disconnects the RO, removes
+  // every window/document listener owned by THIS instance. Called from
+  // remount/fresh-container BEFORE remove() so a dead map never kicks
+  // again. The live census drops in the remove wrap (remove is the true
+  // end of the GL context).
+  function disposeInst() {
+    if (disposed) return;
+    disposed = true;
+    try {
+      clearInterval(healTimer);
+    } catch {}
+    try {
+      ro?.disconnect?.();
+    } catch {}
+    try {
+      window.removeEventListener('resize', kickResize);
+    } catch {}
+    try {
+      window.removeEventListener('orientationchange', kickResize);
+    } catch {}
+    try {
+      document.removeEventListener('visibilitychange', onVis);
+    } catch {}
+  }
   // Stale-ref clear: main.js tears instances down via remove() on remount.
   // Null the singleton when THIS instance is removed so ground-flag writes
   // can't hit a dead map while the status line blames the live one.
@@ -389,6 +503,13 @@ export async function mountMapBase(el, opts = {}) {
       try {
         origRemove();
       } finally {
+        disposeInst();
+        if (counted) {
+          counted = false;
+          try {
+            if (ctxmon) ctxLive(ctxmon, -1);
+          } catch { /* census never breaks teardown */ }
+        }
         releaseMap(map);
         try {
           if (window.__ring2map === map) window.__ring2map = null;
@@ -402,5 +523,5 @@ export async function mountMapBase(el, opts = {}) {
   }
   _map = map;
   window.__ring2map = map;
-  return { map, loadedClean };
+  return { map, loadedClean, dispose: disposeInst, isCtxLost: () => ctxLostFlag };
 }

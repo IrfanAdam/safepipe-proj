@@ -18,6 +18,22 @@ import { applyTwinToMap, assertTerrainVex, pitchForPose } from './sync.js';
 import { createOverlayTwin } from './overlays.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
+import {
+  createCtxMon,
+  ctxLive,
+  ctxLost,
+  ctxRestored,
+  mapLostPending,
+  noteMapAdopted,
+  killGL,
+  pxToken,
+  ctxToken,
+  cxlToken,
+  tileToken,
+  ldTerrToken,
+  effToken,
+  CTX_DECODE,
+} from './ctxmon.js';
 
 const el = document.getElementById('ring2-dev');
 if (!el) throw new Error('ring2 harness: #ring2-dev missing');
@@ -41,7 +57,14 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = 60;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'b3220cc';
+const BUILD_ID = 'a5db08e';
+// Shared GL-context + tile telemetry registry (see ctxmon.js: one
+// real-Safari screenshot of the six tokens discriminates every hypothesis
+// in the defect-hunt report).
+const mon = createCtxMon();
+try {
+  window.__ring2ctx = mon;
+} catch { /* diag ref only */ }
 let map = null;
 let twin = null;
 let mixCtl = null;
@@ -68,6 +91,19 @@ let freshContainerTried = false;
 // paintStatus is module scope, so boot hands it a callable here.
 let requestRemount = null;
 let requestFreshContainer = null;
+// Per-adoption teardown handles from mountMapBase: dispose() stops the
+// instance's heal timer + RO + window listeners (P9), isCtxLost reports a
+// lost GL context (skip loseContext churn on teardown when already lost).
+let mapTeardown = null;
+// Slow-lane retry (P4 terminal-STUCK0 fix): after the 2+1 budget is spent,
+// keep one retry per 30 s while the canvas is stuck or the context is lost
+// in a sized container. Alternates remount / fresh-div; counted in-status.
+let slowRemounts = 0;
+let lastSlowRemount = 0;
+const SLOW_RETRY_MS = 30000;
+// Twin re-size tracker (P6): container dims at the last twin.onResize() —
+// a changed box re-kicks the twin from the status tick (cheap, idempotent).
+let lastTwinWH = '';
 // Hidden->sized budget re-arm: a gallery iframe flickering hidden again
 // burns the old budget on a 0x0-born instance. When the container comes
 // back sized after having been hidden, the escalation counters reset so a
@@ -118,6 +154,68 @@ function canvasDims() {
   return `${mapSize} ${twinSize}`;
 }
 
+/* Terrain state for the ld/terr token: off (no terrain), vex (live at the
+ * shared VEX), mis (on but wrong exaggeration — sync would float/bury). */
+function terrainState() {
+  try {
+    if (!map || typeof map.getTerrain !== 'function') return 'off';
+    const t = map.getTerrain();
+    if (!t) return 'off';
+    return t.exaggeration === VEX ? 'vex' : 'mis';
+  } catch {
+    return 'off';
+  }
+}
+
+function mapLoaded() {
+  try {
+    return !!map?.loaded?.();
+  } catch {
+    return false;
+  }
+}
+
+function mapPixelRatio() {
+  try {
+    const pr = map?.getPixelRatio?.();
+    return typeof pr === 'number' && Number.isFinite(pr) ? pr : null;
+  } catch {
+    return null;
+  }
+}
+
+/* The six ship-first telemetry tokens (ctxmon.js): one screenshot
+ * discriminates every defect-hunt hypothesis. All values already exist on
+ * live handles — status text only, no layout/DOM/network changes. */
+function telemetryTokens() {
+  let cw = 0, ch = 0;
+  try {
+    const c = map?.getCanvas?.();
+    if (c) {
+      cw = c.width | 0;
+      ch = c.height | 0;
+    }
+  } catch { /* pre-mount */ }
+  const ew = mapDiv?.clientWidth | 0, eh = mapDiv?.clientHeight | 0;
+  let dpr = 1;
+  try {
+    dpr = window.devicePixelRatio || 1;
+  } catch { /* ssr-proof */ }
+  const stored = mixCtl?.getMix?.() ?? loadMix(50);
+  let eff = stored;
+  try {
+    eff = mixCtl?.getEffMix?.() ?? stored;
+  } catch { /* pre-mount floor unknown */ }
+  return (
+    ` · ${pxToken({ cw, ch, ew, eh, dpr, pr: mapPixelRatio() })}` +
+    ` · ${ctxToken(mon)}` +
+    ` · ${cxlToken(mon)}` +
+    ` · ${tileToken(mon)}` +
+    ` · ${ldTerrToken({ loaded: mapLoaded(), terrain: terrainState() })}` +
+    ` · mix:${stored} ${effToken(eff)}`
+  );
+}
+
 function paintStatus() {
   if (!statusDiv) return;
   // Hidden->sized re-arm runs first: a container that was hidden and is
@@ -141,6 +239,39 @@ function paintStatus() {
   } catch {
     /* re-arm is best-effort */
   }
+  // Escalation ladder (shared by the zero-canvas and context-loss paths):
+  // a wedged instance is torn down and rebuilt into the live container.
+  // Budget: 2 remounts, then 1 fresh-div; past that the slow lane keeps
+  // one retry per 30 s while stuck (P4 terminal-STUCK0 fix). A lost map
+  // (P1/P2) escalates on restore or 5 s after loss — never via resize()
+  // (that is the L3 brick). Twin size drift re-kicks twin.onResize.
+  function escalate(reason) {
+    if (remounting) return;
+    const [vw, vh] = containerWH();
+    if (!isSizedWH(vw, vh)) {
+      mapZeroTicks = 0;
+      return; // hidden again — wait for visibility
+    }
+    if (typeof requestRemount !== 'function') return;
+    if (remounts < 2) {
+      requestRemount(reason);
+    } else if (typeof requestFreshContainer === 'function' && !freshContainerTried) {
+      requestFreshContainer(reason);
+    } else {
+      const now = Date.now();
+      if (now - lastSlowRemount < SLOW_RETRY_MS) return;
+      lastSlowRemount = now;
+      slowRemounts++;
+      // Alternate: even slow ticks remount into the live div, odd slow
+      // ticks swap a fresh div (the old div itself may hold stale layout).
+      if (slowRemounts % 2 === 0) {
+        remounts = 1;
+        requestRemount(reason ? `${reason}+slow` : 'slow');
+      } else {
+        requestFreshContainer(reason ? `${reason}+slow` : 'slow', true);
+      }
+    }
+  }
   // Self-heal: map canvas 0x0 while its container has size (hidden-at-mount
   // gallery iframe). Cheap, runs on the existing 500ms tick; twin path needs
   // no help. Without this, mix:0 (pure SAT) is a permanent black hole.
@@ -148,13 +279,20 @@ function paintStatus() {
   // container and the canvas is STILL zero (observed live on real Safari —
   // resize() a permanent no-op there, fresh mounts also 0x0), the map
   // instance itself is wedged — tear it down and construct a fresh one into
-  // the now-sized container. Capped at 2 remounts. Past that, the poison may
-  // be the DIV itself (it lived through display:none; Safari can hold a stale
-  // layout object on it) — swap in a brand-new container (1 shot) and mount
-  // there. Counters ride in the status bar so a screenshot always diagnoses.
+  // the now-sized container. A ratio-0 canvas (pr:0) or a context lost
+  // without restore is condemned on sight: no resize can ever undo those.
   try {
+    const lostPending = mapLostPending(mon);
     const c = map?.getCanvas?.();
-    if (c && ((c.width | 0) === 0 || (c.height | 0) === 0)) {
+    const pr = mapPixelRatio();
+    if (lostPending && map) {
+      // P1/P2: loss with healthy dims never tripped the zero ladder (the
+      // canvas keeps its WxH while the style is dead). Remount now, or 5 s
+      // after loss at the latest — restore fires a remount on its own tick.
+      const ageMs = Date.now() - mon.mapLostAt;
+      if (ageMs > 5000) escalate('ctxlost');
+      else mapZeroTicks = 0;
+    } else if (c && ((c.width | 0) === 0 || (c.height | 0) === 0)) {
       const w = mapDiv?.clientWidth | 0, h = mapDiv?.clientHeight | 0;
       if (w > 0 && h > 0 && typeof map.resize === 'function') {
         mapResizes++;
@@ -164,22 +302,38 @@ function paintStatus() {
         const c2 = map.getCanvas?.();
         if (c2 && ((c2.width | 0) === 0 || (c2.height | 0) === 0)) {
           mapZeroTicks++;
-          if (mapZeroTicks >= 10 && !remounting && typeof requestRemount === 'function') {
-            if (remounts < 2) requestRemount();
-            else if (!freshContainerTried) requestFreshContainer();
-          }
+          if (mapZeroTicks >= 10) escalate('stuck0');
         } else mapZeroTicks = 0;
       }
+    } else if (pr === 0 && map) {
+      // Ratio-0 brick with non-zero canvas: _maxCanvasSize locked [0,0],
+      // every resize recomputes ratio 0. Only a re-mount heals it.
+      mapZeroTicks = 10;
+      escalate('ratio0');
     } else mapZeroTicks = 0;
   } catch { /* heal is best-effort */ }
+  // Twin re-size on drift (P6): gallery show / iframe settle / orientation
+  // without a window resize leaves renderer.setSize stale (1x1 blur, wrong
+  // aspect). Cheap + idempotent — fire only when the box actually changed.
+  try {
+    const tw = twinDiv?.clientWidth | 0, th = twinDiv?.clientHeight | 0;
+    if (tw > 0 && th > 0 && twin && typeof twin.onResize === 'function') {
+      const key = `${tw}x${th}`;
+      if (lastTwinWH && lastTwinWH !== key) {
+        try {
+          twin.onResize();
+        } catch { /* twin drives on without us */ }
+      }
+      lastTwinWH = key;
+    }
+  } catch { /* twin kick is best-effort */ }
   const s = getStatus();
-  const mix = mixCtl?.getMix() ?? loadMix(50);
   const info = twin?.getInfo?.();
   const mapErr = globalThis.__ring2mapErrors?.at(-1);
   statusDiv.textContent =
     `RING-2 [${BUILD_ID}] · dem:${s.stage}/${s.source} tiles:${s.tilesLoaded}/${s.tilesTotal}` +
     ` · ${canvasDims()}` +
-    ` · mix:${mix}` +
+    telemetryTokens() +
     (info && info.min !== undefined
       ? ` · relief:${(info.max - info.min).toFixed(0)}m idx:${info.indexCount ?? 0} src:${info.source ?? '?'}`
       : '') +
@@ -188,10 +342,15 @@ function paintStatus() {
     (mapFatal ? ` · MAPFAILED:${mapFatal}` : '') +
     (waitingViewport ? ' · map:waiting-viewport' : '') +
     (rearmed ? ` · rearm:${rearmed}` : '') +
+    (slowRemounts ? ` · slow:${slowRemounts}` : '') +
     (isMapStuckZero() ? ` · STUCK0 rs:${mapResizes} rm:${remounts}${freshContainerTried ? ' newdiv:1' : ''}${mapResizeErr ? ` rserr:${mapResizeErr}` : ''}` : '') +
+    (mapLostPending(mon) ? ' · CTXLOST' : '') +
     (twinFrames >= 0
       ? ` · frames:${twinFrames}${twinErr ? ` TWINERR:${String(twinErr).slice(0, 120)}` : ''}`
       : '');
+  try {
+    statusDiv.title = CTX_DECODE;
+  } catch { /* tooltip never breaks paint */ }
 }
 
 async function boot() {
@@ -206,12 +365,41 @@ async function boot() {
 
   twin = createOverlayTwin(twinDiv, { fovDeg: FOV_DEG, startRange: 26000 });
   statusDiv.textContent = 'RING-2 · boot: twin ✓ · map: loading…';
+  // Twin GL census + context wiring: the twin canvas is the second context
+  // in the budget. Lost → stamp (cxl:twin:lost); restored → re-size into
+  // the live box (three re-inits its own GL state on restore; the size may
+  // have drifted while the canvas was dead). No twin re-mount: three
+  // self-heals, and rebuilding would churn a third context for nothing.
+  try {
+    ctxLive(mon, +1);
+  } catch { /* census never breaks boot */ }
+  try {
+    const twinCanvas = twin?.canvas;
+    twinCanvas?.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      try {
+        ctxLost(mon, 'twin');
+      } catch { /* stamp is best-effort */ }
+      window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), 'twin WebGL context LOST (GPU)'].slice(-5);
+      paintStatus();
+    });
+    twinCanvas?.addEventListener('webglcontextrestored', () => {
+      try {
+        ctxRestored(mon, 'twin');
+      } catch { /* stamp is best-effort */ }
+      try {
+        twin?.onResize?.();
+      } catch { /* twin drives on without us */ }
+      paintStatus();
+    });
+  } catch { /* twin wiring never breaks boot */ }
 
   mixCtl = mountMixBar(barDiv, {
     getTwinCanvas: () => twinDiv.querySelector('[data-ring2="twin"]'),
     getTwinContainer: () => twinDiv,
     getMap: () => map,
     applyEmphasis: (t) => twin.setEmphasis(t),
+    setTakeover: (u) => twin.setTakeover(u),
     getPitchDeg: () => 0,
   });
   paintStatus();
@@ -241,17 +429,66 @@ async function boot() {
   // black twin until the 30s timeout). The map resolves in the background
   // and sync engages when it lands (guarded per-frame).
   const MAP_TIMEOUT_MS = 30000;
+  // Map-side context recovery (P1/P2): on loss the instance is condemned
+  // (kicks already suppressed in mapbase); on restore do a FULL clean
+  // re-mount — never a resize, never leave a ratio-0 canvas in place.
+  function onMapCtxLost() {
+    mapZeroTicks = 0;
+    paintStatus();
+  }
+  function onMapCtxRestored() {
+    try {
+      // Stale-restore guard: a dead (remounted-away) canvas can fire restore
+      // AFTER its replacement adopted. Only the current instance's restore
+      // condemns — otherwise this would remount a healthy new map.
+      let curLost = false;
+      try {
+        curLost = typeof mapTeardown?.isCtxLost === 'function' ? !!mapTeardown.isCtxLost() : !!map;
+      } catch { /* assume current */ }
+      if (!curLost) {
+        paintStatus();
+        return;
+      }
+      // The restored canvas keeps whatever ratio-0 state the loss left:
+      // condemn it and rebuild into the live container.
+      mapZeroTicks = 10;
+      if (!remounting && typeof requestRemount === 'function') {
+        const [vw, vh] = containerWH();
+        if (isSizedWH(vw, vh)) {
+          if (remounts < 2) requestRemount('ctx-restored');
+          else if (!freshContainerTried && typeof requestFreshContainer === 'function') {
+            requestFreshContainer('ctx-restored');
+          }
+        }
+      }
+    } catch { /* recovery is best-effort; the 5 s lost-timeout covers */ }
+    paintStatus();
+  }
   function mapRace() {
     return Promise.race([
-      mountMapBase(mapDiv, { zoom: 11, pitch: 0, bearing: 0 }),
+      mountMapBase(mapDiv, {
+        zoom: 11,
+        pitch: 0,
+        bearing: 0,
+        ctxmon: mon,
+        onCtxLost: onMapCtxLost,
+        onCtxRestored: onMapCtxRestored,
+      }),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error(`map mount timed out after ${MAP_TIMEOUT_MS / 1000}s (tiles/worker blocked?)`)), MAP_TIMEOUT_MS)),
     ]);
   }
-  function adoptMap(m, loadedClean, isRemount = false) {
+  function adoptMap(m, loadedClean, isRemount = false, teardown = null) {
     map = m;
     window.__ring2.map = m;
+    mapTeardown = teardown;
     adoptSeq++;
+    try {
+      noteMapAdopted(mon);
+    } catch { /* generation is best-effort */ }
+    // A successful adopt clears the sticky failure: MAPFAILED lingering
+    // past recovery (P4) made healthy screenshots read as dead.
+    mapFatal = null;
     // A remount leaves the previous instance's death rattle (e.g. a headless
     // GPU 'context LOST' from the torn-down canvas) in the error ring — prune
     // entries that belong to the old instance so the bar doesn't cry MAPERR
@@ -314,48 +551,60 @@ async function boot() {
   // Wedged-instance recovery: the old map was constructed into a 0x0
   // container and resize() can't unstick it. Tear down and construct fresh
   // into the live-sized container; adoptMap re-engages mix + terrain.
-  function remountMap() {
+  // Reuse-or-clean (D2 churn fix): exactly one loseContext on the condemned
+  // canvas — skipped when it is already lost — then per-mount dispose()
+  // (heal timer + RO + window listeners) and remove() BEFORE the new
+  // construction starts, so two maps never hold live contexts at once.
+  // The old double-getContext('webgl2' ?? 'webgl') pattern is gone: a
+  // single killGL() owns teardown.
+  function teardownMap(reason) {
+    const td = mapTeardown;
+    mapTeardown = null;
+    try {
+      td?.dispose?.();
+    } catch { /* already disposed */ }
+    try {
+      const oldCanvas = map?.getCanvas?.();
+      // Skip loseContext churn when the context is already lost — killing a
+      // dead context still costs a (possibly new) GL context on some GPUs.
+      let alreadyLost = false;
+      try {
+        alreadyLost = typeof td?.isCtxLost === 'function' ? !!td.isCtxLost() : false;
+      } catch { /* assume live */ }
+      killGL(oldCanvas, alreadyLost);
+      map?.remove?.();
+    } catch { /* already dead */ }
+    try {
+      releaseMap(map);
+    } catch { /* singleton already clear */ }
+    map = null;
+    window.__ring2.map = null;
+  }
+  function remountMap(reason = '') {
     if (remounting) return; // audit: manual double-call (diag hook) interleaved two mounts
     const cw = mapDiv?.clientWidth | 0, ch = mapDiv?.clientHeight | 0;
     if (cw === 0 || ch === 0) { mapZeroTicks = 0; return; } // hidden again — wait for visibility
     remounting = true;
     remounts++;
-    try {
-      // Free the old GL context BEFORE constructing the new map: remove()
-      // alone can leave the context alive until GC, briefly holding 3 live
-      // contexts (twin + old + new) — enough to tip small-GPU browsers into
-      // a context loss on the new map.
-      const oldCanvas = map?.getCanvas?.();
-      const gl = oldCanvas?.getContext?.('webgl2') ?? oldCanvas?.getContext?.('webgl');
-      try { gl?.getExtension?.('WEBGL_lose_context')?.loseContext(); } catch { /* already lost */ }
-      map?.remove?.();
-    } catch { /* already dead */ }
-    try { releaseMap(map); } catch { /* singleton already clear */ }
-    map = null;
-    window.__ring2.map = null;
+    teardownMap(reason);
     mapRace().then(
-      ({ map: m, loadedClean }) => { adoptMap(m, loadedClean, true); remounting = false; mapZeroTicks = 0; },
+      ({ map: m, loadedClean, dispose, isCtxLost }) => { adoptMap(m, loadedClean, true, { dispose, isCtxLost }); remounting = false; mapZeroTicks = 0; },
       (err) => { failMap(err); remounting = false; mapZeroTicks = 0; },
     );
   }
   try { window.__ring2remountMap = () => remountMap(); } catch { /* diag hook */ }
-  requestRemount = () => remountMap();
+  requestRemount = (reason) => remountMap(reason);
   // Last resort (1 shot): the DIV itself may carry a stale layout object in
   // Safari after living through display:none — no remount into it will ever
   // size. Swap in a brand-new div (same id/class/style) and mount there.
-  function freshContainer() {
-    if (remounting || freshContainerTried) return;
+  // force=true re-arms for the slow lane (one fresh div per 60 s while
+  // stuck — the old one-shot-forever was the P4 terminal state).
+  function freshContainer(reason = '', force = false) {
+    if (remounting) return;
+    if (freshContainerTried && !force) return;
     freshContainerTried = true;
     remounting = true;
-    try {
-      const oldCanvas = map?.getCanvas?.();
-      const gl = oldCanvas?.getContext?.('webgl2') ?? oldCanvas?.getContext?.('webgl');
-      try { gl?.getExtension?.('WEBGL_lose_context')?.loseContext(); } catch { /* already lost */ }
-      map?.remove?.();
-    } catch { /* already dead */ }
-    try { releaseMap(map); } catch { /* singleton already clear */ }
-    map = null;
-    window.__ring2.map = null;
+    teardownMap(reason || 'freshdiv');
     try {
       const fresh = document.createElement('div');
       fresh.id = mapDiv.id || '';
@@ -371,12 +620,12 @@ async function boot() {
       return;
     }
     mapRace().then(
-      ({ map: m, loadedClean }) => { adoptMap(m, loadedClean, true); remounting = false; mapZeroTicks = 0; },
+      ({ map: m, loadedClean, dispose, isCtxLost }) => { adoptMap(m, loadedClean, true, { dispose, isCtxLost }); remounting = false; mapZeroTicks = 0; },
       (err) => { failMap(err); remounting = false; mapZeroTicks = 0; },
     );
   }
   try { window.__ring2freshContainer = () => freshContainer(); } catch { /* diag hook */ }
-  requestFreshContainer = () => freshContainer();
+  requestFreshContainer = (reason, force) => freshContainer(reason, force);
   // First-mount gate (Safari-black birth defect): don't construct the map
   // into a 0x0 box. Defer until the container is visible with size; the
   // status line says waiting-viewport meanwhile and the twin loop below
@@ -394,9 +643,31 @@ async function boot() {
     }
   }
   mapRace().then(
-    ({ map: m, loadedClean }) => adoptMap(m, loadedClean),
+    ({ map: m, loadedClean, dispose, isCtxLost }) => adoptMap(m, loadedClean, false, { dispose, isCtxLost }),
     (err) => failMap(err),
   );
+  // External kick (gallery tab-show, same pattern as v1 resizeOps3d): the
+  // gallery calls __ring2kick when the Ring-2 panel appears — twin re-size
+  // + map kick + immediate status repaint. Covers the display:none→block
+  // path where WebKit drops internal ResizeObserver notifications.
+  try {
+    window.__ring2kick = () => {
+      try {
+        twin?.onResize?.();
+      } catch { /* twin drives on without us */ }
+      try {
+        window.__ring2resizeMap?.();
+      } catch { /* pre-mount */ }
+      try {
+        paintStatus();
+      } catch { /* status never breaks the kick */ }
+    };
+    window.__ring2twinResize = () => {
+      try {
+        twin?.onResize?.();
+      } catch { /* pre-mount */ }
+    };
+  } catch { /* diag hooks only */ }
 
   // Frame heartbeat: a silently-throwing update() renders as an
   // unexplained black twin. Count frames, keep the first error, and paint
