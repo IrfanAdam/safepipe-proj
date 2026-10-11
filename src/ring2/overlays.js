@@ -596,56 +596,23 @@ function edgeFade(x, z) {
    * (it IS the clipper). depthWrite off — nothing in this scene writes
    * depth, so paint order alone composites mask-first, overlays-over. */
   function buildMask() {
-    const half = MASK_SIZE_M / 2;
-    const cell = MASK_SIZE_M / MASK_SEG;
-    const vn = MASK_SEG + 1;
-    const pos = new Float32Array(vn * vn * 3);
-    for (let i = 0; i < vn; i++) {
-      for (let j = 0; j < vn; j++) {
-        const x = -half + j * cell;
-        const z = -half + i * cell;
-        const k = i * vn + j;
-        pos[k * 3] = x;
-        pos[k * 3 + 1] = sampleH(x, z) * VEX + MASK_LIFT_M;
-        pos[k * 3 + 2] = z;
-      }
+    // Ring with a REAL hole (geometry-level clip, zero shader injection).
+    // The old 300 km plane + onBeforeCompile fragment-discard misfired on
+    // real-Safari GPUs (whole viewport black, v1 unaffected); a true ring
+    // cannot over-discard, and there is no injected GLSL to miscompile.
+    const THETA = 256, PHI = 48; // ~2.9 km radial cells, same drape as before
+    const g = track(new THREE.RingGeometry(RING_RADIUS_M, MASK_SIZE_M / 2, THETA, PHI));
+    g.rotateX(-Math.PI / 2);
+    const p = g.getAttribute('position');
+    for (let i = 0; i < p.count; i++) {
+      p.setY(i, sampleH(p.getX(i), p.getZ(i)) * VEX + MASK_LIFT_M);
     }
-    const idx = [];
-    for (let i = 0; i < MASK_SEG; i++) {
-      for (let j = 0; j < MASK_SEG; j++) {
-        const k00 = i * vn + j;
-        const k10 = k00 + 1;
-        const k01 = k00 + vn;
-        const k11 = k01 + 1;
-        idx.push(k00, k01, k10, k10, k01, k11);
-      }
-    }
-    const g = track(new THREE.BufferGeometry());
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setIndex(idx);
+    p.needsUpdate = true;
+    g.computeVertexNormals();
     const m = track(new THREE.MeshBasicMaterial({
       color: MASK_COL,
       depthWrite: false, side: THREE.DoubleSide,
     }));
-    m.onBeforeCompile = (sh) => {
-      sh.uniforms.uMaskR = { value: RING_RADIUS_M };
-      sh.vertexShader =
-        'varying vec3 vMaskW;\n' +
-        sh.vertexShader.replace(
-          '#include <begin_vertex>',
-          '#include <begin_vertex>\n vMaskW = (modelMatrix * vec4(position, 1.0)).xyz;',
-        );
-      sh.fragmentShader =
-        'varying vec3 vMaskW;\nuniform float uMaskR;\n' +
-        sh.fragmentShader.replace(
-          // NOTE: anchored on opaque_fragment (end of main), NOT
-          // clipping_planes_fragment — diffuseColor is only declared
-          // mid-main, so an early inject would not compile.
-          '#include <opaque_fragment>',
-          '{ float rr = length(vMaskW.xz); if (rr < uMaskR) discard; }\n#include <opaque_fragment>',
-        );
-    };
-    m.customProgramCacheKey = () => 'ring2-maskclip';
     const mesh = new THREE.Mesh(g, m);
     mesh.name = 'ring2-mask';
     mesh.renderOrder = -10;
