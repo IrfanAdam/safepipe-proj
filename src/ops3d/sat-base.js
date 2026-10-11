@@ -156,6 +156,33 @@ export function twinViewToMap(camPos, target, view = {}) {
 // existing HUD/sync import keeps working with zero edits.
 export const twinViewToMapbox = twinViewToMap;
 
+// Construction-seed view for the MapLibre map (Safari-flash fix): the map
+// used to be born at a hardcoded zoom-13 top-down view and syncFromTwin
+// refused to touch it until 'load' — a fast SAT drag during a slow load
+// revealed that stale seed, where the 20 km lens hole dwarfs the viewport
+// and photo reads full-bleed outside the ring until load snaps it back.
+// Seeding (and following) from the live twin pose keeps every pre-load
+// frame in the disc view, so there is no stale view to flash. Pure +
+// unit-tested; falls back to the historic static seed without a pose.
+export function initialMapView({ camPos = null, target = null, heightPx = 0, fovDeg = 0, site = SITE } = {}) {
+  const ext = Number(site?.extentKm) > 0 ? Number(site.extentKm) : 44;
+  const fallback = () => ({
+    center: [Number(site?.lon) || 0, Number(site?.lat) || 0],
+    zoom: 13 + Math.log2(44 / ext),
+    bearing: 0,
+    pitch: 0,
+  });
+  try {
+    if (!camPos || !target) return fallback();
+    const v = twinViewToMap(camPos, target, { heightPx, fovDeg, site });
+    if (!Number.isFinite(v.zoom) || !Number.isFinite(v.bearing) || !Number.isFinite(v.pitch)) return fallback();
+    if (!Number.isFinite(v.center?.lat) || !Number.isFinite(v.center?.lon)) return fallback();
+    return { center: [v.center.lon, v.center.lat], zoom: v.zoom, bearing: v.bearing, pitch: v.pitch };
+  } catch {
+    return fallback();
+  }
+}
+
 // — Circular satellite monitor (TOP scope overlay). —
 // Clips the satellite layer to the mapped-circle disc (r = 20 km, matches
 // terrain.js / gridfloor.js) as projected through the live twin camera, so
@@ -746,6 +773,36 @@ export function initSatBase(container, opts = {}) {
   } catch {
     /* timer is cosmetic */
   }
+  // Seed view from the LIVE twin pose (Safari-flash fix): the map's first
+  // frames must already read as the disc view — a hardcoded seed plus a
+  // load-gated follow used to show photo full-bleed outside the ring on a
+  // fast SAT drag during a slow load. Best-effort: any failure keeps the
+  // historic static seed. Defined before the async mount so both the
+  // constructor seed and the pre-load follow share it.
+  const seedViewFromTwin = () => {
+    try {
+      const twin = getTwin?.();
+      const cam = twin?.debug?.camera;
+      let tgt = null;
+      try {
+        tgt = twin?.debug?.target?.();
+      } catch {
+        tgt = null;
+      }
+      if (cam?.position && tgt) {
+        let h = 0;
+        try {
+          h = container.clientHeight || 0;
+        } catch {
+          h = 0;
+        }
+        return initialMapView({ camPos: cam.position, target: tgt, heightPx: h, fovDeg: cam.fov, site });
+      }
+    } catch {
+      /* fall through to the static seed */
+    }
+    return initialMapView({ site });
+  };
   loadMaplibre().then((ml) => {
     // opts.map injects a ready map (unit tests): same wiring, no CDN.
     if (opts.map) {
@@ -758,15 +815,19 @@ export function initSatBase(container, opts = {}) {
         return;
       }
       try {
+        // Seeded from the live twin pose (see seedViewFromTwin): the first
+        // rendered frame already reads as the disc view, never the stale
+        // top-down seed. Extent-scaled fallback when no pose is readable:
+        // a 20 km window opens ~1.14 closer than the 44 km default.
+        // [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-1]
+        const seed = seedViewFromTwin();
         map = new ml.Map({
         container: base,
         style: satStyle(site),
-        center: [site.lon, site.lat],
-        // Extent-scaled initial zoom: a 20 km window opens ~1.14 closer than
-        // the 44 km Fort McMurray default (13 + log2(44/extent)); default
-        // extent keeps exactly 13.
-        // [plan:2026-10-10_150100-ops3d-sangachal-twin.md#phase-1]
-        zoom: 13 + Math.log2(44 / (Number(site?.extentKm) > 0 ? Number(site.extentKm) : 44)),
+        center: seed.center,
+        zoom: seed.zoom,
+        bearing: seed.bearing,
+        pitch: seed.pitch,
         attributionControl: { compact: true },
         interactive: false,
         fadeDuration: 0,
@@ -1221,7 +1282,15 @@ export function initSatBase(container, opts = {}) {
         /* ignore */
       }
     }
-    if (!map || !mapReady) return;
+    // Follow BEFORE load (Safari-flash fix): jumpTo pre-load only sets the
+    // transform, so the first tiles arrive in the twin-synced disc view
+    // instead of the construction seed. Gating the follow on mapReady used
+    // to leave the map on its stale seed until load — a fast SAT drag in
+    // that window revealed photo full-bleed outside the ring (the 20 km
+    // lens hole dwarfs the viewport at the seed zoom) until load snapped it
+    // back. moodMap + showcase stay load-gated; this block is pure math +
+    // jumpTo and safe on a loading map.
+    if (!map) return;
     const now =
       typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
     // Motion-adaptive throttle: a fixed 150 ms timer makes the map drag

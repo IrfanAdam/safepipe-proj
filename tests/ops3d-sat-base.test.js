@@ -755,3 +755,63 @@ describe('ops3d maplibre-terrain redo — real ground, ground seam, showcase', (
     api.dispose();
   });
 });
+
+describe('ops3d satellite base — pre-load view sync (no outer-disc flash)', () => {
+  const twinPose = () => ({
+    debug: {
+      camera: { position: { x: 0, y: 62, z: 0 }, fov: 40 },
+      target: () => ({ x: 0, y: 0, z: 0 }),
+    },
+  });
+
+  it('initialMapView: live pose seeds the twin-synced disc view, not zoom 13', () => {
+    const v = sat.initialMapView({
+      camPos: { x: 0, y: 62, z: 0 },
+      target: { x: 0, y: 0, z: 0 },
+      heightPx: 900,
+      fovDeg: 40,
+    });
+    assert.deepEqual(v.center, [-111.68, 57.03], 'site center');
+    assert.ok(v.zoom < 11 && v.zoom > 8.5, `synced disc zoom, got ${v.zoom}`);
+    assert.equal(v.bearing, 0);
+    assert.ok(Math.abs(v.pitch) < 1, `top-down pitch, got ${v.pitch}`);
+  });
+
+  it('initialMapView: no pose falls back to the historic static seed', () => {
+    const d = sat.initialMapView({});
+    assert.deepEqual(d.center, [-111.68, 57.03]);
+    assert.equal(d.zoom, 13, 'default extent keeps exactly 13');
+    assert.equal(d.bearing, 0);
+    assert.equal(d.pitch, 0);
+    const sang = sat.initialMapView({ site: { lat: 40.2, lon: 49.48, extentKm: 20 } });
+    assert.ok(Math.abs(sang.zoom - (13 + Math.log2(44 / 20))) < 1e-9, `extent-scaled zoom ${sang.zoom}`);
+    assert.deepEqual(sang.center, [49.48, 40.2]);
+    const garbage = sat.initialMapView({ camPos: { x: NaN, y: NaN, z: NaN }, target: { x: 0, y: 0, z: 0 } });
+    assert.equal(garbage.zoom, 13, 'non-finite pose → safe seed');
+    assert.deepEqual(garbage.center, [-111.68, 57.03]);
+  });
+
+  it('syncFromTwin follows BEFORE load: jumpTo lands the disc view pre-mapReady', async () => {
+    const jumps = [];
+    const map = withLensLayers(new FakeMap());
+    map.jumpTo = (v) => void jumps.push(v);
+    const container = new FakeEl('div');
+    container.clientWidth = 1280;
+    container.clientHeight = 800;
+    container._canvas = new FakeEl('canvas');
+    const api = sat.initSatBase(container, {
+      search: '?sat=0',
+      storage: memStore(),
+      getTwin: twinPose,
+      getLevel: () => 'network',
+      map,
+    });
+    await tick();
+    assert.equal(api.mapReady, false, 'load never fired — the stale-seed window');
+    api.syncFromTwin();
+    assert.ok(jumps.length >= 1, 'pre-load jumpTo happened');
+    assert.ok(jumps[0].zoom < 11, `disc-view zoom, got ${jumps[0].zoom}`);
+    assert.deepEqual(jumps[0].center, [-111.68, 57.03], 'site center, not the seed default drift');
+    api.dispose();
+  });
+});
