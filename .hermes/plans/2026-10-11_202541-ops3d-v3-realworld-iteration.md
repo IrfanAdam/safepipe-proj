@@ -50,6 +50,7 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 ### Task 1: port the v1 control panels ✓ done (`1b7ca0b`)
 **Objective:** Every v1 control exists in the Ring-2 HUD in the same order, styled token-only (`13c8514` laid the `--ops-*` set first, zero visual change).
 **Verify:** Open v1 and Ring-2 side by side — same controls, same order. Shipped `1b7ca0b`, manifest `7738a96`.
+**Slices (this pass):** P0 tokens `13c8514` · P1 static chrome `1b7ca0b` · P2 live controls `b689845` (clock, fullscreen, menu, TOP/ISO/NEAR presets, cam panel UI-only, keymap; overlay/sound rows UI-only till P3) · P3 feed wiring pending.
 ### Task 2: prove panels match v1 stop-for-stop ✓ done (owner Safari confirm)
 **Objective:** No visual or behavior regression a demo viewer could spot.
 **Verify:** Chromium + webkit captures at mix 0/50/100, TOP/NEAR, zero pageerrors — then the owner confirm below.
