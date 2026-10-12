@@ -28,6 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import {
   createCtxMon,
@@ -616,6 +617,65 @@ async function boot() {
       dem: getStatus(),
     }),
   };
+
+  /* Phase 03 Tasks 18+19 (?sector=<h3> preselect + embed close round-trip).
+   * The launcher map opens this page as ?sector=<h3>&embed=1: the camera
+   * reframes onto the sector's worst asset and Esc notifies the parent
+   * (postMessage) instead of touching history. Standalone loads with
+   * ?sector= only reframe. Unmatched/absent params boot normally — the
+   * preselect never breaks boot. Probe: window.__ring2.sector. */
+  try {
+    const sectorQ = parseSectorQuery(location.search);
+    const hit = resolveSector(sectorQ.sector);
+    let sectorSel = null;
+    if (hit) {
+      const wx = hit.sector.dx;
+      const wz = hit.sector.dz;
+      let wy = 0;
+      try {
+        wy = sampleH(wx, wz) * VEX;
+      } catch { /* procedural height fallback keeps y=0 */ }
+      try {
+        const RANGE_M = 4500;
+        const POL = (50 * Math.PI) / 180;
+        const cur = twin.camera.position.clone().sub(twin.controls.target);
+        let az = Math.atan2(cur.x, cur.z);
+        if (!Number.isFinite(az)) az = (35 * Math.PI) / 180;
+        twin.controls.target.set(wx, wy, wz);
+        twin.camera.position.set(
+          wx + RANGE_M * Math.sin(POL) * Math.sin(az),
+          wy + RANGE_M * Math.cos(POL),
+          wz + RANGE_M * Math.sin(POL) * Math.cos(az),
+        );
+        twin.updateControls();
+      } catch { /* reframe is best-effort; probe still reports the sector */ }
+      sectorSel = {
+        h3: hit.h3, sectorId: hit.sector.id,
+        assetId: hit.worstAsset, worst: hit.worst, embedded: sectorQ.embed,
+      };
+    } else if (sectorQ.sector) {
+      sectorSel = {
+        h3: sectorQ.sector, sectorId: null, assetId: null,
+        worst: null, embedded: sectorQ.embed,
+      };
+    } else if (sectorQ.embed) {
+      sectorSel = { h3: null, sectorId: null, assetId: null, worst: null, embedded: true };
+    }
+    try {
+      window.__ring2.sector = sectorSel;
+    } catch { /* probe write is best-effort */ }
+    if (sectorQ.embed) {
+      window.addEventListener('keydown', (e) => {
+        if (!e || e.key !== 'Escape') return;
+        if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+        // The HUD popover manager registered first and swallows this Esc
+        // when a popover is open — this fires only when nothing claimed it.
+        try {
+          window.parent?.postMessage(TWIN_CLOSE_MSG, '*');
+        } catch { /* parent notify is best-effort */ }
+      });
+    }
+  } catch { /* preselect never breaks boot */ }
 
   // Rendering-first: the loop starts NOW, not after the map. A hung tile
   // host used to gate every painted frame behind mountMapBase (map:- +

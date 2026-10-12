@@ -158,10 +158,10 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 ### Task 17: draw the health rings ✓ done
 **Objective:** One glance shows worst-health per sector — health-divided arcs sized by H3 hex, pins where rings can't render.
 **Verify:** Force a feed worst-health — the matching sector's ring shows it.
-### Task 18: make a click open the twin
+### Task 18: make a click open the twin ✓ done
 **Objective:** Click sector → full-screen twin, already focused on that sector's worst asset.
 **Verify:** Click any ring — URL carries `?sector=<h3>`, twin opens pre-selected.
-### Task 19: make Esc bring you home intact
+### Task 19: make Esc bring you home intact ✓ done
 **Objective:** Closing the twin never loses your place — hex + selection survive X / Esc / back.
 **Verify:** Esc mid-orbit — map returns with selection kept.
 
