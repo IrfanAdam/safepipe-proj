@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T16:42:39.521Z",
+  "generated": "2026-10-12T16:53:18.908Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "4966356",
+      "full": "4966356d6e8ff46c05be85e62db2e681702eda97",
+      "date": "2026-10-12",
+      "time": "22:13",
+      "subject": "feat(changelog): per-plan revision list in detail drawer [plan:2026-10-07_130000-safepipe-changelog.md#task-8]",
+      "plan": "2026-10-07_130000-safepipe-changelog.md",
+      "anchor": "task-8"
+    },
     {
       "sha": "f4c2d1d",
       "full": "f4c2d1d1de3693f393dd3f2fe5dd9e32beb01d18",
@@ -2962,7 +2971,6 @@
   "wip": [
     "src/changelog/changelog-drawer.css",
     "src/changelog/changelog/paint-detail.js",
-    "src/changelog/pages-changelog.js",
     "src/changelog/changelog/paint-revs.js"
   ]
 }

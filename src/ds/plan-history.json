@@ -599,6 +599,58 @@
      "state": ""
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-12",
+   "hash": "96e43654",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "7ba9e648",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Data-sanity pass ✓ done",
+     "hash": "087948f8",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
+     "hash": "0442a299",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
+     "hash": "c8e8534e",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
+     "hash": "2113de07",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 9: Revisions block — above commits, compact scrollable list",
+     "hash": "c4c8f750",
+     "state": ""
+    }
+   ]
   }
  ],
  "2026-10-07_153000-ops3d-realworld-twin.md": [

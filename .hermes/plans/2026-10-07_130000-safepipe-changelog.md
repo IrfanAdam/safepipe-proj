@@ -105,3 +105,19 @@
 - Styling follows the host changelog visual language (tokens only); prototype reference (scratch, not shipped): `/Users/irfan/.hermes/cache/scratch/plan-iterations.html`.
 
 **Verify:** every plan with >1 rev shows its full list; rev counts match history; section states match live parse; build green; existing changelog tests pass.
+
+## Task 9: Revisions block — above commits, compact scrollable list ✓ done
+
+**Objective:** Owner steer 2026-10-12 on the Task 8 block: it must sit BEFORE the commit history, read as a compact scrollable list, never an accordion.
+
+**Design (redirected by owner steer 2026-10-12 — supersedes the accordion/list draft below):**
+- Revisions block sits above the commit timeline (order: phases/sections → Revisions → commits) and flows FLAT in the drawer's own scroll — no nested scroll container.
+- Content is the feedback of each revision, newest-first, not rev names/numbers: each entry is dated and leads with what changed — changed sections with old→new state transitions (e.g. "Phase 02 · 1/6 → 6/6 · changed"); unchanged sections collapse to a quiet count line.
+- Keep `data-revs` / `data-rev` / `data-changed` attributes; token-only styling.
+
+**Superseded draft (kept for the record):**
+- Move the `paintRevs` block above the commit timeline in the drawer (order: phases/sections → Revisions → commits).
+- Replace native `<details>` accordion with a compact flat list in a max-height scroll container: one tight row per rev (`rN · date · n sections`, changed-section count inline), section heads + states + changed marks visible inline without expanding.
+- Keep `data-revs` / `data-rev` / `data-changed` attributes so the list stays probeable; token-only styling.
+
+**Verify:** revisions render above commits; all rows visible via scroll with no expand step; rev counts + changed marks unchanged vs Task 8; build green; 0 page errors.

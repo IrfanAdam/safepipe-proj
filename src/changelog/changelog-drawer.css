@@ -50,17 +50,17 @@
 .ds-md table{width:100%;table-layout:fixed;border-collapse:collapse}
 .ds-md th,.ds-md td{overflow-wrap:anywhere;vertical-align:top}
 .ds-md pre{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:visible}
-/* per-plan revision list (Task 8): rN + date rows, native <details> expand
-   to section heads + states; changed/new marks mirror rail · edited */
+/* per-plan revision list (Task 9): flat newest-first dated feedback — date-led
+   entries, changed sections as old→new state lines, unchanged collapsed to a
+   quiet count; flows in the drawer's own scroll, no nested box */
 .ds-revs-title{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin-bottom:var(--cl-4)}
-.ds-rev{border-top:var(--border-hairline)}
-.ds-rev summary{display:flex;gap:var(--cl-8);align-items:baseline;cursor:pointer;padding:var(--cl-6) var(--cl-2);list-style:none}
-.ds-rev summary::-webkit-details-marker{display:none}
-.ds-rev-n{font-weight:700;min-width:var(--cl-26)}
+.ds-rev{border-top:var(--border-hairline);padding:var(--cl-4) var(--cl-2)}
+.ds-rev-row{display:flex;gap:var(--cl-8);align-items:baseline}
+.ds-rev-same{list-style:none;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding:var(--cl-1) var(--cl-2)}
 .ds-rev-date{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
-.ds-rev-sum{margin-left:auto;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
-.ds-rev table{width:100%;border-collapse:collapse}
-.ds-rev td{padding:var(--cl-4) var(--cl-2);border-top:var(--border-hairline);vertical-align:top;overflow-wrap:anywhere}
-.ds-revs-head{font-size:var(--text-ds-body);color:var(--color-ink)}
+.ds-rev-sum{margin-left:auto;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);white-space:nowrap}
+.ds-rev-secs{list-style:none;margin:var(--cl-2) 0 0;padding:0}
+.ds-rev-sec{display:flex;gap:var(--cl-8);align-items:baseline;justify-content:space-between;padding:var(--cl-1) var(--cl-2);overflow-wrap:anywhere}
+.ds-revs-head{font-size:var(--text-ds-body);color:var(--color-ink);min-width:0;overflow-wrap:anywhere}
 .ds-revs-state{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);white-space:nowrap;text-align:right}
 .ds-revs-mark,.ds-revs-new{color:var(--color-accent);font-weight:700}

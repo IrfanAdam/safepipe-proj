@@ -153,7 +153,7 @@ export function paintDetail(root, ctx){
     ` · `,
     esc(short(sprint.head)),
     `</b><button data-close aria-label="Close detail">✕</button></div><div class="ds-md">`,
-    marked.parse(sprint.body) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : '') + paintRevs(revs),
+    marked.parse(sprint.body) + paintRevs(revs) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : ''),
     `</div>`,
   ].join('');
   const u = unlinked(texts);
