@@ -72,7 +72,7 @@ test('applyTwinToMap drives the map with jumpTo only — never eased', () => {
   assert.ok(!/\bsetZoom\b/.test(src), 'sync.js must not setZoom (partial update splits the camera)');
 });
 
-test('applyTwinToMap forces map paint in the SAME task while moving', () => {
+test('applyTwinToMap forces map paint in the SAME task — resting or moving', () => {
   const log = [];
   const map = fakeMap(log);
   applyTwinToMap(map, poseAt(12000), { viewportPx: VPX, fovDeg: FOV });
@@ -80,18 +80,62 @@ test('applyTwinToMap forces map paint in the SAME task while moving', () => {
   assert.deepEqual(order, ['jumpTo', 'redraw'], `redraw must follow jumpTo synchronously (got ${order})`);
 });
 
-test('idle map keeps its own pace — no forced redraw when the pose rests', () => {
+test('authoritative re-assertion: resting pose re-pushes + repaints every frame', () => {
   const log = [];
   const map = fakeMap(log);
   const opts = { viewportPx: VPX, fovDeg: FOV };
   applyTwinToMap(map, poseAt(12000), opts);
   log.length = 0;
-  applyTwinToMap(map, poseAt(12000), opts);
+  const mp = applyTwinToMap(map, poseAt(12000), opts);
+  // Suspect 1 fix: no pose-moved gate — a map-side-only change can never
+  // linger past the next twin frame. jumpTo is idempotent, so this is cheap.
   assert.deepEqual(
     log.map((e) => e.op),
-    ['jumpTo'],
-    'resting pose re-applies the camera but must not force redraw',
+    ['jumpTo', 'redraw'],
+    'resting pose must still re-push + repaint (authoritative sync)',
   );
+  assert.equal(mp.snapped, undefined, 'agreeing map must not snap-back');
+});
+
+test('snap-back: map-side drift is re-pushed with authoritative values', () => {
+  const log = [];
+  const pose = poseAt(12000);
+  const expect = mapPoseForTwin(pose, { viewportPx: VPX, fovDeg: FOV });
+  // A map that reports a drifted camera (stray gesture remnant, remount
+  // default, programmatic nudge) no matter what it was told.
+  const drifted = {
+    getTerrain: () => ({ exaggeration: VEX }),
+    jumpTo: (opts) => log.push({ op: 'jumpTo', opts }),
+    redraw: () => log.push({ op: 'redraw' }),
+    getCenter: () => ({ lng: expect.center[0] + 0.01, lat: expect.center[1] }),
+    getZoom: () => expect.zoom,
+    getBearing: () => expect.bearing,
+    getPitch: () => expect.pitch,
+  };
+  const mp = applyTwinToMap(drifted, pose, { viewportPx: VPX, fovDeg: FOV });
+  const jumps = log.filter((e) => e.op === 'jumpTo');
+  assert.equal(jumps.length, 2, 'drift must trigger a snap-back re-push');
+  assert.deepEqual(jumps[1].opts.center, expect.center, 'snap-back carries the twin-authoritative center');
+  assert.equal(mp.snapped, true, 'snap-back must flag .snapped');
+});
+
+test('mapDisagrees: agreeing camera passes, bearing wraps on the circle', async () => {
+  const { mapDisagrees } = await import('../src/ring2/sync.js');
+  const pose = poseAt(12000);
+  const expect = mapPoseForTwin(pose, { viewportPx: VPX, fovDeg: FOV });
+  const agree = {
+    getCenter: () => ({ lng: expect.center[0], lat: expect.center[1] }),
+    getZoom: () => expect.zoom,
+    getBearing: () => expect.bearing - 360, // wrap form agrees on the circle
+    getPitch: () => expect.pitch,
+  };
+  assert.equal(mapDisagrees(agree, expect), false, 'agreeing camera (wrapped bearing) must pass');
+  assert.equal(
+    mapDisagrees({ ...agree, getZoom: () => expect.zoom + 0.5 }, expect),
+    true,
+    'zoom drift beyond tolerance must flag',
+  );
+  assert.equal(mapDisagrees({}, expect), false, 'getter-less stub can never disagree');
 });
 
 test('main.js frame loop is sync-first: controls -> jumpTo -> paint', () => {

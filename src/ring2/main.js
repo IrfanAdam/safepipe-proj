@@ -69,7 +69,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = MAP_TRUE_FOV_DEG;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'b63tile';
+const BUILD_ID = 'b64tilt';
 // Shared GL-context + tile telemetry registry (see ctxmon.js: one
 // real-Safari screenshot of the six tokens discriminates every hypothesis
 // in the defect-hunt report).
@@ -754,6 +754,11 @@ async function boot() {
       }
       const pitch = pitchForPose(pose.eye, pose.target, pose.target.y ?? 0);
       mixCtl.updateForCamera(pitch);
+      // Tilt fade (suspect 3): draped linework dissolves as pitch nears the
+      // clamp, so high-tilt views never float linework past the silhouette.
+      try {
+        twin.setTiltFade?.(pitch);
+      } catch { /* cosmetic — never breaks the frame */ }
       // Paint LAST: the map already holds this frame's pose (jumpTo above),
       // so both GL paints land in the same frame — no catch-up lag.
       twin.renderTwin();

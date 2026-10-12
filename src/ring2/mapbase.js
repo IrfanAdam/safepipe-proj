@@ -13,7 +13,7 @@
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { SANGACHAL, VEX, worldToGeo } from './site.js';
-import { MAP_MAX_PITCH_DEG, MAP_INPUT_HANDLERS, assertMapNonInteractive } from './sync.js';
+import { MAP_MAX_PITCH_DEG, MAP_INPUT_HANDLERS, assertMapNonInteractive, SAT_IMAGERY_MAXZOOM, TERRAIN_DEM_MAXZOOM } from './sync.js';
 /* Re-exported for callers that already reach the map through mapbase. */
 export { MAP_INPUT_HANDLERS, assertMapNonInteractive };
 import { waitForSized } from './sizeGate.js';
@@ -111,7 +111,7 @@ export function mapStyle() {
         type: 'raster-dem',
         tiles: TERRARIUM_TILES,
         tileSize: 256,
-        maxzoom: 15,
+        maxzoom: TERRAIN_DEM_MAXZOOM,
         encoding: 'terrarium',
         attribution: 'Terrain: AWS Terrarium (Mapzen Joerd)',
       },
@@ -119,28 +119,28 @@ export function mapStyle() {
         type: 'raster-dem',
         tiles: TERRARIUM_TILES,
         tileSize: 256,
-        maxzoom: 15,
+        maxzoom: TERRAIN_DEM_MAXZOOM,
         encoding: 'terrarium',
       },
       'esri-imagery-src': {
         type: 'raster',
         tiles: ESRI_IMAGERY_TILES,
         tileSize: 256,
-        maxzoom: 19,
+        maxzoom: SAT_IMAGERY_MAXZOOM,
         attribution: ESRI_ATTRIB,
       },
       'esri-imagery-backup-src': {
         type: 'raster',
         tiles: ESRI_IMAGERY_TILES_BACKUP,
         tileSize: 256,
-        maxzoom: 19,
+        maxzoom: SAT_IMAGERY_MAXZOOM,
         attribution: ESRI_ATTRIB,
       },
       'esri-reference-src': {
         type: 'raster',
         tiles: ESRI_REFERENCE_TILES,
         tileSize: 256,
-        maxzoom: 19,
+        maxzoom: SAT_IMAGERY_MAXZOOM,
         attribution: 'Reference &copy; Esri',
       },
       'ring2-mask-src': {

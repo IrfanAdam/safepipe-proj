@@ -12,7 +12,9 @@
 // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-00]
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import {
   mapPoseForTwin,
   groundResForZoom,
@@ -20,9 +22,15 @@ import {
   rangeForZoom,
   aspectMismatch,
   assertAspectParity,
+  tiltFadeForPitch,
   MAP_FOV_RAD,
   MAP_TRUE_FOV_DEG,
   MAP_MAX_PITCH_DEG,
+  TILT_FADE_START_DEG,
+  TWIN_MIN_RANGE_M,
+  TWIN_MAX_ZOOM,
+  SAT_IMAGERY_MAXZOOM,
+  TERRAIN_DEM_MAXZOOM,
 } from '../src/ring2/sync.js';
 import { SANGACHAL } from '../src/ring2/site.js';
 
@@ -175,7 +183,12 @@ test('aspect parity helper flags shear, passes identical boxes', () => {
 });
 
 test('tilt clamp is shared: twin maxPolar == map maxPitch == MAP_MAX_PITCH_DEG', () => {
-  assert.equal(MAP_MAX_PITCH_DEG, 85, 'shared clamp stays 85');
+  // Suspect 3 (PRIMARY, owner video): 85 permitted near-grazing edge-on
+  // views where any residual DEM difference reads as vertical decoupling.
+  // 65 keeps parallax magnification ~tan(p) at ~2.1 (vs 11.4 at 85) and the
+  // pitch-60 parity proof inside the legal envelope.
+  assert.equal(MAP_MAX_PITCH_DEG, 65, 'shared clamp is 65 — grazing unreachable');
+  assert.ok(MAP_MAX_PITCH_DEG <= 70, 'clamp must stay out of the grazing band');
   const overlays = srcOf('../src/ring2/overlays.js');
   const mapbase = srcOf('../src/ring2/mapbase.js');
   assert.ok(/maxPolarAngle\s*=\s*\(MAP_MAX_PITCH_DEG/.test(overlays), 'twin tilt must use the shared clamp');
@@ -205,4 +218,147 @@ test('zoom/range round-trip holds under the unified default fov', () => {
     const back = rangeForZoom(z);
     assert.ok(Math.abs(back - r) / r < 1e-9, `range ${r} round-trips (got ${back})`);
   }
+});
+
+test('CLOSE-RANGE pan sweep: range 800-1500m, pitch 60, target +-2km — NDC parity holds', () => {
+  // Suspect 2 (projection-breakdown variant): KILLED by this sweep. The
+  // pinhole projection has no close-range cliff — same eye/target/fov/
+  // aspect reconstructs to ~0 residual at dive ranges with a panned target.
+  // Any residual on-device shear at close range is DEM resampling (see the
+  // overzoom test below), not projection math.
+  // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
+  const H = 800;
+  const ASP = 16 / 9;
+  const PITCH = 60; // inside the 65 clamp; the steepest legal oblique
+  let worst = 0;
+  let checked = 0;
+  for (const rangeM of [800, 1000, 1500]) {
+    for (const tx of [-2000, 0, 2000]) {
+      for (const tz of [-2000, 0, 2000]) {
+        const target = { x: tx, y: 0, z: tz };
+        const eye = {
+          x: tx,
+          y: rangeM * Math.cos(rad(PITCH)),
+          z: tz + rangeM * Math.sin(rad(PITCH)),
+        };
+        const mp = mapPoseForTwin({ eye, target }, { viewportPx: H, fovDeg: MAP_TRUE_FOV_DEG });
+        const distPx = (0.5 * H) / Math.tan(rad(MAP_TRUE_FOV_DEG) / 2);
+        const distM = distPx * groundResForZoom(mp.zoom, SANGACHAL.lat);
+        assert.ok(
+          Math.abs(distM - rangeM) / rangeM < 1e-9,
+          `range ${rangeM} target (${tx},${tz}): map eye must reconstruct twin range (got ${distM})`,
+        );
+        const mapEye = {
+          x: tx,
+          y: distM * Math.cos(rad(mp.pitch)),
+          z: tz + distM * Math.sin(rad(mp.pitch)),
+        };
+        for (const g of ringPoints()) {
+          const a = ndcFor(eye, target, g, MAP_TRUE_FOV_DEG, ASP);
+          const b = ndcFor(mapEye, target, g, MAP_TRUE_FOV_DEG, ASP);
+          if (!a || !b) continue;
+          checked++;
+          worst = Math.max(worst, Math.hypot(a[0] - b[0], a[1] - b[1]));
+        }
+      }
+    }
+  }
+  assert.ok(checked > 0, 'sweep must compare in-frame points');
+  assert.ok(worst < 1e-9, `close-range pan sweep residual must be ~0 (got ${worst} over ${checked} pairs)`);
+});
+
+test('overzoom quantified: old 800m dive exceeded DEM native by ~2 levels; clamp holds ≤1', () => {
+  // Suspect 2 verdict: Esri-overzoom variant KILLED (z19 native never
+  // approached at twin ranges); DEM-overzoom variant PROVED (Terrarium z15
+  // native exceeded) and clamped by TWIN_MIN_RANGE_M.
+  // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
+  const opt = (h) => ({ viewportPx: h, fovDeg: MAP_TRUE_FOV_DEG });
+  const zOld = zoomForRange(800, SANGACHAL.lat, opt(800));
+  assert.ok(
+    zOld > TERRAIN_DEM_MAXZOOM + 1,
+    `old 800m dive must exceed one DEM-overzoom level (got z${zOld.toFixed(2)} vs native ${TERRAIN_DEM_MAXZOOM}+1)`,
+  );
+  assert.ok(
+    zOld < SAT_IMAGERY_MAXZOOM,
+    `old dive must still stay under Esri native (got z${zOld.toFixed(2)} vs ${SAT_IMAGERY_MAXZOOM})`,
+  );
+  // The clamp: zoom ≤16 for viewport heights ≤ ~1096px (every owner device).
+  for (const h of [600, 800, 1000, 1096]) {
+    const z = zoomForRange(TWIN_MIN_RANGE_M, SANGACHAL.lat, opt(h));
+    assert.ok(
+      z <= TWIN_MAX_ZOOM + 1e-9,
+      `clamped dive must hold zoom ≤${TWIN_MAX_ZOOM} at H=${h} (got z${z.toFixed(3)})`,
+    );
+  }
+  // Comment-math proof: the clamp radius IS rangeForZoom(16) at H=1096.
+  const derived = rangeForZoom(TWIN_MAX_ZOOM, SANGACHAL.lat, opt(1096));
+  assert.ok(
+    Math.abs(derived - TWIN_MIN_RANGE_M) / TWIN_MIN_RANGE_M < 0.01,
+    `TWIN_MIN_RANGE_M must equal rangeForZoom(16)@H1096 (got ${derived.toFixed(0)} vs ${TWIN_MIN_RANGE_M})`,
+  );
+  // Wired single-source: overlays dives on the constant, mapbase style on
+  // the native ceilings (no bare maxzoom literals left).
+  const overlays = srcOf('../src/ring2/overlays.js');
+  const mapbase = srcOf('../src/ring2/mapbase.js');
+  assert.ok(/controls\.minDistance\s*=\s*TWIN_MIN_RANGE_M/.test(overlays), 'twin dive must use TWIN_MIN_RANGE_M');
+  assert.ok(!/controls\.minDistance\s*=\s*800/.test(overlays), 'bare 800 dive must be gone');
+  assert.ok(/maxzoom:\s*TERRAIN_DEM_MAXZOOM/.test(mapbase), 'DEM sources must use TERRAIN_DEM_MAXZOOM');
+  assert.ok(/maxzoom:\s*SAT_IMAGERY_MAXZOOM/.test(mapbase), 'imagery sources must use SAT_IMAGERY_MAXZOOM');
+  assert.ok(!/maxzoom:\s*1[59],/.test(mapbase), 'bare maxzoom literals must be gone from mapbase');
+});
+
+test('tilt fade law: full to 50deg, gone at the clamp, monotonic between', () => {
+  assert.equal(TILT_FADE_START_DEG, 50, 'fade starts at 50deg');
+  assert.equal(tiltFadeForPitch(0), 1, 'nadir is full opacity');
+  assert.equal(tiltFadeForPitch(50), 1, 'fade start is still full');
+  assert.equal(tiltFadeForPitch(MAP_MAX_PITCH_DEG), 0, 'clamp is zero — no linework at max tilt');
+  assert.equal(tiltFadeForPitch(90), 0, 'past-clamp stays zero');
+  const mid = tiltFadeForPitch((TILT_FADE_START_DEG + MAP_MAX_PITCH_DEG) / 2);
+  assert.ok(mid > 0.4 && mid < 0.6, `mid-ramp must be ~0.5 smoothstep (got ${mid})`);
+  let prev = 1;
+  for (let p = 50; p <= 65; p += 1) {
+    const k = tiltFadeForPitch(p);
+    assert.ok(k <= prev + 1e-12, `fade must be monotonic (pitch ${p}: ${k} > ${prev})`);
+    prev = k;
+  }
+});
+
+test('tilt fade is wired: overlays exposes setTiltFade, main loop drives it per frame', () => {
+  const overlays = srcOf('../src/ring2/overlays.js');
+  const main = srcOf('../src/ring2/main.js');
+  assert.ok(/function setTiltFade\(pitchDeg\)/.test(overlays), 'overlays must define setTiltFade');
+  assert.ok(/setTiltFade,\s*setTakeover/.test(overlays), 'twin handle must export setTiltFade');
+  assert.ok(/tiltFadeForPitch\(pitchDeg\)/.test(overlays), 'fade must use the pure sync.js law');
+  assert.ok(/twin\.setTiltFade\?\.\(pitch\)/.test(main), 'main loop must drive setTiltFade per frame');
+});
+
+test('input-path audit: one map, no enablers, twin canvas owns Shift+drag', () => {
+  // Audit verdict: exactly ONE `new maplibregl.Map` (mapbase.js); ZERO
+  // `.enable(` calls anywhere in src/ring2 (nothing can re-arm a handler
+  // behind the sync); boxZoom stays in the disabled+probed handler list; the
+  // twin canvas sits above the map (z-index) with pointer-events auto, so
+  // Shift+drag (MapLibre boxZoom's trigger) can never reach the map —
+  // OrbitControls owns it and the map follows via authoritative sync.
+  // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'ring2');
+  const files = readdirSync(root).filter((f) => f.endsWith('.js'));
+  let mapCtors = 0;
+  let enablers = 0;
+  for (const f of files) {
+    const src = readFileSync(join(root, f), 'utf8');
+    mapCtors += (src.match(/new maplibregl\.Map\(/g) ?? []).length;
+    enablers += (src.match(/\.\s*enable\s*\(/g) ?? []).length;
+  }
+  assert.equal(mapCtors, 1, `exactly one map constructor in src/ring2 (got ${mapCtors})`);
+  assert.equal(enablers, 0, `zero .enable( calls in src/ring2 (got ${enablers})`);
+  const mapbase = srcOf('../src/ring2/mapbase.js');
+  assert.ok(/map\[name\]\?\.disable\?\.\(\)/.test(mapbase), 'mapbase must disable every handler post-construction');
+  assert.ok(/assertMapNonInteractive\(map\)/.test(mapbase), 'mapbase must probe non-interactive (fail closed)');
+  const html = srcOf('../ops3d-ring2.html');
+  const zMap = Number(html.match(/\.ring2-map\s*\{[^}]*z-index:\s*(\d+)/)?.[1]);
+  const zTwin = Number(html.match(/\.ring2-twin\s*\{[^}]*z-index:\s*(\d+)/)?.[1]);
+  assert.ok(Number.isFinite(zMap) && Number.isFinite(zTwin) && zTwin > zMap,
+    `twin layer must sit above the map (got map z${zMap} twin z${zTwin})`);
+  assert.ok(/\.ring2-twin canvas\s*\{\s*pointer-events:\s*auto/.test(html),
+    'twin canvas must take pointer events (Shift+drag reaches OrbitControls, never the map)');
 });

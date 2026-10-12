@@ -29,7 +29,7 @@ import * as THREE from 'three';
 import { pickGLPrecision } from '../glprecision.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { SANGACHAL, VEX, RING_RADIUS_M, EXTENT_M } from './site.js';
-import { MAP_MAX_PITCH_DEG, MAP_TRUE_FOV_DEG } from './sync.js';
+import { MAP_MAX_PITCH_DEG, MAP_TRUE_FOV_DEG, TWIN_MIN_RANGE_M, tiltFadeForPitch } from './sync.js';
 import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
 import { DRAPE_LIFTS, RIM_FADE_IN, RIM_TILT_GAIN } from './drape.js';
 
@@ -280,7 +280,14 @@ export function createOverlayTwin(container, opts = {}) {
   // Tilt clamp === map maxPitch (sync.js MAP_MAX_PITCH_DEG): the twin can
   // never orbit past where the map clamps, or the mix fade shears there.
   controls.maxPolarAngle = (MAP_MAX_PITCH_DEG * Math.PI) / 180;
-  controls.minDistance = 800;
+  /* Dive clamp (suspect 2, DEM-overzoom variant PROVED): minDistance 800 let
+   * the map overzoom to z≈16.5–16.9 — ~2 levels past the Terrarium z15
+   * native — magnifying twin-coarse vs map-full-res DEM differences into
+   * vertical shear at oblique pitch. 1500 m keeps zoom ≤16 (≤1 level) on
+   * viewports ≤ ~1096 px; Esri z19 native is never binding (needs ≲140 m).
+   * Derived in sync.js (TWIN_MIN_RANGE_M) — single source of truth.
+   * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+  controls.minDistance = TWIN_MIN_RANGE_M;
   controls.maxDistance = 32000; // user call: a touch past the lens frame, never deep void
 
   const group = new THREE.Group();
@@ -925,10 +932,24 @@ function edgeFade(x, z) {
   });
 
   let lastT = 0.5;
+  /* Tilt fade (suspect 3, PRIMARY): near-grazing pitch hides the draped
+   * linework instead of floating it past the terrain silhouette — the exact
+   * frame the owner video caught. Multiplies with the mix emphasis, so SAT
+   * mode and high-tilt twin mode both go clean. Survives rebuild (module
+   * scope, re-applied with lastT); driven per frame by main.js via
+   * setTiltFade(pitch). Pure law lives in sync.js (tiltFadeForPitch).
+   * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+  let lastTiltK = 1;
+  function applyEmphasisFull() {
+    for (const m of emphasisMats) m.opacity = (m.userData.baseOpacity ?? m.opacity) * lastT * lastTiltK;
+  }
   function applyEmphasis(t) {
     lastT = Math.min(1, Math.max(0, t));
-    const k = lastT; // full range: mix 0 melts overlays into the satellite, mix 100 full analysis
-    for (const m of emphasisMats) m.opacity = (m.userData.baseOpacity ?? m.opacity) * k;
+    applyEmphasisFull();
+  }
+  function setTiltFade(pitchDeg) {
+    lastTiltK = tiltFadeForPitch(pitchDeg);
+    applyEmphasisFull();
   }
   function setEmphasis(t) {
     applyEmphasis(t);
@@ -1006,7 +1027,7 @@ function edgeFade(x, z) {
 
   return {
     renderer, scene, camera, controls, canvas,
-    rebuild, setEmphasis, setTakeover, update, updateControls, renderTwin,
+    rebuild, setEmphasis, setTiltFade, setTakeover, update, updateControls, renderTwin,
     getPose, dispose, onResize,
     getInfo: () => ({ ...(lastInfo ?? {}), takeoverU: lastU, status: getStatus(), pills: getPillState() }),
   };

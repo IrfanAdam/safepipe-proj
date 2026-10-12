@@ -20,8 +20,39 @@ export const MAP_FOV_RAD = 0.6435011087932844;
 export const MAP_TRUE_FOV_DEG = (MAP_FOV_RAD * 180) / Math.PI; // ≈36.8699
 /* Twin tilt clamp: OrbitControls maxPolarAngle and the map maxPitch must be
  * the SAME number or the twin can tilt past where the map clamps and the
- * mix fade shears at the extreme. mapbase.js + overlays.js both use this. */
-export const MAP_MAX_PITCH_DEG = 85;
+ * mix fade shears at the extreme. mapbase.js + overlays.js both use this.
+ * 65 (not 85): owner video proved the Shift+drag decoupling happens at
+ * NEAR-GRAZING edge-on pitch — world collapsed to a line, drape floating
+ * past the terrain silhouette. Parallax magnification of ANY residual
+ * twin-vs-map DEM difference scales ~tan(pitch): tan(85°)=11.4 vs
+ * tan(65°)=2.1, a 5× reduction, and grazing becomes unreachable. 65 stays
+ * just past MapLibre's own default 60 so oblique inspection still feels
+ * open, and keeps the pitch-60 parity proof inside the legal envelope.
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+export const MAP_MAX_PITCH_DEG = 65;
+/* Drape tilt-fade start: draped linework holds full opacity to this pitch,
+ * then ramps to zero at MAP_MAX_PITCH_DEG so no floating linework survives
+ * near the clamp to read as decoupling past the silhouette. */
+export const TILT_FADE_START_DEG = 50;
+/* Native-zoom ceilings (single source of truth — mapbase.js mapStyle()
+ * consumes these for its source maxzoom instead of bare literals, and the
+ * twin dive clamp below is derived from them).
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+export const SAT_IMAGERY_MAXZOOM = 19; // Esri World Imagery native ceiling
+export const TERRAIN_DEM_MAXZOOM = 15; // Terrarium raster-dem native ceiling
+/* Usable overzoom past DEM native: 1 level of bilinear upscale stays smooth
+ * on this relief; ~2 levels (the old 800 m dive: z≈16.5 at H=800, z≈16.9 at
+ * H=1096) visibly magnifies the twin-coarse (maxTiles:16 sampler + SRTM
+ * fallback) vs map-full-res DEM difference into vertical shear at oblique
+ * pitch. Esri z19 native is never approached at twin ranges (z19 would need
+ * range ≲140 m at H=800) — the DEM, not the imagery, is the binding
+ * ceiling, so the clamp is derived from TERRAIN_DEM_MAXZOOM + 1. */
+export const TWIN_MAX_DEM_OVERZOOM = 1;
+export const TWIN_MAX_ZOOM = TERRAIN_DEM_MAXZOOM + TWIN_MAX_DEM_OVERZOOM; // 16
+/* Closest legal twin dive: rangeForZoom(16, lat, {viewportPx:1096}) ≈ 1500 m,
+ * so minDistance 1500 keeps map zoom ≤16 (≤1 DEM-overzoom level) on viewport
+ * heights ≤ ~1096 px — every owner device. */
+export const TWIN_MIN_RANGE_M = 1500;
 /* 512-px tile convention (MapLibre default tileSize 512): metres per pixel
  * at zoom 0 on the equator. The 256-px constant (156543.03392) is WRONG
  * here — using it halves every zoom (v1's 2x-zoom class). */
@@ -114,47 +145,87 @@ export function assertTerrainVex(map) {
   return true;
 }
 
-/* Per-map last-applied camera: redraw() is forced only while the pose is
- * actually moving, so an idle map keeps its own tile-refinement pace. */
-const _lastApplied = new WeakMap();
-function poseMovedSinceLast(map, mp) {
-  const prev = _lastApplied.get(map);
-  _lastApplied.set(map, { center: [...mp.center], zoom: mp.zoom, bearing: mp.bearing, pitch: mp.pitch });
-  if (!prev) return true;
-  // Bearing wraps 360->0: compare on the circle, not the raw number.
-  const circ = (a, b) => Math.abs((((a - b + 540) % 360) + 360) % 360 - 180);
-  return (
-    Math.abs(mp.center[0] - prev.center[0]) > 1e-12 ||
-    Math.abs(mp.center[1] - prev.center[1]) > 1e-12 ||
-    Math.abs(mp.zoom - prev.zoom) > 1e-9 ||
-    circ(mp.bearing, prev.bearing) > 1e-9 ||
-    Math.abs(mp.pitch - prev.pitch) > 1e-9
-  );
+/* Read-back truth: does the live map camera disagree with the authoritative
+ * twin-derived pose beyond tolerance? jumpTo applies synchronously, but any
+ * map-side-only deviation between frames (post-remount default camera,
+ * terrain re-init, a stray programmatic nudge, a re-enabled handler in a
+ * future edit) used to PERSIST until the twin next moved — the one-way-sync
+ * gap behind the owner's permanent Shift+drag decoupling. Missing getters
+ * pass (a stub without them can't disagree); bearing compares on the
+ * circle, not the raw number. */
+const SYNC_SNAP_TOL = { center: 1e-9, zoom: 1e-6, bearing: 1e-3, pitch: 1e-3 };
+export function mapDisagrees(map, mp, tol = SYNC_SNAP_TOL) {
+  try {
+    const c = typeof map?.getCenter === 'function' ? map.getCenter() : null;
+    const z = typeof map?.getZoom === 'function' ? map.getZoom() : null;
+    const b = typeof map?.getBearing === 'function' ? map.getBearing() : null;
+    const p = typeof map?.getPitch === 'function' ? map.getPitch() : null;
+    if (c == null || z == null || b == null || p == null) return false;
+    const clon = Array.isArray(c) ? c[0] : c.lng;
+    const clat = Array.isArray(c) ? c[1] : c.lat;
+    if (![clon, clat, z, b, p].every(Number.isFinite)) return false;
+    const circ = (a, x) => Math.abs((((a - x + 540) % 360) + 360) % 360 - 180);
+    return (
+      Math.abs(clon - mp.center[0]) > tol.center ||
+      Math.abs(clat - mp.center[1]) > tol.center ||
+      Math.abs(z - mp.zoom) > tol.zoom ||
+      circ(b, mp.bearing) > tol.bearing ||
+      Math.abs(p - mp.pitch) > tol.pitch
+    );
+  } catch {
+    return false; // read-back is best-effort; the jumpTo already applied
+  }
 }
 
 /* Drive a live MapLibre map from a twin pose (jumpTo: sync, no animation
- * fight). jumpTo applies synchronously with zero easing, and redraw()
- * forces the map's GL paint in the SAME task — so when the caller runs
- * controls-update -> applyTwinToMap -> twin paint (see main.js loop), the
- * twin delta reaches the map before EITHER side paints and photo + twin
- * scale as one. Without the forced redraw the map paints on its own async
- * rAF — exactly one frame behind every twin move (the visible catch-up).
- * redraw() runs only while the pose is actually moving, so an idle map
- * keeps its own tile-refinement pace. Asserts VEX first so a
- * mis-exaggerated map can never silently receive a synced camera. Returns
- * the applied { center, zoom, bearing, pitch }. */
+ * fight). AUTHORITATIVE every twin frame: jumpTo + redraw run
+ * unconditionally, then the camera is read back and snapped back on ANY
+ * disagreement beyond tolerance — jumpTo is idempotent, so the agreeing
+ * fast path costs one comparison and a map-side nudge can never persist
+ * past the next frame. Asserts VEX first so a mis-exaggerated map can never
+ * silently receive a synced camera. Returns the applied
+ * { center, zoom, bearing, pitch } with .snapped=true when a snap-back
+ * re-push fired. */
 export function applyTwinToMap(map, pose, opts = {}) {
   assertTerrainVex(map);
   const mp = mapPoseForTwin(pose, opts);
-  map.jumpTo({ center: mp.center, zoom: mp.zoom, bearing: mp.bearing, pitch: mp.pitch });
-  if (poseMovedSinceLast(map, mp)) {
-    try {
-      if (typeof map.redraw === 'function') map.redraw();
-    } catch {
-      /* the map's own async loop still paints — parity degrades one frame, nothing breaks */
+  const push = { center: mp.center, zoom: mp.zoom, bearing: mp.bearing, pitch: mp.pitch };
+  // Unconditional re-push + repaint: the twin pose is the camera authority
+  // every frame, resting or moving — a map-side-only change can never linger.
+  map.jumpTo(push);
+  try {
+    if (typeof map.redraw === 'function') map.redraw();
+  } catch {
+    /* the map's own async loop still paints — parity degrades one frame, nothing breaks */
+  }
+  // Snap-back: read the live camera back; any disagreement beyond tolerance
+  // is re-pushed immediately (jumpTo is idempotent, so agreement is cheap).
+  try {
+    if (mapDisagrees(map, mp)) {
+      map.jumpTo(push);
+      try {
+        if (typeof map.redraw === 'function') map.redraw();
+      } catch {
+        /* same one-frame grace as above */
+      }
+      mp.snapped = true;
     }
+  } catch {
+    /* read-back is best-effort — the first push already applied */
   }
   return mp;
+}
+
+/* Drape tilt fade (pure): linework opacity multiplier for a camera pitch.
+ * 1 up to TILT_FADE_START_DEG, smoothstep ramp to 0 at the shared clamp —
+ * near-grazing views hide the drape instead of floating it past the
+ * silhouette. Node-testable; overlays.setTiltFade consumes it per frame. */
+export function tiltFadeForPitch(pitchDeg, fadeStart = TILT_FADE_START_DEG, clamp = MAP_MAX_PITCH_DEG) {
+  const p = Number(pitchDeg);
+  if (!Number.isFinite(p) || p <= fadeStart) return 1;
+  if (p >= clamp) return 0;
+  const t = (p - fadeStart) / (clamp - fadeStart);
+  return 1 - t * t * (3 - 2 * t);
 }
 
 /* Input ownership: the twin canvas is the ONLY camera input at every mix.
