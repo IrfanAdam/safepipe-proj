@@ -24,6 +24,7 @@ import { createOverlayTwin } from './overlays.js';
 import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
+import { scaleForLevel } from './hud-furniture.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import {
   createCtxMon,
@@ -440,11 +441,68 @@ async function boot() {
   });
   paintStatus();
 
-  // Phase 00 Task 1 (P1): static v1 HUD chrome over the twin. Guarded —
-  // HUD dressing never breaks boot; live wiring lands in P2/P3.
+  // Phase 00 Task 1 (P1) HUD chrome + P2 Lane C camera presets (TOP/ISO/
+  // NEAR over the v1 LEVELS network/segment/asset). Guarded — HUD dressing
+  // + preset wiring never break boot; live feed wiring lands in P3.
+  //
+  // Preset geometry (twin metres, origin = Sangachal terminal pin):
+  //   network/TOP: high zenith ~0 over target (straight-down survey view)
+  //   segment/ISO: mid oblique (45° polar) covering the segment reach
+  //   asset/NEAR:  close low oblique (60° polar, 3 km) on the terminal
+  // Ranges sit inside the twin orbit clamps (1500 m … 32000 m) and polars
+  // inside the 65° tilt clamp, so a preset never fights OrbitControls.
+  const VIEW_PRESETS = {
+    network: { range: 28000, polarDeg: 0, azimDeg: 0 },
+    segment: { range: 12000, polarDeg: 45, azimDeg: 35 },
+    asset: { range: 3000, polarDeg: 60, azimDeg: 35 },
+  };
+  const LEVEL_ALIASES = {
+    network: 'network', top: 'network', 1: 'network',
+    segment: 'segment', iso: 'segment', 2: 'segment',
+    asset: 'asset', near: 'asset', 3: 'asset',
+  };
+  function setViewPreset(name) {
+    const level = LEVEL_ALIASES[String(name ?? '').toLowerCase()];
+    if (!level) return null;
+    const p = VIEW_PRESETS[level];
+    try {
+      if (!twin?.controls || !twin?.camera) return null;
+      twin.controls.target.set(0, 0, 0);
+      const pol = (p.polarDeg * Math.PI) / 180;
+      const az = (p.azimDeg * Math.PI) / 180;
+      const sp = Math.sin(pol), cp = Math.cos(pol);
+      // TOP (polar 0) mirrors the boot camera: straight above + epsilon z
+      // so the up-vector never degenerates.
+      twin.camera.position.set(
+        p.range * sp * Math.sin(az),
+        p.range * cp,
+        p.range * sp * Math.cos(az) + (p.polarDeg === 0 ? 0.01 : 0),
+      );
+      // Settle damping + snap the orbit target to terrain NOW so getPose()
+      // (and the next frame's map sync) already report the preset pose.
+      twin.updateControls();
+      try {
+        const lbl = hud?.els?.scaleLabel;
+        if (lbl) lbl.textContent = `≈ ${scaleForLevel(level).label}`;
+      } catch { /* scale fallback never breaks a preset */ }
+      return level;
+    } catch {
+      return null;
+    }
+  }
+  // REAL backend for Lane A's 1/2/3 keys + Lane B's VIEW buttons: both lanes
+  // call onLevel(name); the per-frame loop feeds the resulting pitch+range
+  // to mixCtl, so telemetry/status + mix bar follow untouched.
+  function handleLevel(name) {
+    try {
+      return setViewPreset(name);
+    } catch {
+      return null;
+    }
+  }
   let hud = null;
   try {
-    hud = buildRingHud(el);
+    hud = buildRingHud(el, { onLevel: handleLevel });
   } catch { /* hud chrome never breaks boot */ }
 
   window.__ring2 = {
@@ -455,6 +513,9 @@ async function boot() {
     build: BUILD_ID,
     getPose: () => twin.getPose(),
     setMix: (v) => mixCtl.setMix(v),
+    setViewPreset: (name) => setViewPreset(name),
+    setLevel: handleLevel,
+    onLevel: handleLevel,
     getStatus,
     diag: () => ({
       build: BUILD_ID,
