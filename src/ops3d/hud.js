@@ -5,6 +5,7 @@
  *          level:'network'|'segment'|'asset', banner:{kind,assetId}|null}.
  * DOM-only: no three.js import. Parent twin.js owns all data and calls update().
  */
+import '../../design-system/ops-tokens.css';
 import './hud.css';
 
 const LEVELS = ['network', 'segment', 'asset'];

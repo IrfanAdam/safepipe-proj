@@ -1,6 +1,6 @@
 /* Safepipe Ops 3D — src/ops3d/hud.css · HUD overlay styling.
- * Token-sourced: font.mono ui-monospace stack, warning #ff8c39, danger #e31919.
- * Bone text #E6E8E8 on translucent dark panels rgba(11,12,12,.72), 1px borders.
+ * Token-sourced: every value below is var(--ops-*) (see
+ * design-system/ops-tokens.css; --sp-* aliases where exact).
  * Accent discipline: amber = watch, red = critical only. No other hues.
  */
 
@@ -8,12 +8,12 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 10;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  z-index: var(--ops-z-hud);
+  font-family: var(--ops-font-mono);
+  font-size: var(--ops-fs-md);
   line-height: 1.5;
   letter-spacing: 0.04em;
-  color: #e6e8e8;
+  color: var(--ops-ink);
 }
 
 .ops-hud--hidden {
@@ -25,9 +25,9 @@
 .ops-hud__legend,
 .ops-hud__panel {
   position: absolute;
-  background: rgba(11, 12, 12, 0.72);
-  border: 1px solid rgba(230, 232, 232, 0.18);
-  padding: 8px 10px;
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-border);
+  padding: var(--ops-pad-y) var(--ops-pad-x);
 }
 
 /* Cyberpunk signature: diagonal-cut top-right corner on every box.
@@ -51,8 +51,8 @@
 .ops-hud__help-panel,
 .ops-hud__compass,
 .ops-hud__scalebar {
-  --cut: 16px;
-  --edge: rgba(230, 232, 232, 0.5);
+  --cut: var(--ops-cut-lg);
+  --edge: var(--ops-edge);
   clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
 }
 .ops-hud__overlay-btn,
@@ -67,8 +67,8 @@
 .ops-hud__help-btn,
 .ops-hud__chip,
 .ops-hud__badge {
-  --cut: 10px;
-  --edge: rgba(230, 232, 232, 0.5);
+  --cut: var(--ops-cut-sm);
+  --edge: var(--ops-edge);
   clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, 0 100%);
 }
 /* The cut-edge stroke: 2px bar rotated 45° (top edge runs into the right
@@ -110,11 +110,11 @@
 /* Top-left column: sector block with the alert banner pinned below it */
 .ops-hud__topleft {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: var(--ops-inset);
+  left: var(--ops-inset);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--ops-pad-y);
   align-items: flex-start;
 }
 
@@ -140,12 +140,12 @@
   left: -1px;
   width: 10px;
   height: 10px;
-  border-top: 1px solid #e6e8e8;
-  border-left: 1px solid #e6e8e8;
+  border-top: 1px solid var(--ops-ink);
+  border-left: 1px solid var(--ops-ink);
 }
 
 .ops-hud__title {
-  font-size: 12px;
+  font-size: var(--ops-fs-title);
   font-weight: 700;
 }
 
@@ -161,12 +161,12 @@
 .ops-hud__overlay-btn {
   margin-top: 6px;
   background: transparent;
-  border: 1px solid rgba(230, 232, 232, 0.35);
-  color: #e6e8e8;
+  border: 1px solid var(--ops-border-strong);
+  color: var(--ops-ink);
   font: inherit;
-  font-size: 11px;
+  font-size: var(--ops-fs-md);
   letter-spacing: 0.08em;
-  padding: 2px 8px;
+  padding: 2px var(--ops-pad-y);
   cursor: pointer;
   opacity: 0.75;
 }
@@ -174,21 +174,21 @@
   opacity: 1;
 }
 .ops-hud__overlay-btn--active {
-  border-color: #f0a232;
-  --edge: #f0a232;
-  color: #ffc86a;
+  border-color: var(--ops-amber-watch);
+  --edge: var(--ops-amber-watch);
+  color: var(--ops-pale);
   opacity: 1;
 }
 .ops-hud__mute-btn {
   margin-top: 6px;
   margin-left: 6px;
   background: transparent;
-  border: 1px solid rgba(230, 232, 232, 0.35);
-  color: #e6e8e8;
+  border: 1px solid var(--ops-border-strong);
+  color: var(--ops-ink);
   font: inherit;
-  font-size: 11px;
+  font-size: var(--ops-fs-md);
   letter-spacing: 0.08em;
-  padding: 2px 8px;
+  padding: 2px var(--ops-pad-y);
   cursor: pointer;
   opacity: 0.75;
 }
@@ -199,12 +199,12 @@
   margin-top: 6px;
   margin-left: 6px;
   background: transparent;
-  border: 1px solid rgba(230, 232, 232, 0.35);
-  color: #e6e8e8;
+  border: 1px solid var(--ops-border-strong);
+  color: var(--ops-ink);
   font: inherit;
-  font-size: 11px;
+  font-size: var(--ops-fs-md);
   letter-spacing: 0.08em;
-  padding: 2px 8px;
+  padding: 2px var(--ops-pad-y);
   cursor: pointer;
   opacity: 0.75;
 }
@@ -212,27 +212,27 @@
   opacity: 1;
 }
 .ops-hud__cam-btn--active {
-  border-color: #f0a232;
-  --edge: #f0a232;
-  color: #ffc86a;
+  border-color: var(--ops-amber-watch);
+  --edge: var(--ops-amber-watch);
+  color: var(--ops-pale);
   opacity: 1;
 }
 /* Camera sliders: below the detail panel, hidden until ◉ opens them. */
 .ops-hud__cam-panel {
   margin-top: 8px;
-  border: 1px solid rgba(240, 162, 50, 0.45);
-  --edge: #f0a232;
-  background: rgba(10, 14, 18, 0.94);
-  padding: 8px 10px 10px;
+  border: 1px solid var(--ops-amber-glow);
+  --edge: var(--ops-amber-watch);
+  background: var(--ops-panel-cam);
+  padding: var(--ops-pad-y) var(--ops-pad-x) var(--ops-pad-x);
   min-width: 240px;
 }
 .ops-hud__cam-panel--hidden {
   display: none;
 }
 .ops-hud__cam-title {
-  font-size: 10px;
+  font-size: var(--ops-fs-sm);
   letter-spacing: 0.14em;
-  color: #ffc86a;
+  color: var(--ops-pale);
   opacity: 0.9;
   margin-bottom: 2px;
 }
@@ -240,8 +240,8 @@
   flex: none;
   min-width: 48px;
   text-align: right;
-  font-size: 11px;
-  color: #ffc86a;
+  font-size: var(--ops-fs-md);
+  color: var(--ops-pale);
   font-variant-numeric: tabular-nums;
 }
 .ops-hud__cam-toggles {
@@ -252,10 +252,10 @@
 .ops-hud__cam-toggle {
   flex: 1;
   background: transparent;
-  border: 1px solid rgba(230, 232, 232, 0.35);
-  color: #e6e8e8;
+  border: 1px solid var(--ops-border-strong);
+  color: var(--ops-ink);
   font: inherit;
-  font-size: 10px;
+  font-size: var(--ops-fs-sm);
   letter-spacing: 0.08em;
   padding: 3px 0;
   cursor: pointer;
@@ -265,36 +265,36 @@
   opacity: 1;
 }
 .ops-hud__cam-toggle--active {
-  border-color: #f0a232;
-  color: #ffc86a;
+  border-color: var(--ops-amber-watch);
+  color: var(--ops-pale);
   opacity: 1;
 }
 .ops-hud__slider-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--ops-pad-y);
   margin-top: 6px;
 }
 .ops-hud__slider-label {
   flex: none;
   width: 58px;
-  font-size: 10px;
+  font-size: var(--ops-fs-sm);
   opacity: 0.65;
   letter-spacing: 0.08em;
 }
 .ops-hud__slider {
   flex: 1;
   min-width: 0;
-  accent-color: #f0a232;
+  accent-color: var(--ops-amber-watch);
   cursor: pointer;
 }
 
 /* Alert banner: under the sector block. Worst fault + asset only.
  * A real button — click flies to the asset. */
 .ops-hud__banner {
-  border-color: #e31919;
-  --edge: #e31919;
-  color: #e6e8e8;
+  border-color: var(--ops-red-critical);
+  --edge: var(--ops-red-critical);
+  color: var(--ops-ink);
   white-space: nowrap;
   font: inherit;
   text-align: left;
@@ -303,8 +303,8 @@
 }
 
 .ops-hud__banner:hover {
-  border-color: #e6e8e8;
-  --edge: #e6e8e8;
+  border-color: var(--ops-ink);
+  --edge: var(--ops-ink);
 }
 
 .ops-hud__banner--hidden {
@@ -312,7 +312,7 @@
 }
 
 .ops-hud__banner-kind {
-  color: #e31919;
+  color: var(--ops-red-critical);
   font-weight: 700;
   margin-right: 8px;
 }
@@ -330,23 +330,23 @@
 /* Bottom-left help: ? button + shortcuts/controls overlay */
 .ops-hud__help {
   position: absolute;
-  bottom: 12px;
-  left: 12px;
+  bottom: var(--ops-inset);
+  left: var(--ops-inset);
   pointer-events: auto;
 }
 
 .ops-hud__help-btn {
   font: inherit;
-  color: #e6e8e8;
-  background: rgba(11, 12, 12, 0.72);
-  border: 1px solid rgba(230, 232, 232, 0.35);
-  padding: 5px 10px;
+  color: var(--ops-ink);
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-border-strong);
+  padding: 5px var(--ops-pad-x);
   cursor: pointer;
   pointer-events: auto;
 }
 
 .ops-hud__help-btn:hover {
-  border-color: #e6e8e8;
+  border-color: var(--ops-ink);
 }
 
 .ops-hud__help-panel {
@@ -354,9 +354,9 @@
   bottom: 100%;
   left: 0;
   margin-bottom: 6px;
-  background: rgba(11, 12, 12, 0.92);
-  border: 1px solid rgba(230, 232, 232, 0.18);
-  padding: 8px 10px;
+  background: var(--ops-panel-deep);
+  border: 1px solid var(--ops-border);
+  padding: var(--ops-pad-y) var(--ops-pad-x);
   min-width: 250px;
   white-space: nowrap;
 }
@@ -368,7 +368,7 @@
 .ops-hud__help-head {
   margin: 6px 0 2px;
   opacity: 0.55;
-  font-size: 10px;
+  font-size: var(--ops-fs-sm);
   letter-spacing: 0.1em;
 }
 
@@ -393,7 +393,7 @@
 /* Bottom-left legend (hatch-type key) — sits above the ? button. */
 .ops-hud__legend {
   bottom: 56px;
-  left: 12px;
+  left: var(--ops-inset);
   max-width: 300px;
   pointer-events: auto;
 }
@@ -401,13 +401,13 @@
 .ops-hud__legend-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--ops-pad-y);
 }
 
 /* Subtext under each key row: what the symbol means on the map. */
 .ops-hud__legend-sub {
   margin: 1px 0 6px 26px;
-  font-size: 10px;
+  font-size: var(--ops-fs-sm);
   letter-spacing: 0.06em;
   opacity: 0.55;
   max-width: 240px;
@@ -424,17 +424,17 @@
   height: 6px;
   width: 6px;
   border-radius: 50%;
-  background: #e6e8e8;
+  background: var(--ops-ink);
   margin: 0 6px;
 }
 
 .ops-hud__swatch--box {
   height: 8px;
-  border: 1px solid #e6e8e8;
+  border: 1px solid var(--ops-ink);
 }
 
 .ops-hud__swatch--dash {
-  border-top: 1px dashed #ff8c39;
+  border-top: 1px dashed var(--ops-warn);
 }
 
 /* Hatch-type swatches: diagonal-line fills mirroring the in-scene markers
@@ -446,39 +446,39 @@
 .ops-hud__swatch--hatch-wellhead {
   height: 14px;
   width: 20px;
-  border: 1px solid rgba(230, 232, 232, 0.9);
-  background-color: rgba(11, 12, 12, 0.9);
+  border: 1px solid var(--ops-edge-solid);
+  background-color: var(--ops-panel-hatch);
 }
 .ops-hud__swatch--hatch-compressor {
-  background-image: repeating-linear-gradient(45deg, rgba(230,232,232,0.9) 0 1px, transparent 1px 4px);
+  background-image: repeating-linear-gradient(45deg, var(--ops-edge-solid) 0 1px, transparent 1px 4px);
 }
 .ops-hud__swatch--hatch-valve {
   border-radius: 50%;
-  background-image: repeating-linear-gradient(135deg, rgba(230,232,232,0.9) 0 1px, transparent 1px 3px);
+  background-image: repeating-linear-gradient(135deg, var(--ops-edge-solid) 0 1px, transparent 1px 3px);
 }
 .ops-hud__swatch--hatch-terminal {
-  background-image: repeating-linear-gradient(30deg, rgba(230,232,232,0.9) 0 1px, transparent 1px 6px);
+  background-image: repeating-linear-gradient(30deg, var(--ops-edge-solid) 0 1px, transparent 1px 6px);
 }
 .ops-hud__swatch--hatch-wellhead {
   border-radius: 50%;
-  background-image: repeating-linear-gradient(60deg, rgba(230,232,232,0.9) 0 1px, transparent 1px 5px);
+  background-image: repeating-linear-gradient(60deg, var(--ops-edge-solid) 0 1px, transparent 1px 5px);
 }
 
 .ops-hud__hints {
   margin-top: 6px;
   opacity: 0.65;
-  font-size: 10px;
+  font-size: var(--ops-fs-sm);
 }
 
 /* Right column: detail panel with the camera toggle + sliders below it. */
 .ops-hud__rightcol {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: var(--ops-inset);
+  right: var(--ops-inset);
   width: 240px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--ops-pad-y);
   align-items: stretch;
   pointer-events: none;
 }
@@ -492,9 +492,9 @@
 
 /* VIEW presets: own box under the asset panel, selection only. */
 .ops-hud__viewbox {
-  background: rgba(11, 12, 12, 0.72);
-  border: 1px solid rgba(230, 232, 232, 0.18);
-  padding: 8px 10px;
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-border);
+  padding: var(--ops-pad-y) var(--ops-pad-x);
   pointer-events: auto;
 }
 
@@ -503,9 +503,9 @@
 }
 
 .ops-hud__viewbox-head {
-  font-size: 10px;
+  font-size: var(--ops-fs-sm);
   letter-spacing: 0.14em;
-  color: #ffc86a;
+  color: var(--ops-pale);
   opacity: 0.9;
   margin-bottom: 2px;
 }
@@ -516,8 +516,8 @@
 
 /* Right detail panel: top-right corner, no gap above it. */
 .ops-hud__panel {
-  top: 12px;
-  right: 12px;
+  top: var(--ops-inset);
+  right: var(--ops-inset);
   width: 240px;
   pointer-events: auto;
 }
@@ -531,9 +531,9 @@
 .ops-hud__level-btn {
   pointer-events: auto;
   font: inherit;
-  color: #e6e8e8;
-  background: rgba(11, 12, 12, 0.72);
-  border: 1px solid rgba(230, 232, 232, 0.35);
+  color: var(--ops-ink);
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-border-strong);
 }
 
 .ops-hud__search {
@@ -551,7 +551,7 @@
 }
 
 .ops-hud__asset-id {
-  font-size: 13px;
+  font-size: var(--ops-fs-asset);
   font-weight: 700;
   width: 100%;
 }
@@ -564,28 +564,28 @@
 .ops-hud__chip {
   display: inline-block;
   position: relative;
-  border: 1px solid rgba(230, 232, 232, 0.5);
+  border: 1px solid var(--ops-edge);
   padding: 0 6px;
   text-transform: uppercase;
 }
 
 .ops-hud__chip--watch {
-  border-color: #ff8c39;
-  --edge: #ff8c39;
-  color: #ff8c39;
+  border-color: var(--ops-warn);
+  --edge: var(--ops-warn);
+  color: var(--ops-warn);
 }
 
 .ops-hud__chip--critical {
-  border-color: #e31919;
-  --edge: #e31919;
-  color: #e31919;
+  border-color: var(--ops-red-critical);
+  --edge: var(--ops-red-critical);
+  color: var(--ops-red-critical);
 }
 
 .ops-hud__badge {
   position: relative;
-  border: 1px dashed #ff8c39;
-  --edge: #ff8c39;
-  color: #ff8c39;
+  border: 1px dashed var(--ops-warn);
+  --edge: var(--ops-warn);
+  color: var(--ops-warn);
   padding: 0 6px;
 }
 
@@ -598,13 +598,13 @@
 }
 
 .ops-hud__fault {
-  border-left: 2px solid #e31919;
+  border-left: 2px solid var(--ops-red-critical);
   padding-left: 6px;
   margin-top: 4px;
 }
 
 .ops-hud__comp {
-  border-left: 2px solid #ff8c39;
+  border-left: 2px solid var(--ops-warn);
   padding-left: 6px;
   margin-top: 4px;
 }
@@ -647,16 +647,16 @@
 }
 
 .ops-hud__level-btn--active {
-  border-color: #ff8c39;
-  --edge: #ff8c39;
-  color: #ff8c39;
+  border-color: var(--ops-warn);
+  --edge: var(--ops-warn);
+  color: var(--ops-warn);
 }
 
 /* Bottom-right system cluster: ··· menu + fullscreen */
 .ops-hud__sys {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
+  bottom: var(--ops-inset);
+  right: var(--ops-inset);
   display: flex;
   gap: 6px;
   align-items: flex-end;
@@ -667,10 +667,10 @@
 .ops-hud__more,
 .ops-hud__sys .ops-hud__cam-btn {
   font: inherit;
-  color: #e6e8e8;
-  background: rgba(11, 12, 12, 0.72);
-  border: 1px solid rgba(230, 232, 232, 0.35);
-  padding: 5px 10px;
+  color: var(--ops-ink);
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-border-strong);
+  padding: 5px var(--ops-pad-x);
   cursor: pointer;
   pointer-events: auto;
   white-space: nowrap;
@@ -679,13 +679,13 @@
 .ops-hud__fs:hover,
 .ops-hud__more:hover,
 .ops-hud__sys .ops-hud__cam-btn:hover {
-  border-color: #e6e8e8;
+  border-color: var(--ops-ink);
   opacity: 1;
 }
 
 .ops-hud__more {
   letter-spacing: 0.2em;
-  padding: 5px 8px 5px 12px;
+  padding: 5px var(--ops-pad-y) 5px var(--ops-inset);
 }
 
 /* Menu popover: overlay / sound / focus rows above the buttons */
@@ -694,9 +694,9 @@
   bottom: 100%;
   right: 0;
   margin-bottom: 6px;
-  background: rgba(11, 12, 12, 0.92);
-  border: 1px solid rgba(230, 232, 232, 0.18);
-  padding: 8px;
+  background: var(--ops-panel-deep);
+  border: 1px solid var(--ops-border);
+  padding: var(--ops-pad-y);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -737,11 +737,11 @@
  * health-only hues, never orientation furniture. */
 .ops-hud__compass,
 .ops-hud__scalebar {
-  --cut: 10px;
+  --cut: var(--ops-cut-sm);
   position: absolute;
-  background: rgba(11, 12, 12, 0.72);
-  border: 1px solid rgba(230, 232, 232, 0.18);
-  padding: 6px 12px 8px;
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-border);
+  padding: 6px var(--ops-inset) var(--ops-pad-y);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -751,13 +751,13 @@
 }
 
 .ops-hud__compass {
-  top: 12px;
+  top: var(--ops-inset);
   left: 50%;
   transform: translateX(-50%);
 }
 
 .ops-hud__compass-n {
-  font-size: 11px;
+  font-size: var(--ops-fs-md);
   font-weight: 700;
   letter-spacing: 0.1em;
 }
@@ -776,7 +776,7 @@
   left: 0;
   width: 14px;
   height: 11px;
-  background: #e6e8e8;
+  background: var(--ops-ink);
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
@@ -786,18 +786,18 @@
   left: 0;
   width: 14px;
   height: 11px;
-  background: rgba(230, 232, 232, 0.35);
+  background: var(--ops-border-strong);
   clip-path: polygon(0 0, 100% 0, 50% 100%);
 }
 
 .ops-hud__scalebar {
-  bottom: 12px;
+  bottom: var(--ops-inset);
   left: 50%;
   transform: translateX(-50%);
 }
 
 .ops-hud__scalebar-label {
-  font-size: 10px;
+  font-size: var(--ops-fs-sm);
   letter-spacing: 0.12em;
   opacity: 0.75;
   white-space: nowrap;
@@ -808,7 +808,7 @@
   display: flex;
   width: 120px;
   height: 5px;
-  border: 1px solid rgba(230, 232, 232, 0.6);
+  border: 1px solid var(--ops-edge-dim);
 }
 
 .ops-hud__scalebar-seg {
@@ -816,7 +816,7 @@
 }
 
 .ops-hud__scalebar-seg--fill {
-  background: rgba(230, 232, 232, 0.75);
+  background: var(--ops-edge-wash);
 }
 
 /* Site coords + clock: dim rows inside the sector block, no new box. */
@@ -824,7 +824,7 @@
 .ops-hud__clock {
   opacity: 0.65;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: var(--ops-fs-sm);
   letter-spacing: 0.08em;
 }
 
@@ -837,9 +837,9 @@
 .ops-hud__xray {
   opacity: 0.85;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: var(--ops-fs-sm);
   letter-spacing: 0.12em;
-  border: 1px dashed rgba(230, 232, 232, 0.6);
+  border: 1px dashed var(--ops-edge-dim);
   padding: 0 6px;
   margin-top: 2px;
   display: inline-block;

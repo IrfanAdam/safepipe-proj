@@ -1,0 +1,45 @@
+/* Safepipe Ops 3D tokens — additive extension, Phase 00 Task 1 (P0).
+ * Owns the --ops-* namespace ONLY. Aliases --sp-* where the value is an
+ * exact match (danger/warning/mono/spacing); HUD-native values (bone ink,
+ * dusk panels, amber-watch, pale) are defined literally — no --sp-*
+ * equivalent exists. Every value below is byte-identical to the v1
+ * src/ops3d/hud.css raw value it replaces (screenshot-diff gated).
+ */
+:root {
+  /* Ink + text */
+  --ops-ink: #e6e8e8;
+  --ops-bone: #e6e8e8;
+  /* Panels (dusk tints; alpha steps are load-bearing, do not merge) */
+  --ops-panel: rgba(11, 12, 12, 0.72);
+  --ops-panel-deep: rgba(11, 12, 12, 0.92);
+  --ops-panel-hatch: rgba(11, 12, 12, 0.9);
+  --ops-panel-cam: rgba(10, 14, 18, 0.94);
+  /* Borders + cut-edge strokes (bone at stepped alphas) */
+  --ops-border: rgba(230, 232, 232, 0.18);
+  --ops-border-strong: rgba(230, 232, 232, 0.35);
+  --ops-edge: rgba(230, 232, 232, 0.5);
+  --ops-edge-dim: rgba(230, 232, 232, 0.6);
+  --ops-edge-wash: rgba(230, 232, 232, 0.75);
+  --ops-edge-solid: rgba(230, 232, 232, 0.9);
+  /* Signal hues: amber = watch, red = critical only */
+  --ops-amber-watch: #f0a232;
+  --ops-amber-glow: rgba(240, 162, 50, 0.45);
+  --ops-red-critical: var(--sp-danger, #e31919);
+  --ops-warn: var(--sp-warning, #ff8c39);
+  --ops-pale: #ffc86a;
+  /* Type */
+  --ops-font-mono: var(--sp-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  --ops-fs-sm: 10px;
+  --ops-fs-md: 11px;
+  --ops-fs-title: 12px;
+  --ops-fs-asset: 13px;
+  /* Spacing (8/12 alias the --sp-* scale; HUD-only steps stay literal) */
+  --ops-pad-y: var(--sp-spacing-sm, 8px);
+  --ops-pad-x: 10px;
+  --ops-inset: var(--sp-spacing-md, 12px);
+  /* Chamfer-cut signature: 16px boxes / 10px chips + furniture */
+  --ops-cut-lg: 16px;
+  --ops-cut-sm: 10px;
+  /* Stacking */
+  --ops-z-hud: 10;
+}
