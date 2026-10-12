@@ -114,19 +114,19 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 | 14 | Facilities ✓ done T0+T1 (`6544f1f` + `8179d07`: 225 meshes, dyke area matches bp 688 ha within 1%) (tanks, processing blocks, buildings; reusable components; splat-assisted where licensable multi-view exists) | terminal recognisable vs board at TOP / ISO / NEAR |
 | 15 | Category parity loops + tier labels ✓ done (loop-log 7 runs, 0 unstamped meshes; baseline `094c7fb`) (per category: capture → diff → refine; every object stamped **derived** / **reconstructed** / **approximated**; loop log kept) | all objects tiered; loop log attached to gate note |
 
-### Task 10: assemble the reference board
+### Task 10: assemble the reference board ✓ done
 **Objective:** One cited source of visual truth every later task points at — dated frames from all sources, gaps named with download pages.
 **Verify:** Tasks 11–14 each cite board frames; board contains references + captures only, zero third-party pixels in-repo.
-### Task 11: detail the terrain + lay the roads
+### Task 11: detail the terrain + lay the roads ✓ done
 **Objective:** Ground you can drive on — micro-relief within DEM limits, road corridors draped, paved areas reading as paved.
 **Verify:** Orbit NEAR along a road — no float, no sink; too-coarse spots stamped approximated, not smoothed over.
-### Task 12: dress the backdrops
+### Task 12: dress the backdrops ✓ done
 **Objective:** The world around the terminal reads (coast, off-terminal structures, landforms) without stealing focus.
 **Verify:** ISO capture — backdrops present but the eye lands on the terminal first.
-### Task 13: run the pipelines
+### Task 13: run the pipelines ✓ done
 **Objective:** Continuous parametric pipe runs + rack repeats, routed only where evidence shows them.
 **Verify:** Trace a run at NEAR — unbroken; any inferred routing stamped as such, never claimed verified.
-### Task 14: raise the facilities
+### Task 14: raise the facilities ✓ done
 **Objective:** The money shot — tanks, processing blocks, buildings a viewer recognizes as Sangachal against the board at TOP / ISO / NEAR.
 **Verify:** Side-by-side board-vs-twin captures at all three distances; splat-assisted only where multi-view is licensable.
 ### Task 15: tier everything + keep the loop log ✓ done
