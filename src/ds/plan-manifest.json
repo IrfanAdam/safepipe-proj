@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-11T16:37:21.577Z",
+  "generated": "2026-10-12T07:21:17.838Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,51 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "caa94d6",
+      "full": "caa94d644ffe45af664fdf709300a87c42c5841a",
+      "date": "2026-10-12",
+      "time": "12:42",
+      "subject": "fix(ring2): last-resort 60-65 tilt band scoped to linework, drape lifts to floor [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "d577805",
+      "full": "d577805865fa9336e11d55b6b16645d072588243",
+      "date": "2026-10-12",
+      "time": "12:33",
+      "subject": "fix(ring2): register OSM vector mats in mix+tilt emphasis so high-tilt fade dims roads [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "7727ad9",
+      "full": "7727ad92b693bab9f98418dbcbf410446f31555a",
+      "date": "2026-10-12",
+      "time": "12:28",
+      "subject": "fix(ring2): authoritative per-frame map re-assertion + grazing-tilt clamp 65 + dive clamp 1500 + tilt-fade drape [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "ea7f7c8",
+      "full": "ea7f7c82a426ab5a678cefa010328f925a4bf679",
+      "date": "2026-10-11",
+      "time": "22:11",
+      "subject": "docs(plan): ledger tonight's Phase 01 commits [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "f1b0427",
+      "full": "f1b04278eaa1fbd7aafeca15a50998fab02b29be",
+      "date": "2026-10-11",
+      "time": "22:07",
+      "subject": "fix(ring2): retune proceduralH fallback shoreline to audited contours [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
     {
       "sha": "29b6a31",
       "full": "29b6a3154af20d37324d682d00f427f76de59dd7",
@@ -173,8 +218,8 @@
       "date": "2026-10-11",
       "time": "15:39",
       "subject": "fix(ops3d-v1): seed + follow map view from live twin pose pre-load — kills outer-disc flash on fast SAT slide (Safari)",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-10_150100-ops3d-sangachal-twin.md",
+      "anchor": "phase-4"
     },
     {
       "sha": "befed0a",
@@ -1127,8 +1172,8 @@
       "date": "2026-10-10",
       "time": "15:00",
       "subject": "fix(ops3d): scope lens stands down at full TWIN — slider promise kept, no photo bleed",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-10_150100-ops3d-sangachal-twin.md",
+      "anchor": "phase-4"
     },
     {
       "sha": "451b1e8",
@@ -1136,8 +1181,8 @@
       "date": "2026-10-10",
       "time": "13:34",
       "subject": "fix(ops3d): late map load clears stale watchdog offline tag",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "f2ece53",
@@ -1145,8 +1190,8 @@
       "date": "2026-10-10",
       "time": "13:30",
       "subject": "feat(ops3d): MapLibre owns the ground — real 3D terrain + satellite, twin overlays only",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-10_150100-ops3d-sangachal-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "8b94752",
@@ -1154,8 +1199,8 @@
       "date": "2026-10-09",
       "time": "23:55",
       "subject": "feat(ops3d): DEM-surveyed water — Viterbi river channel + measured lake basins, synthetic fallback",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "d371f08",
@@ -1163,8 +1208,8 @@
       "date": "2026-10-09",
       "time": "19:33",
       "subject": "chore: plan-tracker + changelog catch-up (loop commits through dfc8411)",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_130000-safepipe-changelog.md",
+      "anchor": "task-5"
     },
     {
       "sha": "dfc8411",
@@ -1172,8 +1217,8 @@
       "date": "2026-10-09",
       "time": "19:29",
       "subject": "feat(ops3d): Terrarium-primary DEM (16s cold), shared status bus, global budget, ?site= twins",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "a7dec9d",
@@ -1181,8 +1226,8 @@
       "date": "2026-10-09",
       "time": "18:45",
       "subject": "fix(ops3d): crossfade in sync — slant-corrected zoom + motion-adaptive map follow",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "1b7b48f",
@@ -1190,8 +1235,8 @@
       "date": "2026-10-09",
       "time": "18:33",
       "subject": "feat(ops3d): loop-1 atmosphere+edge — depth aerial perspective, survey-grey rim ring",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "9790bf4",
@@ -1199,8 +1244,8 @@
       "date": "2026-10-09",
       "time": "18:31",
       "subject": "feat(ops3d): real-map parity — pan-tracking center, true-scale zoom, natural satellite colors",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "cd74165",
@@ -1208,8 +1253,8 @@
       "date": "2026-10-09",
       "time": "18:25",
       "subject": "fix(ops3d): sat bar above system cluster — no more overlap",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "f299a0f",
@@ -1217,8 +1262,8 @@
       "date": "2026-10-09",
       "time": "18:24",
       "subject": "fix(ops3d): satellite never black — opaque base layer, loading/offline honesty, gallery base styles",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "24d7397",
@@ -1226,8 +1271,8 @@
       "date": "2026-10-09",
       "time": "18:13",
       "subject": "ops3d terrain loop1: surveyed carve axis, relief swing, thread legibility, valley-tag clip fix",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "795dce9",
@@ -1235,8 +1280,8 @@
       "date": "2026-10-09",
       "time": "18:10",
       "subject": "fix(ops3d): satellite base + SAT/TWIN/SCOPE bar in gallery specimen",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "d9994f2",
@@ -1244,8 +1289,8 @@
       "date": "2026-10-09",
       "time": "18:04",
       "subject": "feat(ops3d): SCOPE toggle flies camera to TOP/network on enable",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "5cfb524",
@@ -1253,8 +1298,8 @@
       "date": "2026-10-09",
       "time": "18:04",
       "subject": "ops3d loop1: emissive hierarchy + label leaders (network/labels/markers)",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "3f4896e",
@@ -1262,8 +1307,8 @@
       "date": "2026-10-09",
       "time": "17:38",
       "subject": "feat(ops3d): valley-seated water lines (no slab/carets), glow cut 0.55-0.95, trough carve",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "432fdca",
@@ -1271,8 +1316,8 @@
       "date": "2026-10-09",
       "time": "17:36",
       "subject": "feat(ops3d): render-fidelity pass — MSAA post RT, pixel-ratio cap, fog/vignette depth, cinematic push-in",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "6086d3b",
@@ -1280,8 +1325,8 @@
       "date": "2026-10-09",
       "time": "17:32",
       "subject": "feat(ops3d): circular satellite monitor clipped to TOP scope disc",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "ae68eba",
@@ -1298,8 +1343,8 @@
       "date": "2026-10-09",
       "time": "16:46",
       "subject": "feat(ops3d): grazing-angle armor — camera floor, terrain-seated labels, occlusion fade",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "04a5b49",
@@ -1307,8 +1352,8 @@
       "date": "2026-10-09",
       "time": "16:38",
       "subject": "feat(ops3d): open-source satellite base (MapLibre + Esri/Terrarium, tokenless)",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "ef68282",
@@ -1316,8 +1361,8 @@
       "date": "2026-10-09",
       "time": "16:32",
       "subject": "fix(ops3d): neutral pipes lead over quiet land — walls up, contour glow cut (terrain agent)",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "d5f4bd8",
@@ -1325,8 +1370,8 @@
       "date": "2026-10-09",
       "time": "16:29",
       "subject": "feat(ops3d): live compass+scale furniture, single-popover manager, TOP label restraint, focus X-ray",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "3ab1323",
@@ -1334,8 +1379,8 @@
       "date": "2026-10-09",
       "time": "16:27",
       "subject": "fix(ops3d): shrink flow chevrons to tube width — no more blobs at TOP",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "2c14b61",
@@ -1343,8 +1388,8 @@
       "date": "2026-10-09",
       "time": "16:20",
       "subject": "feat(ops3d): mapbox satellite base + crossfade to custom twin (tokenless-safe)",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "ccbc26e",
@@ -1352,8 +1397,8 @@
       "date": "2026-10-09",
       "time": "16:19",
       "subject": "feat(ops3d): cylindrical tube walls + neutral-white chevron flow, blue reserved for water",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
     },
     {
       "sha": "4666a95",
@@ -2275,7 +2320,6 @@
     }
   ],
   "wip": [
-    "docs/source-manifest.json",
-    "src/ring2/field.js"
+    "src/ds/plan-retro.json"
   ]
 }
