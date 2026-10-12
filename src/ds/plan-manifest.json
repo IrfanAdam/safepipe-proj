@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T12:06:23.156Z",
+  "generated": "2026-10-12T12:13:31.680Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,24 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "d4be641",
+      "full": "d4be6418294be0f5355a6f5f1fbef7a0888915c1",
+      "date": "2026-10-12",
+      "time": "17:43",
+      "subject": "feat(ring2): loop hardened — HUD mask, 5s settle, T3 baseline, all views stable [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "c0a0bed",
+      "full": "c0a0bedb11a220740585ff529deb0592363919cc",
+      "date": "2026-10-12",
+      "time": "17:36",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "8f79263",
       "full": "8f792639ff328f531c6c692563b9d656f3dec49c",
