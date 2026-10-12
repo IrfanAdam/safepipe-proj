@@ -50,7 +50,7 @@ globalThis.document ??= {
   querySelector: () => null,
 };
 
-const { takeoverU } = await import('../src/ring2/takeover.js');
+const { takeoverU, gatePureSatEndpoint } = await import('../src/ring2/takeover.js');
 const { tiltU } = await import('../src/ring2/sync.js');
 const { mountMixBar } = await import('../src/ring2/mix.js');
 
@@ -75,30 +75,40 @@ function mountAtSat(spies = {}) {
   return { ctl, emphasis, takeover };
 }
 
-test('pure law: fresh u is 1 steep+close, 0 top-down far at mix 0', () => {
-  assert.equal(Math.max(takeoverU(0), tiltU(65, 1500)), 1, 'steep+close must take over at mix 0');
-  assert.equal(Math.max(takeoverU(0), tiltU(0, 32000)), 0, 'zenith far must stay satellite at mix 0');
+test('pure law: raw fresh u still 1 steep+close, but the SAT endpoint gates it to 0', () => {
+  assert.equal(Math.max(takeoverU(0), tiltU(65, 1500)), 1, 'raw merge still takes steep+close');
+  assert.equal(Math.max(takeoverU(0), tiltU(0, 32000)), 0, 'zenith far stays satellite');
+  assert.equal(gatePureSatEndpoint(0, 1), 0, 'mix 0 pins the merged u to 0 (pure satellite)');
+  assert.equal(gatePureSatEndpoint(50, 0.5), 0.5, 'mix 50 passes the merged u through untouched');
 });
 
-test('twin side follows a simulated dive: lastT-equivalent tracks fresh u per frame', () => {
+test('twin side follows a simulated dive — except at mix 0, where the SAT endpoint holds', () => {
   const { ctl, emphasis, takeover } = mountAtSat();
   assert.equal(emphasis.at(-1), 0, 'mount FAR: emphasis starts at 0');
   assert.equal(takeover.at(-1), 0, 'mount FAR: takeover starts at 0');
-  // CLOSE grazing pass — fresh u rides to 1 on BOTH sides.
+  // CLOSE grazing pass at mix 0 — the pure-satellite endpoint holds: tilt
+  // can no longer relight emphasis or twin ground over the bare photo.
   ctl.updateForCamera(65, 1500);
-  assert.equal(emphasis.at(-1), 1, 'CLOSE grazing: emphasis (lastT) must ride to max(t, fresh-u)=1');
-  assert.equal(takeover.at(-1), 1, 'CLOSE grazing: takeover must ride to fresh-u=1');
-  // Back out to FAR — fresh u returns to 0 on BOTH sides (the live bug left 1 behind).
+  assert.equal(emphasis.at(-1), 0, 'CLOSE grazing at mix 0: emphasis stays 0');
+  assert.equal(takeover.at(-1), 0, 'CLOSE grazing at mix 0: takeover stays 0');
+  // Back out to FAR — still 0.
   ctl.updateForCamera(0, 32000);
-  assert.equal(emphasis.at(-1), 0, 'FAR return: emphasis (lastT) must fall back to max(0, 0)=0');
-  assert.equal(takeover.at(-1), 0, 'FAR return: takeover must fall back to fresh-u=0');
+  assert.equal(emphasis.at(-1), 0, 'FAR return: emphasis stays 0');
+  assert.equal(takeover.at(-1), 0, 'FAR return: takeover stays 0');
+  // Same dive at mix 50 — the band still rides fresh u.
+  ctl.setMix(50);
+  ctl.updateForCamera(65, 1500);
+  const fresh = Math.max(takeoverU(50), tiltU(65, 1500));
+  assert.ok(Math.abs(emphasis.at(-1) - Math.max(0.5, fresh)) < 1e-12, `mix-50 dive: emphasis rides max(0.5, u) (got ${emphasis.at(-1)})`);
+  assert.ok(Math.abs(takeover.at(-1) - fresh) < 1e-12, `mix-50 dive: takeover rides u (got ${takeover.at(-1)})`);
 });
 
 test('twin side mid-ramp follows fresh u (no sticking at endpoints)', () => {
   const { ctl, emphasis, takeover } = mountAtSat();
+  ctl.setMix(50);
   ctl.updateForCamera(62.5, 6500);
-  const fresh = Math.max(takeoverU(0), tiltU(62.5, 6500));
+  const fresh = Math.max(takeoverU(50), tiltU(62.5, 6500));
   assert.ok(fresh > 0 && fresh < 1, `mid state must be genuinely mid (got ${fresh})`);
-  assert.ok(Math.abs(emphasis.at(-1) - fresh) < 1e-12, `emphasis must equal fresh u (got ${emphasis.at(-1)}, want ${fresh})`);
+  assert.ok(Math.abs(emphasis.at(-1) - Math.max(0.5, fresh)) < 1e-12, `emphasis must equal max(0.5, u) (got ${emphasis.at(-1)}, want ${Math.max(0.5, fresh)})`);
   assert.ok(Math.abs(takeover.at(-1) - fresh) < 1e-12, `takeover must equal fresh u (got ${takeover.at(-1)}, want ${fresh})`);
 });

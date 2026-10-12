@@ -49,3 +49,15 @@ export function satBaseV(mix) {
 export function groundHidden(mix) {
   return clampMixNum(mix) >= TAKEOVER_FULL;
 }
+
+/* Pure-satellite endpoint gate: stored/effective mix 0 means bare photo —
+ * the tilt takeover must not reintroduce twin content there (it used to
+ * relight emphasis + twin ground at steep+close pitch even at mix 0).
+ * Returns 0 at the SAT endpoint, the merged u unchanged everywhere else:
+ * endpoint-only, the 1..100 band law is untouched. mix.js gates the merged
+ * (slider ramp + tiltU) u through this on the EFFECTIVE mix, so the
+ * pre-map dead-end floor (eff 50 while the map mounts) still keeps the
+ * live twin up instead of black-holing. */
+export function gatePureSatEndpoint(mix, u) {
+  return clampMixNum(mix) <= 0 ? 0 : u;
+}

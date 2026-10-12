@@ -24,7 +24,7 @@
  * [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-3]
  */
 import { setGroundOwns, getGroundOwns, setGroundFade } from './mapbase.js';
-import { takeoverU, groundHidden } from './takeover.js';
+import { takeoverU, groundHidden, gatePureSatEndpoint } from './takeover.js';
 import { twinPointerEvents, tiltU } from './sync.js';
 
 export const MIX_STORE_KEY = 'ring2.mix';
@@ -170,9 +170,15 @@ export function mountMixBar(el, opts = {}) {
    * both consume it, so the twin ground, the satellite fade and the
    * endpoint rule can never disagree): u = max(takeoverU(effMix),
    * tiltU(pitch, range)). Slider owns the base top-down at any range;
-   * steep + close tilt takes it regardless of slider. */
+   * steep + close tilt takes it regardless of slider — EXCEPT at the
+   * pure-satellite endpoint: effective mix 0 pins u to 0
+   * (gatePureSatEndpoint) so tilt can never relight emphasis or twin
+   * ground over the bare photo. Gated on the EFFECTIVE mix so the pre-map
+   * dead-end floor (eff 50 while the map mounts) still keeps the live
+   * twin up; endpoint-only, the 1..100 band is untouched. */
   function effUNow() {
-    return Math.max(takeoverU(effMixNow()), tiltU(lastPitch, lastRange));
+    const merged = Math.max(takeoverU(effMixNow()), tiltU(lastPitch, lastRange));
+    return gatePureSatEndpoint(effMixNow(), merged);
   }
 
   function setMix(v, { silent = false } = {}) {
@@ -248,5 +254,13 @@ export function mountMixBar(el, opts = {}) {
     // reads 50 so the live twin stays visible). Feeds the eff: telemetry
     // token so the bar can show stored vs effective side by side.
     getEffMix: () => effMixNow(),
+    // Pure-satellite endpoint flag: true exactly when the twin channel is
+    // fully gated (effective mix 0 with the map up — emphasis 0, takeover
+    // ground hidden, satellite base at full opacity). Lanes whose content
+    // bypasses the emphasis registry (unregistered facility/vector groups)
+    // can consume this for group visibility until their materials register
+    // via addEmphasisMats; pre-map it reads false (dead-end floor) so the
+    // live twin stays up while the map mounts.
+    getSatOnly: () => effMixNow() <= 0,
   };
 }
