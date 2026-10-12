@@ -295,6 +295,15 @@ export function createOverlayTwin(container, opts = {}) {
 
   const controls = new OrbitControls(camera, canvas);
   controls.target.set(0, 0, 0);
+  /* Ground-plane pan (pan-drift fix): screenSpacePanning=true (the three.js
+   * default) lifts/drops controls.target.y on every vertical screen drag at
+   * oblique pitch, but getPose() below reports terrain-snapped ty while the
+   * twin renders the drifted target — the rendered view ray and the synced
+   * map ray shear further apart with every pan. false keeps pan in the world
+   * XZ plane (map-style pan; target.y is owned solely by the terrain snap in
+   * updateControls).
+   * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+  controls.screenSpacePanning = false;
   // Input-ownership note: touches stay at the OrbitControls default
   // (ONE-finger ROTATE, TWO-finger DOLLY_PAN). Pan MUST keep working
   // through the twin — the map is non-interactive and follows via the
@@ -1031,6 +1040,18 @@ function edgeFade(x, z) {
    * update() stays as the both-phases shortcut for external callers. */
   function updateControls() {
     controls.update();
+    /* Target-terrain snap (pan-drift fix): the twin must RENDER exactly the
+     * pose the per-frame sync sends — getPose() reports target.y =
+     * sampleH*VEX, so the orbit target is snapped to the same value here,
+     * after damping settles and before main.js reads the pose / paints.
+     * Without this the rendered ray (drifted controls.target.y) and the map
+     * ray (snapped ty) disagree by the drift, growing with every pan at
+     * oblique pitch. Per-frame delta is cm-scale (terrain slope × damped
+     * step) and the snap is a fixed point at rest, so orbit feel is unchanged.
+     * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+    try {
+      controls.target.y = sampleH(controls.target.x, controls.target.z) * VEX;
+    } catch { /* field not ready — pose falls back with target.y as-is */ }
     updatePills();
     // Rim tilt feed (pan-aware): pitch off the orbit target, azimuth off
     // the camera-to-target ground direction. uTiltT is 0 at nadir, so the

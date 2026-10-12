@@ -66,6 +66,23 @@ test('probe: assertMapNonInteractive passes only when no handler owns input', ()
   assert.equal(assertMapNonInteractive({}), true);
 });
 
+test('pan-drift fix: twin pans in the ground plane (screenSpacePanning=false)', () => {
+  const raw = srcOf('../src/ring2/overlays.js');
+  const code = raw.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(
+    /screenSpacePanning\s*=\s*false/.test(code),
+    'twin must pan in the world XZ plane so oblique screen drags never lift/drop target.y',
+  );
+});
+
+test('pan-drift fix: updateControls snaps the orbit target to the terrain', () => {
+  const raw = srcOf('../src/ring2/overlays.js');
+  assert.ok(
+    /controls\.target\.y\s*=\s*sampleH\(controls\.target\.x,\s*controls\.target\.z\)\s*\*\s*VEX/.test(raw),
+    'twin must render exactly the terrain-snapped pose the per-frame sync sends (else rendered vs map rays shear)',
+  );
+});
+
 test('twin keeps pan: OrbitControls never disables pan or drops DOLLY_PAN', () => {
   const raw = srcOf('../src/ring2/overlays.js');
   const code = raw.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
