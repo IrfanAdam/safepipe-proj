@@ -22,7 +22,7 @@ import { mountMapBase, assertTerrainOn, releaseMap } from './mapbase.js';
 import { applyTwinToMap, assertTerrainVex, pitchForPose, MAP_TRUE_FOV_DEG, aspectMismatch } from './sync.js';
 import { createOverlayTwin } from './overlays.js';
 import * as THREE from 'three';
-import { buildT0, buildT1 } from './facilities/index.js';
+import { buildT0, buildT1, buildBackdrops } from './facilities/index.js';
 import { sampleH } from './field.js';
 import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
@@ -408,7 +408,7 @@ async function boot() {
   // (board F1+S1–S6). Additive group — facilities never break boot.
   // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]
   try {
-    for (const build of [buildT0, buildT1]) {
+    for (const build of [buildT0, buildT1, buildBackdrops]) {
       const g = build();
       if (!g) continue;
       // Grounding (parent-owned): each sited structure sits on the live DEM

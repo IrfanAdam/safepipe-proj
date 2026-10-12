@@ -11,6 +11,9 @@ import { buildHalls } from './halls.js';
 import { buildFlare } from './flare.js';
 import { buildAdmin } from './admin.js';
 import { buildPerimeter } from './perimeter.js';
+import { buildCoast } from './coast.js';
+import { buildOffsite } from './offsite.js';
+import { buildLandform } from './landform.js';
 
 export { buildTanks } from './tanks.js';
 export { buildTrains } from './trains.js';
@@ -19,6 +22,9 @@ export { buildHalls } from './halls.js';
 export { buildFlare } from './flare.js';
 export { buildAdmin } from './admin.js';
 export { buildPerimeter } from './perimeter.js';
+export { buildCoast, SHORE, shoreXAt, shoreSlopeAt, coastSegFrame } from './coast.js';
+export { buildOffsite, NAVAL, navalDistKm, QUARRIES, quarryDistKm, M2, m2LengthM } from './offsite.js';
+export { buildLandform, HILL_N, HILL_SW, HILLOCK, hillockSpots } from './landform.js';
 export * from './dims.js';
 
 /** Assemble the full T0 structures group. Parent owns siting/grounding. */
@@ -42,5 +48,18 @@ export function buildT1() {
   g.add(buildFlare());
   g.add(buildAdmin());
   g.add(buildPerimeter());
+  return g;
+}
+
+/** Assemble the additive backdrops group (T0/T1 untouched): shoreline
+ * treatment + off-terminal structures + hillock furniture. Parent owns
+ * siting/grounding; no main.js/overlays/boot edits here. */
+export function buildBackdrops() {
+  const g = new THREE.Group();
+  g.name = 'BD-backdrops';
+  g.userData.phase = 'BD';
+  g.add(buildCoast());
+  g.add(buildOffsite());
+  g.add(buildLandform());
   return g;
 }
