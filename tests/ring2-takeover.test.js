@@ -1,6 +1,6 @@
 // tests/ring2-takeover.test.js — smooth base crossfade band.
-// The base swap (satellite photo <-> twin ground) dissolves across mix
-// 40->100 on BOTH sides via one smoothstep: twin ground ramps 0->1
+// The base swap (satellite photo <-> twin ground) dissolves across the
+// WHOLE mix 0->100 range via one smoothstep: twin ground ramps 0->1
 // (takeoverU) while the satellite base fades 1->0 (satBaseV) as paint
 // opacity. Only the visibility endpoint stays binary (hidden at exactly
 // 100, where the twin ground is opaque — never a black hole).
@@ -16,28 +16,29 @@ import {
   groundHidden,
 } from '../src/ring2/takeover.js';
 
-test('thresholds: smooth band 40->100, full at 100', () => {
-  assert.equal(TAKEOVER_START, 40);
+test('thresholds: smooth band 0->100, full at 100', () => {
+  assert.equal(TAKEOVER_START, 0);
   assert.equal(TAKEOVER_FULL, 100);
 });
 
-test('takeoverU: zero below the band (overlay composite untouched)', () => {
-  for (const m of [0, 25, 39, 40]) {
-    assert.equal(takeoverU(m), 0, `mix ${m}`);
+test('takeoverU: zero only at the endpoint (no dead zone, ease starts at 0)', () => {
+  assert.equal(takeoverU(0), 0);
+  for (const m of [1, 10, 25, 40]) {
+    assert.ok(takeoverU(m) > 0, `mix ${m} must already ease in (got ${takeoverU(m)})`);
   }
 });
 
 test('takeoverU: smoothstep endpoints exact, midpoint halves', () => {
   assert.equal(takeoverU(100), 1);
   assert.equal(takeoverU(250), 1);
-  // Band midpoint (40+100)/2 = 70: smoothstep(0.5) = 0.5 exactly.
-  assert.equal(takeoverU(70), 0.5);
+  // Band midpoint (0+100)/2 = 50: smoothstep(0.5) = 0.5 exactly.
+  assert.equal(takeoverU(50), 0.5);
 });
 
 test('takeoverU: smoothstep values across the band', () => {
   const sstep = (t) => t * t * (3 - 2 * t);
-  for (const m of [41, 50, 60, 80, 90, 95, 99]) {
-    const t = (m - 40) / (100 - 40);
+  for (const m of [1, 10, 25, 40, 60, 80, 90, 95, 99]) {
+    const t = m / 100;
     assert.ok(
       Math.abs(takeoverU(m) - sstep(t)) < 1e-12,
       `mix ${m}: got ${takeoverU(m)}, want smoothstep(${t})`,
@@ -50,10 +51,10 @@ test('takeoverU: per-step delta bounded (no jump anywhere)', () => {
   for (let m = 0; m < 100; m++) {
     worst = Math.max(worst, Math.abs(takeoverU(m + 1) - takeoverU(m)));
   }
-  // Smoothstep peak slope is 1.5/60 = 0.025/step; linear would allow
-  // 1/60 ≈ 0.0167. Anything near 0.5/step would be the old 2-step jump.
-  assert.ok(worst < 0.035, `max per-step delta ${worst} must stay < 0.035`);
-  assert.ok(worst > 0.015, `band must actually move (worst ${worst})`);
+  // Smoothstep peak slope is 1.5/100 = 0.015/step; linear would allow
+  // 1/100 = 0.01. Anything near 0.5/step would be the old 2-step jump.
+  assert.ok(worst < 0.025, `max per-step delta ${worst} must stay < 0.025`);
+  assert.ok(worst > 0.008, `band must actually move (worst ${worst})`);
 });
 
 test('takeoverU: monotone non-decreasing over the whole slider', () => {
@@ -64,9 +65,9 @@ test('takeoverU: monotone non-decreasing over the whole slider', () => {
 
 test('satBaseV: mirror of the ramp across the same band', () => {
   assert.equal(satBaseV(0), 1);
-  assert.equal(satBaseV(40), 1);
-  assert.equal(satBaseV(70), 0.5);
+  assert.equal(satBaseV(50), 0.5);
   assert.equal(satBaseV(100), 0);
+  assert.ok(satBaseV(25) < 1 && satBaseV(25) > 0.5, `satBaseV(25) must ease mid-band (got ${satBaseV(25)})`);
   for (let m = 0; m <= 100; m++) {
     assert.ok(Math.abs(satBaseV(m) - (1 - takeoverU(m))) < 1e-12, `mix ${m}: base+twin must sum to 1`);
   }
@@ -74,11 +75,11 @@ test('satBaseV: mirror of the ramp across the same band', () => {
   for (let m = 0; m < 100; m++) {
     worst = Math.max(worst, Math.abs(satBaseV(m + 1) - satBaseV(m)));
   }
-  assert.ok(worst < 0.035, `satellite per-step delta ${worst} must stay < 0.035`);
+  assert.ok(worst < 0.025, `satellite per-step delta ${worst} must stay < 0.025`);
 });
 
 test('groundHidden: only at full takeover (never a black hole)', () => {
-  for (const m of [0, 39, 40, 50, 70, 99]) {
+  for (const m of [0, 25, 40, 50, 70, 99]) {
     assert.equal(groundHidden(m), false, `mix ${m}`);
   }
   assert.equal(groundHidden(100), true);

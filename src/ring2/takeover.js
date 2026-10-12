@@ -1,6 +1,6 @@
 /* Safepipe Ops3D Ring-2 — src/ring2/takeover.js (Phase 4, Issue 2).
- * True-endpoint crossfade math. The slider fades overlay emphasis over a
- * live satellite base through the low/mid-range; across the base band
+ * True-endpoint crossfade math. The slider eases overlay emphasis over a
+ * live satellite base across the WHOLE 0->100 range; across the full band
  * (TAKEOVER_START->TAKEOVER_FULL) the twin ground ramps in AND the
  * satellite base fades out over the SAME steps, so the base swap reads as
  * a smooth dissolve instead of a 2-step jump. At exactly TAKEOVER_FULL the
@@ -10,8 +10,8 @@
  * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
  */
 
-/** Base crossfade band starts here (below: pure overlay composite, as before). */
-export const TAKEOVER_START = 40;
+/** Base crossfade band starts here (full-slider ease: no dead zone). */
+export const TAKEOVER_START = 0;
 /** Full takeover here: twin ground opaque AND satellite ground hidden. */
 export const TAKEOVER_FULL = 100;
 
@@ -21,10 +21,10 @@ function clampMixNum(v) {
   return Math.min(100, Math.max(0, Math.round(n)));
 }
 
-/* Smoothstep ramp: 0 at/below TAKEOVER_START, 1 at/above TAKEOVER_FULL.
+/* Smoothstep ramp: 0 at 0, 1 at/above TAKEOVER_FULL.
  * u = t^2*(3-2t) with t the band fraction — zero slope at both ends, so
  * neither the satellite-side fade nor the twin-ground ramp starts or lands
- * with a visible step. Max per-step delta is 1.5/bandWidth = 1.5/60 = 0.025, far
+ * with a visible step. Max per-step delta is 1.5/bandWidth = 1.5/100 = 0.015, far
  * below any perceivable jump. Drives the twin ground mesh opacity
  * (overlays/mix.js feed it straight to the twin). */
 export function takeoverU(mix) {
