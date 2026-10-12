@@ -86,6 +86,11 @@ T2/T3 per tier loop (Task 15).
   (40.201997,49.482156) · (40.202747,49.483610); 60 m sphere (40.193380,49.459434).
 - 116 tank ways in F1 (157 counting nodes); shells not bunds at these diameters.
 
+## T2 refinement seeds
+
+- Racks: 132 in-terminal OSM pipeline ways carry real routes (F1) — current
+  T0 corridors sit at approximated anchors; re-seat lanes on way geometries.
+
 ## T1 candidate seeds (measured F1 footprints ≥40 m, function UNVERIFIED)
 
 Function TBD by T1 lane against EBRD zone tables + aerial pattern — positions
