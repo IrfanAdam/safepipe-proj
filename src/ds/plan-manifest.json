@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T09:05:52.926Z",
+  "generated": "2026-10-12T09:34:59.419Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,24 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "8972aaf",
+      "full": "8972aafe8146ef38dd259bd7701d2ae9b420af5d",
+      "date": "2026-10-12",
+      "time": "15:04",
+      "subject": "fix(ring2): twin-side mix follows per-frame camera clock, ends stale ghost cubes [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "7738a96",
+      "full": "7738a96f363bcbe6ea695118d022bfb03363e913",
+      "date": "2026-10-12",
+      "time": "14:35",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-00]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-00"
+    },
     {
       "sha": "1b7ca0b",
       "full": "1b7ca0b7964e55444c6a903a3de2c51f80da4f5a",
