@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T11:53:56.258Z",
+  "generated": "2026-10-12T12:03:01.970Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,24 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "c540c02",
+      "full": "c540c02663fc5d3fb3b1320ec9e9976c7e9bf8ec",
+      "date": "2026-10-12",
+      "time": "17:33",
+      "subject": "fix(ring2): kill sea band — sand follows real waterline; M2 on true trace; domes de-olived [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "d2c5a7c",
+      "full": "d2c5a7cc77ccffc2be5c89596bcafe821692fb8c",
+      "date": "2026-10-12",
+      "time": "17:27",
+      "subject": "chore(history): backfill committed plan snapshots — v3 now 15 revs [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
     {
       "sha": "e4d0711",
       "full": "e4d071184d1211614cc5a4c2a2b351cafd254c9b",
@@ -2768,9 +2786,6 @@
     "scripts/data-pipe/out/sangachal-vectors.json",
     "scripts/data-pipe/overpass.mjs",
     "scripts/data-pipe/run.mjs",
-    "scripts/data-pipe/validate.mjs",
-    "src/ring2/facilities/coast.js",
-    "src/ring2/facilities/landform.js",
-    "src/ring2/facilities/offsite.js"
+    "scripts/data-pipe/validate.mjs"
   ]
 }
