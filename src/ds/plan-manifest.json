@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T09:55:58.364Z",
+  "generated": "2026-10-12T10:00:13.586Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,24 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "831c745",
+      "full": "831c745c6871fc7e2f745f8f1d723a095dd52967",
+      "date": "2026-10-12",
+      "time": "15:30",
+      "subject": "feat(ring2): full-band 0-100 slide ease, no dead zone [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "ea409fa",
+      "full": "ea409fac848851ce5b0f256df76fe479847b7454",
+      "date": "2026-10-12",
+      "time": "15:25",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
     {
       "sha": "8e15ad7",
       "full": "8e15ad762ca68c3cbf4c4e47b3427db19de2886c",
