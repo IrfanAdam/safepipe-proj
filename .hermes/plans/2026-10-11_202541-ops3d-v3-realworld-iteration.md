@@ -1,6 +1,6 @@
 # OPS 3D V3 — REAL-WORLD SA… (Ring-2 chassis iteration)
 
-> Status: 🟡 BUILDING v3 — Phase 00 pending owner's go. Binding spec: `/Users/irfan/.hermes/attachments/pasted_content_2026-10-11_15-02-15-677_1a4c96.txt` (owner's Sangachal outline, 277 lines, verbatim — more optimization input to follow).
+> Status: 🟢 CANVAS LOCKED — base map + twin locked as the canvas (Phase 01 shipped, owner-verified). NEXT: twin-model build (Phase 02 facility reconstruction, scored by the parity rubric). Binding spec: `/Users/irfan/.hermes/attachments/pasted_content_2026-10-11_15-02-15-677_1a4c96.txt` (owner's Sangachal outline, 277 lines, verbatim). Parity rubric: `/Users/irfan/.hermes/attachments/pasted_content_2026-10-12_08-22-14-560_f474d7.txt` (real→digital parity guide — the evaluation lens for every REF GATE below).
 > Continues method of: `2026-10-07_153000-ops3d-realworld-twin.md` (Phases 00–01 done — foundation + real-terrain workflow in `src/ops3d/`, carried over as method, not site).
 > Replaces as active plan: `2026-10-10_191500-ops3d-ring2-seamless-redo.md` (COMPLETE — pushed `c36d8d1`). Ring-2 @ Sangachal stays live as the shipped reference build AND the v3 work site.
 > Chassis: `src/ring2/` + `ops3d-ring2.html` (gate-mount, context-loss recovery + telemetry, takeover endpoints, same-frame zoom sync, tilt-aware rim fade).
@@ -108,6 +108,22 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 ---
 
+## Twin parity rubric (real → digital evaluation)
+
+*The parity doc is the yardstick, not a second build spec. Every REF GATE is scored against it — a gate passes only when its parity checks hold. Evidence wins over looks: geographic accuracy + coherent reconstruction over decorative effects.*
+
+| Gate | Parity check (rubric §§) | Pass bar |
+|---|---|---|
+| REF 1 — terrain canvas ✅ | §§2–4: real-DEM mesh, true proportions + units, water separated, coastline agrees with imagery at control points, imagery bounds + projection honored, too-coarse acknowledged never invented | owner confirms terrain reads as the real Sangachal coast (screenshot vs reference) |
+| REF 2 — facility | §5: majors placed by geographic reference; every object tiered **derived** / **reconstructed** / **approximated**; no fabricated hidden detail, no verified-claims on inferred dims/routes; reusable components; hierarchy terrain / water / roads / buildings / industrial | owner approves honesty (toy / noisy / just right) + tier labels visible |
+| REF 3–5 — launcher / time / ops | §6: interaction parity, selection round-trips to panel; sim state labeled modeled + SIM watermark; no invented live state | per-gate owner sign-off as tabled |
+| REF 6 — lock (final) | §§7–10: pipeline reproducible from docs alone; manifest covers every external file with license; README states accuracy limits; scene recognisably the real terminal landscape | full walkthrough sign-off |
+
+- Parity evidence per gate: captures TOP / ISO / NEAR at mix 0 / 50 / 100, set against the pinned reference set and attached to the gate note.
+- Disputes resolve to the rubric, not to taste. A prettier gate that breaks a parity check fails the gate.
+
+---
+
 ## Standing rules
 
 - Ports: agents on `:5198`/`:5199` only — NEVER `:5173`/`:5175` (owner's). Reuse live `:5198`, never start/kill servers.
@@ -115,4 +131,4 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 - Tests + `npm run build` green before every commit; commit carries `[plan:<this-file>#<phase>]`; no push without owner's `y`.
 - Every phase ends at its REF GATE before the next starts. Phases never restart silently.
 - Headless-WebKit green ≠ real-Safari proven: Safari proof is an owner-device screenshot with readable telemetry bar.
-- The binding spec (attachment path in the header) MUST be passed in-context to every Phase 01–02 task delegation, and each task's verify step checks its spec section (§§1–9) — the plan tables are the index, the attachment is the text.
+- The binding spec + parity rubric (attachment paths in the header) MUST be passed in-context to every Phase 01–02 task delegation, and each task's verify step checks its spec section (§§1–9) — the plan tables are the index, the attachments are the text. Phase 02+ gates are additionally scored by the parity rubric above.
