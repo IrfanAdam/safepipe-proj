@@ -1,9 +1,15 @@
 // scripts/data-pipe/run.mjs — single entry: fetch -> clip -> validate -> wire.
 //
-//   node scripts/data-pipe/run.mjs [--input FILE] [--out DIR] [--apply] [--fetch-only]
+//   node scripts/data-pipe/run.mjs [--input FILE]... [--out DIR] [--apply] [--fetch-only]
 //
 // --input FILE  offline/cached mode: skip the Overpass fetch, read FILE
-//               (e.g. public/data/osm-sangachal.json). LIVE fetch is default.
+//               (e.g. public/data/osm-sangachal.json). Repeatable: elements
+//               merge in order, first file wins on duplicate ids.
+// --with-coastline-from FILE  if the inputs hold zero natural=coastline
+//               ways (e.g. the 2026-10-12 board sweep omitted that
+//               selector), pull coastline ways from FILE (dedup by id).
+//               A live fetch needs no supplement — the pipe query includes
+//               natural=coastline natively.
 // --out DIR     pipe output dir (default scripts/data-pipe/out).
 // --apply       install the fresh asset to the boot path (default: dry-run diff).
 // --fetch-only  stop after fetching (writes the raw sweep, prints counts).
@@ -20,6 +26,14 @@ const arg = (k) => {
   const i = process.argv.indexOf(k);
   return i >= 0 ? process.argv[i + 1] : null;
 };
+// Repeatable flags: --input A --input B ...
+const args = (k) => {
+  const out = [];
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === k && process.argv[i + 1]) out.push(process.argv[i + 1]);
+  }
+  return out;
+};
 const flag = (k) => process.argv.includes(k);
 
 async function main() {
@@ -31,9 +45,50 @@ async function main() {
   // ---- fetch ----
   let raw;
   let inputTotalWays = null;
-  if (arg('--input')) {
-    raw = JSON.parse(readFileSync(arg('--input'), 'utf8'));
-    console.log(`input=${arg('--input')} (offline, fetch skipped)`);
+  const inputs = args('--input');
+  if (inputs.length) {
+    // Offline merge: first file wins on duplicate ids (later files only
+    // fill gaps, e.g. a coastline supplement sweep).
+    const seen = new Set();
+    const merged = [];
+    const perFile = [];
+    let firstOsm3s = null;
+    for (const f of inputs) {
+      const j = JSON.parse(readFileSync(f, 'utf8'));
+      if (firstOsm3s === null) firstOsm3s = j.osm3s;
+      let added = 0;
+      for (const el of j.elements ?? []) {
+        const key = `${el?.type}:${el?.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push(el);
+        added += 1;
+      }
+      perFile.push({ file: f, elements: (j.elements ?? []).length, added });
+    }
+    raw = { elements: merged, osm3s: firstOsm3s, pipeInputs: perFile };
+    console.log(`inputs=${inputs.join(',')} (offline, fetch skipped)`);
+    for (const p of perFile) console.log(`  ${p.file}: elements=${p.elements} added=${p.added}`);
+    // Coastline supplement: only coastline ways, only when missing.
+    if (arg('--with-coastline-from')) {
+      const hasCoast = merged.some((e) => e?.type === 'way' && e?.tags?.natural === 'coastline');
+      if (!hasCoast) {
+        const sup = JSON.parse(readFileSync(arg('--with-coastline-from'), 'utf8'));
+        let n = 0;
+        for (const el of sup.elements ?? []) {
+          if (el?.type !== 'way' || el?.tags?.natural !== 'coastline') continue;
+          const key = `way:${el.id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          merged.push(el);
+          n += 1;
+        }
+        raw.pipeInputs.push({ file: arg('--with-coastline-from'), elements: sup.elements?.length ?? 0, added: n, coastline_supplement: true });
+        console.log(`coastline supplement: +${n} ways from ${arg('--with-coastline-from')}`);
+      } else {
+        console.log('coastline present in inputs, supplement skipped');
+      }
+    }
   } else {
     const { buildQuery, fetchOverpass, LoudFetchError } = await import('./overpass.mjs');
     const query = buildQuery();
@@ -97,7 +152,7 @@ async function main() {
   // ---- provenance (REPORT; parent writes docs/source-manifest.json) ----
   console.log([
     'PROVENANCE (for docs/source-manifest.json single-writer):',
-    `  name=OpenStreetMap Sangachal AOI vectors (roads/tracks/paths/coastline/terminal)`,
+    `  name=OpenStreetMap Sangachal AOI vectors (12 layers: roads/tracks/paths/coastline/terminal + arterials/streets/landuse/water/power/barriers/buildings)`,
     `  source=Overpass API (https://overpass-turbo.eu/, api overpass-api.de)`,
     `  query_bbox=S40.111431 N40.291093 W49.363656 E49.598884`,
     `  osm_base_timestamp=${asset.meta.osm_base_timestamp}`,

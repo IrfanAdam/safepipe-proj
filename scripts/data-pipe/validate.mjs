@@ -3,8 +3,8 @@
 // Errors (exit 1): broken schema, disc overflow, meta/count mismatch, NaN.
 // Warnings (exit 0): empty layer with a named cause — e.g. coastline is empty
 // when the input sweep query omitted natural=coastline (the 2026-10-12 board
-// sweep did); the live fetch query in overpass.mjs includes it, so a fresh
-// fetch should clear the warning.
+// sweep did; run.mjs --with-coastline-from supplements it). The live fetch
+// query in overpass.mjs includes it, so a fresh fetch clears the warning.
 
 import { DISC_R, DISC_TOL } from './clip.mjs';
 import { LAYER_ORDER } from './classify.mjs';
@@ -65,12 +65,21 @@ export function validateAsset(asset, { inputTotalWays = null } = {}) {
       errors.push(`meta.max_rr_m ${meta.max_rr_m} != measured ${maxRR.toFixed(1)}`);
     }
     if (inputTotalWays != null) {
-      const accounted = (meta.src_elements ?? 0) + (meta.filtered ?? 0)
-        + Object.values(meta.out_of_scope ?? {}).reduce((a, b) => a + b, 0);
-      // skipped_non_way covers relations + nodes + geometry-less entries.
-      const accountedAll = accounted + (meta.skipped_non_way ?? 0);
-      if (accountedAll !== inputTotalWays) {
-        errors.push(`accounting gap: src ${meta.src_elements}+filtered ${meta.filtered}+oos+skipped != input ways ${inputTotalWays}`);
+      // Overlap-aware accounting: context layers share members with the
+      // legacy buckets, so meta.accounting tracks UNIQUE assigned ways.
+      const a = meta.accounting;
+      if (!a || typeof a !== 'object') {
+        errors.push('meta.accounting missing (unique-assignment ledger)');
+      } else {
+        const sum = (a.assigned_unique ?? 0) + (a.filtered_only ?? 0)
+          + (a.oos_only ?? 0) + (a.skipped_ways ?? 0);
+        if (sum !== a.input_ways) {
+          errors.push(`accounting gap: assigned ${a.assigned_unique}+filtered_only ${a.filtered_only}+oos_only ${a.oos_only}+skipped_ways ${a.skipped_ways} != input ways ${a.input_ways}`);
+        }
+        const nonWays = inputTotalWays - a.input_ways;
+        if ((a.skipped_non_way ?? 0) - (a.skipped_ways ?? 0) !== nonWays) {
+          errors.push(`accounting gap: non-way skipped mismatch (input elements ${inputTotalWays} - input ways ${a.input_ways} != skipped non-ways)`);
+        }
       }
     }
   }

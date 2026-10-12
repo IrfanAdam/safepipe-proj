@@ -9,7 +9,7 @@
 // the same DEM as every other twin layer. Nothing here writes depth.
 //
 // Provenance per asset: 'osm' | 'parametric' | 'indicated' (spec §6 /
-// plan Task 14). All five OSM layers are 'osm'; procedural or
+// plan Task 14). All twelve OSM layers are 'osm'; procedural or
 // imagery-inferred layers register here when they land.
 //
 // PARENT-HANDOFF — exact call site (add to src/ring2/main.js boot(), after
@@ -48,6 +48,13 @@ export const PROVENANCE = Object.freeze({
   paths: 'osm',
   coastline: 'osm',
   terminal: 'osm',
+  arterials: 'osm',
+  streets: 'osm',
+  landuse: 'osm',
+  water: 'osm',
+  power: 'osm',
+  barriers: 'osm',
+  buildings: 'osm',
 });
 
 /** Drape lift (m, DRAPE_LIFTS key) per layer id. */
@@ -57,9 +64,19 @@ export const LAYER_LIFT = Object.freeze({
   paths: 'MINOR',
   coastline: 'WATER',
   terminal: 'MINOR',
+  arterials: 'MAJOR',
+  streets: 'MINOR',
+  landuse: 'MINOR',
+  water: 'WATER',
+  power: 'MINOR',
+  barriers: 'MINOR',
+  buildings: 'MINOR',
 });
 
-const LAYER_ORDER = ['roads', 'tracks', 'paths', 'coastline', 'terminal'];
+const LAYER_ORDER = [
+  'roads', 'tracks', 'paths', 'coastline', 'terminal',
+  'arterials', 'streets', 'landuse', 'water', 'power', 'barriers', 'buildings',
+];
 
 /** Total vertex count across all layers of an asset object. */
 export function countVertices(data) {
@@ -101,6 +118,13 @@ export async function mountVectors(scene, data, opts = {}) {
   const colors = {
     roads: 0xd8dee6, tracks: 0x9fb2c8, paths: 0x7f8ea3,
     coastline: 0x4fb3ff, terminal: 0xffc46b,
+    // Phase 02 Task 12 context layers: muted, never focus-pullers.
+    // Vectors mount as LINES, so landuse/buildings render as footprint
+    // outlines — correct at this stage. Arterials sit slightly brighter
+    // than service roads; buildings are faint amber-grey outlines.
+    arterials: 0xe2e8f0, streets: 0xa8b4c4, landuse: 0x8a9a7c,
+    water: 0x5f93b8, power: 0x9a8fb0, barriers: 0xb08a7e,
+    buildings: 0xa89880,
   };
   const segs = [];
   const mats = [];

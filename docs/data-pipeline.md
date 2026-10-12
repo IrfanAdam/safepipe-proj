@@ -10,21 +10,24 @@ wire (boot)**. Reproduce it from this file alone.
 node scripts/data-pipe/run.mjs
 
 # Offline: reuse a cached sweep (no network), same clip+validate+wire
-node scripts/data-pipe/run.mjs --input public/data/osm-sangachal.json
+node scripts/data-pipe/run.mjs --input public/data/osm-sangachal.json --with-coastline-from scripts/data-pipe/out/osm-sangachal.raw.json
 
 # Install the fresh asset to the boot path (default is dry-run diff only)
-node scripts/data-pipe/run.mjs --apply
+node scripts/data-pipe/run.mjs --input public/data/osm-sangachal.json --with-coastline-from scripts/data-pipe/out/osm-sangachal.raw.json --apply
 ```
 
-Flags: `--input FILE` (skip fetch), `--out DIR` (default
-`scripts/data-pipe/out/`), `--fetch-only`, `--apply`.
+Flags: `--input FILE` (repeatable, first file wins on duplicate ids; skip
+fetch), `--with-coastline-from FILE` (pull `natural=coastline` ways from a
+second sweep only when the inputs hold none — the 2026-10-12 board sweep
+omitted that selector), `--out DIR` (default `scripts/data-pipe/out/`),
+`--fetch-only`, `--apply`.
 
 ## Stages
 
 | Step | Script | In → out |
 |---|---|---|
 | fetch | `scripts/data-pipe/overpass.mjs` | Overpass QL (bbox `S40.111431 N40.291093 W49.363656 E49.598884`) → raw sweep JSON |
-| classify | `scripts/data-pipe/classify.mjs` | raw ways → 5 boot layers + filtered + out-of-scope counts |
+| classify | `scripts/data-pipe/classify.mjs` | raw ways → 12 boot layers + filtered + out-of-scope counts |
 | clip | `scripts/data-pipe/clip.mjs` | AOI clamp → `geoToWorld` → disc split → 0.1 m → boot-schema JSON |
 | validate | `scripts/data-pipe/validate.mjs` | schema + counts + bounds gates (exit 1 on error, 0 with warnings) |
 | wire | `scripts/data-pipe/wire.mjs` | dry-run diff vs `public/data/sangachal-vectors.json`; `--apply` installs |
@@ -45,14 +48,26 @@ fetch reproduces them almost exactly (tracks 61/61, paths 113/113, coastline
 - **paths** — footway, path, steps, pedestrian, cycleway, bridleway
 - **coastline** — `natural=coastline`
 - **terminal** — `landuse=industrial` (incl. `barrier=fence` subsets)
+- **arterials** — classified roads + links: motorway, trunk, primary,
+  secondary, tertiary, unclassified (+`_link`); shares members with roads
+- **streets** — residential, living_street, footway, steps, path; shares
+  members with roads/paths (living_street stays filtered from legacy buckets)
+- **landuse** — industrial, residential, grass, quarry, military,
+  construction, greenfield polys (industrial shares members with terminal)
+- **water** — waterway stream, river, canal, drain
+- **power** — power plant, substation, line (0 lines in the 2026-10-12 sweep)
+- **barriers** — `barrier=fence` (all 12 share members with terminal)
+- **buildings** — `building=*` footprints
 - **filtered (logged, with reason)** — `highway=living_street` (board gap #5:
   likely mis-tagged town streets, filtered in Task 11)
-- **out-of-scope (kept in raw, not boot vectors)** — buildings, pipelines,
-  storage tanks, waterways, non-industrial landuse: modeling inputs for later
-  tasks, counts reported per run, never silently dropped
+- **out-of-scope (kept in raw, not boot vectors)** — pipelines, storage
+  tanks, non-installed landuse (orchard/forest/cemetery/…): modeling inputs
+  for later tasks, counts reported per run, never silently dropped
 
-Every input element lands in exactly one bucket; validate asserts the
-accounting sums back to the input total.
+Context layers are additive views: a way may join several layers, so input
+ways are NOT partitioned 1:1. `meta.accounting` ledgers unique assigned
+ways (`assigned_unique + filtered_only + oos_only + skipped_ways ==
+input_ways`); validate asserts the ledger balances.
 
 ## Clip math
 
@@ -67,12 +82,9 @@ port it to `clip.mjs` and note it here.
 
 ## Validation gates
 
-Errors (exit 1): layer keys ≠ the 5 boot layers, malformed features,
+Errors (exit 1): layer keys ≠ the 12 boot layers, malformed features,
 non-finite vertices, any vertex past `DISC_R + 0.11`, meta/count mismatch,
-accounting gap. Warnings (exit 0): empty layer with a named cause — e.g.
-`coastline` is empty for the 2026-10-12 board sweep, whose query omitted
-`natural=coastline`; the pipe's own query includes it, so a live fetch clears
-the warning.
+accounting gap. Warnings (exit 0): empty layer with a named cause.
 
 ## Failure contract
 
@@ -95,8 +107,9 @@ lane). It prints a `PROVENANCE` block per run for the parent to file. Latest:
 
 ## Last verified
 
-2026-10-12: offline chain (`--input public/data/osm-sangachal.json`) and
-live chain both VALID; `node --test tests/` green; `npm run build` green.
-Wire left as dry-run: fresh asset differs from the live boot file only in
-roads (649 vs 638 — new OSM ways since the Phase-01 cache); wiring is a
-parent decision with pinned-test + manifest updates.
+2026-10-12: offline chain (`--input public/data/osm-sangachal.json
+--with-coastline-from scripts/data-pipe/out/osm-sangachal.raw.json --apply`)
+VALID, 12 layers, 2744 elements / 25473 vertices; legacy 5 layers
+byte-identical to the previous boot asset (roads 649 / tracks 46 / paths 97
+/ coastline 2 / terminal 89); `node --test tests/` green;
+`npm run build` green.

@@ -89,14 +89,20 @@ export function buildAsset(classified, raw, { pipeline = 'scripts/data-pipe/run.
   let elements = 0;
   let vertices = 0;
   let clippedFeatures = 0;
+  // Source accounting is by UNIQUE way: context layers overlap the legacy
+  // buckets by design (shared refs), so per-layer inputs would double-count.
+  const srcIds = new Set();
   let srcVertices = 0;
-  let srcElements = 0;
+  const layerSrc = {};
   let maxRR = 0;
   for (const layer of LAYER_ORDER) {
     out[layer] = [];
+    layerSrc[layer] = classified.layers[layer].length;
     for (const el of classified.layers[layer]) {
-      srcElements += 1;
-      srcVertices += el.geometry.length;
+      if (!srcIds.has(el.id)) {
+        srcIds.add(el.id);
+        srcVertices += el.geometry.length;
+      }
       const world = [];
       let clipped = false;
       for (const p of el.geometry) {
@@ -126,6 +132,12 @@ export function buildAsset(classified, raw, { pipeline = 'scripts/data-pipe/run.
   if (maxRR > DISC_R + DISC_TOL) {
     throw new Error(`DISC OVERFLOW: max rr ${maxRR.toFixed(2)} m > DISC_R ${DISC_R} + ${DISC_TOL}`);
   }
+  // Unique-assignment accounting: a filtered/oos way that also joined a
+  // context layer counts as assigned, never as dropped.
+  const filteredOnly = classified.filtered.filter((f) => !srcIds.has(f.id)).length;
+  const inputWays = (raw.elements ?? []).filter((e) => e?.type === 'way').length;
+  const skippedWays = classified.skippedWays ?? 0;
+  const oosOnly = inputWays - srcIds.size - filteredOnly - skippedWays;
   return {
     meta: {
       site: { lat: 40.201262, lon: 49.48127 },
@@ -138,16 +150,23 @@ export function buildAsset(classified, raw, { pipeline = 'scripts/data-pipe/run.
       elements,
       vertices,
       clippedFeatures,
-      src_elements: srcElements,
+      src_elements: srcIds.size,
       src_vertices: srcVertices,
+      layer_src: layerSrc,
       max_rr_m: Math.round(maxRR * 10) / 10,
       license: 'ODbL-1.0',
       attribution: '© OpenStreetMap contributors',
       pipeline,
       osm_base_timestamp: raw?.osm3s?.timestamp_osm_base ?? null,
+      inputs: raw?.pipeInputs ?? null,
       filtered: classified.filtered.length,
       out_of_scope: classified.outOfScope,
       skipped_non_way: classified.skippedNonWay,
+      accounting: {
+        assigned_unique: srcIds.size, filtered_only: filteredOnly,
+        oos_only: oosOnly, skipped_ways: skippedWays,
+        skipped_non_way: classified.skippedNonWay, input_ways: inputWays,
+      },
     },
     layers: out,
   };

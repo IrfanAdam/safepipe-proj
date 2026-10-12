@@ -10,17 +10,21 @@ export const AOI_BBOX = Object.freeze({
 
 export const DOWNLOAD_PAGE = 'https://overpass-turbo.eu/';
 
-// Union of every selector the boot vector layers need, plus living_street
+// Union of every selector the 12 boot vector layers need, plus living_street
 // (fetched so classify.mjs can filter it with a logged reason — board gap #5,
 // "373 highway=living_street likely mis-tagged town streets — filter in
 // Task 11" — instead of pretending the fetch never saw it).
 export function buildQuery(b = AOI_BBOX) {
   const bb = `${b.S},${b.W},${b.N},${b.E}`;
-  return `[out:json][timeout:120];
+  return `[out:json][timeout:180];
 (
   way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|living_street|service|track|footway|path|steps|pedestrian|cycleway|bridleway)$"](${bb});
   way["natural"="coastline"](${bb});
-  way["landuse"="industrial"](${bb});
+  way["landuse"~"^(industrial|residential|grass|quarry|military|construction|greenfield)$"](${bb});
+  way["waterway"~"^(stream|river|canal|drain)$"](${bb});
+  way["power"~"^(plant|substation|line)$"](${bb});
+  way["barrier"="fence"](${bb});
+  way["building"](${bb});
 );
 out geom;`;
 }
