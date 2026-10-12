@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T11:16:42.120Z",
+  "generated": "2026-10-12T11:18:05.517Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,24 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "094c7fb",
+      "full": "094c7fbbac4c5740318732f9095cbfa692656385",
+      "date": "2026-10-12",
+      "time": "16:48",
+      "subject": "feat(ring2): T1 visual baseline TOP/ISO/NEAR + loop run 6 [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "381f745",
+      "full": "381f745c96ac5e7317dd9dacd3752200ad273a6e",
+      "date": "2026-10-12",
+      "time": "16:46",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "8179d07",
       "full": "8179d07a27fff46d3ea01c5838218a94e1c14afd",
