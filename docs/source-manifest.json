@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T11:09:59.399Z",
+  "generated": "2026-10-12T12:20:45.834Z",
   "datasets": [
     {
       "name": "OpenStreetMap Sangachal AOI vectors (roads/tracks/paths/coastline/terminal)",
@@ -77,6 +77,15 @@
       "installed": "public/data/sangachal-vectors.json: 883 el / 7911 vtx (roads 649 +11, tracks 46, paths 97, coastline 2, terminal 89; src 958/10065), Task 11",
       "road_proof": "18500 samples / 272.4km: 0% sink, residuals>5m only 0.68% (one 3km chord w353991411)",
       "note": "process-osm.mjs rewrites boot+manifest on import — tests now use side-effect-free data-pipe/clip.mjs"
+    },
+    {
+      "name": "Phase 02 far-context arterials to 25 km (motorway/trunk/primary; 39 ways fetched, 11 installed)",
+      "source": "Overpass API via overpass.kumi.systems; osm_base 2026-05-06T03:25:00Z (mirror stale vs main sweep 2026-10-12); bbox S40.111431 N40.45 W49.25 E49.598884",
+      "fetched": "2026-10-12",
+      "cache": "scripts/data-pipe/out/osm-far-nw.raw.json",
+      "installed": "public/data/sangachal-vectors.json far_context: 11 feats (M2/Alat legs + Musfiqabad-Sahil R6 to ~27 km, clipped 25 km)",
+      "gap": "M1 Baku-Quba motorway (~20 km NW, visible on satellite) has NO OSM geometry in bbox — untagged/sub-arterial; flagged, nothing invented",
+      "license": "ODbL-1.0 © OpenStreetMap contributors"
     }
   ]
 }

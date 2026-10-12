@@ -88,8 +88,10 @@ T2/T3 per tier loop (Task 15).
 
 ## T2 refinement seeds
 
-- Racks: 132 in-terminal OSM pipeline ways carry real routes (F1) — current
-  T0 corridors sit at approximated anchors; re-seat lanes on way geometries.
+- Racks: reseated T2 on 136 real F1 routes (`f101722`) — done.
+- M1 Baku–Quba (~20 km NW, bright on satellite): NO OSM geometry in two
+  sweeps (untagged/sub-arterial) — flagged gap; trace interactively from
+  imagery as reconstructed, or leave. Nothing invented meanwhile.
 
 ## T1 candidate seeds (measured F1 footprints ≥40 m, function UNVERIFIED)
 

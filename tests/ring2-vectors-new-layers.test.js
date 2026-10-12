@@ -21,7 +21,7 @@ test('context layers match the disc-clipped build (1861 features)', () => {
   );
   const feats = NEW_LAYERS.reduce((n, k) => n + asset.layers[k].length, 0);
   assert.equal(feats, 1861);
-  assert.equal(asset.meta.elements, 883 + 1861);
+  assert.equal(asset.meta.elements, 883 + 1861 + asset.layers.far_context.length);
 });
 
 test('context layer sources match the board sweep (pre-clip inputs)', () => {
@@ -51,8 +51,9 @@ test('no context-layer vertex lies past the twin disc', () => {
 
 test('unique-assignment accounting sums back to the merged input', () => {
   const a = asset.meta.accounting;
-  assert.equal(a.assigned_unique + a.filtered_only + a.oos_only + a.skipped_ways, a.input_ways);
-  assert.equal(a.input_ways, 2774); // 2773 board-sweep ways + 1 coastline supplement
+  assert.equal(a.assigned_unique + a.filtered_only + a.oos_only + a.skipped_ways + a.far_dups, a.input_ways);
+  assert.equal(a.input_ways, 2813); // 2774 main-sweep ways + 39 far-sweep ways
+  assert.equal(a.far_dups, 28); // far ways already in the main sweep (main copy wins)
   assert.equal(a.assigned_unique, asset.meta.src_elements);
   assert.equal(a.skipped_non_way, asset.meta.skipped_non_way);
 });

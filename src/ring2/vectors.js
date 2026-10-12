@@ -30,8 +30,15 @@ export const VECTORS_URL = '/data/sangachal-vectors.json';
  * this band — but a stale/unclipped asset still dissolves to transparent at
  * the ring line instead of spilling past it. Mirrors the DISC_R formula
  * (RING_RADIUS_M single source of truth, 150 m inset), never a literal.
+ * far_context is the exception: it is clipped to the 25 km FAR_R ring and
+ * dissolves there via farContextFadeAlpha, never vectorFadeAlpha.
  */
 export const VECTORS_DISC_R = RING_RADIUS_M - 150;
+
+/** Far-context ring: regional arterials ride out to 25 km, strongly faded. */
+export const FAR_R = 25000;
+/** Ceiling alpha for far_context: muted even at its brightest. */
+export const FAR_MAX_ALPHA = 0.45;
 
 /** Per-vertex alpha: 1 inside the disc, smoothstep to 0 at the ring line. */
 export function vectorFadeAlpha(rr, discR = VECTORS_DISC_R, ringR = RING_RADIUS_M) {
@@ -39,6 +46,18 @@ export function vectorFadeAlpha(rr, discR = VECTORS_DISC_R, ringR = RING_RADIUS_
   if (rr >= ringR) return 0;
   const u = (rr - discR) / (ringR - discR);
   return 1 - u * u * (3 - 2 * u);
+}
+
+/**
+ * Per-vertex alpha for far_context: flat FAR_MAX_ALPHA out to the 10 km
+ * ring, then smoothstep to 0 at the 25 km FAR_R ring. The ceiling keeps
+ * regional arterials an orientation backdrop — never focus-pullers.
+ */
+export function farContextFadeAlpha(rr, ringR = RING_RADIUS_M, farR = FAR_R) {
+  if (!(rr > ringR)) return FAR_MAX_ALPHA;
+  if (rr >= farR) return 0;
+  const u = (rr - ringR) / (farR - ringR);
+  return FAR_MAX_ALPHA * (1 - u * u * (3 - 2 * u));
 }
 
 /** Provenance tier per layer id. */
@@ -55,6 +74,7 @@ export const PROVENANCE = Object.freeze({
   power: 'osm',
   barriers: 'osm',
   buildings: 'osm',
+  far_context: 'osm',
 });
 
 /** Drape lift (m, DRAPE_LIFTS key) per layer id. */
@@ -71,11 +91,13 @@ export const LAYER_LIFT = Object.freeze({
   power: 'MINOR',
   barriers: 'MINOR',
   buildings: 'MINOR',
+  far_context: 'MINOR',
 });
 
 const LAYER_ORDER = [
   'roads', 'tracks', 'paths', 'coastline', 'terminal',
   'arterials', 'streets', 'landuse', 'water', 'power', 'barriers', 'buildings',
+  'far_context',
 ];
 
 /** Total vertex count across all layers of an asset object. */
@@ -125,6 +147,9 @@ export async function mountVectors(scene, data, opts = {}) {
     arterials: 0xe2e8f0, streets: 0xa8b4c4, landuse: 0x8a9a7c,
     water: 0x5f93b8, power: 0x9a8fb0, barriers: 0xb08a7e,
     buildings: 0xa89880,
+    // far_context: muted slate — dimmer than every main layer, and capped
+    // at FAR_MAX_ALPHA vertex alpha on top (see farContextFadeAlpha).
+    far_context: 0x6b7686,
   };
   const segs = [];
   const mats = [];
@@ -145,12 +170,15 @@ export async function mountVectors(scene, data, opts = {}) {
     // per-vertex alpha; the build-time disc clip remains the real fix.)
     const col = new Float32Array((arr.length / 4) * 8);
     const [cr, cg, cb] = hexRgb(colors[id] ?? 0xffffff);
+    // Rim fade is per lane: main layers dissolve at the 10 km ring line,
+    // far_context dissolves across the 10–25 km band (never full-bright).
+    const fadeFor = id === 'far_context' ? farContextFadeAlpha : vectorFadeAlpha;
     for (let s = 0; s < arr.length; s += 4) {
       const v = (s / 4) * 2;
       col[v * 4] = cr; col[v * 4 + 1] = cg; col[v * 4 + 2] = cb;
-      col[v * 4 + 3] = vectorFadeAlpha(Math.hypot(arr[s], arr[s + 1]));
+      col[v * 4 + 3] = fadeFor(Math.hypot(arr[s], arr[s + 1]));
       col[(v + 1) * 4] = cr; col[(v + 1) * 4 + 1] = cg; col[(v + 1) * 4 + 2] = cb;
-      col[(v + 1) * 4 + 3] = vectorFadeAlpha(Math.hypot(arr[s + 2], arr[s + 3]));
+      col[(v + 1) * 4 + 3] = fadeFor(Math.hypot(arr[s + 2], arr[s + 3]));
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));

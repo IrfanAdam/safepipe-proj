@@ -10,9 +10,13 @@
 //               selector), pull coastline ways from FILE (dedup by id).
 //               A live fetch needs no supplement — the pipe query includes
 //               natural=coastline natively.
+// --with-far-from FILE  offline far-context sweep (motorway/trunk/primary
+//               in FAR_BBOX, e.g. scripts/data-pipe/out/osm-far-nw.raw.json).
+//               Live mode always fetches it; offline mode needs this flag
+//               or far_context builds empty (validate warns, exit stays 0).
 // --out DIR     pipe output dir (default scripts/data-pipe/out).
 // --apply       install the fresh asset to the boot path (default: dry-run diff).
-// --fetch-only  stop after fetching (writes the raw sweep, prints counts).
+// --fetch-only  stop after fetching (writes the raw sweeps, prints counts).
 // On unreachable sources: exits 2 with the official download page + query,
 // never invented data. Provenance: REPORTED on stdout (docs/source-manifest.json
 // is single-writer owned by the parent lane — this pipe never touches it).
@@ -44,6 +48,7 @@ async function main() {
 
   // ---- fetch ----
   let raw;
+  let rawFar = null;
   let inputTotalWays = null;
   const inputs = args('--input');
   if (inputs.length) {
@@ -89,8 +94,23 @@ async function main() {
         console.log('coastline present in inputs, supplement skipped');
       }
     }
+    // Far-context offline sweep (kept separate: it clamps to FAR_BBOX and
+    // clips to the 25 km ring, never the AOI rect / twin disc).
+    if (arg('--with-far-from')) {
+      const ff = arg('--with-far-from');
+      const fj = JSON.parse(readFileSync(ff, 'utf8'));
+      rawFar = {
+        elements: fj.elements ?? [],
+        osm3s: fj.osm3s,
+        fetched_at: fj.fetched_at ?? `offline:${ff}`,
+        pipeInputs: [{ file: ff, elements: (fj.elements ?? []).length }],
+      };
+      console.log(`far input=${ff} (offline, fetch skipped): elements=${rawFar.elements.length}`);
+    } else {
+      console.log('no --with-far-from: far_context will build empty (validate warns)');
+    }
   } else {
-    const { buildQuery, fetchOverpass, LoudFetchError } = await import('./overpass.mjs');
+    const { buildQuery, buildFarQuery, fetchOverpass, LoudFetchError } = await import('./overpass.mjs');
     const query = buildQuery();
     try {
       const { json, endpoint } = await fetchOverpass(query);
@@ -107,14 +127,38 @@ async function main() {
       }
       process.exit(2);
     }
+    // ---- far fetch (motorway/trunk/primary in the extended NW bbox) ----
+    const farPath = join(outDir, 'osm-far-nw.raw.json');
+    const farQuery = buildFarQuery();
+    try {
+      const { json, endpoint } = await fetchOverpass(farQuery);
+      rawFar = {
+        elements: json.elements ?? [],
+        osm3s: json.osm3s,
+        fetched_at: new Date().toISOString().slice(0, 10),
+        pipeInputs: [{ fetch: 'live', endpoint }],
+      };
+      writeFileSync(farPath, JSON.stringify(rawFar));
+      console.log(`far fetched via ${endpoint} -> ${farPath}`);
+    } catch (e) {
+      console.error(`FAR FETCH FAILED: ${e.message}`);
+      console.error('\n--- Far Overpass QL (paste at https://overpass-turbo.eu/) ---');
+      console.error(farQuery);
+      process.exit(2);
+    }
   }
   const ways = (raw.elements ?? []).filter((e) => e?.type === 'way');
   inputTotalWays = raw.elements?.length ?? null;
   console.log(`raw: elements=${raw.elements?.length ?? 0} ways=${ways.length} osm_base=${raw.osm3s?.timestamp_osm_base ?? '?'}`);
+  const farWays = (rawFar?.elements ?? []).filter((e) => e?.type === 'way');
+  if (rawFar) {
+    inputTotalWays += rawFar.elements?.length ?? 0;
+    console.log(`far: elements=${rawFar.elements?.length ?? 0} ways=${farWays.length} osm_base=${rawFar.osm3s?.timestamp_osm_base ?? '?'} fetched=${rawFar.fetched_at ?? '?'}`);
+  }
   if (flag('--fetch-only')) return;
 
   // ---- classify + clip ----
-  const { classify } = await import('./classify.mjs');
+  const { classify, classifyFar } = await import('./classify.mjs');
   const { buildAsset } = await import('./clip.mjs');
   const classified = classify(raw.elements);
   const perLayer = Object.fromEntries(
@@ -123,7 +167,12 @@ async function main() {
   console.log(`classified: ${JSON.stringify(perLayer)} filtered=${classified.filtered.length} skipped_non_way=${classified.skippedNonWay}`);
   const oosTotal = Object.values(classified.outOfScope).reduce((a, b) => a + b, 0);
   if (oosTotal) console.log(`out-of-scope (kept in raw, not boot vectors): ${JSON.stringify(classified.outOfScope)}`);
-  const asset = buildAsset(classified, raw);
+  // Far sweep: dedup against main-sweep way ids (first file wins — the main
+  // copy is already assigned there), then classify arterials-only.
+  const mainIds = new Set(ways.map((e) => e.id));
+  const farClassified = classifyFar(rawFar?.elements, mainIds);
+  console.log(`far classified: far_context=${farClassified.layers.far_context.length} dups=${farClassified.dups} skipped_ways=${farClassified.skippedWays} oos=${JSON.stringify(farClassified.outOfScope)}`);
+  const asset = buildAsset(classified, raw, { far: farClassified, rawFar });
   writeFileSync(assetPath, JSON.stringify(asset));
   console.log(`asset: ${assetPath} elements=${asset.meta.elements} vertices=${asset.meta.vertices} clipped=${asset.meta.clippedFeatures} max_rr=${asset.meta.max_rr_m}`);
 
@@ -152,13 +201,16 @@ async function main() {
   // ---- provenance (REPORT; parent writes docs/source-manifest.json) ----
   console.log([
     'PROVENANCE (for docs/source-manifest.json single-writer):',
-    `  name=OpenStreetMap Sangachal AOI vectors (12 layers: roads/tracks/paths/coastline/terminal + arterials/streets/landuse/water/power/barriers/buildings)`,
+    `  name=OpenStreetMap Sangachal AOI vectors (13 layers: roads/tracks/paths/coastline/terminal + arterials/streets/landuse/water/power/barriers/buildings + far_context)`,
     `  source=Overpass API (https://overpass-turbo.eu/, api overpass-api.de)`,
     `  query_bbox=S40.111431 N40.291093 W49.363656 E49.598884`,
+    `  far_query_bbox=S40.111431 N40.45 W49.25 E49.598884 (motorway/trunk/primary only)`,
+    `  far_osm_base_timestamp=${asset.meta.far_osm_base_timestamp}`,
+    `  far_fetched=${asset.meta.far_fetched}`,
     `  osm_base_timestamp=${asset.meta.osm_base_timestamp}`,
     `  license=Open Database License (ODbL) 1.0 — https://opendatacommons.org/licenses/odbl/`,
     `  attribution=© OpenStreetMap contributors`,
-    `  counts=${JSON.stringify(perLayer)} total={elements:${asset.meta.elements},vertices:${asset.meta.vertices}}`,
+    `  counts=${JSON.stringify(perLayer)} far_context={src:${asset.meta.far_src},features:${asset.layers.far_context.length}} total={elements:${asset.meta.elements},vertices:${asset.meta.vertices}}`,
   ].join('\n'));
 }
 

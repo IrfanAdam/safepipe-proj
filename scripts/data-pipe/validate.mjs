@@ -6,7 +6,7 @@
 // sweep did; run.mjs --with-coastline-from supplements it). The live fetch
 // query in overpass.mjs includes it, so a fresh fetch clears the warning.
 
-import { DISC_R, DISC_TOL } from './clip.mjs';
+import { DISC_R, DISC_TOL, FAR_R, FAR_TOL } from './clip.mjs';
 import { LAYER_ORDER } from './classify.mjs';
 
 export function validateAsset(asset, { inputTotalWays = null } = {}) {
@@ -26,6 +26,11 @@ export function validateAsset(asset, { inputTotalWays = null } = {}) {
   for (const id of LAYER_ORDER) {
     const fs = layers?.[id];
     if (!Array.isArray(fs)) { errors.push(`layer ${id} not an array`); continue; }
+    // Bounds are per lane: the 12 main layers stay inside the twin disc;
+    // far_context alone may reach the 25 km ring (clipped in clip.mjs).
+    const isFar = id === 'far_context';
+    const rrLimit = isFar ? FAR_R + FAR_TOL : DISC_R + DISC_TOL;
+    const boxLimit = isFar ? 30000 : 20000;
     if (fs.length === 0) {
       warnings.push(
         `layer ${id} empty` +
@@ -46,15 +51,19 @@ export function validateAsset(asset, { inputTotalWays = null } = {}) {
         vertices += 1;
         const rr = Math.hypot(pt[0], pt[1]);
         if (rr > maxRR) maxRR = rr;
-        if (Math.abs(pt[0]) > 20000 || Math.abs(pt[1]) > 20000) {
-          errors.push(`layer ${id} id=${f.id}: vertex outside 20 km sanity box`);
+        if (rr > rrLimit) {
+          errors.push(`layer ${id} id=${f.id}: vertex rr ${rr.toFixed(1)} past ${rrLimit}`);
+          break;
+        }
+        if (Math.abs(pt[0]) > boxLimit || Math.abs(pt[1]) > boxLimit) {
+          errors.push(`layer ${id} id=${f.id}: vertex outside ${boxLimit / 1000} km sanity box`);
           break;
         }
       }
     }
   }
-  if (maxRR > DISC_R + DISC_TOL) {
-    errors.push(`DISC OVERFLOW: max rr ${maxRR.toFixed(2)} > ${DISC_R} + ${DISC_TOL}`);
+  if (maxRR > FAR_R + FAR_TOL) {
+    errors.push(`FAR OVERFLOW: max rr ${maxRR.toFixed(2)} > ${FAR_R} + ${FAR_TOL}`);
   }
   if (elements === 0 || vertices === 0) errors.push('asset has no features/vertices');
   if (meta) {
@@ -72,9 +81,9 @@ export function validateAsset(asset, { inputTotalWays = null } = {}) {
         errors.push('meta.accounting missing (unique-assignment ledger)');
       } else {
         const sum = (a.assigned_unique ?? 0) + (a.filtered_only ?? 0)
-          + (a.oos_only ?? 0) + (a.skipped_ways ?? 0);
+          + (a.oos_only ?? 0) + (a.skipped_ways ?? 0) + (a.far_dups ?? 0);
         if (sum !== a.input_ways) {
-          errors.push(`accounting gap: assigned ${a.assigned_unique}+filtered_only ${a.filtered_only}+oos_only ${a.oos_only}+skipped_ways ${a.skipped_ways} != input ways ${a.input_ways}`);
+          errors.push(`accounting gap: assigned ${a.assigned_unique}+filtered_only ${a.filtered_only}+oos_only ${a.oos_only}+skipped_ways ${a.skipped_ways}+far_dups ${a.far_dups} != input ways ${a.input_ways}`);
         }
         const nonWays = inputTotalWays - a.input_ways;
         if ((a.skipped_non_way ?? 0) - (a.skipped_ways ?? 0) !== nonWays) {

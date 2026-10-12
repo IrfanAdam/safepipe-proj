@@ -8,6 +8,14 @@ export const AOI_BBOX = Object.freeze({
   S: 40.111431, N: 40.291093, W: 49.363656, E: 49.598884,
 });
 
+// Far-context bbox: same S/E as the AOI, extended NW to catch regional
+// arterials outside the 10 km ring (M1 Baku-Quba corridor ~20 km NW).
+// Kept tight (N40.45 ≈ 28 km N of the pin, W49.25 ≈ 20 km W) — the
+// far_context layer clips to the 25 km ring, never the bbox edge.
+export const FAR_BBOX = Object.freeze({
+  S: 40.111431, N: 40.45, W: 49.25, E: 49.598884,
+});
+
 export const DOWNLOAD_PAGE = 'https://overpass-turbo.eu/';
 
 // Union of every selector the 12 boot vector layers need, plus living_street
@@ -25,6 +33,18 @@ export function buildQuery(b = AOI_BBOX) {
   way["power"~"^(plant|substation|line)$"](${bb});
   way["barrier"="fence"](${bb});
   way["building"](${bb});
+);
+out geom;`;
+}
+
+// Classified arterials only: motorway/trunk/primary. Everything else the
+// twin needs at 10–25 km is out of scope — the far_context layer is a
+// muted orientation backdrop, never street detail.
+export function buildFarQuery(b = FAR_BBOX) {
+  const bb = `${b.S},${b.W},${b.N},${b.E}`;
+  return `[out:json][timeout:180];
+(
+  way["highway"~"^(motorway|trunk|primary)$"](${bb});
 );
 out geom;`;
 }

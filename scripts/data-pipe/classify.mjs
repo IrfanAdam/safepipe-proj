@@ -18,6 +18,7 @@
 export const LAYER_ORDER = Object.freeze([
   'roads', 'tracks', 'paths', 'coastline', 'terminal',
   'arterials', 'streets', 'landuse', 'water', 'power', 'barriers', 'buildings',
+  'far_context',
 ]);
 
 // Byte-pinned legacy buckets (do not reorder or widen — tests pin output).
@@ -39,6 +40,12 @@ const LANDUSE = new Set([
 ]);
 const WATERWAY = new Set(['stream', 'river', 'canal', 'drain']);
 const POWER = new Set(['plant', 'substation', 'line']);
+
+// Far-context membership: classified arterials only (motorway/trunk/
+// primary — mirrors the far Overpass query in overpass.mjs buildFarQuery).
+// The far sweep never joins the 12 main layers: those clamp to the AOI
+// rect, which would smear beyond-AOI geometry onto the rect edge.
+const FAR_ARTERIALS = new Set(['motorway', 'trunk', 'primary']);
 
 /**
  * Returns { layers: {12 arrays}, filtered: [{id, reason}],
@@ -86,4 +93,34 @@ export function classify(elements) {
     if (t.building !== undefined) layers.buildings.push(el);
   }
   return { layers, filtered, skippedNonWay, skippedWays, outOfScope };
+}
+
+/**
+ * Far-sweep classify: motorway/trunk/primary ways -> far_context ONLY.
+ * knownIds = main-sweep way ids (dedup: first file wins, the main copy is
+ * already assigned there). Returns { layers: {far_context}, skippedNonWay,
+ * skippedWays, dups, outOfScope } — every input way lands in exactly one
+ * ledger bucket (assigned | skipped | dup) so validate can balance it.
+ */
+export function classifyFar(elements, knownIds = new Set()) {
+  const layers = { far_context: [] };
+  const outOfScope = {};
+  let skippedNonWay = 0;
+  let skippedWays = 0;
+  let dups = 0;
+  for (const el of elements ?? []) {
+    if (el?.type !== 'way' || !Array.isArray(el.geometry)) {
+      skippedNonWay += 1;
+      if (el?.type === 'way') skippedWays += 1;
+      continue;
+    }
+    if (knownIds.has(el.id)) { dups += 1; continue; }
+    const hw = el.tags?.highway;
+    if (hw && FAR_ARTERIALS.has(hw)) layers.far_context.push(el);
+    else {
+      const key = hw ? `highway=${hw}` : Object.keys(el.tags ?? {}).slice(0, 3).join(',') || 'untagged';
+      outOfScope[key] = (outOfScope[key] ?? 0) + 1;
+    }
+  }
+  return { layers, skippedNonWay, skippedWays, dups, outOfScope };
 }

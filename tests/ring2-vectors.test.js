@@ -14,9 +14,9 @@ import { DISC_R, DISC_TOL, clipPolylineToDisc } from '../scripts/data-pipe/clip.
 
 const asset = JSON.parse(readFileSync('public/data/sangachal-vectors.json', 'utf8'));
 
-test('vector asset counts match the disc-clipped build (2744 / 25473)', () => {
-  assert.equal(countFeatures(asset), 2744);
-  assert.equal(countVertices(asset), 25473);
+test('vector asset counts match the disc-clipped build (2755 / 25610)', () => {
+  assert.equal(countFeatures(asset), 2755);
+  assert.equal(countVertices(asset), 25610);
   // Legacy 5 layers are byte-pinned; the 7 context layers (Phase 02 Task 12)
   // are pinned here too (feature detail lives in
   // ring2-vectors-new-layers.test.js — do not duplicate it, just pin).
@@ -36,13 +36,17 @@ test('vector asset counts match the disc-clipped build (2744 / 25473)', () => {
       power: 4, barriers: 12, buildings: 1082,
     },
   );
-  assert.equal(asset.meta.src_elements, 2592);
-  assert.equal(asset.meta.src_vertices, 25319);
+  // Far-context arterials (motorway/trunk/primary to the 25 km ring;
+  // detail pinned in ring2-vectors-far-context.test.js).
+  assert.equal(asset.layers.far_context.length, 11);
+  assert.equal(asset.meta.src_elements, 2603);
+  assert.equal(asset.meta.src_vertices, 25460);
 });
 
-test('no asset vertex lies past the twin disc (max rr <= DISC_R + 0.11)', () => {
+test('no main-layer vertex lies past the twin disc (max rr <= DISC_R + 0.11)', () => {
   let max = 0;
   for (const id of Object.keys(asset.layers)) {
+    if (id === 'far_context') continue; // 25 km ring, pinned in the far-context gate
     for (const f of asset.layers[id]) {
       for (const [x, z] of f.pts) {
         const rr = Math.hypot(x, z);
@@ -97,13 +101,13 @@ test('sample road point (way 20878167) projects within the ring', () => {
 });
 
 test('every mounted layer carries an osm|parametric|indicated provenance tier', () => {
-  // All 12 boot-mounted layers have PROVENANCE entries (Phase 02 Task 12
-  // wired the 7 context layers into the mount lane).
+  // All 13 boot-mounted layers have PROVENANCE entries (Phase 02 Task 12
+  // wired the 7 context layers into the mount lane; far_context followed).
   for (const id of Object.keys(PROVENANCE)) {
     assert.match(PROVENANCE[id] ?? '', /^(osm|parametric|indicated)$/, id);
     assert.ok(Array.isArray(asset.layers[id]), `mounted layer ${id} present in asset`);
   }
-  assert.equal(Object.keys(PROVENANCE).length, 12);
+  assert.equal(Object.keys(PROVENANCE).length, 13);
 });
 
 test('new context layers mount with osm provenance and known drape lifts', async () => {
