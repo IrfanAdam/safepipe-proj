@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T16:53:18.908Z",
+  "generated": "2026-10-12T16:57:33.479Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "9fb1f05",
+      "full": "9fb1f05745973361c484e29c265ac0919d92f949",
+      "date": "2026-10-12",
+      "time": "22:24",
+      "subject": "feat(changelog): revisions as flat dated feedback above commits [plan:2026-10-07_130000-safepipe-changelog.md#task-9]",
+      "plan": "2026-10-07_130000-safepipe-changelog.md",
+      "anchor": "task-9"
+    },
     {
       "sha": "4966356",
       "full": "4966356d6e8ff46c05be85e62db2e681702eda97",
@@ -2969,8 +2978,9 @@
     }
   ],
   "wip": [
+    "scripts/plan-backfill.mjs",
+    "scripts/plan-track.mjs",
     "src/changelog/changelog-drawer.css",
-    "src/changelog/changelog/paint-detail.js",
     "src/changelog/changelog/paint-revs.js"
   ]
 }

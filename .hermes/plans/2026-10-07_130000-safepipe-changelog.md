@@ -121,3 +121,15 @@
 - Keep `data-revs` / `data-rev` / `data-changed` attributes so the list stays probeable; token-only styling.
 
 **Verify:** revisions render above commits; all rows visible via scroll with no expand step; rev counts + changed marks unchanged vs Task 8; build green; 0 page errors.
+
+## Task 10: Revisions as semantic feedback — date, time, what changed ✓ done
+
+**Objective:** Owner steer 2026-10-12 with screenshot: each revision must read as date + time + a semantic summary of what was requested/changed — no left indentation on section lines, no status words (no "new / changed" marks).
+
+**Design:**
+- Entry header: date + time (e.g. "12 Oct 2026 · 21:47"). History entries today carry date only — extend the tracker (`scripts/plan-track.mjs`) to stamp `time` (HH:MM local) on new snapshots, keeping `date` untouched for back-compat; old revs render date-only. Optional: backfill times from git commit timestamps where a rev maps to a commit (`scripts/plan-backfill.mjs`).
+- Entry body: zero indentation everywhere (date line, summary lines, all at the same left edge), one step smaller than drawer body text (quiet metadata size, token scale). One plain-language line per changed section derived from the diff — task-count transitions ("Phase 02 — 5 tasks closed, 1/6 → 6/6"), done markings ("Tasks 10–14 marked done"), renames ("renamed 'X' → 'Y'"), body edits ("edited"), new sections ("added"). Drop the `· new` / `· changed` marks and the "N unchanged" line entirely — the summary lines carry the meaning.
+- Optional enrichment (lane's call, only if clean): pull the linked commit subjects for the plan+anchor from `plan-manifest.json` as the "requested" line. Never invent summaries — every line traces to a hash diff or a real commit.
+- Keep `data-revs` / `data-rev` / `data-changed` attributes; token-only styling.
+
+**Verify:** no indented rows; no "new/changed" strings in the block; every entry shows date (+time where recorded); each summary line traces to a real diff or commit; tracker rerun diff-clean; build green; 0 page errors.

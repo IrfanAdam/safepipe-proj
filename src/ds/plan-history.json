@@ -35,7 +35,8 @@
      "hash": "38f7f36b",
      "state": ""
     }
-   ]
+   ],
+   "time": "13:00"
   },
   {
    "sha": "6934f4e",
@@ -72,7 +73,8 @@
      "hash": "311076b4",
      "state": "1/1"
     }
-   ]
+   ],
+   "time": "13:30"
   }
  ],
  "2026-10-05_150017-safepipe-ds-extraction.md": [
@@ -111,7 +113,8 @@
      "hash": "c7297004",
      "state": "1/1"
     }
-   ]
+   ],
+   "time": "13:00"
   }
  ],
  "2026-10-05_150017-safepipe-prototype-screens.md": [
@@ -150,7 +153,8 @@
      "hash": "de7fc31f",
      "state": ""
     }
-   ]
+   ],
+   "time": "13:00"
   }
  ],
  "2026-10-06_003000-ops3d-theatre-style.md": [
@@ -209,7 +213,8 @@
      "hash": "51369e22",
      "state": "0/1"
     }
-   ]
+   ],
+   "time": "13:00"
   },
   {
    "sha": null,
@@ -315,7 +320,8 @@
      "hash": "70a799a6",
      "state": "7/7"
     }
-   ]
+   ],
+   "time": "13:00"
   },
   {
    "sha": "89494ec",
@@ -362,7 +368,8 @@
      "hash": "70a799a6",
      "state": "7/7"
     }
-   ]
+   ],
+   "time": "13:15"
   }
  ],
  "2026-10-07_120000-safepipe-production-ready.md": [
@@ -421,96 +428,11 @@
      "hash": "418413c4",
      "state": "0/1"
     }
-   ]
+   ],
+   "time": "13:00"
   }
  ],
  "2026-10-07_130000-safepipe-changelog.md": [
-  {
-   "sha": "e9c609b",
-   "date": "2026-10-07",
-   "hash": "2bb9d8ae",
-   "sections": [
-    {
-     "head": "Task 1: Manifest readiness + plan names ✓ done",
-     "hash": "b9376bd0",
-     "state": "1/1"
-    },
-    {
-     "head": "Task 2: Parse + link layers (pure, tested)",
-     "hash": "85808fee",
-     "state": ""
-    },
-    {
-     "head": "Task 3: Shell + views in safepipe visual language",
-     "hash": "59ac16f1",
-     "state": ""
-    },
-    {
-     "head": "Task 4: Wire + verify + close",
-     "hash": "26a6fef3",
-     "state": ""
-    }
-   ]
-  },
-  {
-   "sha": "59c38f3",
-   "date": "2026-10-07",
-   "hash": "d6ca358b",
-   "sections": [
-    {
-     "head": "Task 1: Manifest readiness + plan names ✓ done",
-     "hash": "b9376bd0",
-     "state": "1/1"
-    },
-    {
-     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
-     "hash": "93389863",
-     "state": "1/1"
-    },
-    {
-     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
-     "hash": "af719f20",
-     "state": "1/1"
-    },
-    {
-     "head": "Task 4: Wire + verify + close ✓ done",
-     "hash": "e99ebe6e",
-     "state": "1/1"
-    }
-   ]
-  },
-  {
-   "sha": "a7d7434",
-   "date": "2026-10-07",
-   "hash": "6efe0d05",
-   "sections": [
-    {
-     "head": "Task 1: Manifest readiness + plan names ✓ done",
-     "hash": "b9376bd0",
-     "state": "1/1"
-    },
-    {
-     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
-     "hash": "93389863",
-     "state": "1/1"
-    },
-    {
-     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
-     "hash": "af719f20",
-     "state": "1/1"
-    },
-    {
-     "head": "Task 4: Wire + verify + close ✓ done",
-     "hash": "7ba9e648",
-     "state": "1/1"
-    },
-    {
-     "head": "Task 5: Data-sanity pass ✓ done",
-     "hash": "087948f8",
-     "state": "1/1"
-    }
-   ]
-  },
   {
    "sha": null,
    "date": "2026-10-07",
@@ -552,6 +474,95 @@
      "state": "1/1"
     }
    ]
+  },
+  {
+   "sha": "e9c609b",
+   "date": "2026-10-07",
+   "hash": "2bb9d8ae",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested)",
+     "hash": "85808fee",
+     "state": ""
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language",
+     "hash": "59ac16f1",
+     "state": ""
+    },
+    {
+     "head": "Task 4: Wire + verify + close",
+     "hash": "26a6fef3",
+     "state": ""
+    }
+   ],
+   "time": "13:12"
+  },
+  {
+   "sha": "59c38f3",
+   "date": "2026-10-07",
+   "hash": "d6ca358b",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "e99ebe6e",
+     "state": "1/1"
+    }
+   ],
+   "time": "13:12"
+  },
+  {
+   "sha": "a7d7434",
+   "date": "2026-10-07",
+   "hash": "6efe0d05",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "7ba9e648",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Data-sanity pass ✓ done",
+     "hash": "087948f8",
+     "state": "1/1"
+    }
+   ],
+   "time": "13:23"
   },
   {
    "sha": null,
@@ -648,6 +659,223 @@
     {
      "head": "Task 9: Revisions block — above commits, compact scrollable list",
      "hash": "c4c8f750",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": "4966356",
+   "date": "2026-10-12",
+   "time": "22:13",
+   "hash": "605117bb",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "7ba9e648",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Data-sanity pass ✓ done",
+     "hash": "087948f8",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
+     "hash": "0442a299",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
+     "hash": "c8e8534e",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
+     "hash": "2113de07",
+     "state": "1/1"
+    }
+   ]
+  },
+  {
+   "sha": "9fb1f05",
+   "date": "2026-10-12",
+   "time": "22:24",
+   "hash": "835f2841",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "7ba9e648",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Data-sanity pass ✓ done",
+     "hash": "087948f8",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
+     "hash": "0442a299",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
+     "hash": "c8e8534e",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
+     "hash": "2113de07",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
+     "hash": "96017c20",
+     "state": "1/1"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-12",
+   "time": "22:27",
+   "hash": "ceb4a257",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "7ba9e648",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Data-sanity pass ✓ done",
+     "hash": "087948f8",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
+     "hash": "0442a299",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
+     "hash": "c8e8534e",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
+     "hash": "2113de07",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
+     "hash": "96017c20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed",
+     "hash": "8e5053e7",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-12",
+   "time": "22:31",
+   "hash": "1b186867",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "7ba9e648",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Data-sanity pass ✓ done",
+     "hash": "087948f8",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
+     "hash": "0442a299",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
+     "hash": "c8e8534e",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
+     "hash": "2113de07",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
+     "hash": "96017c20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed",
+     "hash": "a6d6f96f",
      "state": ""
     }
    ]
@@ -1223,7 +1451,8 @@
      "hash": "0913dca9",
      "state": "0/3"
     }
-   ]
+   ],
+   "time": "16:50"
   },
   {
    "sha": null,
@@ -1756,342 +1985,6 @@
    ]
   },
   {
-   "sha": "2b24407",
-   "date": "2026-10-12",
-   "hash": "c73408ca",
-   "sections": [
-    {
-     "head": "Phase 00 — Fix the foundation (chassis parity)",
-     "hash": "5c41b72c",
-     "state": ""
-    },
-    {
-     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
-     "hash": "86c1de4e",
-     "state": ""
-    },
-    {
-     "head": "Phase 02 — Reconstruct the terminal (honest provenance)",
-     "hash": "f4326a07",
-     "state": ""
-    },
-    {
-     "head": "Phase 03 — Hotspot launcher map",
-     "hash": "a3c26bfa",
-     "state": ""
-    },
-    {
-     "head": "Phase 04 — Time variance + sim",
-     "hash": "fb99d686",
-     "state": ""
-    },
-    {
-     "head": "Phase 05 — Operations layer",
-     "hash": "e2779592",
-     "state": ""
-    },
-    {
-     "head": "Phase 06 — Lock",
-     "hash": "072ee2ca",
-     "state": ""
-    }
-   ]
-  },
-  {
-   "sha": "8bf3a3b",
-   "date": "2026-10-12",
-   "hash": "42e344ad",
-   "sections": [
-    {
-     "head": "Phase 00 — Fix the foundation (chassis parity)",
-     "hash": "5c41b72c",
-     "state": ""
-    },
-    {
-     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
-     "hash": "86c1de4e",
-     "state": ""
-    },
-    {
-     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
-     "hash": "2fe16130",
-     "state": ""
-    },
-    {
-     "head": "Phase 03 — Hotspot launcher map",
-     "hash": "437c7ed4",
-     "state": ""
-    },
-    {
-     "head": "Phase 04 — Time variance + sim",
-     "hash": "5efca7d7",
-     "state": ""
-    },
-    {
-     "head": "Phase 05 — Operations layer",
-     "hash": "f860438b",
-     "state": ""
-    },
-    {
-     "head": "Phase 06 — Lock",
-     "hash": "e3d069a9",
-     "state": ""
-    }
-   ]
-  },
-  {
-   "sha": "4581a71",
-   "date": "2026-10-12",
-   "hash": "51341710",
-   "sections": [
-    {
-     "head": "Phase 00 — Fix the foundation (chassis parity)",
-     "hash": "5c41b72c",
-     "state": ""
-    },
-    {
-     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
-     "hash": "86c1de4e",
-     "state": ""
-    },
-    {
-     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
-     "hash": "ab4f0407",
-     "state": ""
-    },
-    {
-     "head": "Phase 03 — Hotspot launcher map",
-     "hash": "437c7ed4",
-     "state": ""
-    },
-    {
-     "head": "Phase 04 — Time variance + sim",
-     "hash": "5efca7d7",
-     "state": ""
-    },
-    {
-     "head": "Phase 05 — Operations layer",
-     "hash": "f860438b",
-     "state": ""
-    },
-    {
-     "head": "Phase 06 — Lock",
-     "hash": "e3d069a9",
-     "state": ""
-    }
-   ]
-  },
-  {
-   "sha": "8adad1c",
-   "date": "2026-10-12",
-   "hash": "041d1894",
-   "sections": [
-    {
-     "head": "Phase 00 — Fix the foundation (chassis parity)",
-     "hash": "5c41b72c",
-     "state": ""
-    },
-    {
-     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
-     "hash": "86c1de4e",
-     "state": ""
-    },
-    {
-     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
-     "hash": "61a63fff",
-     "state": ""
-    },
-    {
-     "head": "Phase 03 — Hotspot launcher map",
-     "hash": "437c7ed4",
-     "state": ""
-    },
-    {
-     "head": "Phase 04 — Time variance + sim",
-     "hash": "5efca7d7",
-     "state": ""
-    },
-    {
-     "head": "Phase 05 — Operations layer",
-     "hash": "f860438b",
-     "state": ""
-    },
-    {
-     "head": "Phase 06 — Lock",
-     "hash": "e3d069a9",
-     "state": ""
-    }
-   ]
-  },
-  {
-   "sha": "fb2f707",
-   "date": "2026-10-12",
-   "hash": "42072296",
-   "sections": [
-    {
-     "head": "Phase 00 — Fix the foundation (chassis parity)",
-     "hash": "8545a43a",
-     "state": ""
-    },
-    {
-     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
-     "hash": "0c811176",
-     "state": ""
-    },
-    {
-     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
-     "hash": "0ba312bf",
-     "state": ""
-    },
-    {
-     "head": "Phase 03 — Hotspot launcher map",
-     "hash": "cca97ae6",
-     "state": ""
-    },
-    {
-     "head": "Phase 04 — Time variance + sim",
-     "hash": "288fca73",
-     "state": ""
-    },
-    {
-     "head": "Phase 05 — Operations layer",
-     "hash": "0602fce2",
-     "state": ""
-    },
-    {
-     "head": "Phase 06 — Lock",
-     "hash": "e3d069a9",
-     "state": ""
-    }
-   ]
-  },
-  {
-   "sha": "cf36897",
-   "date": "2026-10-12",
-   "hash": "237faacc",
-   "sections": [
-    {
-     "head": "Phase 00 — Fix the foundation (chassis parity)",
-     "hash": "8545a43a",
-     "state": ""
-    },
-    {
-     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
-     "hash": "bd41575c",
-     "state": ""
-    },
-    {
-     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
-     "hash": "0ba312bf",
-     "state": ""
-    },
-    {
-     "head": "Phase 03 — Hotspot launcher map",
-     "hash": "cca97ae6",
-     "state": ""
-    },
-    {
-     "head": "Phase 04 — Time variance + sim",
-     "hash": "288fca73",
-     "state": ""
-    },
-    {
-     "head": "Phase 05 — Operations layer",
-     "hash": "0602fce2",
-     "state": ""
-    },
-    {
-     "head": "Phase 06 — Lock",
-     "hash": "e3d069a9",
-     "state": ""
-    }
-   ]
-  },
-  {
-   "sha": "bbdb9d9",
-   "date": "2026-10-12",
-   "hash": "8e51efd3",
-   "sections": [
-    {
-     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
-     "hash": "e5e551f2",
-     "state": "2/2"
-    },
-    {
-     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
-     "hash": "71804c38",
-     "state": "7/7"
-    },
-    {
-     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
-     "hash": "a6814ebc",
-     "state": "0/6"
-    },
-    {
-     "head": "Phase 03 — Hotspot launcher map",
-     "hash": "eeab3490",
-     "state": "0/4"
-    },
-    {
-     "head": "Phase 04 — Time variance + sim",
-     "hash": "599f97a8",
-     "state": "0/4"
-    },
-    {
-     "head": "Phase 05 — Operations layer",
-     "hash": "838920cf",
-     "state": "0/7"
-    },
-    {
-     "head": "Phase 06 — Lock",
-     "hash": "a3622214",
-     "state": "0/3"
-    }
-   ]
-  },
-  {
-   "sha": "f2d277b",
-   "date": "2026-10-12",
-   "hash": "f6f950ba",
-   "sections": [
-    {
-     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
-     "hash": "e5e551f2",
-     "state": "2/2"
-    },
-    {
-     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
-     "hash": "71804c38",
-     "state": "7/7"
-    },
-    {
-     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
-     "hash": "b4feaead",
-     "state": "0/6"
-    },
-    {
-     "head": "Phase 03 — Hotspot launcher map",
-     "hash": "eeab3490",
-     "state": "0/4"
-    },
-    {
-     "head": "Phase 04 — Time variance + sim",
-     "hash": "599f97a8",
-     "state": "0/4"
-    },
-    {
-     "head": "Phase 05 — Operations layer",
-     "hash": "838920cf",
-     "state": "0/7"
-    },
-    {
-     "head": "Phase 06 — Lock",
-     "hash": "a3622214",
-     "state": "0/3"
-    }
-   ]
-  },
-  {
    "sha": null,
    "date": "2026-10-12",
    "hash": "cd041067",
@@ -2193,6 +2086,393 @@
     {
      "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "86cbea4d",
+     "state": "1/6"
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "eeab3490",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "599f97a8",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "838920cf",
+     "state": "0/7"
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "a3622214",
+     "state": "0/3"
+    }
+   ]
+  },
+  {
+   "sha": "2b24407",
+   "date": "2026-10-12",
+   "hash": "c73408ca",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "5c41b72c",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "86c1de4e",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Reconstruct the terminal (honest provenance)",
+     "hash": "f4326a07",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "a3c26bfa",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "fb99d686",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "e2779592",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "072ee2ca",
+     "state": ""
+    }
+   ],
+   "time": "13:53"
+  },
+  {
+   "sha": "8bf3a3b",
+   "date": "2026-10-12",
+   "hash": "42e344ad",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "5c41b72c",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "86c1de4e",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
+     "hash": "2fe16130",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "437c7ed4",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "5efca7d7",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "f860438b",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "e3d069a9",
+     "state": ""
+    }
+   ],
+   "time": "14:00"
+  },
+  {
+   "sha": "4581a71",
+   "date": "2026-10-12",
+   "hash": "51341710",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "5c41b72c",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "86c1de4e",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
+     "hash": "ab4f0407",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "437c7ed4",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "5efca7d7",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "f860438b",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "e3d069a9",
+     "state": ""
+    }
+   ],
+   "time": "14:02"
+  },
+  {
+   "sha": "8adad1c",
+   "date": "2026-10-12",
+   "hash": "041d1894",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "5c41b72c",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "86c1de4e",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
+     "hash": "61a63fff",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "437c7ed4",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "5efca7d7",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "f860438b",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "e3d069a9",
+     "state": ""
+    }
+   ],
+   "time": "14:02"
+  },
+  {
+   "sha": "fb2f707",
+   "date": "2026-10-12",
+   "hash": "42072296",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "8545a43a",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "0c811176",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
+     "hash": "0ba312bf",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "cca97ae6",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "288fca73",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "0602fce2",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "e3d069a9",
+     "state": ""
+    }
+   ],
+   "time": "14:06"
+  },
+  {
+   "sha": "cf36897",
+   "date": "2026-10-12",
+   "hash": "237faacc",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "8545a43a",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "bd41575c",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
+     "hash": "0ba312bf",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "cca97ae6",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "288fca73",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "0602fce2",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "e3d069a9",
+     "state": ""
+    }
+   ],
+   "time": "14:07"
+  },
+  {
+   "sha": "bbdb9d9",
+   "date": "2026-10-12",
+   "hash": "8e51efd3",
+   "sections": [
+    {
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
+     "hash": "e5e551f2",
+     "state": "2/2"
+    },
+    {
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
+     "hash": "71804c38",
+     "state": "7/7"
+    },
+    {
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
+     "hash": "a6814ebc",
+     "state": "0/6"
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "eeab3490",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "599f97a8",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "838920cf",
+     "state": "0/7"
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "a3622214",
+     "state": "0/3"
+    }
+   ],
+   "time": "16:04"
+  },
+  {
+   "sha": "f2d277b",
+   "date": "2026-10-12",
+   "hash": "f6f950ba",
+   "sections": [
+    {
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
+     "hash": "e5e551f2",
+     "state": "2/2"
+    },
+    {
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
+     "hash": "71804c38",
+     "state": "7/7"
+    },
+    {
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
+     "hash": "b4feaead",
+     "state": "0/6"
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "eeab3490",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "599f97a8",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "838920cf",
+     "state": "0/7"
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "a3622214",
+     "state": "0/3"
+    }
+   ],
+   "time": "16:12"
+  },
+  {
+   "sha": "0a0355a",
+   "date": "2026-10-12",
+   "time": "21:29",
+   "hash": "ddc501c8",
+   "sections": [
+    {
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
+     "hash": "e5e551f2",
+     "state": "2/2"
+    },
+    {
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
+     "hash": "71804c38",
+     "state": "7/7"
+    },
+    {
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
+     "hash": "abc35159",
      "state": "1/6"
     },
     {

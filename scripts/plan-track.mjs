@@ -92,7 +92,9 @@ for (const f of plans) {
   // Move-to-end preserves the entry's original sha/date provenance.
   const ix = hist[f].findIndex((v) => v.hash === h);
   if (ix === -1) {
-    hist[f].push({ sha: null, date: new Date().toISOString().slice(0, 10), hash: h,
+    const now = new Date();
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    hist[f].push({ sha: null, date: now.toISOString().slice(0, 10), time: hhmm, hash: h,
       sections: split(md).map((s) => ({ head: s.head.slice(0, 80), hash: phash(s.head + '\n' + s.body), state: state(s.body) })) });
     histAdded++;
   } else if (ix !== hist[f].length - 1) {
