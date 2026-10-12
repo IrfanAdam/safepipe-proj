@@ -86,6 +86,15 @@
       "installed": "public/data/sangachal-vectors.json far_context: 11 feats (M2/Alat legs + Musfiqabad-Sahil R6 to ~27 km, clipped 25 km)",
       "gap": "M1 Baku-Quba motorway (~20 km NW, visible on satellite) has NO OSM geometry in bbox — untagged/sub-arterial; flagged, nothing invented",
       "license": "ODbL-1.0 © OpenStreetMap contributors"
+    },
+    {
+      "name": "Elevation triangulation 2026-10-12 (Terrarium live vs SRTM Skadi vs GLO-90; GLO-30 probed-absent)",
+      "source": "Terrarium z12 tiles (live field) vs SRTM 1-arcsec HGT via AWS Skadi mirror (USGS public domain) vs Copernicus GLO-90 via Open-Meteo API (free non-commercial, attribute Copernicus + Open-Meteo) — 41x41 grid n=1681 + 72 rim pts + -24m shore transect",
+      "scripts": "scripts/data-pipe/elev-common.mjs + elev-fetch.mjs + elev-compare.mjs (node --check clean)",
+      "report": "scratch elev-triangulation/elev-report.md (scratch, pruned after 24h idle)",
+      "result": "srtm-terrarium RMSE 2.45m r=0.9995; GLO-90-terrarium RMSE 6.36m; relief ratio 1.005/0.994; shore crossing terrarium 3365m vs srtm 3318m — agreement only, no independent truth; NO DEM SWAP, Terrarium stays live",
+      "gap": "Copernicus GLO-30 tile Copernicus_DSM_COG_10_N40_00_E049_00_DEM.tif absent from AWS mirror (E043-E050 404); original at https://dataspace.copernicus.eu/ (OAuth) / https://doi.org/10.5270/ESA-c5d3d65",
+      "license": "Mixed — Terrarium blend (stream, never vendored); SRTM public domain; GLO-90 Copernicus terms; stats are ours"
     }
   ]
 }
