@@ -101,7 +101,7 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 | # | Task | Done when |
 |---|---|---|
-| 10 | Reference board (multi-source sweep: Google views, Sentinel-2/Copernicus, Esri reference, OSM/Overpass vectors, BP ESIA figures, ground photos; dates pinned; unobtainable views named with official download pages) | every later task cites board frames; board holds references + captures, never third-party pixels in-repo |
+| 10 | Reference board (multi-source sweep: in-browser map views, Sentinel-2/Copernicus, Esri reference, OSM/Overpass vectors, BP ESIA figures, public terminal photography for shape/depth; owner supplies nothing — all public; dates pinned; unobtainable views named with official download pages) | every later task cites board frames; board holds references + captures, never third-party pixels in-repo |
 | 11 | Terrain detail + roads (micro-relief within DEM limits, OSM road corridors draped, paved polys; never invented detail) | roads sit on terrain with no float; too-coarse spots recorded approximated |
 | 12 | Backdrop objects (non-facility physical inside ring bounds: off-terminal structures, coastal features, landform furniture) | backdrops read at ISO without pulling focus from the terminal |
 | 13 | Pipelines + pipe racks (parametric runs, rack repeats; routes from visible evidence only, inferred runs tiered never claimed) | runs continuous at NEAR; no verified-claims on hidden routing |
