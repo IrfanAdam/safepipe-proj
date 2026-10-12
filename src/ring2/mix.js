@@ -9,9 +9,14 @@
  *     satellite-base fade (setGroundFade, same smoothstep band).
  *   - Endpoint rule: the satellite hides ONLY at mix 100, the exact step
  *     the twin ground reaches opaque (same condition both sides — the old
- *     anytime-takeover black hole can't recur); across mix 62->100 the
+ *     anytime-takeover black hole can't recur); across the mix band the
  *     photo base dissolves out as paint opacity while the twin ground
  *     dissolves in, so the base swap never jumps.
+ *   - Tilt takeover (owner verdict 2026-10-12): at steep tilt + close range
+ *     the twin takes the base regardless of slider — u is the max-merge of
+ *     the mix ramp and tiltU(pitch, range), the satellite fades as (1 - u)
+ *     so base + twin always sum to 1, and emphasis follows max(t, u) so the
+ *     (never tilt-faded) lines stay lit when tilt takes over.
  *   - Canvas-identity watch: a MutationObserver on the twin container
  *     re-applies the full mix (opacity + pointer-events + emphasis) whenever
  *     the canvas remounts, so a remount can never reset to a stale look
@@ -19,8 +24,8 @@
  * [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-3]
  */
 import { setGroundOwns, getGroundOwns, setGroundFade } from './mapbase.js';
-import { takeoverU, satBaseV, groundHidden } from './takeover.js';
-import { twinPointerEvents } from './sync.js';
+import { takeoverU, groundHidden } from './takeover.js';
+import { twinPointerEvents, tiltU } from './sync.js';
 
 export const MIX_STORE_KEY = 'ring2.mix';
 export const TOP_PITCH_DEG = 20; // retired: ground no longer pitch-gated (kept for API compat)
@@ -57,11 +62,13 @@ export function mountMixBar(el, opts = {}) {
     applyEmphasis = () => {},
     setTakeover = () => {},
     getPitchDeg = () => 0,
+    getRangeM = () => Infinity,
     initial = loadMix(50),
   } = opts;
 
   let mix = clampMix(initial);
   let lastPitch = getPitchDeg();
+  let lastRange = getRangeM();
   let lastCanvas = null;
   const subs = new Set();
   const emit = () => {
@@ -95,7 +102,9 @@ export function mountMixBar(el, opts = {}) {
 
   /* Full mix application: canvas opacity + events + emphasis + takeover
    * pair (twin-ground ramp in overlays + satellite-base fade in mapbase,
-   * same smoothstep band both sides) + ground endpoint rule. */
+   * same steps both sides) + ground endpoint rule. The takeover u is the
+   * max-merge of the mix ramp and the tilt takeover (see effUNow) — base +
+   * twin always sum to 1, so a black hole is impossible from either side. */
   function reapply() {
     // Dead-end guard: stored mix 0 + map still mounting = empty viewport
     // with orbit going nowhere. While the map object doesn't exist, floor
@@ -104,6 +113,7 @@ export function mountMixBar(el, opts = {}) {
     // moment the map lands.
     const effMix = effMixNow();
     const t = effMix / 100;
+    const u = effUNow();
     const canvas = getTwinCanvas();
     lastCanvas = canvas ?? lastCanvas;
     if (canvas) {
@@ -118,10 +128,10 @@ export function mountMixBar(el, opts = {}) {
       canvas.style.pointerEvents = twinPointerEvents(effMix);
     }
     try {
-      applyEmphasis(t);
+      applyEmphasis(Math.max(t, u));
     } catch { /* emphasis is cosmetic */ }
     try {
-      setTakeover(takeoverU(effMix));
+      setTakeover(u);
     } catch { /* takeover ground is cosmetic */ }
     applyGroundRule(lastPitch);
     paintLabel();
@@ -135,22 +145,34 @@ export function mountMixBar(el, opts = {}) {
   }
 
   /* Smooth base crossfade (was: binary satellite hide at mix 100). Every
-   * reapply drives BOTH sides of the dissolve over the same smoothstep
-   * band: the twin ground ramps 0->1 via setTakeover(takeoverU) in
-   * reapply, and here the satellite base fades 1->0 via
-   * setGroundFade(satBaseV) as raster-opacity / hillshade-exaggeration
-   * paint. setGroundOwns keeps the ENDPOINT only: layers stay
-   * layout-visible through the band and hide exactly at mix 100, the step
-   * the twin ground reaches opaque (a black hole stays impossible).
+   * reapply drives BOTH sides of the dissolve over the SAME steps: the twin
+   * ground ramps 0->1 via setTakeover(u) in reapply, and here the satellite
+   * base fades to (1 - u) via setGroundFade as raster-opacity /
+   * hillshade-exaggeration paint — u is the max-merge (see effUNow), so the
+   * mix band and the close-range tilt takeover share one law and base +
+   * twin always sum to 1. setGroundOwns keeps the slider ENDPOINT only:
+   * layers stay layout-visible through the band and hide exactly at mix
+   * 100, the step the mix-driven twin ground reaches opaque.
    * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
-  function applyGroundRule(pitchDeg) {
-    lastPitch = pitchDeg;
+  function applyGroundRule(pitchDeg, rangeM) {
+    if (pitchDeg !== undefined) lastPitch = pitchDeg;
+    if (Number.isFinite(Number(rangeM))) lastRange = Number(rangeM);
     const eff = effMixNow();
+    const u = effUNow();
     try {
-      setGroundFade(satBaseV(eff));
+      setGroundFade(1 - u);
     } catch { /* base fade is cosmetic */ }
     setGroundOwns(!groundHidden(eff));
     paintLabel();
+  }
+
+  /* Central takeover law (single source of truth — reapply + applyGroundRule
+   * both consume it, so the twin ground, the satellite fade and the
+   * endpoint rule can never disagree): u = max(takeoverU(effMix),
+   * tiltU(pitch, range)). Slider owns the base top-down at any range;
+   * steep + close tilt takes it regardless of slider. */
+  function effUNow() {
+    return Math.max(takeoverU(effMixNow()), tiltU(lastPitch, lastRange));
   }
 
   function setMix(v, { silent = false } = {}) {
@@ -177,13 +199,17 @@ export function mountMixBar(el, opts = {}) {
   const watchRoot = seen() ?? el;
   observer.observe(watchRoot, { childList: true, subtree: true });
 
-  /** Per-frame hook from main.js: re-resolves canvas identity + ground rule. */
-  function updateForCamera(pitchDeg) {
+  /** Per-frame hook from main.js: re-resolves canvas identity + ground rule.
+   * Feeds the tilt takeover (pitch + eye-to-target range) before applying,
+   * so a remount reapply also sees the fresh camera. */
+  function updateForCamera(pitchDeg, rangeM) {
+    if (pitchDeg !== undefined) lastPitch = pitchDeg;
+    if (Number.isFinite(Number(rangeM))) lastRange = Number(rangeM);
     const cur = getTwinCanvas();
     if (cur !== lastCanvas) {
       reapply();
     } else {
-      applyGroundRule(pitchDeg);
+      applyGroundRule(lastPitch);
     }
   }
 

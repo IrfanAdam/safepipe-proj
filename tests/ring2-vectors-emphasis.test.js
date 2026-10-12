@@ -1,17 +1,18 @@
-// tests/ring2-vectors-emphasis.test.js — Phase 01 tilt-fade gate for OSM vectors.
+// tests/ring2-vectors-emphasis.test.js — Phase 01 vector registration gate.
 // Owner video proof (build b64tilt): white roads floated bright past the
 // terrain silhouette at high tilt because mountVectors materials never
-// entered the overlays emphasis registry. This pins the fix: mount sample
-// vectors, register mats (same baseOpacity capture as addEmphasisMats),
-// then setTiltFade(65) -> opacity ~0, setTiltFade(0) -> base, setEmphasis(0)
-// -> 0, using the REAL tilt law (sync.js) and the REAL opacity law
-// (overlays.js emphasisOpacity, the exact function applyEmphasisFull uses).
+// entered the overlays emphasis registry. This pins registration: mount
+// sample vectors, register mats (same baseOpacity capture as
+// addEmphasisMats). Verdict change (pan-drift follow-up): vectors are
+// per-vertex terrain-coupled, so tilt NO LONGER dims them — lines stay at
+// base at every pitch and the SATELLITE yields instead (see tiltU in
+// sync.js + effUNow in mix.js). setEmphasis(0) -> 0 still holds.
 // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mountVectors } from '../src/ring2/vectors.js';
 import { tiltFadeForPitch, MAP_MAX_PITCH_DEG } from '../src/ring2/sync.js';
-import { emphasisOpacity } from '../src/ring2/overlays.js';
+import { emphasisOpacity, matOpacity } from '../src/ring2/overlays.js';
 
 const fakeScene = () => ({ children: [], add(o) { this.children.push(o); } });
 const SAMPLE = {
@@ -41,18 +42,16 @@ test('mountVectors exposes materials for the emphasis registry', async () => {
   }
 });
 
-test('tilt 65 dims registered vector mats to ~0; tilt 0 restores base', async () => {
+test('tilt never dims registered vector mats: 65 and 90 keep base at full mix', async () => {
   const h = await mountVectors(fakeScene(), SAMPLE);
   const mats = register(h.materials);
-  const t = 1; // full twin mix: tilt alone must kill the roads
-  assert.equal(tiltFadeForPitch(65), 0);
-  assert.equal(tiltFadeForPitch(0), 1);
-  for (const m of mats) {
-    const base = m.userData.baseOpacity;
-    m.opacity = emphasisOpacity(base, t, tiltFadeForPitch(65));
-    assert.ok(Math.abs(m.opacity) < 1e-9, `tilt65 opacity ${m.opacity}`);
-    m.opacity = emphasisOpacity(base, t, tiltFadeForPitch(0));
-    assert.ok(Math.abs(m.opacity - base) < 1e-9, `tilt0 opacity ${m.opacity} restores base ${base}`);
+  const t = 1; // full twin mix: lines stay — the satellite yields instead
+  for (const pitch of [0, 59, 60, 65, 90]) {
+    for (const m of mats) {
+      const base = m.userData.baseOpacity;
+      m.opacity = matOpacity(base, t, pitch, 'vector');
+      assert.equal(m.opacity, base * t, `pitch ${pitch} must keep base`);
+    }
   }
 });
 

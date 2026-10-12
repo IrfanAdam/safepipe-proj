@@ -759,9 +759,17 @@ async function boot() {
         }
       }
       const pitch = pitchForPose(pose.eye, pose.target, pose.target.y ?? 0);
-      mixCtl.updateForCamera(pitch);
-      // Tilt fade (suspect 3): draped linework dissolves as pitch nears the
-      // clamp, so high-tilt views never float linework past the silhouette.
+      const rangeM = Math.hypot(
+        pose.eye.x - pose.target.x,
+        pose.eye.y - (pose.target.y ?? 0),
+        pose.eye.z - pose.target.z,
+      );
+      mixCtl.updateForCamera(pitch, rangeM);
+      // Tilt takeover (owner verdict 2026-10-12): the mix control merges
+      // steep-tilt + close-range into the twin-takeover u above, so the
+      // SATELLITE yields while the terrain-coupled lines stay fully lit.
+      // setTiltFade stays driven per frame for API compat (no-op: lines are
+      // mix-only at every pitch now).
       try {
         twin.setTiltFade?.(pitch);
       } catch { /* cosmetic — never breaks the frame */ }

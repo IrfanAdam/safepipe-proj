@@ -11,7 +11,7 @@
  */
 
 /** Base crossfade band starts here (below: pure overlay composite, as before). */
-export const TAKEOVER_START = 62;
+export const TAKEOVER_START = 40;
 /** Full takeover here: twin ground opaque AND satellite ground hidden. */
 export const TAKEOVER_FULL = 100;
 
@@ -24,7 +24,7 @@ function clampMixNum(v) {
 /* Smoothstep ramp: 0 at/below TAKEOVER_START, 1 at/above TAKEOVER_FULL.
  * u = t^2*(3-2t) with t the band fraction — zero slope at both ends, so
  * neither the satellite-side fade nor the twin-ground ramp starts or lands
- * with a visible step. Max per-step delta is 1.5/bandWidth ≈ 0.039, far
+ * with a visible step. Max per-step delta is 1.5/bandWidth = 1.5/60 = 0.025, far
  * below any perceivable jump. Drives the twin ground mesh opacity
  * (overlays/mix.js feed it straight to the twin). */
 export function takeoverU(mix) {

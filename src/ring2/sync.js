@@ -223,10 +223,49 @@ export function applyTwinToMap(map, pose, opts = {}) {
   return mp;
 }
 
-/* Drape tilt fade (pure): linework opacity multiplier for a camera pitch.
- * 1 up to TILT_FADE_START_DEG, smoothstep ramp to 0 at the shared clamp —
- * near-grazing views hide the drape instead of floating it past the
- * silhouette. Node-testable; overlays.setTiltFade consumes it per frame. */
+/* Tilt takeover (pure): how much of the base the TWIN owns at steep tilt +
+ * close range, merged by max() with the mix-driven takeoverU in mix.js.
+ * Pitch factor = smoothstep 60->65 (reuses TILT_FADE_START_DEG /
+ * MAP_MAX_PITCH_DEG — same last-resort band that used to fade linework);
+ * range factor = 1 at/below TILT_RANGE_FULL_M, smoothstep-fading to 0 at
+ * TILT_RANGE_OFF_M, so a zoomed-out oblique (high range, whole disc in
+ * view) keeps the satellite photo and only a close steep dive swaps the
+ * base to twin terrain. tiltU = pitchFactor * rangeFactor, in [0, 1].
+ * Owner verdict 2026-10-12: at steep tilt the terrain-coupled contour /
+ * vector lines stay FULLY visible (they ride sampleH, so no float) and the
+ * SATELLITE yields instead — twin ground in via setTakeover(u), satellite
+ * out via setGroundFade(1-u), base + twin always summing to 1. */
+export const TILT_RANGE_FULL_M = 4000;
+export const TILT_RANGE_OFF_M = 9000;
+export function tiltU(pitchDeg, rangeM) {
+  const p = Number(pitchDeg);
+  const r = Number(rangeM);
+  if (!Number.isFinite(p) || !Number.isFinite(r)) return 0;
+  let pf;
+  if (p <= TILT_FADE_START_DEG) pf = 0;
+  else if (p >= MAP_MAX_PITCH_DEG) pf = 1;
+  else {
+    const t = (p - TILT_FADE_START_DEG) / (MAP_MAX_PITCH_DEG - TILT_FADE_START_DEG);
+    pf = t * t * (3 - 2 * t);
+  }
+  let rf;
+  if (r <= TILT_RANGE_FULL_M) rf = 1;
+  else if (r >= TILT_RANGE_OFF_M) rf = 0;
+  else {
+    const t = (r - TILT_RANGE_FULL_M) / (TILT_RANGE_OFF_M - TILT_RANGE_FULL_M);
+    rf = 1 - t * t * (3 - 2 * t);
+  }
+  return pf * rf;
+}
+
+/* Drape tilt fade (pure, RETIRED as a linework law — kept for API compat):
+ * linework no longer fades with pitch (owner verdict 2026-10-12: lines stay,
+ * satellite yields), so overlays.tiltFadeApplies is false for every kind and
+ * this always resolves to the mix-only branch there. tiltU above is the live
+ * tilt law (base swap, not line fade).
+ * Old law, retired: 1 up to TILT_FADE_START_DEG, smoothstep ramp to 0 at
+ * the shared clamp — near-grazing views hid the drape instead of floating
+ * it past the silhouette. */
 export function tiltFadeForPitch(pitchDeg, fadeStart = TILT_FADE_START_DEG, clamp = MAP_MAX_PITCH_DEG) {
   const p = Number(pitchDeg);
   if (!Number.isFinite(p) || p <= fadeStart) return 1;

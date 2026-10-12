@@ -324,13 +324,16 @@ test('tilt fade law: full to 60deg, gone at the clamp, monotonic between', () =>
   }
 });
 
-test('tilt fade is wired: overlays exposes setTiltFade, main loop drives it per frame', () => {
+test('tilt response is wired: compat setTiltFade stays driven, steep-tilt law lives in mix.js', () => {
   const overlays = srcOf('../src/ring2/overlays.js');
   const main = srcOf('../src/ring2/main.js');
-  assert.ok(/function setTiltFade\(pitchDeg\)/.test(overlays), 'overlays must define setTiltFade');
+  const mix = srcOf('../src/ring2/mix.js');
+  assert.ok(/function setTiltFade\([^)]*\)/.test(overlays), 'overlays must keep the setTiltFade compat hook');
   assert.ok(/setTiltFade,\s*setTakeover/.test(overlays), 'twin handle must export setTiltFade');
-  assert.ok(/tiltFadeForPitch\(pitchDeg\)/.test(overlays), 'fade must use the pure sync.js law');
+  assert.ok(/tiltFadeApplies/.test(overlays), 'tilt membership must keep one audit point');
   assert.ok(/twin\.setTiltFade\?\.\(pitch\)/.test(main), 'main loop must drive setTiltFade per frame');
+  assert.ok(/updateForCamera\(pitch, rangeM\)/.test(main), 'main loop must feed pitch+range to the mix control');
+  assert.ok(/tiltU\(lastPitch, lastRange\)/.test(mix), 'steep-tilt satellite yield must run through tiltU');
 });
 
 test('input-path audit: one map, no enablers, twin canvas owns Shift+drag', () => {

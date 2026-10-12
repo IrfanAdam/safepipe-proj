@@ -95,20 +95,23 @@ export function emphasisOpacity(baseOpacity, t, tiltK) {
 }
 
 /* Tilt-fade MEMBERSHIP (single source of truth — reg() stamps every mat
- * through this, addEmphasisMats() stamps OSM vectors through this). ONLY
- * draped linework rides the tilt fade: contours + OSM vectors. Ground,
- * water, ring, labels, leaders, schematic, mask and rim are mix-only and
- * pitch-invariant at every angle — the b65vecfade regression (whole twin
- * dissolving past 50°) came from fading the entire registry. Narrowing the
- * band alone would not have fixed it; scoping the membership does.
+ * through this, addEmphasisMats() stamps OSM vectors through this). NOTHING
+ * rides the tilt fade anymore: owner verdict 2026-10-12 — at steep tilt the
+ * terrain-coupled contour/vector lines stay FULLY visible (per-vertex
+ * sampleH drape, so no float) and the SATELLITE yields instead via the
+ * mix.js tilt takeover (twin ground in, photo out). Every kind is mix-only
+ * and pitch-invariant at every angle. Kept as a function (not deleted) so
+ * reg()/addEmphasisMats() call sites and the node pins keep one audit
+ * point; the b65vecfade regression (whole twin dissolving past 50°) stays
+ * fixed by scoping, now taken to zero.
  * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
-export function tiltFadeApplies(kind) {
-  return kind === 'contour' || kind === 'vector';
+export function tiltFadeApplies(_kind) {
+  return false;
 }
 
-/** Per-mat opacity with tilt membership (node-testable). Non-linework
- * kinds ignore pitch entirely: matOpacity(base, t, anyPitch, 'water') is
- * exactly base*t. */
+/** Per-mat opacity with tilt membership (node-testable). Every kind is
+ * mix-only now (tiltFadeApplies is false across the board): matOpacity(base,
+ * t, anyPitch, anyKind) is exactly base*t. */
 export function matOpacity(baseOpacity, t, pitchDeg, kind) {
   return emphasisOpacity(baseOpacity, t, tiltFadeApplies(kind) ? tiltFadeForPitch(pitchDeg) : 1);
 }
@@ -356,8 +359,8 @@ export function createOverlayTwin(container, opts = {}) {
     for (const m of mats ?? []) {
       if (!m) continue;
       if (m.userData.baseOpacity == null) m.userData.baseOpacity = m.opacity ?? 1;
-      // OSM vectors are draped linework: the ONLY externals that ride tilt.
-      // Ground/water fills must never be passed here (mix-only by policy).
+      // OSM vectors are draped linework: stamped through the same membership
+      // (mix-only like everything else since the tilt fade retired).
       m.userData.tiltFade = tiltFadeApplies('vector');
       if (!emphasisMats.includes(m)) emphasisMats.push(m);
       if (!externalMats.includes(m)) externalMats.push(m);
@@ -604,7 +607,7 @@ export function createOverlayTwin(container, opts = {}) {
       g.setAttribute('color', new THREE.BufferAttribute(carr, 4));
       const m = new THREE.LineSegments(g, reg(track(new THREE.LineBasicMaterial({
         color: 0xffffff, vertexColors: true, transparent: true, opacity, depthWrite: false,
-      })), 'contour')); // draped linework: the ONLY in-house kind that rides tilt
+      })), 'contour')); // draped linework: mix-only at every pitch (tilt fade retired)
       m.frustumCulled = false;
       group.add(m);
     };
@@ -995,21 +998,22 @@ function edgeFade(x, z) {
   });
 
   let lastT = 0.5;
-  /* Tilt fade (suspect 3, PRIMARY, scoped 2026-10-12): near-grazing pitch
-   * hides the draped LINEWORK (contours + OSM vectors) instead of floating
-   * it past the terrain silhouette — the exact frame the owner video caught.
-   * Last-resort 60–65° band (sync.js TILT_FADE_START_DEG); below 60° tiltK
-   * is exactly 1. Ground, water, ring, labels and schematic are mix-only
-   * (tiltFade stamp false) so the twin can never dissolve at moderate
-   * angles again (b65vecfade regression). Survives rebuild (module scope,
-   * re-applied with lastT); driven per frame by main.js via
-   * setTiltFade(pitch). Pure law lives in sync.js (tiltFadeForPitch).
+  /* Tilt response (RETIRED as a line fade 2026-10-12 — owner verdict: lines
+   * stay, satellite yields). The old suspect-3 law hid draped linework over
+   * the 60–65° band; now every mat is mix-only (tiltFade stamp false
+   * everywhere, setTiltFade pins 1) and the steep-tilt response lives in
+   * mix.js as the tilt takeover: twin ground in via setTakeover(u),
+   * satellite out via setGroundFade(1-u). Survives rebuild (module scope,
+   * re-applied with lastT); driven per frame by main.js via the mix
+   * control's updateForCamera(pitch, rangeM). Pure law lives in sync.js
+   * (tiltU).
    * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
   let lastTiltK = 1;
   function applyEmphasisFull() {
     for (const m of emphasisMats) {
-      // Linework (tiltFade stamp) rides mix*tilt; everything else is
-      // mix-only and pitch-invariant at every angle.
+      // Every mat is mix-only now (tiltFadeApplies is false for all kinds):
+      // the tilt stamp below is dead weight kept for API compat, and pitch
+      // can never dim a line again.
       m.opacity = emphasisOpacity(m.userData.baseOpacity ?? m.opacity, lastT, m.userData.tiltFade ? lastTiltK : 1);
     }
   }
@@ -1017,8 +1021,12 @@ function edgeFade(x, z) {
     lastT = Math.min(1, Math.max(0, t));
     applyEmphasisFull();
   }
-  function setTiltFade(pitchDeg) {
-    lastTiltK = tiltFadeForPitch(pitchDeg);
+  /* Neutered 2026-10-12 (owner verdict: lines stay, satellite yields): kept
+   * exported + driven per frame by main.js for API compat, but pins the
+   * multiplier at 1 — the steep-tilt response now lives in mix.js as the
+   * tilt takeover (twin ground in, photo out), not a line fade. */
+  function setTiltFade(_pitchDeg) {
+    lastTiltK = 1;
     applyEmphasisFull();
   }
   function setEmphasis(t) {
