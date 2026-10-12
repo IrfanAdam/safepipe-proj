@@ -32,6 +32,13 @@ import { SANGACHAL, VEX, RING_RADIUS_M, EXTENT_M } from './site.js';
 import { MAP_MAX_PITCH_DEG, MAP_TRUE_FOV_DEG, TWIN_MIN_RANGE_M, tiltFadeForPitch } from './sync.js';
 import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
 import { DRAPE_LIFTS, RIM_FADE_IN, RIM_TILT_GAIN } from './drape.js';
+import { TIER } from './facilities/dims.js';
+
+/* REF GATE 2: every overlay renderable carries userData.tier. All overlay
+ * geometry is computed from the real field/site constants (mapped radius,
+ * DEM drape, schematic program) — TIER.DERIVED throughout.
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02] */
+const tagDerived = (o) => { o.userData.tier = TIER.DERIVED; return o; };
 
 /** Blue reserved EXCLUSIVELY for water (sampleH < CASPIAN_SHORE_H). */
 /* Caspian shoreline datum: the Caspian surface sits at -28 m but Terrarium
@@ -400,7 +407,7 @@ export function createOverlayTwin(container, opts = {}) {
     const m = reg(track(new THREE.LineBasicMaterial({
       color: RING_COL, transparent: true, opacity: 0.95, depthWrite: false,
     })), 'ring'); // mapped-radius reference: mix-only, never tilt-faded
-    const ring = new THREE.Line(g, m);
+    const ring = tagDerived(new THREE.Line(g, m));
     ring.name = 'ring2-ring';
     ring.frustumCulled = false;
     group.add(ring);
@@ -422,6 +429,7 @@ export function createOverlayTwin(container, opts = {}) {
     const pin = new THREE.LineSegments(pinG, reg(track(new THREE.LineBasicMaterial({
       color: RING_COL, transparent: true, opacity: 0.8, depthWrite: false,
     })), 'marker'));
+    tagDerived(pin);
     pin.position.y = groundY(0, 0, 40);
     group.add(pin);
     const pinLbl = makeLabelSprite(
@@ -439,6 +447,7 @@ export function createOverlayTwin(container, opts = {}) {
     const line = new THREE.Line(g, reg(track(new THREE.LineBasicMaterial({
       color: SCHEMATIC_EDGE_COL, transparent: true, opacity: 0.55, depthWrite: false,
     })), 0.55, 'leader'));
+    tagDerived(line);
     line.frustumCulled = false;
     group.add(line);
     return line;
@@ -483,12 +492,14 @@ export function createOverlayTwin(container, opts = {}) {
         labels.push({ sprite: tip, leader: makeLeader(blockTop, tip.position), anchor: blockTop });
       }
       mesh.name = `schematic-${b.name}`;
+      tagDerived(mesh);
       group.add(mesh);
       const edges = new THREE.LineSegments(
         track(new THREE.EdgesGeometry(mesh.geometry)),
         reg(track(new THREE.LineBasicMaterial({ color: SCHEMATIC_EDGE_COL, transparent: true, opacity: 0.9, depthWrite: false })), 'schematic'),
       );
       edges.position.copy(mesh.position);
+      tagDerived(edges);
       group.add(edges);
       const lbl = makeLabelSprite(`${b.name} · source:schematic`, { h: 150 });
       reg(lbl.material, 'label');
@@ -642,6 +653,7 @@ export function createOverlayTwin(container, opts = {}) {
       const m = new THREE.LineSegments(g, reg(track(new THREE.LineBasicMaterial({
         color: 0xffffff, vertexColors: true, transparent: true, opacity, depthWrite: false,
       })), 'contour')); // draped linework: mix-only at every pitch (tilt fade retired)
+      tagDerived(m);
       m.frustumCulled = false;
       group.add(m);
     };
@@ -726,6 +738,7 @@ function edgeFade(x, z) {
       depthWrite: false, side: THREE.DoubleSide,
     })), WATER_MAX_OPACITY, 'water')); // sea fill: mix-only, NEVER tilt-faded
     m.name = 'ring2-water';
+    tagDerived(m);
     m.frustumCulled = false;
     group.add(m);
     return wet;
@@ -765,6 +778,7 @@ function edgeFade(x, z) {
     }));
     const mesh = new THREE.Mesh(g, m);
     mesh.name = 'ring2-mask';
+    tagDerived(mesh);
     mesh.renderOrder = -10;
     mesh.frustumCulled = false;
     group.add(mesh);
@@ -858,6 +872,7 @@ function edgeFade(x, z) {
     m.needsUpdate = true;
     const mesh = new THREE.Mesh(g, m);
     mesh.name = 'ring2-rimfade';
+    tagDerived(mesh);
     mesh.renderOrder = 5;
     mesh.frustumCulled = false;
     group.add(mesh);
@@ -931,7 +946,7 @@ function edgeFade(x, z) {
       vertexColors: true, transparent: true, opacity: 0,
       depthWrite: false, side: THREE.DoubleSide,
     }));
-    groundMesh = new THREE.Mesh(g, groundMat);
+    groundMesh = tagDerived(new THREE.Mesh(g, groundMat));
     groundMesh.name = 'ring2-ground';
     groundMesh.renderOrder = -5;
     groundMesh.frustumCulled = false;

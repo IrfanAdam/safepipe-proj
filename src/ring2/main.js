@@ -43,7 +43,6 @@ import {
   tileToken,
   ldTerrToken,
   effToken,
-  CTX_DECODE,
 } from './ctxmon.js';
 
 const el = document.getElementById('ring2-dev');
@@ -366,9 +365,6 @@ function paintStatus() {
     (twinFrames >= 0
       ? ` · frames:${twinFrames}${twinErr ? ` TWINERR:${String(twinErr).slice(0, 120)}` : ''}`
       : '');
-  try {
-    statusDiv.title = CTX_DECODE;
-  } catch { /* tooltip never breaks paint */ }
 }
 
 async function boot() {

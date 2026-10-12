@@ -128,6 +128,7 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 **Verify:** No unstamped objects (probed 0 untiered across T0+T1+backdrops); loop log `scripts/parity-loop/loop-log.jsonl` (7 runs) + baseline `scripts/parity-loop/baseline/t1/` attached to the gate note.
 
 - REF GATE 2 (OPEN): owner scores captures against the reference board via the parity rubric (toy / noisy / just right) + tier labels visible. How to judge: open the TOP/ISO/NEAR captures next to the board frames; first check every object carries a tier stamp; then score realism — pass = "just right" with stamps visible.
+  - Evidence 2026-10-12 (subagent rounds, this commit): tier audit PARTIAL→fixed — overlays 12 + vectors 1 stamped derived, facilities 48/48 already stamped, 0 unstamped; loop-log run 16 on 21 Phase-02 objects (5 stale retired explicitly), verdicts minor = expected content delta vs old-twin t3 baseline; captures gate2-caps TOP/ISO/NEAR with 0 page errors; tests 168/0 + build green. Tooltip cleanup bundled: gallery iframe title→aria-label, status-line legend tooltip dropped.
 
 ## Phase 03 — Hotspot launcher map
 <!-- {#phase-03} -->

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T12:21:00.823Z",
+  "generated": "2026-10-12T15:36:20.986Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -11,9 +11,73 @@
     "2026-10-07_153000-ops3d-realworld-twin.md",
     "2026-10-10_150100-ops3d-sangachal-twin.md",
     "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
-    "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
+    "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+    "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "b5cafc2",
+      "full": "b5cafc24afde09324f827972df29975b84d41e9c",
+      "date": "2026-10-12",
+      "time": "18:31",
+      "subject": "fix(ring2): facilities honor mix-0 endpoint via satgate visibility gate — 0/320 at SAT [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "446350f",
+      "full": "446350fe4806e42c8d4a138710924e20407b58aa",
+      "date": "2026-10-12",
+      "time": "18:25",
+      "subject": "feat(geotri): OSM rebuild 2877/27662 — landuse/water/power/barriers closed, M1 still absent [plan:2026-10-12_175646-ops3d-geo-triangulation.md#phase-01]",
+      "plan": "2026-10-12_175646-ops3d-geo-triangulation.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "11b347a",
+      "full": "11b347a3d658fbbf07b10fe4ec71b27df3af3a15",
+      "date": "2026-10-12",
+      "time": "18:18",
+      "subject": "fix(ring2): pure-satellite endpoint — tilt-takeover gated at mix 0, stale pins rewritten [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "9cca07e",
+      "full": "9cca07e8ee07b731ea0e95623562e2385dbebf4a",
+      "date": "2026-10-12",
+      "time": "18:07",
+      "subject": "feat(geotri): elevation triangulation scripts + manifest — Terrarium holds, GLO-30 gap named [plan:2026-10-12_175646-ops3d-geo-triangulation.md#phase-01]",
+      "plan": "2026-10-12_175646-ops3d-geo-triangulation.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "10956ad",
+      "full": "10956ade66a5f5566882c24c0471930e3649ad40",
+      "date": "2026-10-12",
+      "time": "17:56",
+      "subject": "feat(ring2): shared tank/sphere geometries + edge-outline rims for NEAR crispness [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "0f0de9d",
+      "full": "0f0de9ddfba4719896f14c981e1a9673cd733738",
+      "date": "2026-10-12",
+      "time": "17:55",
+      "subject": "feat(ring2): bicubic height-field sampling — smoother NEAR/MACRO drape, zero extra fetches [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "87ca3be",
+      "full": "87ca3bea7ea6d000dc9992c852a7f9f1e34408d6",
+      "date": "2026-10-12",
+      "time": "17:51",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "7030c0e",
       "full": "7030c0ee80e2d4dda7de34be6ef27a6dda0d6689",
@@ -2832,5 +2896,13 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "gallery.html",
+    "scripts/parity-loop/corrections.md",
+    "scripts/parity-loop/loop-log.jsonl",
+    "scripts/parity-loop/tiers.json",
+    "src/ring2/main.js",
+    "src/ring2/overlays.js",
+    "src/ring2/vectors.js"
+  ]
 }

@@ -21,6 +21,7 @@
 import { VEX, RING_RADIUS_M } from './site.js';
 import { sampleH } from './field.js';
 import { DRAPE_LIFTS } from './drape.js';
+import { TIER } from './facilities/dims.js';
 
 export const VECTORS_URL = '/data/sangachal-vectors.json';
 
@@ -198,6 +199,7 @@ export async function mountVectors(scene, data, opts = {}) {
     const lines = new THREE.LineSegments(g, m);
     lines.name = `vectors:${id}`;
     lines.userData.provenance = PROVENANCE[id] ?? 'indicated';
+    lines.userData.tier = TIER.DERIVED; // REF GATE 2: OSM-sourced vectors are derived
     lines.renderOrder = -4;
     lines.frustumCulled = false;
     segs.push(lines);
