@@ -36,20 +36,10 @@
     clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
   }
   #ring2-dev .ring2-mix[data-ground="twin"] .ring2-mix__val { background: rgba(232, 163, 61, 0.12); }
-  /* Status chip: bottom-left above the HUD help buttons. The v1 sector
-   * panel owns top-left now (Phase 00 P1) and the HUD sits above the
-   * chassis (z 10 > 2), so top-left would ghost behind it. Same
-   * diagonal-cut language as the mix bar. */
-  #ring2-dev .ring2-status {
-    position: absolute; left: 12px; bottom: 52px; top: auto; z-index: 2;
-    padding: 6px 16px;
-    background: rgba(10, 14, 18, 0.88);
-    border: 1px solid rgba(207, 212, 214, 0.18);
-    clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
-    font: 10px/1.6 ui-monospace, Menlo, monospace; letter-spacing: 0.1em;
-    color: rgba(207, 212, 214, 0.8); pointer-events: none;
-    max-width: 70vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
+  /* Status chip: hidden from view (owner steer 2026-10-12 — the debug
+   * subtext is console-only now). The node stays in the DOM: telemetry
+   * reads its textContent and boot-failure writes into it. */
+  #ring2-dev .ring2-status { display: none; }
 </style>
 </head>
 <body>

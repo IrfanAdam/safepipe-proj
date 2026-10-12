@@ -63,6 +63,10 @@ let mapDiv = el.querySelector('[data-ring2="map"]');
 const twinDiv = el.querySelector('[data-ring2="twin-wrap"]');
 const barDiv = el.querySelector('[data-ring2="bar"]');
 const statusDiv = el.querySelector('[data-ring2="status"]');
+// Console mirror of the (now hidden) status chip: log only on change so the
+// 500 ms paint loop never spams. Owner steer 2026-10-12: subtext is
+// console-only, never painted.
+let lastConsoleStatus = '';
 
 /* Twin vertical fov === the MapLibre camera's true fov (sync.js
  * MAP_TRUE_FOV_DEG, pinned to maplibre-gl 6.13.0 transform_helper.ts
@@ -365,6 +369,15 @@ function paintStatus() {
     (twinFrames >= 0
       ? ` · frames:${twinFrames}${twinErr ? ` TWINERR:${String(twinErr).slice(0, 120)}` : ''}`
       : '');
+  try {
+    // frames: ticks every paint — strip it so the console only hears real
+    // state changes (tiles, errors, remounts), not the heartbeat.
+    const stable = statusDiv.textContent.replace(/ · frames:\d+/, '');
+    if (stable !== lastConsoleStatus) {
+      lastConsoleStatus = stable;
+      console.debug(`[ring2] ${stable}`);
+    }
+  } catch { /* console never breaks paint */ }
 }
 
 async function boot() {

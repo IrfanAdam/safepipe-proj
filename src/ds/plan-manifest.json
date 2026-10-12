@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T15:36:20.986Z",
+  "generated": "2026-10-12T15:39:14.955Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "093cb96",
+      "full": "093cb96ba022069abc9e816fc9af2e53c736c595",
+      "date": "2026-10-12",
+      "time": "21:08",
+      "subject": "fix(ring2): gate-2 evidence — 13 tier stamps, loop-log run 16 on Phase-02 objects, tooltip cleanup [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "b5cafc2",
       "full": "b5cafc24afde09324f827972df29975b84d41e9c",
@@ -2897,12 +2906,7 @@
     }
   ],
   "wip": [
-    "gallery.html",
-    "scripts/parity-loop/corrections.md",
-    "scripts/parity-loop/loop-log.jsonl",
-    "scripts/parity-loop/tiers.json",
-    "src/ring2/main.js",
-    "src/ring2/overlays.js",
-    "src/ring2/vectors.js"
+    "ops3d-ring2.html",
+    "src/ring2/main.js"
   ]
 }
