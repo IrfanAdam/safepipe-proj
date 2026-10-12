@@ -126,7 +126,17 @@ export const GAS_TRAIN = Object.freeze({
 });
 
 /* ---- S4 pipe racks: portal frames 8–12 m spacing, beam 5–6.5 m, 3–6 pipes,
- * 28–42 in mains [board:S4]. Corridors run site-scale (hundreds of metres). */
+ * 28–42 in mains [board:S4]. Corridors run site-scale (hundreds of metres).
+ * T2 re-seat: mains derived from F1 OSM pipeline ways
+ * (public/data/osm-sangachal.json; 136 man_made=pipeline ways intersect the
+ * terminal bbox ≈ board's 132-seed set). In-terminal geometry splits into
+ * two perpendicular families (mod-180 segment bearings ≈32° NW–SE and
+ * ≈122° NE–SW); per-family perpendicular-offset peaks locate the collinear
+ * bundles, corridor ends = along-axis p5–p95, rounded to 10 m:
+ *  central — 17-way ≈122° bundle through the core;
+ *  west    — 25-way ≈32° gas bunch W of the pin (incl. way 554551484);
+ *  trunks  — twin overground export lines S (ways 305369101/305369459).
+ * Frame dims stay practice-approximated; corridor anchors are DERIVED. */
 export const RACK = Object.freeze({
   frameSpacing: 10,
   beamH: 6,
@@ -135,12 +145,12 @@ export const RACK = Object.freeze({
   pipeCount: 4,
   pipeDiaIn: 36, // mid of 28–42 in
   mains: Object.freeze([
-    // E-W spine: trains → tank farm [approx]
-    { from: { x: -1000, z: 40 }, to: { x: 400, z: -160 }, tier: TIER.APPROXIMATED },
-    // N-S spine: SD block → spine [approx]
-    { from: { x: 480, z: 420 }, to: { x: 480, z: -420 }, tier: TIER.APPROXIMATED },
-    // Spur to EOP row [approx]
-    { from: { x: 400, z: -160 }, to: { x: 700, z: -560 }, tier: TIER.APPROXIMATED },
+    // Central ≈122° bundle through the core (17 F1 ways) [derived]
+    { from: { x: -1180, z: 790 }, to: { x: 140, z: -30 }, tier: TIER.DERIVED },
+    // West ≈32° gas bunch W of the pin (25 F1 ways) [derived]
+    { from: { x: -850, z: -180 }, to: { x: -420, z: 510 }, tier: TIER.DERIVED },
+    // Twin overground export trunks S (ways 305369101/305369459) [derived]
+    { from: { x: -520, z: 1500 }, to: { x: 1080, z: 510 }, tier: TIER.DERIVED },
   ]),
   tier: TIER.APPROXIMATED,
 });

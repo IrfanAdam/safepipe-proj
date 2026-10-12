@@ -70,6 +70,6 @@ test('racks: spacing 8–12 m, beam 5–6.5 m, 3–6 pipes, 28–42 in mains', (
   assert.ok(RACK.mains.length >= 2, 'spine corridors');
   for (const m of RACK.mains) {
     assert.ok(rackLengthM(m) >= 200, `corridor site-scale (got ${rackLengthM(m).toFixed(0)} m)`);
-    assert.equal(m.tier, TIER.APPROXIMATED);
+    assert.equal(m.tier, TIER.DERIVED);
   }
 });
