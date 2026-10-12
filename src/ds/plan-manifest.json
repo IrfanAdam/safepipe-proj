@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T11:36:25.480Z",
+  "generated": "2026-10-12T11:53:56.258Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,15 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "e4d0711",
+      "full": "e4d071184d1211614cc5a4c2a2b351cafd254c9b",
+      "date": "2026-10-12",
+      "time": "17:06",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "311d5fc",
       "full": "311d5fc436f7a379b0dfa0dc06bd9e46b6cecbcb",
@@ -2751,5 +2760,17 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "docs/data-pipeline.md",
+    "public/data/sangachal-vectors.json",
+    "scripts/data-pipe/classify.mjs",
+    "scripts/data-pipe/clip.mjs",
+    "scripts/data-pipe/out/sangachal-vectors.json",
+    "scripts/data-pipe/overpass.mjs",
+    "scripts/data-pipe/run.mjs",
+    "scripts/data-pipe/validate.mjs",
+    "src/ring2/facilities/coast.js",
+    "src/ring2/facilities/landform.js",
+    "src/ring2/facilities/offsite.js"
+  ]
 }

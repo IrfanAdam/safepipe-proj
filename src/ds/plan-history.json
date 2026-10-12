@@ -1080,6 +1080,53 @@
    ]
   },
   {
+   "sha": "32ff9a6",
+   "date": "2026-10-08",
+   "hash": "fa3b02d8",
+   "sections": [
+    {
+     "head": "Phase 0 — Fix the foundation",
+     "hash": "a5319c68",
+     "state": "5/5"
+    },
+    {
+     "head": "Phase 1 — Real terrain",
+     "hash": "c95187d3",
+     "state": "5/5"
+    },
+    {
+     "head": "Phase 1 iteration — feedback pass ✓ done (2026-10-08)",
+     "hash": "9a33de77",
+     "state": "1/1"
+    },
+    {
+     "head": "Phase 2 — Real inspectable assets",
+     "hash": "8e9306a6",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 3 — Hotspot launcher map",
+     "hash": "693d51f0",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 4 — Time variance + sim",
+     "hash": "6b283fba",
+     "state": "0/5"
+    },
+    {
+     "head": "Phase 5 — Operations layer",
+     "hash": "240addd8",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 6 — Lock",
+     "hash": "0913dca9",
+     "state": "0/3"
+    }
+   ]
+  },
+  {
    "sha": null,
    "date": "2026-10-08",
    "hash": "6635eded",
@@ -1586,6 +1633,384 @@
      "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "a6814ebc",
      "state": "0/6"
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "eeab3490",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "599f97a8",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "838920cf",
+     "state": "0/7"
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "a3622214",
+     "state": "0/3"
+    }
+   ]
+  },
+  {
+   "sha": "2b24407",
+   "date": "2026-10-12",
+   "hash": "c73408ca",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "5c41b72c",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "86c1de4e",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Reconstruct the terminal (honest provenance)",
+     "hash": "f4326a07",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "a3c26bfa",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "fb99d686",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "e2779592",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "072ee2ca",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": "8bf3a3b",
+   "date": "2026-10-12",
+   "hash": "42e344ad",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "5c41b72c",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "86c1de4e",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
+     "hash": "2fe16130",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "437c7ed4",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "5efca7d7",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "f860438b",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "e3d069a9",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": "4581a71",
+   "date": "2026-10-12",
+   "hash": "51341710",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "5c41b72c",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "86c1de4e",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
+     "hash": "ab4f0407",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "437c7ed4",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "5efca7d7",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "f860438b",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "e3d069a9",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": "8adad1c",
+   "date": "2026-10-12",
+   "hash": "041d1894",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "5c41b72c",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "86c1de4e",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
+     "hash": "61a63fff",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "437c7ed4",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "5efca7d7",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "f860438b",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "e3d069a9",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": "fb2f707",
+   "date": "2026-10-12",
+   "hash": "42072296",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "8545a43a",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "0c811176",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
+     "hash": "0ba312bf",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "cca97ae6",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "288fca73",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "0602fce2",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "e3d069a9",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": "cf36897",
+   "date": "2026-10-12",
+   "hash": "237faacc",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "8545a43a",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "bd41575c",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
+     "hash": "0ba312bf",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "cca97ae6",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "288fca73",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "0602fce2",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "e3d069a9",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": "bbdb9d9",
+   "date": "2026-10-12",
+   "hash": "8e51efd3",
+   "sections": [
+    {
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
+     "hash": "e5e551f2",
+     "state": "2/2"
+    },
+    {
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
+     "hash": "71804c38",
+     "state": "7/7"
+    },
+    {
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
+     "hash": "a6814ebc",
+     "state": "0/6"
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "eeab3490",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "599f97a8",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "838920cf",
+     "state": "0/7"
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "a3622214",
+     "state": "0/3"
+    }
+   ]
+  },
+  {
+   "sha": "f2d277b",
+   "date": "2026-10-12",
+   "hash": "f6f950ba",
+   "sections": [
+    {
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
+     "hash": "e5e551f2",
+     "state": "2/2"
+    },
+    {
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
+     "hash": "71804c38",
+     "state": "7/7"
+    },
+    {
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
+     "hash": "b4feaead",
+     "state": "0/6"
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "eeab3490",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "599f97a8",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "838920cf",
+     "state": "0/7"
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "a3622214",
+     "state": "0/3"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-12",
+   "hash": "cd041067",
+   "sections": [
+    {
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
+     "hash": "e5e551f2",
+     "state": "2/2"
+    },
+    {
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
+     "hash": "71804c38",
+     "state": "7/7"
+    },
+    {
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
+     "hash": "1e4a56ae",
+     "state": "1/6"
     },
     {
      "head": "Phase 03 — Hotspot launcher map",
