@@ -114,8 +114,9 @@ import { hits, badges, unlinked } from '../changelog-links.js';
 import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../changelog-titles.js';
 import { isDone, state } from '../changelog-parse.js';
 import { esc } from './esc.js';
+import { paintRevs } from './paint-revs.js';
 export function paintDetail(root, ctx){
-  const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts, edited } = ctx;
+  const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts, edited, revs } = ctx;
   const scrim = root.querySelector('[data-scrim]'), drawer = root.querySelector('[data-drawer]');
   const sprint = sprints[si], sprintDesc = (s) => descOf(s.body);
   const railHead = `<div class="ds-rail-plan">` + esc([plan.id, plan.title || provenance(plan)].filter(Boolean).join(' · ')) + `</div>`;
@@ -152,7 +153,7 @@ export function paintDetail(root, ctx){
     ` · `,
     esc(short(sprint.head)),
     `</b><button data-close aria-label="Close detail">✕</button></div><div class="ds-md">`,
-    marked.parse(sprint.body) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : ''),
+    marked.parse(sprint.body) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : '') + paintRevs(revs),
     `</div>`,
   ].join('');
   const u = unlinked(texts);

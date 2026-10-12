@@ -94,3 +94,14 @@
 **Objective:** `changelog-kit@0.2.0` documents the history contract, backfill procedure, and new pitfalls so the next project gets iteration tracking free.
 
 **Verify:** SKILL.md diff reviewed; version bumped; procedure/pitfalls/verification all mention plan-history.
+
+## Task 8: Per-plan revision list in the changelog views ✓ done
+
+**Objective:** The owner can open any plan and see every revision (r1…rN with date, per-section heads + states, changed-since-previous marks) — not just `rev N` counts. Owner steer 2026-10-12: "i need to see all the iterations done per plan".
+
+**Design:**
+- Detail drawer (or card expansion — lane picks the surface that fits existing view roles): a revisions block per plan, newest-first or oldest-first to match history order, each row `rN · date`, expanding to section heads + `state` with a changed mark when the section hash differs from the previous rev (same rule as rail `· edited`).
+- Data comes from the already-bundled `plan-history.json` (see `references/iterations.md` import-depth note); no new data plumbing, no tracker changes.
+- Styling follows the host changelog visual language (tokens only); prototype reference (scratch, not shipped): `/Users/irfan/.hermes/cache/scratch/plan-iterations.html`.
+
+**Verify:** every plan with >1 rev shows its full list; rev counts match history; section states match live parse; build green; existing changelog tests pass.

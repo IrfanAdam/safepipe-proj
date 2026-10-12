@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T16:03:16.014Z",
+  "generated": "2026-10-12T16:42:39.521Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "f4c2d1d",
+      "full": "f4c2d1d1de3693f393dd3f2fe5dd9e32beb01d18",
+      "date": "2026-10-12",
+      "time": "21:33",
+      "subject": "docs(plan): mark Tasks 10-14 headers done — tracker reads 6/6 [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "0a0355a",
       "full": "0a0355a62eefdc23793d55ae6d66a3082cd1e66d",
@@ -2950,5 +2959,10 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "src/changelog/changelog-drawer.css",
+    "src/changelog/changelog/paint-detail.js",
+    "src/changelog/pages-changelog.js",
+    "src/changelog/changelog/paint-revs.js"
+  ]
 }
