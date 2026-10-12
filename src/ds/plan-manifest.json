@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T10:37:57.271Z",
+  "generated": "2026-10-12T10:38:06.267Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,15 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "97b4709",
+      "full": "97b47092283be0df94416981475e717b3debcf07",
+      "date": "2026-10-12",
+      "time": "16:08",
+      "subject": "chore(traceability): retro-link 3 orphan commits, every-commit trailer rule [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-00]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-00"
+    },
     {
       "sha": "91c8bb1",
       "full": "91c8bb11eaed57b169b3cac71e1a91cc24fa60fd",
@@ -2499,7 +2508,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/ds/plan-retro.json"
-  ]
+  "wip": []
 }
