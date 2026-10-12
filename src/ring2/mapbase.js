@@ -210,6 +210,27 @@ let _groundOwns = true;
  * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
 let _groundFade = 1;
 
+/* Paint dedupe (slide smoothing): setGroundFade/setGroundOwns fire per slider
+ * input AND per frame via mix.updateForCamera — at rest every call repeats
+ * the current values, and each redundant setPaint/setLayoutProperty dirties
+ * the style and forces another map render (perpetual 60fps repaint of the
+ * hillshade among it). The records below track what actually reached the
+ * live instance so repeats are skipped; changed values still apply
+ * immediately and every mount force-applies, so endpoints stay bit-identical.
+ * [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-3] */
+let _fadeApplied = null;
+let _fadeMap = null;
+let _ownsApplied = null;
+let _ownsMap = null;
+/** Fade values closer than this skip the paint round-trip (invisible step). */
+export const GROUND_FADE_EPS = 1e-4;
+/** Pure compare for the fade dedupe (node-testable, no map needed). */
+export function fadeEqual(a, b, eps = GROUND_FADE_EPS) {
+  const x = Number(a), y = Number(b);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  return Math.abs(x - y) < eps;
+}
+
 /** Live MapLibre instance (null before mount resolves). */
 export function getMap() {
   return _map;
@@ -237,14 +258,23 @@ export function getGroundOwns() {
 export function setGroundOwns(on) {
   _groundOwns = !!on;
   const m = _map;
-  if (m) {
+  // Dedupe: repeats (per-frame reapply at rest) skip the style round-trip.
+  // A failed layer write leaves the record untouched so the next call
+  // retries — same eventual behavior as the unguarded version.
+  if (m && (_ownsApplied !== _groundOwns || _ownsMap !== m)) {
     const vis = _groundOwns ? 'visible' : 'none';
+    let ok = true;
     for (const id of GROUND_LAYER_IDS) {
       try {
         m.setLayoutProperty(id, 'visibility', vis);
       } catch {
+        ok = false;
         /* layer not yet added — flag still applies on next mount */
       }
+    }
+    if (ok) {
+      _ownsApplied = _groundOwns;
+      _ownsMap = m;
     }
   }
   return _groundOwns;
@@ -262,19 +292,27 @@ export function setGroundFade(satV) {
   const s = !Number.isFinite(n) ? 1 : Math.min(1, Math.max(0, n));
   _groundFade = s;
   const m = _map;
-  if (m) {
+  // Dedupe: sub-epsilon repeats (per-frame reapply at rest) skip the paint
+  // round-trip. Changed values flush immediately — no lag, same endpoints.
+  if (m && (_fadeMap !== m || !fadeEqual(_fadeApplied, s))) {
     const paint = [
       [IMAGERY_LAYER_ID, 'raster-opacity', s],
       [IMAGERY_BACKUP_LAYER_ID, 'raster-opacity', s],
       [REFERENCE_LAYER_ID, 'raster-opacity', s * REFERENCE_BASE_OPACITY],
       [HILLSHADE_LAYER_ID, 'hillshade-exaggeration', s * HILLSHADE_BASE_EXAG],
     ];
+    let ok = true;
     for (const [id, prop, val] of paint) {
       try {
         m.setPaintProperty(id, prop, val);
       } catch {
+        ok = false;
         /* layer not yet added — fade still applies on next mount */
       }
+    }
+    if (ok) {
+      _fadeApplied = s;
+      _fadeMap = m;
     }
   }
   return s;
@@ -286,6 +324,10 @@ export function getGroundFade() {
 }
 
 function applyGroundFlag(m) {
+  // Mount path: force-apply memory state and sync the dedupe records, so a
+  // remount inside the takeover band never flashes full satellite for a
+  // frame and later repeats are still skipped.
+  let paintOk = true;
   for (const [id, prop, val] of [
     [IMAGERY_LAYER_ID, 'raster-opacity', _groundFade],
     [IMAGERY_BACKUP_LAYER_ID, 'raster-opacity', _groundFade],
@@ -295,17 +337,27 @@ function applyGroundFlag(m) {
     try {
       m.setPaintProperty(id, prop, val);
     } catch {
+      paintOk = false;
       /* ignore pre-style race */
     }
   }
-  if (!_groundOwns) {
-    for (const id of GROUND_LAYER_IDS) {
-      try {
-        m.setLayoutProperty(id, 'visibility', 'none');
-      } catch {
-        /* ignore pre-style race */
-      }
+  if (paintOk) {
+    _fadeApplied = _groundFade;
+    _fadeMap = m;
+  }
+  const vis = _groundOwns ? 'visible' : 'none';
+  let visOk = true;
+  for (const id of GROUND_LAYER_IDS) {
+    try {
+      m.setLayoutProperty(id, 'visibility', vis);
+    } catch {
+      visOk = false;
+      /* ignore pre-style race */
     }
+  }
+  if (visOk) {
+    _ownsApplied = _groundOwns;
+    _ownsMap = m;
   }
 }
 

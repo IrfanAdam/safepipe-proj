@@ -117,6 +117,20 @@ export function matOpacity(baseOpacity, t, pitchDeg, kind) {
 }
 
 /** Canvas text sprite. Returns THREE.Sprite with world-height `h`. */
+
+/* Auto-redrape settle rule (slide smoothing, node-testable). The DEM
+ * coarse->live flip schedules a full dispose+recreate+recompile; while the
+ * mix/tilt feed is still moving values the rebuild waits for the view to
+ * settle instead of hitching mid-gesture. */
+export const REDRAPE_DEBOUNCE_MS = 300;
+export const REDRAPE_SETTLE_MS = 500;
+export const REDRAPE_MAX_DEFERS = 20;
+export function shouldDeferRedrape({ nowMs, lastSlideAt, defers = 0 } = {}) {
+  if (!Number.isFinite(nowMs) || !Number.isFinite(lastSlideAt)) return false;
+  if ((defers ?? 0) >= REDRAPE_MAX_DEFERS) return false;
+  return nowMs - lastSlideAt < REDRAPE_SETTLE_MS;
+}
+
 export function makeLabelSprite(text, { h = 260, fg = '#f2f5f6', accent = '#e8a33d' } = {}) {
   const pad = 18;
   const cv = document.createElement('canvas');
@@ -840,6 +854,10 @@ function edgeFade(x, z) {
   let groundMesh = null;
   let groundMat = null;
   let lastU = 0;
+  /* Wall-clock ms of the last VALUE-changing setTakeover/setEmphasis (slider
+   * drag or orbit still moving the view). The DEM auto-redrape waits these
+   * out so a rebuild never lands mid-gesture. */
+  let lastSlideAt = 0;
   function buildTwinGround() {
     const NS = TAKEOVER_SEG;
     const NR = TAKEOVER_RINGS;
@@ -904,7 +922,12 @@ function edgeFade(x, z) {
   /* Takeover control: u 0 = twin ground gone (satellite base), 1 = opaque
    * twin terrain. Called by the mix slider; re-applied after every rebuild. */
   function setTakeover(u) {
-    lastU = Math.min(1, Math.max(0, Number(u) || 0));
+    const nu = Math.min(1, Math.max(0, Number(u) || 0));
+    // Settle stamp: a VALUE change means the slider/orbit is still moving
+    // the view — the DEM auto-redrape below waits these out. Identical
+    // per-frame repeats (at rest) leave the stamp alone.
+    if (nu !== lastU) lastSlideAt = Date.now();
+    lastU = nu;
     if (groundMesh) groundMesh.visible = lastU > 0.003;
     if (groundMat) groundMat.opacity = lastU;
   }
@@ -985,15 +1008,35 @@ function edgeFade(x, z) {
   }
 
   // Re-drape when the field lands on a better source (coarse -> live).
+  // Slide smoothing: a redrape disposes + recreates every overlay mesh and
+  // recompiles its shaders — a multi-frame hitch. While the mix/tilt feed is
+  // still moving values (slider drag or orbit), re-arm the debounce instead
+  // of rebuilding mid-gesture; the pending redrape lands once the view
+  // settles (bounded by REDRAPE_MAX_DEFERS so a marathon drag can't pin a
+  // stale drape forever). Direct rebuild() calls stay synchronous.
   let debounce = 0;
+  let redrapeDefers = 0;
+  let dead = false;
   const unsub = onStatus((s) => {
     if (s.stage === 'live' || s.stage === 'srtm') {
       clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        try {
-          rebuild();
-        } catch { /* a failed re-drape never kills the loop */ }
-      }, 300);
+      redrapeDefers = 0;
+      const arm = () => {
+        if (dead) return;
+        debounce = setTimeout(() => {
+          try {
+            if (!dead && shouldDeferRedrape({ nowMs: Date.now(), lastSlideAt, defers: redrapeDefers })) {
+              redrapeDefers++;
+              arm();
+              return;
+            }
+            if (dead) return;
+            redrapeDefers = 0;
+            rebuild();
+          } catch { /* a failed re-drape never kills the loop */ }
+        }, REDRAPE_DEBOUNCE_MS);
+      };
+      arm();
     }
   });
 
@@ -1018,7 +1061,9 @@ function edgeFade(x, z) {
     }
   }
   function applyEmphasis(t) {
-    lastT = Math.min(1, Math.max(0, t));
+    const nt = Math.min(1, Math.max(0, t));
+    if (nt !== lastT) lastSlideAt = Date.now();
+    lastT = nt;
     applyEmphasisFull();
   }
   /* Neutered 2026-10-12 (owner verdict: lines stay, satellite yields): kept
@@ -1104,6 +1149,7 @@ function edgeFade(x, z) {
   window.addEventListener('resize', onResize);
 
   function dispose() {
+    dead = true;
     unsub?.();
     clearTimeout(debounce);
     window.removeEventListener('resize', onResize);
