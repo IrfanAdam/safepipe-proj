@@ -476,6 +476,7 @@ export function createOverlayTwin(container, opts = {}) {
         reg(tip.material, 'label');
         tip.userData.baseScale = tip.scale.clone();
         tip.userData.screenClamp = true;
+        tip.userData.hideNear = true;
         tip.position.set(b.x, gy + b.h * VEX + 260, b.z);
         tip.name = 'flare-tip';
         group.add(tip);
@@ -493,6 +494,7 @@ export function createOverlayTwin(container, opts = {}) {
       reg(lbl.material, 'label');
       lbl.userData.baseScale = lbl.scale.clone();
       lbl.userData.screenClamp = true;
+      lbl.userData.hideNear = true;
       lbl.position.set(b.x, gy + (b.h ?? 60) * VEX + 520, b.z);
       group.add(lbl);
       labels.push({ sprite: lbl, leader: makeLeader(blockTop, lbl.position), anchor: blockTop });
@@ -534,7 +536,7 @@ export function createOverlayTwin(container, opts = {}) {
     const hidePlaceholder = range < 3500;
     labels.forEach((p, i) => {
       let vis = !collapsed || i < PILL_MAX_MAP_RANGE;
-      if (vis && hidePlaceholder && p.sprite.userData.screenClamp) vis = false;
+      if (vis && hidePlaceholder && p.sprite.userData.hideNear) vis = false;
       p.sprite.visible = vis;
       p.leader.visible = vis;
       if (vis && clampH > 0 && p.sprite.userData.screenClamp && p.sprite.userData.baseScale) {
@@ -611,6 +613,8 @@ export function createOverlayTwin(container, opts = {}) {
           const lbl = makeLabelSprite(`${L} m · source:${src}`, { h: 300, accent: '#ffc46b' });
           lbl.material.opacity = edgeFade(mid.x, mid.z); // dissolve at coverage edge
           reg(lbl.material, 'label');
+          lbl.userData.baseScale = lbl.scale.clone();
+          lbl.userData.screenClamp = true;
           lbl.position.set(mid.x, L * VEX + 420, mid.z);
           group.add(lbl);
           const cAnchor = new THREE.Vector3(mid.x, L * VEX, mid.z);
