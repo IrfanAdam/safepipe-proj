@@ -37,9 +37,13 @@ const ARTERIALS = new Set([
 const STREETS = new Set(['residential', 'living_street', 'footway', 'steps', 'path']);
 const LANDUSE = new Set([
   'industrial', 'residential', 'grass', 'quarry', 'military', 'construction', 'greenfield',
+  // Lane A 2026-10-12: orchard/forest/cemetery/garages/farmyard/commercial
+  // triangulated present-but-orphaned in the board sweep (18 ways) + live AOI.
+  'orchard', 'forest', 'cemetery', 'garages', 'farmyard', 'commercial',
 ]);
 const WATERWAY = new Set(['stream', 'river', 'canal', 'drain']);
-const POWER = new Set(['plant', 'substation', 'line']);
+const POWER = new Set(['plant', 'substation', 'line', 'minor_line']); // Lane A: +minor_line (1 live way)
+const BARRIER = new Set(['fence', 'wall']); // Lane A: +wall (11 live ways)
 
 // Far-context membership: classified arterials only (motorway/trunk/
 // primary — mirrors the far Overpass query in overpass.mjs buildFarQuery).
@@ -88,8 +92,9 @@ export function classify(elements) {
     if (hw && STREETS.has(hw)) layers.streets.push(el);
     if (t.landuse && LANDUSE.has(t.landuse)) layers.landuse.push(el);
     if (t.waterway && WATERWAY.has(t.waterway)) layers.water.push(el);
+    if (t.natural === 'water') layers.water.push(el); // Lane A: inland bodies (31 live ways)
     if (t.power && POWER.has(t.power)) layers.power.push(el);
-    if (t.barrier === 'fence') layers.barriers.push(el);
+    if (t.barrier && BARRIER.has(t.barrier)) layers.barriers.push(el);
     if (t.building !== undefined) layers.buildings.push(el);
   }
   return { layers, filtered, skippedNonWay, skippedWays, outOfScope };

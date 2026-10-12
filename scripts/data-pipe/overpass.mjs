@@ -28,10 +28,11 @@ export function buildQuery(b = AOI_BBOX) {
 (
   way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|living_street|service|track|footway|path|steps|pedestrian|cycleway|bridleway)$"](${bb});
   way["natural"="coastline"](${bb});
-  way["landuse"~"^(industrial|residential|grass|quarry|military|construction|greenfield)$"](${bb});
+  way["natural"="water"](${bb});
+  way["landuse"~"^(industrial|residential|grass|quarry|military|construction|greenfield|orchard|forest|cemetery|garages|farmyard|commercial)$"](${bb});
   way["waterway"~"^(stream|river|canal|drain)$"](${bb});
-  way["power"~"^(plant|substation|line)$"](${bb});
-  way["barrier"="fence"](${bb});
+  way["power"~"^(plant|substation|line|minor_line)$"](${bb});
+  way["barrier"~"^(fence|wall)$"](${bb});
   way["building"](${bb});
 );
 out geom;`;

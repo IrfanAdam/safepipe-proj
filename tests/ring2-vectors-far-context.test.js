@@ -17,11 +17,11 @@ import { classifyFar } from '../scripts/data-pipe/classify.mjs';
 
 const asset = JSON.parse(readFileSync('public/data/sangachal-vectors.json', 'utf8'));
 
-test('far_context matches the live far sweep (11 features / 137 vertices)', () => {
-  assert.equal(asset.layers.far_context.length, 11);
-  assert.equal(asset.meta.far_src, 11);
+test('far_context matches the live far sweep (10 features / 117 vertices)', () => {
+  assert.equal(asset.layers.far_context.length, 10);
+  assert.equal(asset.meta.far_src, 10);
   const vtx = asset.layers.far_context.reduce((n, f) => n + f.pts.length, 0);
-  assert.equal(vtx, 137);
+  assert.equal(vtx, 117);
   for (const f of asset.layers.far_context) {
     assert.ok(typeof f.id === 'number' && Array.isArray(f.pts) && f.pts.length >= 2, `id=${f?.id} well-formed`);
   }

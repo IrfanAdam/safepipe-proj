@@ -1,7 +1,10 @@
 // tests/ring2-vectors.test.js — Phase 01, Tasks 7+10 gate; Phase 02 Task 11 refresh.
-// OSM pipeline: source sweep (958 elements / 10065 vtx) -> disc-clipped asset
-// (counts recorded in meta) + sample projection in ring + no out-of-disc
-// vertex + segment-circle split unit cases.
+// OSM pipeline: live Overpass sweep (2732 ways, 2026-10-12T12:50Z base)
+// -> disc-clipped asset (counts recorded in meta) + sample projection in
+// ring + no out-of-disc vertex + segment-circle split unit cases.
+// Lane A widened the sweep (natural=water, +6 landuse values,
+// power=minor_line, barrier=wall) and absorbed the deltas; buildings stay
+// outlines (no extrusion).
 // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,9 +17,9 @@ import { DISC_R, DISC_TOL, clipPolylineToDisc } from '../scripts/data-pipe/clip.
 
 const asset = JSON.parse(readFileSync('public/data/sangachal-vectors.json', 'utf8'));
 
-test('vector asset counts match the disc-clipped build (2755 / 25610)', () => {
-  assert.equal(countFeatures(asset), 2755);
-  assert.equal(countVertices(asset), 25610);
+test('vector asset counts match the disc-clipped build (2877 / 27662)', () => {
+  assert.equal(countFeatures(asset), 2877);
+  assert.equal(countVertices(asset), 27662);
   // Legacy 5 layers are byte-pinned; the 7 context layers (Phase 02 Task 12)
   // are pinned here too (feature detail lives in
   // ring2-vectors-new-layers.test.js — do not duplicate it, just pin).
@@ -32,15 +35,15 @@ test('vector asset counts match the disc-clipped build (2755 / 25610)', () => {
         .map((k) => [k, asset.layers[k].length]),
     ),
     {
-      arterials: 97, streets: 476, landuse: 167, water: 23,
-      power: 4, barriers: 12, buildings: 1082,
+      arterials: 97, streets: 476, landuse: 184, water: 47,
+      power: 67, barriers: 31, buildings: 1082,
     },
   );
   // Far-context arterials (motorway/trunk/primary to the 25 km ring;
   // detail pinned in ring2-vectors-far-context.test.js).
-  assert.equal(asset.layers.far_context.length, 11);
-  assert.equal(asset.meta.src_elements, 2603);
-  assert.equal(asset.meta.src_vertices, 25460);
+  assert.equal(asset.layers.far_context.length, 10);
+  assert.equal(asset.meta.src_elements, 2700);
+  assert.equal(asset.meta.src_vertices, 28948);
 });
 
 test('no main-layer vertex lies past the twin disc (max rr <= DISC_R + 0.11)', () => {

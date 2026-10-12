@@ -95,6 +95,20 @@
       "result": "srtm-terrarium RMSE 2.45m r=0.9995; GLO-90-terrarium RMSE 6.36m; relief ratio 1.005/0.994; shore crossing terrarium 3365m vs srtm 3318m — agreement only, no independent truth; NO DEM SWAP, Terrarium stays live",
       "gap": "Copernicus GLO-30 tile Copernicus_DSM_COG_10_N40_00_E049_00_DEM.tif absent from AWS mirror (E043-E050 404); original at https://dataspace.copernicus.eu/ (OAuth) / https://doi.org/10.5270/ESA-c5d3d65",
       "license": "Mixed — Terrarium blend (stream, never vendored); SRTM public domain; GLO-90 Copernicus terms; stats are ours"
+    },
+    {
+      "name": "OSM completeness rebuild 2026-10-12 (Lane A: +landuse/+water/+power/+barriers)",
+      "source": "Overpass API live osm_base 2026-10-12T12:50:21Z (far 12:51:21Z), ODbL-1.0 © OpenStreetMap contributors; query widened: +natural=water, +6 landuse values, +minor_line, +barrier=wall",
+      "installed": "public/data/sangachal-vectors.json: 2877 el / 27662 vtx across 13 layers (landuse 184 +17, water 47 +24, power 67 +63, barriers 31 +19, buildings 1082 net 0 verified, far_context 10 net -1)",
+      "chain": "overpass→clip→classify→validate→wire live rebuild, checkWire IN SYNC, node --test 521/521 green",
+      "gap": "M1 Baku-Quba still 0 M1-tagged ways live — flag retained, nothing invented; man_made=pipeline (151) + storage_tank-only + wetland x3 have no owning layer (needs new-layer call)",
+      "license": "ODbL-1.0, attribution © OpenStreetMap contributors"
+    },
+    {
+      "name": "Source recon 2026-10-12 (Lane C: Cesium / OSM2World / GDAL / PostGIS verdicts)",
+      "source": "Docs + environment probes only — no signups, no scraping, no installs",
+      "result": "Cesium ion / OSM Buildings / World Terrain: needs-account (stream-only terms); OSM Buildings low marginal value (same OSM upstream). OSM2World: trial-blocked, no JRE on machine — queue JRE + scratch CLI trial when extrusion starts. GDAL/PROJ: brew-installable, disproportionate now. PostGIS: skip, validate.mjs + node tests cover the gates.",
+      "license": "No in-repo consequence (nothing fetched or committed)"
     }
   ]
 }

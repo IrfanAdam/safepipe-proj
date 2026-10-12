@@ -11,25 +11,25 @@ import { DISC_R, DISC_TOL } from '../scripts/data-pipe/clip.mjs';
 const asset = JSON.parse(readFileSync('public/data/sangachal-vectors.json', 'utf8'));
 const NEW_LAYERS = ['arterials', 'streets', 'landuse', 'water', 'power', 'barriers', 'buildings'];
 
-test('context layers match the disc-clipped build (1861 features)', () => {
+test('context layers match the disc-clipped build (1984 features)', () => {
   assert.deepEqual(
     Object.fromEntries(NEW_LAYERS.map((k) => [k, asset.layers[k].length])),
     {
-      arterials: 97, streets: 476, landuse: 167, water: 23,
-      power: 4, barriers: 12, buildings: 1082,
+      arterials: 97, streets: 476, landuse: 184, water: 47,
+      power: 67, barriers: 31, buildings: 1082,
     },
   );
   const feats = NEW_LAYERS.reduce((n, k) => n + asset.layers[k].length, 0);
-  assert.equal(feats, 1861);
-  assert.equal(asset.meta.elements, 883 + 1861 + asset.layers.far_context.length);
+  assert.equal(feats, 1984);
+  assert.equal(asset.meta.elements, 883 + 1984 + asset.layers.far_context.length);
 });
 
-test('context layer sources match the board sweep (pre-clip inputs)', () => {
+test('context layer sources match the live sweep (pre-clip inputs)', () => {
   assert.deepEqual(
     Object.fromEntries(NEW_LAYERS.map((k) => [k, asset.meta.layer_src[k]])),
     {
-      arterials: 109, streets: 501, landuse: 182, water: 26,
-      power: 4, barriers: 12, buildings: 1123,
+      arterials: 105, streets: 511, landuse: 191, water: 57,
+      power: 69, barriers: 31, buildings: 1123,
     },
   );
 });
@@ -52,8 +52,8 @@ test('no context-layer vertex lies past the twin disc', () => {
 test('unique-assignment accounting sums back to the merged input', () => {
   const a = asset.meta.accounting;
   assert.equal(a.assigned_unique + a.filtered_only + a.oos_only + a.skipped_ways + a.far_dups, a.input_ways);
-  assert.equal(a.input_ways, 2813); // 2774 main-sweep ways + 39 far-sweep ways
-  assert.equal(a.far_dups, 28); // far ways already in the main sweep (main copy wins)
+  assert.equal(a.input_ways, 2732); // 2690 main-sweep ways + 42 far-sweep ways
+  assert.equal(a.far_dups, 32); // far ways already in the main sweep (main copy wins)
   assert.equal(a.assigned_unique, asset.meta.src_elements);
   assert.equal(a.skipped_non_way, asset.meta.skipped_non_way);
 });
@@ -65,5 +65,7 @@ test('spot checks: arterial motorway + town street + terminal fence + substation
   const fenceInTerminal = asset.layers.terminal.filter((f) =>
     asset.layers.barriers.some((b) => b.id === f.id));
   assert.equal(fenceInTerminal.length, 12);
-  assert.equal(asset.layers.power.length, 4); // 1 plant + 3 substations, 0 power=line in sweep
+  // Lane A: power absorbed the live sweep — 1 plant + 9 substations +
+  // 56 lines + 1 minor_line clipped (69 src); lines + walls are the delta.
+  assert.equal(asset.layers.power.length, 67);
 });
