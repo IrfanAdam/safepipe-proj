@@ -8,7 +8,7 @@
 
 ## TLDR
 
-Build the geographically grounded twin of the REAL Sangachal Terminal on the shipped Ring-2 chassis: Phase 00 ports v1 panels + markers (parity first); Phase 01 researches/acquires/processes real Sangachal source data and builds real-DEM terrain with aligned imagery; Phase 02 reconstructs the visible terminal (tanks, structures, pipe racks, roads) with honest 3-tier provenance; Phases 03–06 carry the 153000 scope (launcher map → time+sim → ops → lock). Every phase ends at a **REF GATE**.
+Build the geographically grounded twin of the REAL Sangachal Terminal on the shipped Ring-2 chassis: Phase 00 ports v1 panels + markers (parity first); Phase 01 researches/acquires/processes real Sangachal source data and builds real-DEM terrain with aligned imagery; Phase 02 builds the twin geometry in owner order (terrain detail → backdrops → pipelines → facilities) with evidence loops + honest 3-tier provenance, no new interactivity; Phases 03–06 carry the 153000 scope (launcher map → time+sim → ops → lock). Every phase ends at a **REF GATE**, every gate scored by the parity rubric.
 
 **Non-negotiable (from spec):** real place from real data — never a generic facility. Implement end-to-end, don't stop at a research report. Never invent files, coverage, coordinates, or findings: if a dataset can't be obtained, name the exact missing file + its official download page, use the best alternative, and document the limitation.
 
@@ -43,17 +43,20 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 - REF GATE 1: owner confirms the terrain reads as the real Sangachal coast (screenshot vs reference imagery).
 
-## Phase 02 — Reconstruct the terminal (honest provenance)
+## Phase 02 — Build the twin (ordered reconstruction, evidence loops)
 <!-- {#phase-02} -->
-*Spec §§5–6. Procedural Three.js for the facility; reusable components (tank cylinder+roof, parametric buildings, road curves/extrusions, pipe-rack repeats, paved polys). Clean hierarchy: terrain / water / roads / buildings / industrial.*
+*Spec §5. Geometry only — no new interactivity in this phase; click-selection + panel round-trip is deferred to Phase 05 (ops layer). Build order per owner: terrain detail → non-facility backdrops → pipelines → facilities. Reference strategy: heavy image reading against a pinned reference board (twin + MapLibre position is ground truth); multi-source permitted imagery + open data; Gaussian-splat / photogrammetry experiments only where licensable multi-view exists — single Google views are eyeball reference, never scraped or redistributed (rubric §1C). Each category runs a self-improving loop: build → capture → diff vs board → refine or honestly tier. Procedural Three.js; reusable components (tank cylinder+roof, parametric buildings, road curves/extrusions, pipe-rack repeats, paved polys). Clean hierarchy: terrain / water / roads / buildings / industrial.*
 
 | # | Task | Done when |
 |---|---|---|
-| 12 | Major structures from evidence (tanks, processing structures, frameworks, roads/paved, pipe racks — placed by geographic reference; NO fabricated hidden details or verified-claims on inferred dims/routes) | every object carries tier: **derived** (geo/tech data) / **reconstructed** (visible imagery) / **approximated** (visual fill, recorded as such) |
-| 13 | Scene capabilities (orbit/pan/zoom; initial camera = facility + landscape; terrain materials + light; water + atmosphere; selection on major structures; efficient browser rendering) | interaction parity with Ring-2 feel; selection round-trips to panel |
-| 14 | CC0 kit + Overpass where they help (Poly Haven pipes GLB → mounts; OSM corridors/roads; provenance per asset `osm\|parametric\|indicated`) | kit parts render on mounts; imports cached under budget |
+| 12 | Reference board (multi-source sweep: Sentinel-2/Copernicus, Esri reference, OSM/Overpass vectors, BP ESIA figures, openly-licensed ground photos; dates + licenses pinned; unobtainable views named with official download pages, eyeball-only) | every later task cites board frames; no scraped/redistributed imagery in repo |
+| 13 | Terrain detail + roads (micro-relief within DEM limits, OSM road corridors draped, paved polys; never invented detail) | roads sit on terrain with no float; too-coarse spots recorded approximated |
+| 14 | Backdrop objects (non-facility physical inside ring bounds: off-terminal structures, coastal features, landform furniture) | backdrops read at ISO without pulling focus from the terminal |
+| 15 | Pipelines + pipe racks (parametric runs, rack repeats; routes from visible evidence only, inferred runs tiered never claimed) | runs continuous at NEAR; no verified-claims on hidden routing |
+| 16 | Facilities (tanks, processing blocks, buildings; reusable components; splat-assisted where licensable multi-view exists) | terminal recognisable vs board at TOP / ISO / NEAR |
+| 17 | Category parity loops + tier labels (per category: capture → diff → refine; every object stamped **derived** / **reconstructed** / **approximated**; loop log kept) | all objects tiered; loop log attached to gate note |
 
-- REF GATE 2: owner approves reconstruction honesty (toy / noisy / just right) + tier labels visible.
+- REF GATE 2: owner scores captures against the reference board via the parity rubric (toy / noisy / just right) + tier labels visible.
 
 ## Phase 03 — Hotspot launcher map
 <!-- {#phase-03} -->
@@ -61,10 +64,10 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 | # | Task | Done when |
 |---|---|---|
-| 15 | Map landing (MapLibre + deck.gl, Dark Matter vector; Esri satellite toggle) | loads keyless-ish; satellite toggle works |
-| 16 | Circular hotspot rings (health-divided arcs, H3-hex sized) + pin fallback | ring matches feed worst-health per sector |
-| 17 | Click → full-screen twin overlay (`?sector=<h3>`) | twin opens pre-selected on sector's worst asset |
-| 18 | Close round-trip (X/Esc/back keeps hex + selection) | Esc mid-orbit returns to map, selection kept |
+| 18 | Map landing (MapLibre + deck.gl, Dark Matter vector; Esri satellite toggle) | loads keyless-ish; satellite toggle works |
+| 19 | Circular hotspot rings (health-divided arcs, H3-hex sized) + pin fallback | ring matches feed worst-health per sector |
+| 20 | Click → full-screen twin overlay (`?sector=<h3>`) | twin opens pre-selected on sector's worst asset |
+| 21 | Close round-trip (X/Esc/back keeps hex + selection) | Esc mid-orbit returns to map, selection kept |
 
 - REF GATE 3: owner picks map look + confirms ring reads right.
 
@@ -74,10 +77,10 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 | # | Task | Done when |
 |---|---|---|
-| 19 | `feedAt(t)` + time slider (30 d history, live tick, +72 h sim) | scrub moves infra + weather + WOs + sim together |
-| 20 | Open-Meteo weather overlays (rain tint, wind, temp shift) | cached fixtures offline; live fetch keyless |
-| 21 | USGS seismic markers + risk-gated pulse | pulse fires only above threshold; markers match feed |
-| 22 | Subsidence field (seeded now, labeled modeled) + sim presets + SIM watermark | same seed → same outcome; watermark whenever sim time active |
+| 22 | `feedAt(t)` + time slider (30 d history, live tick, +72 h sim) | scrub moves infra + weather + WOs + sim together |
+| 23 | Open-Meteo weather overlays (rain tint, wind, temp shift) | cached fixtures offline; live fetch keyless |
+| 24 | USGS seismic markers + risk-gated pulse | pulse fires only above threshold; markers match feed |
+| 25 | Subsidence field (seeded now, labeled modeled) + sim presets + SIM watermark | same seed → same outcome; watermark whenever sim time active |
 
 - REF GATE 4: owner approves slider feel + sim honesty.
 
@@ -87,10 +90,11 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 | # | Task | Done when |
 |---|---|---|
-| 23 | WO fixtures + spatial markers/trails (survive map↔twin trip) | markers match fixtures; list survives trip |
-| 24 | Field crews + activity (live pos, heading, ping age) | crews move; stale pings visibly age |
-| 25 | Approval-gated actions (request → approve → execute → audit) | unapproved action never executes; audit entry each |
-| 26 | Sonic + tactile (confirms, chime, pulse; `M` mutes) | all sounds post-gesture; mute covers all |
+| 26 | Twin selection + panel round-trip (deferred from Phase 02: click facility object → panel; panel action → focus) | click object → panel; panel action → focus lands <5px @ NEAR |
+| 27 | WO fixtures + spatial markers/trails (survive map↔twin trip) | markers match fixtures; list survives trip |
+| 28 | Field crews + activity (live pos, heading, ping age) | crews move; stale pings visibly age |
+| 29 | Approval-gated actions (request → approve → execute → audit) | unapproved action never executes; audit entry each |
+| 30 | Sonic + tactile (confirms, chime, pulse; `M` mutes) | all sounds post-gesture; mute covers all |
 
 - REF GATE 5: owner approves the gate flow.
 
@@ -100,9 +104,9 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 | # | Task | Done when |
 |---|---|---|
-| 27 | Perf budgets (pixel cap, instance counts, `?post=0`, reduced-motion) | budgets logged at boot; Safari holds |
-| 28 | Docs + captures (README: setup, processing, architecture, accuracy limits; source manifest with licensing; captures TOP/ISO/NEAR + map) | fresh reader reproduces data pipeline from docs alone |
-| 29 | Track-close (phases marked ✓ + sha, 0 wip) | every phase closed with sha; final walkthrough signed |
+| 31 | Perf budgets (pixel cap, instance counts, `?post=0`, reduced-motion) | budgets logged at boot; Safari holds |
+| 32 | Docs + captures (README: setup, processing, architecture, accuracy limits; source manifest with licensing; captures TOP/ISO/NEAR + map) | fresh reader reproduces data pipeline from docs alone |
+| 33 | Track-close (phases marked ✓ + sha, 0 wip) | every phase closed with sha; final walkthrough signed |
 
 - REF GATE 6 (final): full walkthrough sign-off. **Success = recognisably the real Sangachal landscape** (real-DEM terrain, plausible coastline, evidence-placed structures) — accuracy + coherence over decoration.
 
