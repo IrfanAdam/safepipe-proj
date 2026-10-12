@@ -8,3 +8,4 @@ dist/
 # temp local probes
 _ring2-*.mjs
 shot.mjs
+scripts/data-pipe/out/osm-sangachal.raw.json

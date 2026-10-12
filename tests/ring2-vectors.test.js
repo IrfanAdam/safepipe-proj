@@ -1,5 +1,5 @@
-// tests/ring2-vectors.test.js — Phase 01, Tasks 7+10 gate.
-// OSM pipeline: source cache (946 elements / 9859 vtx) -> disc-clipped asset
+// tests/ring2-vectors.test.js — Phase 01, Tasks 7+10 gate; Phase 02 Task 11 refresh.
+// OSM pipeline: source sweep (958 elements / 10065 vtx) -> disc-clipped asset
 // (counts recorded in meta) + sample projection in ring + no out-of-disc
 // vertex + segment-circle split unit cases.
 // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
@@ -10,19 +10,19 @@ import { geoToWorld, isWithinRing } from '../src/ring2/site.js';
 import {
   countFeatures, countVertices, PROVENANCE, vectorFadeAlpha,
 } from '../src/ring2/vectors.js';
-import { DISC_R, DISC_TOL, clipPolylineToDisc } from '../scripts/process-osm.mjs';
+import { DISC_R, DISC_TOL, clipPolylineToDisc } from '../scripts/data-pipe/clip.mjs';
 
 const asset = JSON.parse(readFileSync('public/data/sangachal-vectors.json', 'utf8'));
 
-test('vector asset counts match the disc-clipped build (872 / 7721)', () => {
-  assert.equal(countFeatures(asset), 872);
-  assert.equal(countVertices(asset), 7721);
+test('vector asset counts match the disc-clipped build (883 / 7911)', () => {
+  assert.equal(countFeatures(asset), 883);
+  assert.equal(countVertices(asset), 7911);
   assert.deepEqual(
     Object.fromEntries(Object.entries(asset.layers).map(([k, v]) => [k, v.length])),
-    { roads: 638, tracks: 46, paths: 97, coastline: 2, terminal: 89 },
+    { roads: 649, tracks: 46, paths: 97, coastline: 2, terminal: 89 },
   );
-  assert.equal(asset.meta.src_elements, 946);
-  assert.equal(asset.meta.src_vertices, 9859);
+  assert.equal(asset.meta.src_elements, 958);
+  assert.equal(asset.meta.src_vertices, 10065);
 });
 
 test('no asset vertex lies past the twin disc (max rr <= DISC_R + 0.11)', () => {

@@ -80,11 +80,11 @@ const TAKEOVER_SEG = 128; // sectors
 const TAKEOVER_RINGS = 26;
 
 /* Schematic terminal program (NOT surveyed — every block is labelled). */
+// Phase-02 T0 supersedes the tank/train/pump placeholders with parametric
+// geometry (src/ring2/facilities/) — those entries are retired, not kept.
+// ADMIN + FLARE stay until T1 raises their replacements.
+// [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]
 const SCHEMATIC_BLOCKS = [
-  { name: 'TRAIN-1', kind: 'box', w: 420, d: 180, h: 60, x: -350, z: -150 },
-  { name: 'TRAIN-2', kind: 'box', w: 420, d: 180, h: 60, x: -350, z: 150 },
-  { name: 'TANK-FARM', kind: 'cyl', r: 160, h: 70, x: 480, z: -260 },
-  { name: 'PUMP-HALL', kind: 'box', w: 260, d: 140, h: 50, x: -60, z: -560 },
   { name: 'ADMIN', kind: 'box', w: 200, d: 120, h: 40, x: 120, z: 560 },
   { name: 'FLARE', kind: 'stack', r: 12, h: 220, x: 720, z: 420 },
 ];
@@ -475,8 +475,10 @@ export function createOverlayTwin(container, opts = {}) {
           reg(track(new THREE.MeshBasicMaterial({ color: SCHEMATIC_COL, transparent: true, opacity: 0.7, depthWrite: false })), 'schematic'),
         );
         mesh.position.set(b.x, gy + (b.h * VEX) / 2, b.z);
-        const tip = makeLabelSprite('FLARE-TIP · source:schematic', { h: 300 });
+        const tip = makeLabelSprite('FLARE-TIP · source:schematic', { h: 150 });
         reg(tip.material, 'label');
+        tip.userData.baseScale = tip.scale.clone();
+        tip.userData.screenClamp = true;
         tip.position.set(b.x, gy + b.h * VEX + 260, b.z);
         tip.name = 'flare-tip';
         group.add(tip);
@@ -490,8 +492,10 @@ export function createOverlayTwin(container, opts = {}) {
       );
       edges.position.copy(mesh.position);
       group.add(edges);
-      const lbl = makeLabelSprite(`${b.name} · source:schematic`, { h: 300 });
+      const lbl = makeLabelSprite(`${b.name} · source:schematic`, { h: 150 });
       reg(lbl.material, 'label');
+      lbl.userData.baseScale = lbl.scale.clone();
+      lbl.userData.screenClamp = true;
       lbl.position.set(b.x, gy + (b.h ?? 60) * VEX + 520, b.z);
       group.add(lbl);
       labels.push({ sprite: lbl, leader: makeLeader(blockTop, lbl.position), anchor: blockTop });
@@ -521,11 +525,26 @@ export function createOverlayTwin(container, opts = {}) {
    * full set returns. Runs per frame from update(). */
   function updatePills() {
     if (!labels.length) return;
-    const collapsed = camera.position.distanceTo(controls.target) > PILL_COLLAPSE_RANGE_M;
+    const range = camera.position.distanceTo(controls.target);
+    const collapsed = range > PILL_COLLAPSE_RANGE_M;
+    // Screen-clamped placeholders: ~40px pills at mid range (v1 DOM-pill
+    // behavior); hidden in closest inspection where T0 geometry stands alone.
+    let clampH = 0;
+    try {
+      const hPx = renderer.domElement.height || 800;
+      clampH = (2 * range * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * (40 / hPx);
+    } catch { /* clamp stays off */ }
+    const hidePlaceholder = range < 3500;
     labels.forEach((p, i) => {
-      const vis = !collapsed || i < PILL_MAX_MAP_RANGE;
+      let vis = !collapsed || i < PILL_MAX_MAP_RANGE;
+      if (vis && hidePlaceholder && p.sprite.userData.screenClamp) vis = false;
       p.sprite.visible = vis;
       p.leader.visible = vis;
+      if (vis && clampH > 0 && p.sprite.userData.screenClamp && p.sprite.userData.baseScale) {
+        const b = p.sprite.userData.baseScale;
+        const k = clampH / b.y;
+        p.sprite.scale.set(b.x * k, clampH, 1);
+      }
     });
     const showCount = collapsed && labels.length > PILL_MAX_MAP_RANGE;
     if (countPill) countPill.visible = showCount;
