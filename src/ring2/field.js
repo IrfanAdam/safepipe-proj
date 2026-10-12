@@ -326,6 +326,19 @@ export async function fetchSrtmGrid(fetchFn, extentKm = SANGACHAL.extentKm) {
   return { lats: latRow, lons, values: json.elevation };
 }
 
+/** 1-D Catmull-Rom spline through p1->p2 at t in [0,1]. Exact at knots. */
+function cubic(p0, p1, p2, p3, t) {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return (
+    0.5 *
+    (2 * p1 +
+      (-p0 + p2) * t +
+      (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+      (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
+  );
+}
+
 function sampleGridBilinear(grid, lat, lon) {
   const { lats, lons, values } = grid;
   // lats descending (north->south); lons ascending.
@@ -342,12 +355,14 @@ function sampleGridBilinear(grid, lat, lon) {
   const c1 = lons[c + 1];
   const fy = r1 === r0 ? 0 : (r0 - la) / (r0 - r1);
   const fx = c1 === c0 ? 0 : (lo - c0) / (c1 - c0);
+  // Bicubic (Catmull-Rom) over the same posts: same cell lookup and edge
+  // clamping as before, smoother fallback surface between posts.
   const n = lons.length;
-  const v00 = values[r * n + c];
-  const v01 = values[r * n + c + 1];
-  const v10 = values[(r + 1) * n + c];
-  const v11 = values[(r + 1) * n + c + 1];
-  return v00 * (1 - fx) * (1 - fy) + v01 * fx * (1 - fy) + v10 * (1 - fx) * fy + v11 * fx * fy;
+  const m = lats.length;
+  const at = (rr, cc) =>
+    values[clamp(rr, 0, m - 1) * n + clamp(cc, 0, n - 1)];
+  const rowV = (rr) => cubic(at(rr, c - 1), at(rr, c), at(rr, c + 1), at(rr, c + 2), fx);
+  return cubic(rowV(r - 1), rowV(r), rowV(r + 1), rowV(r + 2), fy);
 }
 
 /**
@@ -426,23 +441,30 @@ function sampleTerrarium(x, z) {
   const yi = Math.floor(yt);
   const t = tileCache.get(`${TILE_Z}/${xi}/${yi}`);
   if (!t) return null;
+  // Bicubic (Catmull-Rom) reconstruction of the same texels: exact at texel
+  // centres, C1-smooth between them, so dense NEAR/MACRO drape meshes get
+  // curved micro-relief instead of bilinear facets. Zero extra fetches.
   const fx = Math.min(0.99999, Math.max(0, xt - xi)) * t.size;
   const fy = Math.min(0.99999, Math.max(0, yt - yi)) * t.size;
   const x0 = Math.floor(fx);
   const y0 = Math.floor(fy);
-  const x1 = Math.min(t.size - 1, x0 + 1);
-  const y1 = Math.min(t.size - 1, y0 + 1);
   const dx = fx - x0;
   const dy = fy - y0;
   const d = t.data;
   const s = t.size;
-  const v00 = d[y0 * s + x0];
-  const v01 = d[y0 * s + x1];
-  const v10 = d[y1 * s + x0];
-  const v11 = d[y1 * s + x1];
-  return (
-    v00 * (1 - dx) * (1 - dy) + v01 * dx * (1 - dy) + v10 * (1 - dx) * dy + v11 * dx * dy
-  );
+  const row = (yy) => {
+    const y = Math.min(s - 1, Math.max(0, yy));
+    const p0 = d[y * s + Math.min(s - 1, Math.max(0, x0 - 1))];
+    const p1 = d[y * s + x0];
+    const p2 = d[y * s + Math.min(s - 1, x0 + 1)];
+    const p3 = d[y * s + Math.min(s - 1, Math.max(0, x0 + 2))];
+    return cubic(p0, p1, p2, p3, dx);
+  };
+  const v0 = row(y0 - 1);
+  const v1 = row(y0);
+  const v2 = row(Math.min(s - 1, y0 + 1));
+  const v3 = row(Math.min(s - 1, Math.max(0, y0 + 2)));
+  return cubic(v0, v1, v2, v3, dy);
 }
 
 function sampleSrtm(x, z) {
