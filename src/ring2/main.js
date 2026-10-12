@@ -23,6 +23,7 @@ import { applyTwinToMap, assertTerrainVex, pitchForPose, MAP_TRUE_FOV_DEG, aspec
 import { createOverlayTwin } from './overlays.js';
 import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
+import { buildRingHud } from './hud.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import {
   createCtxMon,
@@ -439,10 +440,18 @@ async function boot() {
   });
   paintStatus();
 
+  // Phase 00 Task 1 (P1): static v1 HUD chrome over the twin. Guarded —
+  // HUD dressing never breaks boot; live wiring lands in P2/P3.
+  let hud = null;
+  try {
+    hud = buildRingHud(el);
+  } catch { /* hud chrome never breaks boot */ }
+
   window.__ring2 = {
     map,
     twin,
     mix: mixCtl,
+    hud,
     build: BUILD_ID,
     getPose: () => twin.getPose(),
     setMix: (v) => mixCtl.setMix(v),
