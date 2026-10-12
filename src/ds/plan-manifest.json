@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T11:32:12.336Z",
+  "generated": "2026-10-12T11:34:02.206Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,24 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "c152c57",
+      "full": "c152c575ab6aea127d4221c6532559aaec4ae3ff",
+      "date": "2026-10-12",
+      "time": "17:04",
+      "subject": "feat(ring2): loop run 8 diffs vs T1 baseline — recursion live [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "e08b01a",
+      "full": "e08b01af03923dbecd1c27ac95cd393d2322897d",
+      "date": "2026-10-12",
+      "time": "17:02",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "1675a12",
       "full": "1675a122b5294d466bc4a2831aa4e3d62748dfe9",
