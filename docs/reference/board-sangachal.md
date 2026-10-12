@@ -85,3 +85,14 @@ T2/T3 per tier loop (Task 15).
 - Gas spheres ~50 m row near pin: (40.201230,49.480691) · (40.200474,49.479254) ·
   (40.201997,49.482156) · (40.202747,49.483610); 60 m sphere (40.193380,49.459434).
 - 116 tank ways in F1 (157 counting nodes); shells not bunds at these diameters.
+
+## T1 candidate seeds (measured F1 footprints ≥40 m, function UNVERIFIED)
+
+Function TBD by T1 lane against EBRD zone tables + aerial pattern — positions
+are derived, purposes approximated until confirmed:
+- 101.7×74.3 m @ (40.197546,49.476970) — hall candidate (600 m SW of pin).
+- 81.7×65.2 m industrial @ (40.202211,49.488507) — pump/compressor candidate.
+- 77.1×62.1 m @ (40.198704,49.492264) — hall candidate.
+- 70.2 m industrial @ (40.201341,49.489620); 68.9 m @ (40.202176,49.477174).
+- East row 49.505–49.509 (90×68, 76×58 ×several) — camp/hall row candidates.
+- 39 such footprints within 2.5 km; full sort in F1 query (building + ≥40 m).
