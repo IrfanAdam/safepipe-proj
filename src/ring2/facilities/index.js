@@ -14,6 +14,7 @@ import { buildPerimeter } from './perimeter.js';
 import { buildCoast } from './coast.js';
 import { buildOffsite } from './offsite.js';
 import { buildLandform } from './landform.js';
+import { gateSatOnly } from './satgate.js';
 
 export { buildTanks } from './tanks.js';
 export { buildTrains } from './trains.js';
@@ -26,6 +27,7 @@ export { buildCoast, SHORE, shoreXAt, shoreSlopeAt, coastSegFrame } from './coas
 export { buildOffsite, NAVAL, navalDistKm, QUARRIES, quarryDistKm, M2, m2LengthM } from './offsite.js';
 export { buildLandform, HILL_N, HILL_SW, HILLOCK, hillockSpots } from './landform.js';
 export * from './dims.js';
+export { gateSatOnly, ungateSatOnly, applySatGate, resolveSatOnly, suspendSatGate, satGateCount } from './satgate.js';
 
 /** Assemble the full T0 structures group. Parent owns siting/grounding. */
 export function buildT0() {
@@ -35,7 +37,9 @@ export function buildT0() {
   g.add(buildTanks());
   g.add(buildTrains());
   g.add(buildRacks());
-  return g;
+  // Pure-satellite endpoint gate (mix 0 hides; 1..100 untouched). Materials,
+  // dims, and tier stamps above are unchanged. [satgate.js]
+  return gateSatOnly(g);
 }
 
 /** Assemble the additive T1 structures group (T0 untouched). Parent owns
@@ -48,7 +52,8 @@ export function buildT1() {
   g.add(buildFlare());
   g.add(buildAdmin());
   g.add(buildPerimeter());
-  return g;
+  // Pure-satellite endpoint gate (mix 0 hides; 1..100 untouched). [satgate.js]
+  return gateSatOnly(g);
 }
 
 /** Assemble the additive backdrops group (T0/T1 untouched): shoreline
@@ -61,5 +66,6 @@ export function buildBackdrops() {
   g.add(buildCoast());
   g.add(buildOffsite());
   g.add(buildLandform());
-  return g;
+  // Pure-satellite endpoint gate (mix 0 hides; 1..100 untouched). [satgate.js]
+  return gateSatOnly(g);
 }
