@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T11:09:42.534Z",
+  "generated": "2026-10-12T11:10:03.132Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,24 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "1e3dd85",
+      "full": "1e3dd85b9c7382921c1b04191044627cb9ac38db",
+      "date": "2026-10-12",
+      "time": "16:40",
+      "subject": "docs(manifest): Task 11 installed-asset provenance + pipe footgun note [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "cd34d62",
+      "full": "cd34d62ba5016b17a368995c0c1afdb5f3a8bce1",
+      "date": "2026-10-12",
+      "time": "16:39",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "6544f1f",
       "full": "6544f1f0fbbf7e443c271aed9a300b60cbe219cc",
