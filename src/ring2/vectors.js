@@ -87,7 +87,9 @@ export async function loadVectors(url = VECTORS_URL) {
 /**
  * Mount draped OSM polylines into a live THREE scene.
  * three is imported lazily so node tests can use the pure helpers above.
- * Returns { group, redrape } — call redrape() when sampleH goes live.
+ * Returns { group, redrape, materials } — call redrape() when sampleH goes
+ * live; pass materials to the twin's addEmphasisMats() so mix + tilt fade
+ * dim the roads instead of leaving them full-bright at grazing pitch.
  */
 export async function mountVectors(scene, data, opts = {}) {
   const THREE = await import('three');
@@ -99,6 +101,7 @@ export async function mountVectors(scene, data, opts = {}) {
     coastline: 0x4fb3ff, terminal: 0xffc46b,
   };
   const segs = [];
+  const mats = [];
   const hexRgb = (hex) => [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
   for (const id of LAYER_ORDER) {
     const arr = [];
@@ -132,6 +135,12 @@ export async function mountVectors(scene, data, opts = {}) {
       color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.85,
       depthWrite: false,
     });
+    // Base opacity stamp: the emphasis registry (overlays.addEmphasisMats)
+    // captures this on registration; stamping at creation keeps the base
+    // even if registration races a fade pass. Opacity still multiplies with
+    // the per-vertex rim-fade alpha, never replaces it.
+    m.userData.baseOpacity = m.opacity;
+    mats.push(m);
     const lines = new THREE.LineSegments(g, m);
     lines.name = `vectors:${id}`;
     lines.userData.provenance = PROVENANCE[id] ?? 'indicated';
@@ -158,7 +167,7 @@ export async function mountVectors(scene, data, opts = {}) {
   };
   drape();
   scene.add(group);
-  return { group, redrape: drape };
+  return { group, redrape: drape, materials: mats };
 }
 
 /** Fetch the asset from `url`, then mount. */

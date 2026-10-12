@@ -87,6 +87,11 @@ const SCHEMATIC_BLOCKS = [
   { name: 'FLARE', kind: 'stack', r: 12, h: 220, x: 720, z: 420 },
 ];
 
+/** Pure mix*tilt opacity law (node-testable; applyEmphasisFull is this per mat). */
+export function emphasisOpacity(baseOpacity, t, tiltK) {
+  return baseOpacity * t * tiltK;
+}
+
 /** Canvas text sprite. Returns THREE.Sprite with world-height `h`. */
 export function makeLabelSprite(text, { h = 260, fg = '#f2f5f6', accent = '#e8a33d' } = {}) {
   const pad = 18;
@@ -306,6 +311,22 @@ export function createOverlayTwin(container, opts = {}) {
     emphasisMats.push(mat);
     return mat;
   };
+  /* Externally-owned mats (OSM vectors in twin.scene, NOT in group): rebuild
+   * clears emphasisMats, so registered externals are re-added after every
+   * rebuild with the same lastT/lastTiltK re-applied. They live outside
+   * `group`, so group.clear()/disposables never dispose them.
+   * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+  const externalMats = [];
+  function addEmphasisMats(mats) {
+    for (const m of mats ?? []) {
+      if (!m) continue;
+      if (m.userData.baseOpacity == null) m.userData.baseOpacity = m.opacity ?? 1;
+      if (!emphasisMats.includes(m)) emphasisMats.push(m);
+      if (!externalMats.includes(m)) externalMats.push(m);
+    }
+    applyEmphasisFull();
+    return mats;
+  }
 
   function groundY(x, z, lift = 0) {
     return sampleH(x, z) * VEX + lift;
@@ -866,6 +887,10 @@ function edgeFade(x, z) {
       } catch { /* noop */ }
     }
     emphasisMats = [];
+    for (const m of externalMats) {
+      if (m.userData.baseOpacity == null) m.userData.baseOpacity = m.opacity ?? 1;
+      emphasisMats.push(m);
+    }
     labels = [];
     countPill = null;
     countLeader = null;
@@ -941,7 +966,7 @@ function edgeFade(x, z) {
    * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
   let lastTiltK = 1;
   function applyEmphasisFull() {
-    for (const m of emphasisMats) m.opacity = (m.userData.baseOpacity ?? m.opacity) * lastT * lastTiltK;
+    for (const m of emphasisMats) m.opacity = emphasisOpacity(m.userData.baseOpacity ?? m.opacity, lastT, lastTiltK);
   }
   function applyEmphasis(t) {
     lastT = Math.min(1, Math.max(0, t));
@@ -1027,7 +1052,7 @@ function edgeFade(x, z) {
 
   return {
     renderer, scene, camera, controls, canvas,
-    rebuild, setEmphasis, setTiltFade, setTakeover, update, updateControls, renderTwin,
+    rebuild, setEmphasis, setTiltFade, setTakeover, addEmphasisMats, update, updateControls, renderTwin,
     getPose, dispose, onResize,
     getInfo: () => ({ ...(lastInfo ?? {}), takeoverU: lastU, status: getStatus(), pills: getPillState() }),
   };

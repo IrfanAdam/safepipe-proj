@@ -69,7 +69,7 @@ const statusDiv = el.querySelector('[data-ring2="status"]');
 const FOV_DEG = MAP_TRUE_FOV_DEG;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'b64tilt';
+const BUILD_ID = 'b65vecfade';
 // Shared GL-context + tile telemetry registry (see ctxmon.js: one
 // real-Safari screenshot of the six tokens discriminates every hypothesis
 // in the defect-hunt report).
@@ -391,7 +391,13 @@ async function boot() {
   // provenance). Best-effort — a missing asset never breaks boot.
   // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
   try {
-    mountVectorsFromData(twin.scene).catch(() => {});
+    mountVectorsFromData(twin.scene)
+      .then((h) => {
+        try {
+          twin.addEmphasisMats?.(h?.materials ?? []);
+        } catch { /* emphasis registration never breaks boot */ }
+      })
+      .catch(() => {});
   } catch { /* vectors never break boot */ }
   statusDiv.textContent = 'RING-2 · boot: twin ✓ · map: loading…';
   // Twin GL census + context wiring: the twin canvas is the second context
