@@ -22,7 +22,7 @@ import { mountMapBase, assertTerrainOn, releaseMap } from './mapbase.js';
 import { applyTwinToMap, assertTerrainVex, pitchForPose, MAP_TRUE_FOV_DEG, aspectMismatch } from './sync.js';
 import { createOverlayTwin } from './overlays.js';
 import * as THREE from 'three';
-import { buildT0 } from './facilities/index.js';
+import { buildT0, buildT1 } from './facilities/index.js';
 import { sampleH } from './field.js';
 import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
@@ -408,14 +408,15 @@ async function boot() {
   // (board F1+S1–S6). Additive group — facilities never break boot.
   // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]
   try {
-    const t0 = buildT0();
-    if (t0) {
+    for (const build of [buildT0, buildT1]) {
+      const g = build();
+      if (!g) continue;
       // Grounding (parent-owned): each sited structure sits on the live DEM
       // at its world bbox-center x/z. Long corridors use midpoint height —
       // ends may deviate on slopes (plain site: small; stamped approximated).
       const bb = new THREE.Box3();
       const bc = new THREE.Vector3();
-      for (const cat of t0.children) {
+      for (const cat of g.children) {
         for (const s of cat.children) {
           try {
             bb.setFromObject(s);
@@ -424,7 +425,7 @@ async function boot() {
           } catch { /* one ungrounded structure never blocks the rest */ }
         }
       }
-      twin.scene.add(t0);
+      twin.scene.add(g);
     }
   } catch { /* facilities never break boot */ }
   statusDiv.textContent = 'RING-2 · boot: twin ✓ · map: loading…';

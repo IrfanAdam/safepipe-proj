@@ -80,14 +80,11 @@ const TAKEOVER_SEG = 128; // sectors
 const TAKEOVER_RINGS = 26;
 
 /* Schematic terminal program (NOT surveyed — every block is labelled). */
-// Phase-02 T0 supersedes the tank/train/pump placeholders with parametric
-// geometry (src/ring2/facilities/) — those entries are retired, not kept.
-// ADMIN + FLARE stay until T1 raises their replacements.
+// Phase-02 T0+T1 raise all parametric geometry (src/ring2/facilities/) —
+// the placeholder set is fully retired; buildSchematic stays as a no-op
+// shell so the label/declutter call sites keep one audit point.
 // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]
-const SCHEMATIC_BLOCKS = [
-  { name: 'ADMIN', kind: 'box', w: 200, d: 120, h: 40, x: 120, z: 560 },
-  { name: 'FLARE', kind: 'stack', r: 12, h: 220, x: 720, z: 420 },
-];
+const SCHEMATIC_BLOCKS = [];
 
 /** Pure mix*tilt opacity law (node-testable; applyEmphasisFull is this per mat). */
 export function emphasisOpacity(baseOpacity, t, tiltK) {

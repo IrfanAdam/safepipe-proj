@@ -146,3 +146,78 @@ export const RACK = Object.freeze({
 });
 export const rackPipeDiaM = () => (RACK.pipeDiaIn * 0.0254);
 export const rackLengthM = (m) => Math.hypot(m.to.x - m.from.x, m.to.z - m.from.z);
+
+/* ---- S5 halls: T1 candidate seeds, F1 footprints ≥40 m [board:§T1 candidates].
+ * Footprints DERIVED (measured); functions APPROXIMATED until confirmed —
+ * builders stamp both tiers (tier = footprint, tierFunction = purpose).
+ * Roles assigned by size pattern: largest → BTC pump hall, next → SCP
+ * compressor, rest → turbine halls (all provisional). */
+export const HALLS = Object.freeze({
+  wallH: 12, // industrial eaves height, practice range [approx]
+  roofRise: 3, // shallow gable rise [approx]
+  tierFootprint: TIER.DERIVED,
+  tierFunction: TIER.APPROXIMATED,
+  items: Object.freeze([
+    { name: 'BTC pump hall', lat: 40.197546, lon: 49.47697, w: 101.7, d: 74.3, role: 'pump' },
+    { name: 'SCP compressor', lat: 40.202211, lon: 49.488507, w: 81.7, d: 65.2, role: 'compressor' },
+    { name: 'turbine hall N', lat: 40.198704, lon: 49.492264, w: 77.1, d: 62.1, role: 'turbine' },
+    { name: 'turbine hall C', lat: 40.201341, lon: 49.48962, w: 70.2, d: 56, role: 'turbine' },
+    { name: 'turbine hall W', lat: 40.202176, lon: 49.477174, w: 68.9, d: 54, role: 'turbine' },
+  ]),
+});
+
+/* ---- Turbine exhaust stacks: 7 across the hall row [board:§Reconciled T2].
+ * ~2 m dia × 25 m above roof, gas-turbine practice sizing [approx]. */
+export const TURBINE_STACK = Object.freeze({
+  count: 7,
+  dia: 2,
+  h: 25,
+  tier: TIER.APPROXIMATED,
+});
+export const turbineStacksPerHall = () => [2, 2, 1, 1, 1]; // sums to 7
+
+/* ---- S6 flare: single 107 m SD2 HP/LP stack [board:F5]; KO drum ≤100 m
+ * (sited 40 m out); safety-clearance ring 175 m ≈ 1.6× stack height [approx].
+ * Anchor sits SE of the SD block, clear of condensate/off-spec anchors. */
+export const FLARE = Object.freeze({
+  stackH: 107,
+  baseDia: 4,
+  tipDia: 2.2,
+  koDia: 4,
+  koLen: 12,
+  koDist: 40,
+  clearanceR: 175,
+  anchor: Object.freeze({ x: 860, z: 560 }),
+  tierHeight: TIER.DERIVED,
+  tierRest: TIER.RECONSTRUCTED,
+  tierPlacement: TIER.APPROXIMATED,
+});
+export const flareClearanceHa = () => (Math.PI * FLARE.clearanceR ** 2) / 1e4;
+
+/* ---- Admin/camp massing: layout unknown, generic + indicative [board:§Gaps-3].
+ * Admin block near the retired schematic ADMIN seat (120,560); camp prefab
+ * rows on the east-row candidates (lon 49.505–49.509 → x ≈ 2.0–2.4 km). */
+export const ADMIN_BLOCK = Object.freeze({
+  w: 64, d: 24, h: 12,
+  anchor: Object.freeze({ x: 140, z: 600 }),
+  tier: TIER.APPROXIMATED,
+});
+export const CAMP = Object.freeze({
+  unitW: 24, unitD: 8, unitH: 3.5,
+  rows: 2, perRow: 5, spacingX: 32, spacingZ: 20,
+  anchor: Object.freeze({ x: 2050, z: 420 }),
+  tier: TIER.APPROXIMATED,
+});
+export const campUnitCount = () => CAMP.rows * CAMP.perRow;
+
+/* ---- Dyke perimeter + drainage cue [board:F2 688 ha; F6 zone pattern].
+ * Dyke radius back-computed from 688 ha: r = √(688e4/π) ≈ 1480 m —
+ * ring area matches bp F2 within 1%. Berm 2 m; ditch ring just outside. */
+export const PERIMETER = Object.freeze({
+  dykeR: 1480,
+  dykeH: 2,
+  dykeW: 12,
+  ditchR: 1525,
+  tier: TIER.APPROXIMATED,
+});
+export const dykeAreaHa = () => (Math.PI * PERIMETER.dykeR ** 2) / 1e4;
