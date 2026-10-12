@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ops 3D — Hotspot launcher map</title>
+<link rel="icon" href="data:," />
+<style>
+  html, body { margin: 0; height: 100%; background: var(--ops-bg, #0b0c0c); }
+  #app { position: fixed; inset: 0; overflow: hidden; }
+  #map { position: absolute; inset: 0; background: var(--ops-bg, #0b0c0c); }
+  .map-toggle {
+    position: absolute; right: 12px; bottom: 64px; z-index: 2;
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 18px;
+    background: var(--ops-panel, rgba(10, 14, 18, 0.88));
+    border: 1px solid var(--ops-line, rgba(207, 212, 214, 0.18));
+    clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+    font: 10px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.12em;
+    color: var(--ops-ink, #cfd4d6);
+  }
+  .map-toggle button {
+    background: none; border: 0; padding: 4px 2px; cursor: pointer;
+    font: inherit; letter-spacing: inherit;
+    color: var(--ops-dim, rgba(207, 212, 214, 0.65));
+  }
+  .map-toggle button[aria-pressed="true"] { color: var(--ops-amber, #ffd9a0); }
+  .map-toggle__meta { color: var(--ops-dim, rgba(207, 212, 214, 0.55)); }
+  .map-pins { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  .map-pin {
+    position: absolute; transform: translate(-50%, -50%);
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid var(--ops-bg, #0b0c0c);
+    font: 11px/1 ui-monospace, monospace; color: #0b0c0c;
+    pointer-events: auto; cursor: pointer;
+  }
+  .map-pin--ok { background: #3eb46e; }
+  .map-pin--warn { background: #e8a33d; }
+  .map-pin--crit { background: #e05252; }
+  .map-pin[data-sel="true"] { outline: 2px solid var(--ops-amber, #ffd9a0); }
+  #map-fatal {
+    display: none; position: fixed; left: 12px; bottom: 12px; z-index: 99;
+    max-width: 80vw; padding: 8px 14px;
+    background: rgba(80, 10, 10, 0.94); color: #ffd9a0;
+    font: 11px/1.6 ui-monospace, monospace; white-space: pre-wrap;
+  }
+</style>
+</head>
+<body>
+<div id="app"><div id="map"></div></div>
+<div id="map-fatal"></div>
+<script>
+(function () {
+  var box = document.getElementById('map-fatal');
+  function show(msg) {
+    box.style.display = 'block';
+    box.textContent += msg + '\n';
+  }
+  window.addEventListener('error', function (e) {
+    show('ERR: ' + (e.message || e.error));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    show('REJECT: ' + (r && (r.message || r)));
+  });
+  setTimeout(function () {
+    if (!window.__mapProbe || !window.__mapProbe.ready) show('STILL LOADING @ +10s: map mount hung.');
+  }, 10000);
+})();
+</script>
+<script type="module" src="./src/map/main.js"></script>
+</body>
+</html>

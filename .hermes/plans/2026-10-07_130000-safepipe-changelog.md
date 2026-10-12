@@ -133,3 +133,14 @@
 - Keep `data-revs` / `data-rev` / `data-changed` attributes; token-only styling.
 
 **Verify:** no indented rows; no "new/changed" strings in the block; every entry shows date (+time where recorded); each summary line traces to a real diff or commit; tracker rerun diff-clean; build green; 0 page errors.
+
+## Task 11: Revisions surface the review feedback itself (starts after Lane J lands)
+
+**Objective:** Owner steer 2026-10-12 with screenshot: revision entries should show the FEEDBACK GIVEN IN REVIEW for that phase — the actual critique content (e.g. a "Feedback pass" task's bullets: blips sizes down, terrain glow values, relief changes) — not task-counter transitions. Applies to all plans: wherever a phase's history contains review-feedback sections, the revision feed quotes them.
+
+**Design (for the lane that picks this up after Lane J):**
+- Detect feedback-type sections (head matching feedback/review/pass language) and changed bullets inside them; entry lines quote or tightly summarize the changed bullets (values included: "orbit min 0.05→0.5", "VEX 3.2→4.5").
+- Non-feedback changes keep the Task 10 transition lines. Same format rules: date + time, flush-left, small, no status words.
+- Never invent feedback — every quoted line traces to a real section diff.
+
+**Verify:** a plan with recorded review feedback (e.g. 153000 Ops3D v2) shows the feedback bullets in its revision entries; lines trace to diffs; build green; 0 page errors.

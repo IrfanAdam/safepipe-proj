@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T16:57:33.479Z",
+  "generated": "2026-10-12T17:15:12.236Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "50df3c2",
+      "full": "50df3c2e07e86605432aa3469e97aef87a1b166a",
+      "date": "2026-10-12",
+      "time": "22:32",
+      "subject": "feat(changelog): revisions as dated semantic feedback with times [plan:2026-10-07_130000-safepipe-changelog.md#task-10]",
+      "plan": "2026-10-07_130000-safepipe-changelog.md",
+      "anchor": "task-10"
+    },
     {
       "sha": "9fb1f05",
       "full": "9fb1f05745973361c484e29c265ac0919d92f949",
@@ -2978,9 +2987,11 @@
     }
   ],
   "wip": [
-    "scripts/plan-backfill.mjs",
-    "scripts/plan-track.mjs",
-    "src/changelog/changelog-drawer.css",
-    "src/changelog/changelog/paint-revs.js"
+    "package.json",
+    "vite.config.js",
+    "ops3d-map.html",
+    "src/map/feed.js",
+    "src/map/main.js",
+    "src/map/rings.js"
   ]
 }
