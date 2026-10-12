@@ -24,7 +24,7 @@ Class-level workflow for repos where `.hermes/plans/*.md` is the source of truth
 ## Core guarantee
 
 - **Plan → commits:** Vite eager glob makes every future MD with `## Phase` appear in Miller column 1 without touching the renderer.
-- **Commits → plan:** every commit touching a DS path cites `[plan:<file>#<anchor>]`; tracker joins it per phase; unlinked commits + wip surface for triage.
+- **Commits → plan:** EVERY commit cites `[plan:<file>#<anchor>]` — no path exceptions (skill snapshots, gitignore, docs-only, merch commits all carry trailers). A commit with no owning task takes the closest plan + `null` anchor via `plan-retro.json`, never left unlinked. Pre-commit: name the plan+anchor before writing the message; post-commit: run the tracker and triage any unlinked immediately (retro entry, not history rewrite).
 - Anchor `continuation` (session ID) persists in both `.hermes/continuation.json` and `manifest.continuation` so any later session can `session_search` the same root.
 
 ## Procedure
