@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T07:58:37.552Z",
+  "generated": "2026-10-12T08:41:01.631Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,15 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "d598f0f",
+      "full": "d598f0f532dec9aec9c020d9ffe72f2822a6e2b6",
+      "date": "2026-10-12",
+      "time": "13:28",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
     {
       "sha": "a6ab678",
       "full": "a6ab67892308f6e280764ed93c5adf0b9093dde2",
@@ -2356,6 +2365,33 @@
     }
   ],
   "wip": [
-    "docs/source-manifest.json"
+    "scripts/plan-track.mjs",
+    ".agents/skills/changelog-kit/SKILL.md",
+    ".agents/skills/changelog-kit/references/parallel-lanes.md",
+    ".agents/skills/changelog-kit/references/plan-shapes.md",
+    ".agents/skills/changelog-kit/templates/tracker.mjs",
+    ".agents/skills/crisp-webgl/SKILL.md",
+    ".agents/skills/interactive-3d-views/SKILL.md",
+    ".agents/skills/interactive-3d-views/references/registration-probe.md",
+    ".agents/skills/interactive-3d-views/scripts/orbit-sweep-probe.cjs",
+    ".agents/skills/interactive-3d-views/scripts/registration-probe.cjs",
+    ".agents/skills/map-twin-crossfade/SKILL.md",
+    ".agents/skills/map-twin-crossfade/references/headless-verify.md",
+    ".agents/skills/pixel-proof/SKILL.md",
+    ".agents/skills/pixel-proof/references/browser-raster-sources.md",
+    ".agents/skills/pixel-proof/references/headless-shots.md",
+    ".agents/skills/pixel-proof/references/scroll-probe.md",
+    ".agents/skills/pixel-proof/references/showcase-stages.md",
+    ".agents/skills/pixel-proof/scripts/capture-page.mjs",
+    ".agents/skills/pixel-proof/scripts/scroll-probe.mjs",
+    ".agents/skills/pixel-proof/scripts/webkit-probe.mjs",
+    ".agents/skills/plan-traceability/SKILL.md",
+    ".agents/skills/plan-traceability/references/changelog-rendering.md",
+    ".agents/skills/plan-traceability/references/ds-sheet-chrome.md",
+    ".agents/skills/plan-traceability/references/lint-smoke-gates.md",
+    ".agents/skills/plan-traceability/scripts/validate-plan-anchors.mjs",
+    "AGENTS.md",
+    "docs/agent-skills.md",
+    "docs/reference/sangachal-spec.md"
   ]
 }

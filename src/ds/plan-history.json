@@ -1482,6 +1482,48 @@
      "state": ""
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-12",
+   "hash": "f483adca",
+   "sections": [
+    {
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
+     "hash": "8545a43a",
+     "state": ""
+    },
+    {
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
+     "hash": "bd41575c",
+     "state": ""
+    },
+    {
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
+     "hash": "0ba312bf",
+     "state": ""
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "cca97ae6",
+     "state": ""
+    },
+    {
+     "head": "Phase 04 — Time variance + sim",
+     "hash": "288fca73",
+     "state": ""
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "0602fce2",
+     "state": ""
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "e3d069a9",
+     "state": ""
+    }
+   ]
   }
  ]
 }
