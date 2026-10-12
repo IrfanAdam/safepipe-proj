@@ -77,3 +77,11 @@ OSM ~136 m max tank bboxes read as bund (dyke) areas, not shells.
 T0: terrain + roads + 7 crude tanks + train module rows + rack corridors.
 T1: condensate tanks + flare stack + pump/compressor halls + dyke perimeter.
 T2/T3 per tier loop (Task 15).
+
+## Geometry seeds (measured from F1 OSM geometry, 2026-10-12)
+
+- 3× crude tanks ~96.5 m dia (predicted 94 m — match within 3%):
+  (40.205099,49.477170) · (40.203108,49.478951) · (40.205340,49.483263).
+- Gas spheres ~50 m row near pin: (40.201230,49.480691) · (40.200474,49.479254) ·
+  (40.201997,49.482156) · (40.202747,49.483610); 60 m sphere (40.193380,49.459434).
+- 116 tank ways in F1 (157 counting nodes); shells not bunds at these diameters.
