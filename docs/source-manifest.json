@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T10:52:15.013Z",
+  "generated": "2026-10-12T11:09:59.399Z",
   "datasets": [
     {
       "name": "OpenStreetMap Sangachal AOI vectors (roads/tracks/paths/coastline/terminal)",
@@ -67,13 +67,16 @@
     },
     {
       "name": "Phase 02 data-pipe chain output (fetch-clip-validate-wire)",
-      "source": "Overpass API live 2026-10-12T10:48:02Z (ODbL); offline input public/data/osm-sangachal.json",
+      "source": "Overpass API live osm_base 2026-10-12T10:54:06Z (ODbL); offline input public/data/osm-sangachal.json (10:41:56Z)",
       "entry": "node scripts/data-pipe/run.mjs [--input FILE] [--out DIR] [--apply] [--fetch-only]",
       "live": "883 el / 7911 vtx, max_rr 9850, VALID",
       "offline": "878 el / 7627 vtx, VALID + 1 expected WARN (no coastline in board sweep)",
       "wire": "dry-run only — boot asset untouched (roads 649 vs 638 decision deferred to Task 11)",
       "license": "ODbL-1.0",
-      "attribution": "© OpenStreetMap contributors"
+      "attribution": "© OpenStreetMap contributors",
+      "installed": "public/data/sangachal-vectors.json: 883 el / 7911 vtx (roads 649 +11, tracks 46, paths 97, coastline 2, terminal 89; src 958/10065), Task 11",
+      "road_proof": "18500 samples / 272.4km: 0% sink, residuals>5m only 0.68% (one 3km chord w353991411)",
+      "note": "process-osm.mjs rewrites boot+manifest on import — tests now use side-effect-free data-pipe/clip.mjs"
     }
   ]
 }
