@@ -8,7 +8,7 @@
 
 ## TLDR
 
-Build the geographically grounded twin of the REAL Sangachal Terminal on the shipped Ring-2 chassis: Phase 00 ports v1 panels + markers (parity first); Phase 01 researches/acquires/processes real Sangachal source data and builds real-DEM terrain with aligned imagery; Phase 02 builds the twin geometry in owner order (terrain detail → backdrops → pipelines → facilities) with evidence loops + honest 3-tier provenance, no new interactivity; Phases 03–06 carry the 153000 scope (launcher map → time+sim → ops → lock). Every phase ends at a **REF GATE**, every gate scored by the parity rubric.
+Build the geographically grounded twin of the REAL Sangachal Terminal on the shipped Ring-2 chassis: Phase 00 ports v1 control panels (parity first — markers wait for the models); Phase 01 researches/acquires/processes real Sangachal source data and builds real-DEM terrain with aligned imagery; Phase 02 builds the twin geometry in owner order (terrain detail → backdrops → pipelines → facilities) with evidence loops + honest 3-tier provenance, no new interactivity; Phases 03–06 carry the 153000 scope (launcher map → time+sim → ops → lock). Every phase ends at a **REF GATE**, every gate scored by the parity rubric.
 
 **Non-negotiable (from spec):** real place from real data — never a generic facility. Implement end-to-end, don't stop at a research report. Never invent files, coverage, coordinates, or findings: if a dataset can't be obtained, name the exact missing file + its official download page, use the best alternative, and document the limitation.
 
@@ -16,16 +16,14 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 ## Phase 00 — Fix the foundation (chassis parity)
 <!-- {#phase-00} -->
-*v1 control panels + map markers on Ring-2. Nothing else moves.*
+*Panels only — markers pin to facility geometry that doesn't exist yet, so they move to Phase 05 after the models land. Nothing else moves.*
 
 | # | Task | Done when |
 |---|---|---|
 | 1 | Control panels port (v1 panel set → Ring-2 HUD, token-only `--ops-*`, no raw hex/px) | every v1 control present, same order |
-| 2 | Map markers port (v1 marker set → map + twin overlay) | positions match v1 ±1px @ same zoom; survive SAT↔TWIN slide |
-| 3 | Panel↔marker wiring (select/hover/focus round-trip) | click marker → panel; panel action → focus lands <5px @ NEAR |
-| 4 | Parity sweep (chromium+webkit, mix 0/50/100, TOP/NEAR, zero pageerrors) | screenshots match v1 stop-for-stop |
+| 2 | Parity sweep (chromium+webkit, mix 0/50/100, TOP/NEAR, zero pageerrors) | screenshots match v1 stop-for-stop |
 
-- REF GATE 0: owner confirms panels + markers feel like v1 on real Safari.
+- REF GATE 0: owner confirms panels feel like v1 on real Safari.
 
 ## Phase 01 — Real Sangachal terrain (source → DEM → imagery)
 <!-- {#phase-01} -->
@@ -33,13 +31,13 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 | # | Task | Done when |
 |---|---|---|
-| 5 | Source research — geography (BP Azerbaijan site; BP ACG ESIA PDF: topo maps, hills, coastline, coords/elevations/distances; treat facility layout as HISTORICAL, not current) | source manifest started; usable figures/coords extracted or gaps named |
-| 6 | Source research — elevation (Copernicus Data Space vs OpenTopography vs NASA Earthdata over Sangachal; coverage + resolution + CRS + license compared) | best dataset chosen + documented; limitations written down |
-| 7 | Source research — imagery/features (Google Earth, Copernicus, OSM, Overpass Turbo: footprint, hills, Caspian coastline, roads, tanks, buildings; check resolution + acquisition dates; respect licenses, no scraping) | reference set pinned with dates/licenses; area of interest bounded (whole terminal + hills + coastline, no arbitrary mega-tile) |
-| 8 | Source research — 3D models/tech docs (GLB/GLTF/OBJ/FBX/IFC/STEP hunt; verify downloadable + usable before depending on anything) | verdict per format; procedural fallback confirmed if empty |
-| 9 | DEM → Three.js terrain mesh (real elevations; true horizontal proportions + units; missing-value handling; geo→local coords, never raw lat/lon as positions; Caspian water separated; coastline matches imagery; normals + materials; tiles/LOD for perf; TOO-COARSE acknowledged, never invented detail) | mesh from real band; water/coastline consistent; bounds+CRS recorded |
-| 10 | Geographically aligned imagery drape (bounds+projection honored, no stretch-to-fit; else best-permitted reference + clearly-labeled alternative material; source/resolution/date/license documented) | photo and DEM agree at control points; manifest entry complete |
-| 11 | Processing workflow + metadata (GDAL/Rasterio/GeoPandas/GeoJSON scripts; compact browser outputs; per-dataset: name, URL, date, resolution, CRS, units, license, steps, limitations — metadata never silently dropped) | rerunnable scripts; source manifest covers every external file |
+| 3 | Source research — geography (BP Azerbaijan site; BP ACG ESIA PDF: topo maps, hills, coastline, coords/elevations/distances; treat facility layout as HISTORICAL, not current) | source manifest started; usable figures/coords extracted or gaps named |
+| 4 | Source research — elevation (Copernicus Data Space vs OpenTopography vs NASA Earthdata over Sangachal; coverage + resolution + CRS + license compared) | best dataset chosen + documented; limitations written down |
+| 5 | Source research — imagery/features (Google Earth, Copernicus, OSM, Overpass Turbo: footprint, hills, Caspian coastline, roads, tanks, buildings; check resolution + acquisition dates; respect licenses, no scraping) | reference set pinned with dates/licenses; area of interest bounded (whole terminal + hills + coastline, no arbitrary mega-tile) |
+| 6 | Source research — 3D models/tech docs (GLB/GLTF/OBJ/FBX/IFC/STEP hunt; verify downloadable + usable before depending on anything) | verdict per format; procedural fallback confirmed if empty |
+| 7 | DEM → Three.js terrain mesh (real elevations; true horizontal proportions + units; missing-value handling; geo→local coords, never raw lat/lon as positions; Caspian water separated; coastline matches imagery; normals + materials; tiles/LOD for perf; TOO-COARSE acknowledged, never invented detail) | mesh from real band; water/coastline consistent; bounds+CRS recorded |
+| 8 | Geographically aligned imagery drape (bounds+projection honored, no stretch-to-fit; else best-permitted reference + clearly-labeled alternative material; source/resolution/date/license documented) | photo and DEM agree at control points; manifest entry complete |
+| 9 | Processing workflow + metadata (GDAL/Rasterio/GeoPandas/GeoJSON scripts; compact browser outputs; per-dataset: name, URL, date, resolution, CRS, units, license, steps, limitations — metadata never silently dropped) | rerunnable scripts; source manifest covers every external file |
 
 - REF GATE 1: owner confirms the terrain reads as the real Sangachal coast (screenshot vs reference imagery).
 
@@ -49,12 +47,12 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 | # | Task | Done when |
 |---|---|---|
-| 12 | Reference board (multi-source sweep: Google views, Sentinel-2/Copernicus, Esri reference, OSM/Overpass vectors, BP ESIA figures, ground photos; dates pinned; unobtainable views named with official download pages) | every later task cites board frames; board holds references + captures, never third-party pixels in-repo |
-| 13 | Terrain detail + roads (micro-relief within DEM limits, OSM road corridors draped, paved polys; never invented detail) | roads sit on terrain with no float; too-coarse spots recorded approximated |
-| 14 | Backdrop objects (non-facility physical inside ring bounds: off-terminal structures, coastal features, landform furniture) | backdrops read at ISO without pulling focus from the terminal |
-| 15 | Pipelines + pipe racks (parametric runs, rack repeats; routes from visible evidence only, inferred runs tiered never claimed) | runs continuous at NEAR; no verified-claims on hidden routing |
-| 16 | Facilities (tanks, processing blocks, buildings; reusable components; splat-assisted where licensable multi-view exists) | terminal recognisable vs board at TOP / ISO / NEAR |
-| 17 | Category parity loops + tier labels (per category: capture → diff → refine; every object stamped **derived** / **reconstructed** / **approximated**; loop log kept) | all objects tiered; loop log attached to gate note |
+| 10 | Reference board (multi-source sweep: Google views, Sentinel-2/Copernicus, Esri reference, OSM/Overpass vectors, BP ESIA figures, ground photos; dates pinned; unobtainable views named with official download pages) | every later task cites board frames; board holds references + captures, never third-party pixels in-repo |
+| 11 | Terrain detail + roads (micro-relief within DEM limits, OSM road corridors draped, paved polys; never invented detail) | roads sit on terrain with no float; too-coarse spots recorded approximated |
+| 12 | Backdrop objects (non-facility physical inside ring bounds: off-terminal structures, coastal features, landform furniture) | backdrops read at ISO without pulling focus from the terminal |
+| 13 | Pipelines + pipe racks (parametric runs, rack repeats; routes from visible evidence only, inferred runs tiered never claimed) | runs continuous at NEAR; no verified-claims on hidden routing |
+| 14 | Facilities (tanks, processing blocks, buildings; reusable components; splat-assisted where licensable multi-view exists) | terminal recognisable vs board at TOP / ISO / NEAR |
+| 15 | Category parity loops + tier labels (per category: capture → diff → refine; every object stamped **derived** / **reconstructed** / **approximated**; loop log kept) | all objects tiered; loop log attached to gate note |
 
 - REF GATE 2: owner scores captures against the reference board via the parity rubric (toy / noisy / just right) + tier labels visible.
 
@@ -64,10 +62,10 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 | # | Task | Done when |
 |---|---|---|
-| 18 | Map landing (MapLibre + deck.gl, Dark Matter vector; Esri satellite toggle) | loads keyless-ish; satellite toggle works |
-| 19 | Circular hotspot rings (health-divided arcs, H3-hex sized) + pin fallback | ring matches feed worst-health per sector |
-| 20 | Click → full-screen twin overlay (`?sector=<h3>`) | twin opens pre-selected on sector's worst asset |
-| 21 | Close round-trip (X/Esc/back keeps hex + selection) | Esc mid-orbit returns to map, selection kept |
+| 16 | Map landing (MapLibre + deck.gl, Dark Matter vector; Esri satellite toggle) | loads keyless-ish; satellite toggle works |
+| 17 | Circular hotspot rings (health-divided arcs, H3-hex sized) + pin fallback | ring matches feed worst-health per sector |
+| 18 | Click → full-screen twin overlay (`?sector=<h3>`) | twin opens pre-selected on sector's worst asset |
+| 19 | Close round-trip (X/Esc/back keeps hex + selection) | Esc mid-orbit returns to map, selection kept |
 
 - REF GATE 3: owner picks map look + confirms ring reads right.
 
@@ -77,10 +75,10 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 | # | Task | Done when |
 |---|---|---|
-| 22 | `feedAt(t)` + time slider (30 d history, live tick, +72 h sim) | scrub moves infra + weather + WOs + sim together |
-| 23 | Open-Meteo weather overlays (rain tint, wind, temp shift) | cached fixtures offline; live fetch keyless |
-| 24 | USGS seismic markers + risk-gated pulse | pulse fires only above threshold; markers match feed |
-| 25 | Subsidence field (seeded now, labeled modeled) + sim presets + SIM watermark | same seed → same outcome; watermark whenever sim time active |
+| 20 | `feedAt(t)` + time slider (30 d history, live tick, +72 h sim) | scrub moves infra + weather + WOs + sim together |
+| 21 | Open-Meteo weather overlays (rain tint, wind, temp shift) | cached fixtures offline; live fetch keyless |
+| 22 | USGS seismic markers + risk-gated pulse | pulse fires only above threshold; markers match feed |
+| 23 | Subsidence field (seeded now, labeled modeled) + sim presets + SIM watermark | same seed → same outcome; watermark whenever sim time active |
 
 - REF GATE 4: owner approves slider feel + sim honesty.
 
@@ -90,6 +88,8 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 | # | Task | Done when |
 |---|---|---|
+| 24 | Map markers port (v1 marker set → map + twin overlay, pinned to Phase 02 geometry) | positions match facility models; survive SAT↔TWIN slide |
+| 25 | Panel↔marker wiring (select/hover/focus round-trip) | click marker → panel; panel action → focus lands <5px @ NEAR |
 | 26 | Twin selection + panel round-trip (deferred from Phase 02: click facility object → panel; panel action → focus) | click object → panel; panel action → focus lands <5px @ NEAR |
 | 27 | WO fixtures + spatial markers/trails (survive map↔twin trip) | markers match fixtures; list survives trip |
 | 28 | Field crews + activity (live pos, heading, ping age) | crews move; stale pings visibly age |
