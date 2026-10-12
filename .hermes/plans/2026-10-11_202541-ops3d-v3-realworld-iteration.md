@@ -101,12 +101,12 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 | # | Task | Done when |
 |---|---|---|
-| 10 | Reference board (multi-source sweep: in-browser map views, Sentinel-2/Copernicus, Esri reference, OSM/Overpass vectors, BP ESIA figures, public terminal photography for shape/depth; owner supplies nothing — all public; dates pinned; unobtainable views named with official download pages) | every later task cites board frames; board holds references + captures, never third-party pixels in-repo |
-| 11 | Terrain detail + roads (micro-relief within DEM limits, OSM road corridors draped, paved polys; never invented detail) | roads sit on terrain with no float; too-coarse spots recorded approximated |
-| 12 | Backdrop objects (non-facility physical inside ring bounds: off-terminal structures, coastal features, landform furniture) | backdrops read at ISO without pulling focus from the terminal |
-| 13 | Pipelines + pipe racks (parametric runs, rack repeats; routes from visible evidence only, inferred runs tiered never claimed) | runs continuous at NEAR; no verified-claims on hidden routing |
-| 14 | Facilities (tanks, processing blocks, buildings; reusable components; splat-assisted where licensable multi-view exists) | terminal recognisable vs board at TOP / ISO / NEAR |
-| 15 | Category parity loops + tier labels (per category: capture → diff → refine; every object stamped **derived** / **reconstructed** / **approximated**; loop log kept) | all objects tiered; loop log attached to gate note |
+| 10 | Reference board ✓ done (`aa13c66` + seeds `5c0afb8`/`6898326`/`f65af93`) (multi-source sweep: in-browser map views, Sentinel-2/Copernicus, Esri reference, OSM/Overpass vectors, BP ESIA figures, public terminal photography for shape/depth; owner supplies nothing — all public; dates pinned; unobtainable views named with official download pages) | every later task cites board frames; board holds references + captures, never third-party pixels in-repo |
+| 11 | Terrain detail + roads ✓ done (`6544f1f`: 883 el/7911 vtx, roads 649; 18,500 samples/272 km, 0% sink) (micro-relief within DEM limits, OSM road corridors draped, paved polys; never invented detail) | roads sit on terrain with no float; too-coarse spots recorded approximated |
+| 12 | Backdrop objects ✓ done (`b295814`: coast + off-site + landforms, terminal keeps focus) (non-facility physical inside ring bounds: off-terminal structures, coastal features, landform furniture) | backdrops read at ISO without pulling focus from the terminal |
+| 13 | Pipelines + pipe racks ✓ done T0 (`6544f1f`: parametric corridors; T2 re-seat seeded — 132 real F1 routes) (parametric runs, rack repeats; routes from visible evidence only, inferred runs tiered never claimed) | runs continuous at NEAR; no verified-claims on hidden routing |
+| 14 | Facilities ✓ done T0+T1 (`6544f1f` + `8179d07`: 225 meshes, dyke area matches bp 688 ha within 1%) (tanks, processing blocks, buildings; reusable components; splat-assisted where licensable multi-view exists) | terminal recognisable vs board at TOP / ISO / NEAR |
+| 15 | Category parity loops + tier labels ✓ done (loop-log 7 runs, 0 unstamped meshes; baseline `094c7fb`) (per category: capture → diff → refine; every object stamped **derived** / **reconstructed** / **approximated**; loop log kept) | all objects tiered; loop log attached to gate note |
 
 ### Task 10: assemble the reference board
 **Objective:** One cited source of visual truth every later task points at — dated frames from all sources, gaps named with download pages.
@@ -123,9 +123,9 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 ### Task 14: raise the facilities
 **Objective:** The money shot — tanks, processing blocks, buildings a viewer recognizes as Sangachal against the board at TOP / ISO / NEAR.
 **Verify:** Side-by-side board-vs-twin captures at all three distances; splat-assisted only where multi-view is licensable.
-### Task 15: tier everything + keep the loop log
+### Task 15: tier everything + keep the loop log ✓ done
 **Objective:** Honesty you can point at — every object stamped **derived** / **reconstructed** / **approximated**, with the capture→diff→refine log attached.
-**Verify:** No unstamped objects; loop log attached to the gate note.
+**Verify:** No unstamped objects (probed 0 untiered across T0+T1+backdrops); loop log `scripts/parity-loop/loop-log.jsonl` (7 runs) + baseline `scripts/parity-loop/baseline/t1/` attached to the gate note.
 
 - REF GATE 2 (OPEN): owner scores captures against the reference board via the parity rubric (toy / noisy / just right) + tier labels visible. How to judge: open the TOP/ISO/NEAR captures next to the board frames; first check every object carries a tier stamp; then score realism — pass = "just right" with stamps visible.
 
