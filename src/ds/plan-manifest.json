@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T12:03:01.970Z",
+  "generated": "2026-10-12T12:06:23.156Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,24 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "8f79263",
+      "full": "8f792639ff328f531c6c692563b9d656f3dec49c",
+      "date": "2026-10-12",
+      "time": "17:36",
+      "subject": "feat(ring2): 12 vector layers — arterials, streets, landuse, water, power, barriers, buildings [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "28410af",
+      "full": "28410af2fdccb04e198e9e9d875e37ea3e98b56d",
+      "date": "2026-10-12",
+      "time": "17:33",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "c540c02",
       "full": "c540c02663fc5d3fb3b1320ec9e9976c7e9bf8ec",
@@ -2778,14 +2796,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "docs/data-pipeline.md",
-    "public/data/sangachal-vectors.json",
-    "scripts/data-pipe/classify.mjs",
-    "scripts/data-pipe/clip.mjs",
-    "scripts/data-pipe/out/sangachal-vectors.json",
-    "scripts/data-pipe/overpass.mjs",
-    "scripts/data-pipe/run.mjs",
-    "scripts/data-pipe/validate.mjs"
-  ]
+  "wip": []
 }
