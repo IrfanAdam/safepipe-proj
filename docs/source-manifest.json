@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T07:55:23.536Z",
+  "generated": "2026-10-12T10:47:48.454Z",
   "datasets": [
     {
       "name": "OpenStreetMap Sangachal AOI vectors (roads/tracks/paths/coastline/terminal)",
@@ -50,6 +50,20 @@
         "terminal layer carries OSM tags only — no verified facility layout (binding spec §1A: ESIA layout is historical)",
         "no elevation in source; twin drape samples the DEM field at render time"
       ]
+    },
+    {
+      "name": "Phase 02 Task 10 reference board (OSM sweep + public layout facts + shape cards)",
+      "source": "Overpass API 2026-10-12T10:41:56Z (ODbL) + bp.com + Wikipedia + GlobalData/Offshore-Technology + ADB + EBRD EIAs + view-only photo refs (Granger/Getty/Suau, not reproduced)",
+      "board": "docs/reference/board-sangachal.md",
+      "raw_osm": "public/data/osm-sangachal.json (2.4 MB, 2876 elements)",
+      "scratch_inputs": [
+        "osm-sangachal-counts.json",
+        "safepipe_task10_sangachal_facts.md",
+        "task10_shape_cards.md",
+        "task10_reference_board_outline.md"
+      ],
+      "license": "ODbL for OSM vectors; facts/shapes are citations, zero third-party pixels in-repo",
+      "attribution": "© OpenStreetMap contributors; structure facts © their publishers, cited not copied"
     }
   ]
 }
