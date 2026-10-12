@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T10:47:48.454Z",
+  "generated": "2026-10-12T10:52:15.013Z",
   "datasets": [
     {
       "name": "OpenStreetMap Sangachal AOI vectors (roads/tracks/paths/coastline/terminal)",
@@ -64,6 +64,16 @@
       ],
       "license": "ODbL for OSM vectors; facts/shapes are citations, zero third-party pixels in-repo",
       "attribution": "© OpenStreetMap contributors; structure facts © their publishers, cited not copied"
+    },
+    {
+      "name": "Phase 02 data-pipe chain output (fetch-clip-validate-wire)",
+      "source": "Overpass API live 2026-10-12T10:48:02Z (ODbL); offline input public/data/osm-sangachal.json",
+      "entry": "node scripts/data-pipe/run.mjs [--input FILE] [--out DIR] [--apply] [--fetch-only]",
+      "live": "883 el / 7911 vtx, max_rr 9850, VALID",
+      "offline": "878 el / 7627 vtx, VALID + 1 expected WARN (no coastline in board sweep)",
+      "wire": "dry-run only — boot asset untouched (roads 649 vs 638 decision deferred to Task 11)",
+      "license": "ODbL-1.0",
+      "attribution": "© OpenStreetMap contributors"
     }
   ]
 }
