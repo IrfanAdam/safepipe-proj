@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T11:10:03.132Z",
+  "generated": "2026-10-12T11:16:42.120Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,33 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "8179d07",
+      "full": "8179d07a27fff46d3ea01c5838218a94e1c14afd",
+      "date": "2026-10-12",
+      "time": "16:46",
+      "subject": "feat(ring2): T1 terminal complete — flare, halls, admin, dyke; placeholders fully retired [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "6898326",
+      "full": "6898326bc20a0d41256c902e11e79c232212d9db",
+      "date": "2026-10-12",
+      "time": "16:41",
+      "subject": "docs(board): T1 candidate seeds from measured footprints [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "a0fbecc",
+      "full": "a0fbecc3d375c10bebcaea18826c848f1b689547",
+      "date": "2026-10-12",
+      "time": "16:40",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "1e3dd85",
       "full": "1e3dd85b9c7382921c1b04191044627cb9ac38db",
