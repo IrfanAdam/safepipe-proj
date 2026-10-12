@@ -26,5 +26,21 @@
   "2026-10-07_130000-safepipe-changelog.md": {
     "title": "Changelog — plan-linked build log in safepipe visual language",
     "purpose": "build log"
+  },
+  "2026-10-07_153000-ops3d-realworld-twin.md": {
+    "title": "Ops3D v2 — real DEM + live twin, 7 phases to lock",
+    "purpose": "real twin"
+  },
+  "2026-10-10_150100-ops3d-sangachal-twin.md": {
+    "title": "Sangachal twin — 10 km real terrain + satellite",
+    "purpose": "site pin"
+  },
+  "2026-10-10_191500-ops3d-ring2-seamless-redo.md": {
+    "title": "Ring-2 — seamless Map\u2192twin redo at Sangachal",
+    "purpose": "seamless twin"
+  },
+  "2026-10-11_202541-ops3d-v3-realworld-iteration.md": {
+    "title": "Sangachal Digital Twin — platform demo on Ring-2",
+    "purpose": "platform demo"
   }
 }

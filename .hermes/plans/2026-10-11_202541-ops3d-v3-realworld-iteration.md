@@ -20,6 +20,14 @@ This is the plan that turns the platform into a demonstrable product: a geograph
 
 Each phase has: a one-line *what the demo gains*, the task table (unchanged scope), a `### Task N: plain name` note saying **Objective** (what changes for the demo) + **Verify** (the exact check that closes it), then a **REF GATE checklist** — open this, look at that, pass means this. A gate passes only on its checklist; a prettier gate that breaks a parity check fails.
 
+**Goal:** A demonstrable, geographically grounded twin of the REAL Sangachal Terminal — real-DEM terrain, satellite↔twin crossfade, reconstructed facilities — legible as the real coast in one walkthrough.
+
+**Architecture:** Ring-2 chassis where MapLibre owns ground (Esri satellite + Terrarium DEM + one VEX) and Three.js renders procedural overlays (terrain detail, backdrops, pipelines, facilities) draped via shared field; one mix slider drives opacity + emphasis; camera sync bidirectional.
+
+**Tech Stack:** Vite 5 MPA + Three.js 0.170 + MapLibre GL + deck.gl/H3 + GDAL/Rasterio processing; procedural Three.js components, no committed imagery.
+
+**Tags:** Function
+
 ---
 
 ## TLDR
