@@ -540,13 +540,6 @@ async function boot() {
   try {
     hud = buildRingHud(el, { onLevel: handleLevel });
   } catch { /* hud chrome never breaks boot */ }
-  // Owner steer 2026-10-12: the SAT↔TWIN slider rides inline in the
-  // bottom-right system row (slider ··· ◉ FULLSCREEN) instead of floating
-  // above it. Move the bar node; barDiv stays as the (now empty) mount.
-  // Side effect: H (hide chrome) now hides the slider too.
-  try {
-    if (hud?.els?.sys && mixCtl?.bar) hud.els.sys.prepend(mixCtl.bar);
-  } catch { /* inline mix is cosmetic */ }
 
   window.__ring2 = {
     map,

@@ -14,10 +14,9 @@
   #ring2-dev .ring2-twin { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
   #ring2-dev .ring2-twin canvas { pointer-events: auto; }
   /* Diagonal-cut mix bar: SAT [slider] TWIN. Built by src/ring2/mix.js,
-   * moved inline into the bottom-right system row by main.js (owner steer
-   * 2026-10-12) — the bar mount stays empty. */
-  #ring2-dev .ring2-bar:empty { display: none; }
-  #ring2-dev .ops-hud__sys .ring2-mix { padding: 4px 14px; }
+   * floating above the bottom-right system row (owner steer 2026-10-12:
+   * inline experiment reverted — the bar keeps its own line). */
+  #ring2-dev .ring2-bar { position: absolute; right: 12px; bottom: 64px; z-index: 2; }
   #ring2-dev .ring2-mix {
     display: flex; align-items: center; gap: 10px;
     padding: 8px 18px;
