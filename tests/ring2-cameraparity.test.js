@@ -307,16 +307,17 @@ test('overzoom quantified: old 800m dive exceeded DEM native by ~2 levels; clamp
   assert.ok(!/maxzoom:\s*1[59],/.test(mapbase), 'bare maxzoom literals must be gone from mapbase');
 });
 
-test('tilt fade law: full to 50deg, gone at the clamp, monotonic between', () => {
-  assert.equal(TILT_FADE_START_DEG, 50, 'fade starts at 50deg');
+test('tilt fade law: full to 60deg, gone at the clamp, monotonic between', () => {
+  assert.equal(TILT_FADE_START_DEG, 60, 'fade starts at 60deg (last-resort band)');
   assert.equal(tiltFadeForPitch(0), 1, 'nadir is full opacity');
-  assert.equal(tiltFadeForPitch(50), 1, 'fade start is still full');
+  assert.equal(tiltFadeForPitch(59), 1, 'below the band is still exactly full');
+  assert.equal(tiltFadeForPitch(60), 1, 'fade start is still full');
   assert.equal(tiltFadeForPitch(MAP_MAX_PITCH_DEG), 0, 'clamp is zero — no linework at max tilt');
   assert.equal(tiltFadeForPitch(90), 0, 'past-clamp stays zero');
   const mid = tiltFadeForPitch((TILT_FADE_START_DEG + MAP_MAX_PITCH_DEG) / 2);
   assert.ok(mid > 0.4 && mid < 0.6, `mid-ramp must be ~0.5 smoothstep (got ${mid})`);
   let prev = 1;
-  for (let p = 50; p <= 65; p += 1) {
+  for (let p = 60; p <= 65; p += 1) {
     const k = tiltFadeForPitch(p);
     assert.ok(k <= prev + 1e-12, `fade must be monotonic (pitch ${p}: ${k} > ${prev})`);
     prev = k;

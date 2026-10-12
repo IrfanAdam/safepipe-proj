@@ -6,13 +6,22 @@
  * photo (MapLibre Terrarium terrain, exaggeration VEX) sits at h * VEX over
  * the same DEM. The lift IS the vertical offset — at oblique pitch it reads
  * as parallax separation between photo and overlay. Nothing in the twin
- * scene writes depth, so paint order alone composites: the lifts only need
- * to break ties, not clear terrain. Budget: twin ground 2 m over the photo
- * (photo drapes just under the twin surface), nothing above 8 m. At 12 km
- * range and 65° pitch the worst shift is 8*sin65 ≈ 7 m — subpixel against
- * zoom-11 ground resolution (~tens of m/px) — while top-down (nadir)
- * parallax is exactly 0, so the mid-range composite is pixel-identical
- * from the top.
+ * scene writes depth (every material sets depthWrite:false; paint order
+ * alone composites), so lifts NEVER fight in a depth buffer — there is no
+ * z-fighting to clear and no near/far-plane precision trade applies
+ * (camera near 10 / far 600000 exists only to bound the 300 km mask mesh).
+ * The lifts' only job is preserving the visual stack order (distinct,
+ * ordered values) with the smallest possible photo parallax.
+ *
+ * MINIMUM (2026-10-12 audit, VEX=1.0 so metres map 1:1): ground 1 m over
+ * the photo, linework 2–4 m, rim/mask 5–6 m. Worst photo parallax at the
+ * 65° clamp is 4·sin65° ≈ 3.6 m — subpixel against far-range ground
+ * resolution (≈7 m/px at 12 km range, ≈16 m/px at the 26 km start range).
+ * Measured live-Terrarium far-rim gap, twin-z12 (29 m cells) vs map-z15
+ * (3.6 m cells), 72 pts @ R=10 km: max 16.7 m, mean 1.19 m over 286 m
+ * relief. The LOD gap dominates the float on relief by ~5× over any lift,
+ * so geometry (drape on sampleH) is left alone and lifts sit at the floor
+ * that keeps every layer distinct.
  *
  * PERIPHERY: RIM_FADE_IN matches the overlay ring-clip fade start (0.9 R in
  * overlays.js) so the photo vignette, the overlay clip fade, and the rim
@@ -24,15 +33,17 @@
  */
 import { VEX, RING_RADIUS_M } from './site.js';
 
-/* Vertical offsets (m) of each twin drape above the shared DEM surface. */
+/* Vertical offsets (m) of each twin drape above the shared DEM surface.
+ * Floor values (2026-10-12): smallest distinct ordered set; see header for
+ * the no-depth-writes reasoning and the measured LOD-gap numbers. */
 export const DRAPE_LIFTS = Object.freeze({
-  GROUND: 2, // twin takeover ground: photo drapes just under the twin surface
-  WATER: 3,
-  MINOR: 3,
-  MAJOR: 4,
-  RING: 6,
-  RIM: 7, // periphery vignette ring (inside the disc, under nothing)
-  MASK: 8, // outside-ring cover: hides satellite beneath at any pitch
+  GROUND: 1, // twin takeover ground: photo drapes just under the twin surface
+  WATER: 2,
+  MINOR: 2,
+  MAJOR: 3,
+  RING: 4,
+  RIM: 5, // periphery vignette ring (inside the disc, under nothing)
+  MASK: 6, // outside-ring cover: hides satellite beneath at any pitch
 });
 
 /** Largest drape offset above the photo plane (m). */

@@ -7,14 +7,14 @@ import { DRAPE_LIFTS, maxDrapeLift, drapeY, RIM_FADE_IN, rimFadeAlpha, RIM_TILT_
 
 describe('superimpose budget: twin drapes hug the photo plane', () => {
   it('twin ground sits a hair over the photo (photo drapes just under)', () => {
-    assert.equal(DRAPE_LIFTS.GROUND, 2);
+    assert.equal(DRAPE_LIFTS.GROUND, 1);
     // Offset between twin ground (sampleH*VEX+lift) and map terrain (h*VEX):
-    assert.equal(drapeY(120, DRAPE_LIFTS.GROUND) - 120 * VEX, 2);
+    assert.equal(drapeY(120, DRAPE_LIFTS.GROUND) - 120 * VEX, 1);
   });
   it('no drape floats high enough to separate at oblique pitch', () => {
-    assert.ok(maxDrapeLift() <= 8, `max lift ${maxDrapeLift()} m`);
+    assert.ok(maxDrapeLift() <= 6, `max lift ${maxDrapeLift()} m`);
     // Worst parallax at a 65° tilt stays subpixel vs zoom-11 ground res:
-    assert.ok(maxDrapeLift() * Math.sin((65 * Math.PI) / 180) < 8);
+    assert.ok(maxDrapeLift() * Math.sin((65 * Math.PI) / 180) < 6);
   });
   it('drape ordering preserved: ground < water <= contours < ring < rim < mask', () => {
     const L = DRAPE_LIFTS;

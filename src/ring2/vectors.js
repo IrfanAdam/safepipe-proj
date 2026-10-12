@@ -88,8 +88,10 @@ export async function loadVectors(url = VECTORS_URL) {
  * Mount draped OSM polylines into a live THREE scene.
  * three is imported lazily so node tests can use the pure helpers above.
  * Returns { group, redrape, materials } — call redrape() when sampleH goes
- * live; pass materials to the twin's addEmphasisMats() so mix + tilt fade
- * dim the roads instead of leaving them full-bright at grazing pitch.
+ * live; pass materials to the twin's addEmphasisMats() so mix dims them and
+ * the last-resort 60–65° tilt band dissolves them (linework membership:
+ * overlays stamps these 'vector'; ground/water fills must never enter that
+ * registry).
  */
 export async function mountVectors(scene, data, opts = {}) {
   const THREE = await import('three');

@@ -52,8 +52,10 @@ const INDEX_EVERY = 5; // every 5th minor line is a numbered index ring
 const GRID_N = 140; // marching-squares grid across the full extent
 /* Superimpose budget (drape.js): every lift is the vertical offset between
  * the twin drape (sampleH*VEX+lift) and the map photo (h*VEX, same DEM).
- * Nothing writes depth so paint order composites — lifts stay a hair to
- * keep oblique parallax subpixel while top-down stays pixel-identical. */
+ * Nothing writes depth so paint order composites — lifts sit at the floor
+ * (ground 1 m … mask 6 m) keeping oblique parallax subpixel while top-down
+ * stays pixel-identical. Measured far-rim LOD gap (twin-z12 vs map-z15:
+ * max 16.7 m) dominates any lift on relief — geometry left alone. */
 const LIFT_RING = DRAPE_LIFTS.RING;
 const LIFT_MINOR = DRAPE_LIFTS.MINOR;
 const LIFT_MAJOR = DRAPE_LIFTS.MAJOR;
@@ -90,6 +92,25 @@ const SCHEMATIC_BLOCKS = [
 /** Pure mix*tilt opacity law (node-testable; applyEmphasisFull is this per mat). */
 export function emphasisOpacity(baseOpacity, t, tiltK) {
   return baseOpacity * t * tiltK;
+}
+
+/* Tilt-fade MEMBERSHIP (single source of truth — reg() stamps every mat
+ * through this, addEmphasisMats() stamps OSM vectors through this). ONLY
+ * draped linework rides the tilt fade: contours + OSM vectors. Ground,
+ * water, ring, labels, leaders, schematic, mask and rim are mix-only and
+ * pitch-invariant at every angle — the b65vecfade regression (whole twin
+ * dissolving past 50°) came from fading the entire registry. Narrowing the
+ * band alone would not have fixed it; scoping the membership does.
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+export function tiltFadeApplies(kind) {
+  return kind === 'contour' || kind === 'vector';
+}
+
+/** Per-mat opacity with tilt membership (node-testable). Non-linework
+ * kinds ignore pitch entirely: matOpacity(base, t, anyPitch, 'water') is
+ * exactly base*t. */
+export function matOpacity(baseOpacity, t, pitchDeg, kind) {
+  return emphasisOpacity(baseOpacity, t, tiltFadeApplies(kind) ? tiltFadeForPitch(pitchDeg) : 1);
 }
 
 /** Canvas text sprite. Returns THREE.Sprite with world-height `h`. */
@@ -306,8 +327,13 @@ export function createOverlayTwin(container, opts = {}) {
     return o;
   };
   let emphasisMats = []; // { mat, base }
-  const reg = (mat, base = mat.opacity) => {
+  /* kind: tiltFadeApplies(kind) decides at registration whether the mat
+   * rides the tilt fade ('contour' | 'vector' only) or is mix-only. Every
+   * call site passes an explicit kind — no silent default into the fade. */
+  const reg = (mat, base = mat.opacity, kind = 'other') => {
+    if (typeof base === 'string') { kind = base; base = mat.opacity; } // reg(mat, 'label')
     mat.userData.baseOpacity = base;
+    mat.userData.tiltFade = tiltFadeApplies(kind);
     emphasisMats.push(mat);
     return mat;
   };
@@ -321,6 +347,9 @@ export function createOverlayTwin(container, opts = {}) {
     for (const m of mats ?? []) {
       if (!m) continue;
       if (m.userData.baseOpacity == null) m.userData.baseOpacity = m.opacity ?? 1;
+      // OSM vectors are draped linework: the ONLY externals that ride tilt.
+      // Ground/water fills must never be passed here (mix-only by policy).
+      m.userData.tiltFade = tiltFadeApplies('vector');
       if (!emphasisMats.includes(m)) emphasisMats.push(m);
       if (!externalMats.includes(m)) externalMats.push(m);
     }
@@ -347,13 +376,13 @@ export function createOverlayTwin(container, opts = {}) {
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     const m = reg(track(new THREE.LineBasicMaterial({
       color: RING_COL, transparent: true, opacity: 0.95, depthWrite: false,
-    })));
+    })), 'ring'); // mapped-radius reference: mix-only, never tilt-faded
     const ring = new THREE.Line(g, m);
     ring.name = 'ring2-ring';
     ring.frustumCulled = false;
     group.add(ring);
     const lbl = makeLabelSprite(`RING-2 · r ${SANGACHAL.radiusKm} km · source:${src}`, { h: 420 });
-    reg(lbl.material);
+    reg(lbl.material, 'label');
     lbl.position.set(RING_RADIUS_M * Math.cos(Math.PI / 4), groundY(RING_RADIUS_M * 0.7, RING_RADIUS_M * 0.7, 700), RING_RADIUS_M * Math.sin(Math.PI / 4));
     group.add(lbl);
     const ringAnchor = new THREE.Vector3(
@@ -369,13 +398,13 @@ export function createOverlayTwin(container, opts = {}) {
     ]));
     const pin = new THREE.LineSegments(pinG, reg(track(new THREE.LineBasicMaterial({
       color: RING_COL, transparent: true, opacity: 0.8, depthWrite: false,
-    }))));
+    })), 'marker'));
     pin.position.y = groundY(0, 0, 40);
     group.add(pin);
     const pinLbl = makeLabelSprite(
       `SANGACHAL ${SANGACHAL.lat.toFixed(6)}N ${SANGACHAL.lon.toFixed(6)}E · source:mapped`, { h: 380 },
     );
-    reg(pinLbl.material);
+    reg(pinLbl.material, 'label');
     pinLbl.position.set(0, groundY(0, 0, 1100), 0);
     group.add(pinLbl);
     const pinAnchor = new THREE.Vector3(0, groundY(0, 0, 0), 0);
@@ -386,7 +415,7 @@ export function createOverlayTwin(container, opts = {}) {
     const g = track(new THREE.BufferGeometry().setFromPoints([a.clone(), bPos.clone()]));
     const line = new THREE.Line(g, reg(track(new THREE.LineBasicMaterial({
       color: SCHEMATIC_EDGE_COL, transparent: true, opacity: 0.55, depthWrite: false,
-    })), 0.55));
+    })), 0.55, 'leader'));
     line.frustumCulled = false;
     group.add(line);
     return line;
@@ -405,23 +434,23 @@ export function createOverlayTwin(container, opts = {}) {
       if (b.kind === 'box') {
         mesh = new THREE.Mesh(
           track(new THREE.BoxGeometry(b.w, b.h * VEX, b.d)),
-          reg(track(new THREE.MeshBasicMaterial({ color: SCHEMATIC_COL, transparent: true, opacity: 0.55, depthWrite: false }))),
+          reg(track(new THREE.MeshBasicMaterial({ color: SCHEMATIC_COL, transparent: true, opacity: 0.55, depthWrite: false })), 'schematic'),
         );
         mesh.position.set(b.x, gy + (b.h * VEX) / 2, b.z);
       } else if (b.kind === 'cyl') {
         mesh = new THREE.Mesh(
           track(new THREE.CylinderGeometry(b.r, b.r, b.h * VEX, 28)),
-          reg(track(new THREE.MeshBasicMaterial({ color: SCHEMATIC_COL, transparent: true, opacity: 0.55, depthWrite: false }))),
+          reg(track(new THREE.MeshBasicMaterial({ color: SCHEMATIC_COL, transparent: true, opacity: 0.55, depthWrite: false })), 'schematic'),
         );
         mesh.position.set(b.x, gy + (b.h * VEX) / 2, b.z);
       } else {
         mesh = new THREE.Mesh(
           track(new THREE.CylinderGeometry(b.r, b.r * 1.6, b.h * VEX, 10)),
-          reg(track(new THREE.MeshBasicMaterial({ color: SCHEMATIC_COL, transparent: true, opacity: 0.7, depthWrite: false }))),
+          reg(track(new THREE.MeshBasicMaterial({ color: SCHEMATIC_COL, transparent: true, opacity: 0.7, depthWrite: false })), 'schematic'),
         );
         mesh.position.set(b.x, gy + (b.h * VEX) / 2, b.z);
         const tip = makeLabelSprite('FLARE-TIP · source:schematic', { h: 300 });
-        reg(tip.material);
+        reg(tip.material, 'label');
         tip.position.set(b.x, gy + b.h * VEX + 260, b.z);
         tip.name = 'flare-tip';
         group.add(tip);
@@ -431,12 +460,12 @@ export function createOverlayTwin(container, opts = {}) {
       group.add(mesh);
       const edges = new THREE.LineSegments(
         track(new THREE.EdgesGeometry(mesh.geometry)),
-        reg(track(new THREE.LineBasicMaterial({ color: SCHEMATIC_EDGE_COL, transparent: true, opacity: 0.9, depthWrite: false }))),
+        reg(track(new THREE.LineBasicMaterial({ color: SCHEMATIC_EDGE_COL, transparent: true, opacity: 0.9, depthWrite: false })), 'schematic'),
       );
       edges.position.copy(mesh.position);
       group.add(edges);
       const lbl = makeLabelSprite(`${b.name} · source:schematic`, { h: 300 });
-      reg(lbl.material);
+      reg(lbl.material, 'label');
       lbl.position.set(b.x, gy + (b.h ?? 60) * VEX + 520, b.z);
       group.add(lbl);
       labels.push({ sprite: lbl, leader: makeLeader(blockTop, lbl.position), anchor: blockTop });
@@ -453,7 +482,7 @@ export function createOverlayTwin(container, opts = {}) {
     for (const p of hidden) c.add(p.anchor);
     c.multiplyScalar(1 / hidden.length);
     countPill = makeLabelSprite(`+${hidden.length} MORE`, { h: 300, accent: '#9aa4ad' });
-    reg(countPill.material);
+    reg(countPill.material, 'label');
     countPill.position.set(c.x, c.y + 2600, c.z);
     group.add(countPill);
     countLeader = makeLeader(c, countPill.position);
@@ -539,7 +568,7 @@ export function createOverlayTwin(container, opts = {}) {
           const mid = longest[Math.floor(longest.length / 2)];
           const lbl = makeLabelSprite(`${L} m · source:${src}`, { h: 300, accent: '#ffc46b' });
           lbl.material.opacity = edgeFade(mid.x, mid.z); // dissolve at coverage edge
-          reg(lbl.material);
+          reg(lbl.material, 'label');
           lbl.position.set(mid.x, L * VEX + 420, mid.z);
           group.add(lbl);
           const cAnchor = new THREE.Vector3(mid.x, L * VEX, mid.z);
@@ -566,7 +595,7 @@ export function createOverlayTwin(container, opts = {}) {
       g.setAttribute('color', new THREE.BufferAttribute(carr, 4));
       const m = new THREE.LineSegments(g, reg(track(new THREE.LineBasicMaterial({
         color: 0xffffff, vertexColors: true, transparent: true, opacity, depthWrite: false,
-      }))));
+      })), 'contour')); // draped linework: the ONLY in-house kind that rides tilt
       m.frustumCulled = false;
       group.add(m);
     };
@@ -649,7 +678,7 @@ function edgeFade(x, z) {
     const m = new THREE.Mesh(g, reg(track(new THREE.MeshBasicMaterial({
       color: 0xffffff, vertexColors: true, transparent: true, opacity: WATER_MAX_OPACITY,
       depthWrite: false, side: THREE.DoubleSide,
-    })), WATER_MAX_OPACITY));
+    })), WATER_MAX_OPACITY, 'water')); // sea fill: mix-only, NEVER tilt-faded
     m.name = 'ring2-water';
     m.frustumCulled = false;
     group.add(m);
@@ -957,16 +986,23 @@ function edgeFade(x, z) {
   });
 
   let lastT = 0.5;
-  /* Tilt fade (suspect 3, PRIMARY): near-grazing pitch hides the draped
-   * linework instead of floating it past the terrain silhouette — the exact
-   * frame the owner video caught. Multiplies with the mix emphasis, so SAT
-   * mode and high-tilt twin mode both go clean. Survives rebuild (module
-   * scope, re-applied with lastT); driven per frame by main.js via
+  /* Tilt fade (suspect 3, PRIMARY, scoped 2026-10-12): near-grazing pitch
+   * hides the draped LINEWORK (contours + OSM vectors) instead of floating
+   * it past the terrain silhouette — the exact frame the owner video caught.
+   * Last-resort 60–65° band (sync.js TILT_FADE_START_DEG); below 60° tiltK
+   * is exactly 1. Ground, water, ring, labels and schematic are mix-only
+   * (tiltFade stamp false) so the twin can never dissolve at moderate
+   * angles again (b65vecfade regression). Survives rebuild (module scope,
+   * re-applied with lastT); driven per frame by main.js via
    * setTiltFade(pitch). Pure law lives in sync.js (tiltFadeForPitch).
    * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
   let lastTiltK = 1;
   function applyEmphasisFull() {
-    for (const m of emphasisMats) m.opacity = emphasisOpacity(m.userData.baseOpacity ?? m.opacity, lastT, lastTiltK);
+    for (const m of emphasisMats) {
+      // Linework (tiltFade stamp) rides mix*tilt; everything else is
+      // mix-only and pitch-invariant at every angle.
+      m.opacity = emphasisOpacity(m.userData.baseOpacity ?? m.opacity, lastT, m.userData.tiltFade ? lastTiltK : 1);
+    }
   }
   function applyEmphasis(t) {
     lastT = Math.min(1, Math.max(0, t));

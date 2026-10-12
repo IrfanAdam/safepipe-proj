@@ -65,6 +65,16 @@ test('setEmphasis(0) drives registered vector mats to 0', async () => {
   }
 });
 
+test('no fade below 60deg: tilt 59 keeps vector base at full mix', async () => {
+  const h = await mountVectors(fakeScene(), SAMPLE);
+  const mats = register(h.materials);
+  assert.equal(tiltFadeForPitch(59), 1, 'below-band tilt must be exactly 1');
+  for (const m of mats) {
+    m.opacity = emphasisOpacity(m.userData.baseOpacity, 1, tiltFadeForPitch(59));
+    assert.equal(m.opacity, m.userData.baseOpacity);
+  }
+});
+
 test('clamp is untouched at 65 deg', () => {
   assert.equal(MAP_MAX_PITCH_DEG, 65);
 });

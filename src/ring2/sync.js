@@ -30,10 +30,17 @@ export const MAP_TRUE_FOV_DEG = (MAP_FOV_RAD * 180) / Math.PI; // ≈36.8699
  * open, and keeps the pitch-60 parity proof inside the legal envelope.
  * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
 export const MAP_MAX_PITCH_DEG = 65;
-/* Drape tilt-fade start: draped linework holds full opacity to this pitch,
- * then ramps to zero at MAP_MAX_PITCH_DEG so no floating linework survives
- * near the clamp to read as decoupling past the silhouette. */
-export const TILT_FADE_START_DEG = 50;
+/* Drape tilt-fade start: draped linework holds EXACTLY full opacity to this
+ * pitch, then ramps to zero at MAP_MAX_PITCH_DEG — a last-resort 5° band,
+ * not a look. 60 sits exactly on MapLibre's own default maxPitch, so every
+ * normal oblique inspection (0–60°) is pixel-identical with the fade
+ * compiled out (tiltK === 1); only the 60–65° past-default zone dissolves
+ * contours + OSM vectors instead of floating them past the silhouette.
+ * Ground, water, ring, labels and schematic NEVER ride this fade (mix-only).
+ * Measured 2026-10-12 (live Terrarium, 72 far-rim pts @ R=10 km): twin-z12
+ * vs map-z15 |d| max 16.7 m / mean 1.19 m over 286 m relief — the LOD gap
+ * dominates any lift on relief, so the fade only hides the residual. */
+export const TILT_FADE_START_DEG = 60;
 /* Native-zoom ceilings (single source of truth — mapbase.js mapStyle()
  * consumes these for its source maxzoom instead of bare literals, and the
  * twin dive clamp below is derived from them).
