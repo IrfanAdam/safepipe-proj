@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T11:22:14.582Z",
+  "generated": "2026-10-12T11:24:14.195Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -14,6 +14,24 @@
     "2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ],
   "commits": [
+    {
+      "sha": "d2472d4",
+      "full": "d2472d4237e8dd777daebcd0acca3b774a0dbc9a",
+      "date": "2026-10-12",
+      "time": "16:54",
+      "subject": "docs(plan): Phase 02 Tasks 10-15 shipped, REF GATE 2 awaits owner score [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "b6f6b60",
+      "full": "b6f6b60d35e0631709c850ce69a8396326d17921",
+      "date": "2026-10-12",
+      "time": "16:52",
+      "subject": "chore(ds): sync plan manifest [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "b295814",
       "full": "b295814886fc2ca2f01e7fe7eeb832caf09ceaaf",
