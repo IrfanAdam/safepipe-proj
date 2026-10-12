@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { TIER } from '../src/ring2/facilities/dims.js';
 import {
-  SHORE, shoreXAt, shoreSlopeAt, coastSegFrame,
+  SHORE, shoreXAt, shoreSlopeAt, coastSegFrame, REAL_COAST,
 } from '../src/ring2/facilities/coast.js';
 import {
   NAVAL, navalDistKm, QUARRIES, quarryDistKm, M2, m2LengthM,
@@ -32,19 +32,20 @@ test('shore: bay curve meets audited -24 crossing far-field, OSM wiggle at pin l
   assert.ok(Math.abs(shoreXAt(2600) - shoreXAt(-2600)) < 1e-9, 'bay symmetric about bayZ');
 });
 
-test('shore: 14 segments tile z -3000..9700 with water+sand frames', () => {
-  assert.equal(SHORE.segs, 14);
-  const segLen = (SHORE.zTo - SHORE.zFrom) / SHORE.segs;
-  for (let i = 0; i < SHORE.segs; i++) {
-    const f = coastSegFrame(i);
-    withinPct(f.zmid, SHORE.zFrom + i * segLen + segLen / 2, 1e-9, `seg ${i} zmid`);
-    withinPct(f.waterW, SHORE.waterReach, 1e-9, `seg ${i} water width`);
-    withinPct(f.sandW, SHORE.sandW, 1e-9, `seg ${i} sand width`);
-    assert.ok(f.waterX > f.sandX, `seg ${i} water east of sand`);
-    assert.ok(Number.isFinite(f.rotY) && Math.abs(f.rotY) < 0.3, `seg ${i} yaw small`);
+test('shore: sand drape follows the real waterline S→N, straddles it, derived', () => {
+  const pts = REAL_COAST.pts;
+  assert.ok(pts.length >= 25, 'real-coast waypoint count');
+  assert.ok(pts[0][1] > 9000 && pts[pts.length - 1][1] < -2800, 'trace spans S→N');
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const leg = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    assert.ok(leg > 1 && leg < 2500, `leg ${i} sane (${Math.round(leg)} m)`);
+    assert.ok(Math.hypot(pts[i][0], pts[i][1]) < 10000, `pt ${i} in-ring`);
+    L += leg;
   }
-  assert.equal(SHORE.tierShape, TIER.APPROXIMATED);
-  assert.equal(SHORE.tierDatum, TIER.DERIVED);
+  withinPct(L, 18134, 0.01, 'real-coast drape length');
+  assert.equal(REAL_COAST.sandW, 80);
+  assert.equal(REAL_COAST.tier, TIER.DERIVED);
 });
 
 test('offsite: naval massing ~10.4 km S, quarries 9–12 km, M2 ribbon east', () => {
@@ -57,9 +58,10 @@ test('offsite: naval massing ~10.4 km S, quarries 9–12 km, M2 ribbon east', ()
     assert.ok(d >= 9 && d <= 12, `quarry at ${d.toFixed(1)} km inside 9–12 km band`);
   }
   assert.equal(QUARRIES.tier, TIER.APPROXIMATED);
-  assert.ok(M2.x > 4000, 'M2 corridor east of site');
-  withinPct(m2LengthM(), 16000, 0.001, 'M2 ribbon length');
-  assert.equal(M2.tier, TIER.APPROXIMATED);
+  assert.ok(M2.trace.length >= 20, 'M2 trace follows real waypoints');
+  assert.ok(M2.trace[0][1] > 8000 && M2.trace[M2.trace.length - 1][1] < -3000, 'M2 trace spans SW→NE');
+  withinPct(m2LengthM(), 18022, 0.01, 'M2 trace length');
+  assert.equal(M2.tier, TIER.DERIVED);
   // Never focus-pullers: naval sheds well below the 107 m flare.
   assert.ok(NAVAL.shedH <= 12, 'naval sheds stay low');
 });

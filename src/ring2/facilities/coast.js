@@ -11,8 +11,10 @@ import { TIER } from './dims.js';
 
 const tag = (mesh, tier, kind) => { mesh.userData.tier = tier; mesh.userData.kind = kind; return mesh; };
 
-/* Shore curve: baseX ≈ audited -24 crossing (+3276); bay bump peaks at the
- * pin parallel (+550 → 3850 ≈ OSM far hit 3871, within 1%). Shape cue. */
+/* Real-coast sand drape: the analytic bay curve only matched near z≈0 —
+ * everywhere else the straight N–S column ran inland/in-sea (the sea
+ * band). Replaced with quads straddling the REAL OSM waterline (installed
+ * coastline layer, smoothed window-3, ~18 km in-ring). Tier: derived. */
 export const SHORE = Object.freeze({
   baseX: 3300,
   bayAmp: 550,
@@ -53,28 +55,36 @@ export function coastSegFrame(i) {
   };
 }
 
-const waterMat = () => new THREE.MeshBasicMaterial({ color: 0x3f6474, transparent: true, opacity: 0.55, side: THREE.DoubleSide }); // Caspian haze cue [approx]
 const sandMat = () => new THREE.MeshBasicMaterial({ color: 0xa89e86, transparent: true, opacity: 0.8, side: THREE.DoubleSide }); // wet-sand cue [approx]
 
-/** Shoreline treatment: per-segment water + sand bands along the bay curve. */
+export const REAL_COAST = Object.freeze({
+  pts: Object.freeze([
+    [869, 9418], [163, 8423], [-395, 6818], [-567, 5021], [-575, 3807],
+    [-203, 2922], [532, 2208], [1181, 1893], [1842, 1451], [2610, 759],
+    [3165, 301], [3411, 158], [3486, 146], [3501, 146], [3538, 61],
+    [3716, -83], [3946, -165], [4043, -169], [4548, -321], [5766, -754],
+    [6772, -1190], [7164, -1340], [7390, -1347], [7580, -1444], [7709, -1621],
+    [7886, -1838], [8137, -2098], [8603, -2464], [9156, -2849],
+  ]), // [x, z] S→N, smoothed installed waterline
+  sandW: 80, // straddles the waterline — no land-side call needed
+  tier: TIER.DERIVED,
+});
+
+/** Shoreline treatment: wet-sand quads straddling the real waterline. */
 export function buildCoast() {
   const g = new THREE.Group();
   g.name = 'BD-coast';
-  g.userData.tierPlacement = SHORE.tierShape;
-  for (let i = 0; i < SHORE.segs; i++) {
-    const f = coastSegFrame(i);
-    const seg = new THREE.Group();
-    const water = tag(new THREE.Mesh(new THREE.PlaneGeometry(f.waterW, f.segLen), waterMat()), SHORE.tierDatum, 'shore-water');
-    water.rotation.x = -Math.PI / 2;
-    water.rotation.z = f.rotY;
-    water.position.set(f.waterX, 0.2, f.zmid);
-    seg.add(water);
-    const sand = tag(new THREE.Mesh(new THREE.PlaneGeometry(f.sandW, f.segLen), sandMat()), SHORE.tierShape, 'shore-sand');
+  g.userData.tierPlacement = REAL_COAST.tier;
+  for (let i = 1; i < REAL_COAST.pts.length; i++) {
+    const [x0, z0] = REAL_COAST.pts[i - 1];
+    const [x1, z1] = REAL_COAST.pts[i];
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    if (len < 1) continue;
+    const sand = tag(new THREE.Mesh(new THREE.PlaneGeometry(REAL_COAST.sandW, len), sandMat()), REAL_COAST.tier, 'shore-sand');
     sand.rotation.x = -Math.PI / 2;
-    sand.rotation.z = f.rotY;
-    sand.position.set(f.sandX, 0.3, f.zmid);
-    seg.add(sand);
-    g.add(seg);
+    sand.rotation.z = Math.atan2(x1 - x0, z1 - z0);
+    sand.position.set((x0 + x1) / 2, 0.3, (z0 + z1) / 2);
+    g.add(sand);
   }
   return g;
 }

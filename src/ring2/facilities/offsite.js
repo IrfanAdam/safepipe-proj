@@ -36,16 +36,29 @@ export const QUARRIES = Object.freeze({
 });
 export const quarryDistKm = (q) => Math.hypot(q.x, q.z) / 1000;
 
-/* M2 corridor: Baku–Alat motorway ribbon east of site, N–S cue strip. */
+/* M2 corridor: Baku–Alat motorway on its REAL OSM trace (was a straight
+ * N–S strip at x=6200 that crossed the sea — wrong side, wrong shape).
+ * 25 thinned waypoints, SW→NE, derived from F1 motorway/ref=M2 ways,
+ * clipped to the 10 km ring. Ribbon follows the polyline; each leg is
+ * separately DEM-grounded by the parent. Tier: derived (route). */
 export const M2 = Object.freeze({
-  x: 6200,
-  zFrom: -8000,
-  zTo: 8000,
-  width: 34, // carriageway + verge cue
-  segs: 8,
-  tier: TIER.APPROXIMATED,
+  trace: Object.freeze([
+    [-3647, 8633], [-2862, 6989], [-2408, 6105], [-1996, 5236], [-1717, 4849],
+    [-1551, 4614], [-1583, 4312], [-1141, 3724], [-741, 2988], [-438, 2487],
+    [-261, 2295], [259, 2011], [773, 1717], [1432, 1294], [2654, 465],
+    [3331, 10], [3855, -287], [4173, -485], [5438, -1189], [5951, -1524],
+    [6673, -1954], [7011, -2258], [7439, -2688], [7716, -2941], [8708, -3584],
+  ]), // [x, z] SW→NE, thinned F1 M2 ways, in-ring
+  width: 24, // carriageway cue
+  tier: TIER.DERIVED,
 });
-export const m2LengthM = () => M2.zTo - M2.zFrom;
+export const m2LengthM = () => {
+  let L = 0;
+  for (let i = 1; i < M2.trace.length; i++) {
+    L += Math.hypot(M2.trace[i][0] - M2.trace[i - 1][0], M2.trace[i][1] - M2.trace[i - 1][1]);
+  }
+  return L;
+};
 
 const hazeMat = () => new THREE.MeshBasicMaterial({ color: 0x8a939a, side: THREE.DoubleSide }); // distant massing haze [approx]
 const pitMat = () => new THREE.MeshBasicMaterial({ color: 0x6f6a5e, side: THREE.DoubleSide }); // quarry wall cue [approx]
@@ -94,11 +107,14 @@ function buildM2() {
   const g = new THREE.Group();
   g.name = 'BD-m2';
   g.userData.tierPlacement = M2.tier;
-  const segLen = (M2.zTo - M2.zFrom) / M2.segs;
-  for (let i = 0; i < M2.segs; i++) {
-    const s = tag(new THREE.Mesh(new THREE.PlaneGeometry(M2.width, segLen), roadMat()), M2.tier, 'm2-ribbon');
+  for (let i = 1; i < M2.trace.length; i++) {
+    const [x0, z0] = M2.trace[i - 1];
+    const [x1, z1] = M2.trace[i];
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const s = tag(new THREE.Mesh(new THREE.PlaneGeometry(M2.width, len), roadMat()), M2.tier, 'm2-ribbon');
     s.rotation.x = -Math.PI / 2;
-    s.position.set(M2.x, 0.25, M2.zFrom + i * segLen + segLen / 2);
+    s.rotation.z = Math.atan2(x1 - x0, z1 - z0);
+    s.position.set((x0 + x1) / 2, 0.25, (z0 + z1) / 2);
     g.add(s);
   }
   return g;

@@ -59,7 +59,7 @@ export function hillockSpots() {
   return spots;
 }
 
-const scrubMat = () => new THREE.MeshStandardMaterial({ color: 0x8f8a6a, roughness: 1 }); // dry-grass hillock [approx]
+const scrubMat = () => new THREE.MeshStandardMaterial({ color: 0x7e7a66, roughness: 1 }); // hill-tone drape (was olive, read as blobs vs imagery) [approx]
 const rockMat = () => new THREE.MeshStandardMaterial({ color: 0x8d8a80, roughness: 0.95, flatShading: true }); // outcrop [approx]
 
 /** Hillock furniture: flattened domes on the DEM highs + rock outcrops. */
