@@ -81,9 +81,32 @@ function thumbnail(img, tw = 256) {
   return { tw, th, data: out };
 }
 
+/* HUD mask (relative rects): the loop watches the SCENE, not the chrome.
+ * Top-left info panel carries a live UTC clock (changes every second) and
+ * the bottom debug bar carries frame counters — both would read as
+ * perpetual "drift". Masked to zero in both frames before diffing. */
+const HUD_MASK = [
+  [0, 0, 0.28, 0.18], // info panel + clock
+  [0, 0.9, 1, 1], // bottom debug/credit bar
+];
+
+function applyMask(img) {
+  for (const [x0, y0, x1, y1] of HUD_MASK) {
+    const xa = Math.floor(x0 * img.w), xb = Math.ceil(x1 * img.w);
+    const ya = Math.floor(y0 * img.h), yb = Math.ceil(y1 * img.h);
+    for (let y = ya; y < yb && y < img.h; y++) {
+      for (let x = xa; x < xb && x < img.w; x++) {
+        const d = (y * img.w + x) * 4;
+        img.data[d] = img.data[d + 1] = img.data[d + 2] = 0;
+      }
+    }
+  }
+  return img;
+}
+
 function pixelDiff(aPath, bPath) {
-  const a = thumbnail(decodePNG(readFileSync(aPath)));
-  const b = thumbnail(decodePNG(readFileSync(bPath)));
+  const a = thumbnail(applyMask(decodePNG(readFileSync(aPath))));
+  const b = thumbnail(applyMask(decodePNG(readFileSync(bPath))));
   const n = Math.min(a.data.length, b.data.length);
   let sum = 0, changed = 0;
   for (let i = 0; i < n; i++) {

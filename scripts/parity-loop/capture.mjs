@@ -2,7 +2,7 @@
 /* parity-loop/capture.mjs — capture TOP/ISO/NEAR via headless Chromium on :5198.
  * Reuses the running dev server (never starts one, never touches :5173/:5175).
  * Captures land in scratch only (--out dir). Emits probes.json alongside.
- * Usage: node scripts/parity-loop/capture.mjs --out <scratchDir> --base http://localhost:5198 [--settle 2500] */
+ * Usage: node scripts/parity-loop/capture.mjs --out <scratchDir> --base http://localhost:5198 [--settle 5000] */
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -14,7 +14,7 @@ const args = Object.fromEntries(
 );
 const OUT = args.out;
 const BASE = (args.base ?? 'http://localhost:5198').replace(/\/$/, '');
-const SETTLE = Number(args.settle ?? 2500);
+const SETTLE = Number(args.settle ?? 5000); // close views stream DEM tiles per move; 2.5 s flapped NEAR
 const VW = Number(args.vw ?? 1280);
 const VH = Number(args.vh ?? 800);
 if (!OUT) { console.error('capture.mjs: --out <dir> required'); process.exit(1); }
