@@ -74,6 +74,36 @@ export function groundResForZoom(z, latDeg = SANGACHAL.lat) {
   return (GROUND_RES_Z0_MPX * Math.cos(rad(latDeg))) / Math.pow(2, z);
 }
 
+/* Scale-bar snap (pure): metres for a target-px bar snapped down to a
+ * 1/2/5 × 10^n step. Returns { label, frac } where frac = nice/raw is the
+ * fill fraction of the fixed-px bar (clamped [0.12, 1]). Non-finite input
+ * resolves to a safe default, never throws. Consumers (main.js tickChrome)
+ * paint `≈ ${label}` + flexGrow frac / 1-frac.
+ * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02] */
+export function niceScale(resMpx, targetPx = 120) {
+  const fallback = { label: '1 KM', frac: 1 };
+  if (!Number.isFinite(resMpx) || !Number.isFinite(targetPx)) return { ...fallback };
+  if (!(resMpx > 0) || !(targetPx > 0)) return { ...fallback };
+  const raw = resMpx * targetPx;
+  if (!Number.isFinite(raw) || !(raw > 0)) return { ...fallback };
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  let nice = pow;
+  for (const c of [5, 2, 1]) {
+    if (c * pow <= raw) {
+      nice = c * pow;
+      break;
+    }
+  }
+  const frac = Math.min(1, Math.max(0.12, nice / raw));
+  let label;
+  if (nice >= 1000) {
+    label = `${String(parseFloat((nice / 1000).toFixed(2)))} KM`;
+  } else {
+    label = `${String(parseFloat(nice.toFixed(2)))} M`;
+  }
+  return { label, frac };
+}
+
 /** Inverse: zoom for a ground resolution. Throws on non-finite input. */
 export function zoomForGroundRes(resMpx, latDeg = SANGACHAL.lat) {
   if (!Number.isFinite(resMpx) || resMpx <= 0) throw new Error(`zoomForGroundRes: bad res ${resMpx}`);

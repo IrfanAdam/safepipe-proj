@@ -19,7 +19,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { VEX } from './site.js';
 import { ensureField, getStatus } from './field.js';
 import { mountMapBase, assertTerrainOn, releaseMap } from './mapbase.js';
-import { applyTwinToMap, assertTerrainVex, pitchForPose, MAP_TRUE_FOV_DEG, aspectMismatch } from './sync.js';
+import { applyTwinToMap, assertTerrainVex, pitchForPose, bearingForPose, groundResForZoom, niceScale, MAP_TRUE_FOV_DEG, aspectMismatch } from './sync.js';
 import { createOverlayTwin } from './overlays.js';
 import * as THREE from 'three';
 import { buildT0, buildT1, buildBackdrops } from './facilities/index.js';
@@ -540,6 +540,58 @@ async function boot() {
   try {
     hud = buildRingHud(el, { onLevel: handleLevel });
   } catch { /* hud chrome never breaks boot */ }
+
+  /* Live chrome (Phase 02 Lane F): the compass needle + scale bar follow the
+   * free camera every frame — needle rotates with the twin pose bearing,
+   * scale label/bar follows the live map zoom. Cosmetic only: every read is
+   * guarded (twin/map may be null) and the body + wiring are try/caught so
+   * live chrome can never break boot or a frame. */
+  let lastNeedleDeg = null;
+  let lastScaleText = null;
+  function tickChrome() {
+    try {
+      try {
+        const needle = hud?.els?.needle;
+        const pose = twin?.getPose ? twin.getPose() : null;
+        if (needle && pose?.eye && pose?.target) {
+          const b = bearingForPose(pose.eye, pose.target);
+          if (Number.isFinite(b)) {
+            const r = Math.round(b * 2) / 2;
+            if (r !== lastNeedleDeg) {
+              lastNeedleDeg = r;
+              needle.style.transform = `rotate(${-r}deg)`;
+            }
+          }
+        }
+      } catch { /* needle is cosmetic — never breaks the frame */ }
+      try {
+        const scaleLabel = hud?.els?.scaleLabel;
+        const scaleBar = hud?.els?.scaleBar;
+        if (scaleLabel && map) {
+          const z = typeof map.getZoom === 'function' ? map.getZoom() : null;
+          const c = typeof map.getCenter === 'function' ? map.getCenter() : null;
+          const lat = c && typeof c.lat === 'number' ? c.lat : (Array.isArray(c) ? c[1] : null);
+          if (Number.isFinite(z) && Number.isFinite(lat)) {
+            const { label, frac } = niceScale(groundResForZoom(z, lat), 120);
+            const text = `≈ ${label}`;
+            if (text !== lastScaleText) {
+              lastScaleText = text;
+              scaleLabel.textContent = text;
+            }
+            const segs = scaleBar?.children;
+            if (segs && segs.length >= 2) {
+              segs[0].style.flexGrow = String(frac);
+              segs[1].style.flexGrow = String(1 - frac);
+            }
+          }
+        }
+      } catch { /* scale is cosmetic — never breaks the frame */ }
+    } catch { /* live chrome never breaks a frame */ }
+    requestAnimationFrame(tickChrome);
+  }
+  try {
+    requestAnimationFrame(tickChrome);
+  } catch { /* live chrome never breaks boot */ }
 
   window.__ring2 = {
     map,

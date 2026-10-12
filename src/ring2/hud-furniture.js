@@ -1,7 +1,9 @@
 /* Ring-2 HUD furniture — Lane A static DOM (Phase 00 Task 1 P1).
  * buildFurniture(root) -> { els }.
- * STATIC ONLY: sector block + compass + scalebar, same DOM order and
- * class names as v1 src/ops3d/hud.js. Placeholder text verbatim from v1.
+ * Chrome shell: sector block + compass + scalebar DOM lives here (same DOM
+ * order and class names as v1 src/ops3d/hud.js; placeholder text verbatim
+ * from v1). Values go live in main.js tickChrome, which drives needle
+ * rotation + scale label/bar every frame — this file only owns the DOM.
  * No feed wiring, no clock tick, no callbacks, no three.js import.
  * Styling is token-only via ops-hud__* classes (host page loads
  * design-system/ops-tokens.css + HUD CSS); this file sets no inline
@@ -73,8 +75,8 @@ export function buildFurniture(root) {
   compass.appendChild(needle);
   root.appendChild(compass);
 
-  // 3 — Scale bar, bottom-center (per-level fallback geometry: network
-  // representative scale; live scaleKm wiring is P3).
+  // 3 — Scale bar, bottom-center (per-level fallback label; main.js
+  // tickChrome overwrites the label + fill live from the map zoom).
   const scalebar = el('div', 'ops-hud__scalebar');
   scalebar.setAttribute('data-testid', 'ops-hud-scale');
   const scaleLabel = el('div', 'ops-hud__scalebar-label', `≈ ${scaleForLevel('network').label}`);

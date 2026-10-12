@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T15:53:48.451Z",
+  "generated": "2026-10-12T15:59:16.866Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "d05708f",
+      "full": "d05708f281c06d39ba89cbe2de98f52199dca8db",
+      "date": "2026-10-12",
+      "time": "21:28",
+      "subject": "docs(plan): phase-02 readability — plain intro, glossary, where-things-stand [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
     {
       "sha": "514a538",
       "full": "514a53841cd099fbe241603fa3eb271d33cbf64f",
