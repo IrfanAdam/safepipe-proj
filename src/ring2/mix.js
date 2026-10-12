@@ -210,6 +210,15 @@ export function mountMixBar(el, opts = {}) {
       reapply();
     } else {
       applyGroundRule(lastPitch);
+      // Twin side rides the same per-frame clock as the satellite fade:
+      // without this the else branch left applyEmphasis/setTakeover frozen
+      // at the last reapply's u (stale ground op 1 + lit schematic far out).
+      try {
+        applyEmphasis(Math.max(effMixNow() / 100, effUNow()));
+      } catch { /* emphasis is cosmetic */ }
+      try {
+        setTakeover(effUNow());
+      } catch { /* takeover ground is cosmetic */ }
     }
   }
 
