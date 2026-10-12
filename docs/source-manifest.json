@@ -1,12 +1,12 @@
 {
-  "generated": "2026-10-11T15:44:42.449Z",
+  "generated": "2026-10-12T07:55:23.536Z",
   "datasets": [
     {
       "name": "OpenStreetMap Sangachal AOI vectors (roads/tracks/paths/coastline/terminal)",
       "source": "Overpass API (https://overpass-turbo.eu/, api overpass-api.de)",
       "query_bbox": "S40.111431 N40.291093 W49.363656 E49.598884",
       "osm_base_timestamp": "2026-10-11T15:20:59Z",
-      "processed": "2026-10-11",
+      "processed": "2026-10-12",
       "crs": "EPSG:4326",
       "units": "degrees in, metres out",
       "resolution": "vector (node geometry as returned by Overpass)",
