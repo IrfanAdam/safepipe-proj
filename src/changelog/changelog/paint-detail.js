@@ -1,6 +1,8 @@
 // safepipe changelog — rail + detail · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
 const marked = {
-  parse(s){
+  parse(s, opts){
+    const { phaseDone = false, gateSuffix = '' } = opts || {};
+    let phaseHeadSeen = false;
     let src = String(s||'')
       .replace(/<!--[\s\S]*?-->/g, ' ')
       .replace(/^\s*\{#[^}]*\}\s*$/gm, '')
@@ -55,12 +57,27 @@ const marked = {
     // Headings carrying a trailing `✓ done (date)` / `✗ cancelled` mark get
     // the mark stripped and re-emitted as its own status line (no checkbox
     // exists on a heading, so the line preserves the information).
+    // Owner refinement: the FIRST h2 (the phase title) also carries the
+    // phase gate verdict on that same line (gateSuffix, '' when locked or
+    // gateless); a fully-done phase whose heading lacks the mark still gets
+    // its DONE line so the verdict has a line to sit on. Task headings
+    // (h3/h1, later h2s) are never touched by either.
     const headOf = (tag, text) => {
+      const isPhaseHead = tag === 'h2' && !phaseHeadSeen;
+      if (isPhaseHead) phaseHeadSeen = true;
       const m = text.match(/\s*([✓✗])\s*(done|cancelled)(\s*\([^)]*\))?\s*$/i);
-      if (!m) return `<${tag}>` + text + `</${tag}>`;
+      if (!m) {
+        if (isPhaseHead && phaseDone)
+          return `<h2>` + text + `</h2>` +
+            `<p class="ds-status ds-is-done">✓ DONE${gateSuffix}</p>`;
+        return `<${tag}>` + text + `</${tag}>`;
+      }
       const st = m[1] === '✗' ? 'cancelled' : 'done';
+      let label = `${m[1]} ${m[2]}${m[3] || ''}`;
+      if (isPhaseHead && st === 'done') label = `${m[1]} DONE${m[3] || ''}`;
+      if (isPhaseHead) label += gateSuffix;
       return `<${tag}>` + text.slice(0, m.index) + `</${tag}>` +
-        `<p class="ds-status ds-is-${st}">${m[1]} ${m[2]}${m[3] || ''}</p>`;
+        `<p class="ds-status ds-is-${st}">${label}</p>`;
     };
     const out = [];
     let fence = null;
@@ -115,9 +132,11 @@ import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../ch
 import { isDone, state, parseGates } from '../changelog-parse.js';
 import { esc } from './esc.js';
 import { paintRevs } from './paint-revs.js';
-// Inline gate tag (Task 12): the phase's own REF GATE verdict as quiet text
-// after DONE in the panel head — no rail, no seals, no popovers.
-const gateTagOf = (gates, phaseN) => {
+// Gate verdict (Task 12, owner refinement): the phase's own REF GATE verdict
+// as plain text appended to the below-title status line — same checkmark
+// treatment as DONE, reusing .ds-status styling (no span, no new colors).
+// Locked or gateless phases contribute no gate part.
+const gateSuffixOf = (gates, phaseN) => {
   if (!gates || !gates.length) return '';
   const gs = [...gates].sort((a, b) => a.n - b.n);
   let idx = gs.findIndex((g) => g.n === phaseN);
@@ -127,10 +146,10 @@ const gateTagOf = (gates, phaseN) => {
   const firstOpen = gs.findIndex((x) => x.state === 'open' || x.state === 'failed');
   const disp = (g.state === 'passed' || g.state === 'waiver') ? g.state
     : (idx === firstOpen ? g.state : 'locked');
-  const txt = (disp === 'passed' || disp === 'waiver') ? 'GATE PASSED'
-    : disp === 'failed' ? 'GATE FAILED'
-    : disp === 'open' ? 'GATE OPEN' : '';
-  return txt ? ` <span class="ds-gate-tag" data-gate-tag="${disp}">${txt}</span>` : '';
+  if (disp === 'passed' || disp === 'waiver') return ' ✓ GATE PASSED';
+  if (disp === 'failed') return ' · GATE FAILED';
+  if (disp === 'open') return ' · GATE OPEN';
+  return '';
 };
 export function paintDetail(root, ctx){
   const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts, edited, revs } = ctx;
@@ -166,17 +185,17 @@ export function paintDetail(root, ctx){
   const hs = hits(plan.file, sprint.body, plan.sprints.indexOf(sprint) === 0);
   const pm = (sprint.head || '').match(/Phase\s+(\d+)/i);
   const phaseN = pm ? Number(pm[1]) : si;
-  const doneTag = isDone(state(sprint.body)) ? ` <span class="ds-done">DONE</span>` : '';
   root.querySelector('[data-col="tasks"]').innerHTML = [
     `<div class="ds-drawer-head"><b>`,
     esc(unitLabel(sprint.head, si)),
     ` · `,
     esc(short(sprint.head)),
-    doneTag,
-    gateTagOf(parseGates(plan.raw || ''), phaseN),
     `</b><button data-close aria-label="Close detail">✕</button></div>`,
     `<div class="ds-md">`,
-    marked.parse(sprint.body) + paintRevs(revs) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : ''),
+    marked.parse(sprint.body, {
+      phaseDone: isDone(state(sprint.body)),
+      gateSuffix: gateSuffixOf(parseGates(plan.raw || ''), phaseN),
+    }) + paintRevs(revs) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : ''),
     `</div>`,
   ].join('');
   const u = unlinked(texts);
