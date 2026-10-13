@@ -14,7 +14,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 if (maplibregl?.config) maplibregl.config.WORKER_URL = workerUrl;
 import { MapLibreOverlay } from 'deck.gl';
-import { PolygonLayer, ScatterplotLayer, TextLayer } from 'deck.gl';
+import { PolygonLayer, ScatterplotLayer } from 'deck.gl';
 import { SITE, sectorsWithOverride, worstHealth, HEALTH_COLORS, HEALTH_RANK } from './feed.js';
 import { buildPinData } from './rings.js';
 import {
@@ -119,7 +119,14 @@ async function loadStyle() {
     // style AND defensively re-apply post-load (see stripLabelLayers).
     try {
       const before = Array.isArray(style.layers) ? style.layers.length : 0;
-      style.layers = (style.layers || []).filter((l) => l && l.type !== 'symbol');
+      style.layers = (style.layers || []).filter((l) => {
+        if (!l || typeof l !== 'object') return true;
+        if (l.type === 'symbol') return false;
+        const sl = l['source-layer'];
+        if (sl && (sl === 'place' || sl === 'poi' || sl === 'water_name' ||
+          sl === 'transportation_name' || sl === 'housenumber' || sl === 'waterway')) return false;
+        return true;
+      });
       window.__mapProbe.naked = true;
       window.__mapProbe.strippedLabels = before - style.layers.length;
     } catch { /* filter is best-effort */ }
@@ -132,7 +139,22 @@ async function loadStyle() {
 }
 
 /* LANE A: hide any symbol (label) layers that arrive via runtime style
- * additions. Keeps geometry/roads/water; removes place names. */
+ * additions. Keeps geometry/roads/water; removes place names. Matches by
+ * layer type AND by label source-layer (place, poi, water_name,
+ * transportation_name, housenumber, waterway) so a relabelled/added layer
+ * can never slip through an id list. Removes the layer when possible,
+ * hides it otherwise. */
+const LABEL_SOURCE_LAYERS = new Set([
+  'place', 'poi', 'water_name', 'transportation_name', 'housenumber', 'waterway',
+]);
+function isLabelLayer(l) {
+  try {
+    if (!l || typeof l !== 'object') return false;
+    if (l.type === 'symbol') return true;
+    if (l['source-layer'] && LABEL_SOURCE_LAYERS.has(l['source-layer'])) return true;
+  } catch { /* best-effort */ }
+  return false;
+}
 function stripLabelLayers(map) {
   try {
     const style = map.getStyle();
@@ -140,10 +162,15 @@ function stripLabelLayers(map) {
     let n = 0;
     for (const l of layers) {
       try {
-        if (l.type === 'symbol') {
-          map.setLayoutProperty(l.id, 'visibility', 'none');
-          n++;
+        if (!isLabelLayer(l)) continue;
+        // Prefer removal (frees glyph fetches); fall back to hiding.
+        try {
+          if (map.getLayer(l.id)) map.removeLayer(l.id);
+          else continue;
+        } catch {
+          try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch { /* per-layer best-effort */ }
         }
+        n++;
       } catch { /* per-layer best-effort */ }
     }
     // Accumulate: loadStyle() already recorded the fetch-time strip count;
@@ -167,7 +194,9 @@ function mountMicroCredit() {
   } catch { /* cosmetic */ }
 }
 
-/** deck.gl layers: single Sangachal blip (halo + core) + label. Clickable. */
+/** deck.gl layers: single Sangachal blip (halo + core) only. No TextLayer:
+ * the blip name rides in the DOM pill (.map-pin__tag); a deck text label
+ * duplicated it as a second dark-gray caption above the halo. */
 function deckLayers() {
   const onPick = (info) => {
     const s = info && info.object && info.object.sector;
@@ -212,16 +241,6 @@ function deckLayers() {
       getLineWidth: 3,
       pickable: true,
       onClick: onPick,
-    }),
-    new TextLayer({
-      id: 'sector-labels',
-      data: deckPins,
-      getPosition: (d) => d.position,
-      getText: (d) => d.name,
-      getSize: 13,
-      sizeUnits: 'pixels',
-      getColor: [45, 55, 60, 255],
-      getPixelOffset: [0, -34],
     }),
   ];
 }
@@ -670,6 +689,8 @@ async function boot() {
     mountMicroCredit();
     try {
       map.on('styledata', () => stripLabelLayers(map));
+      map.on('sourcedata', () => stripLabelLayers(map));
+      map.on('idle', () => stripLabelLayers(map));
     } catch { /* styledata guard is best-effort */ }
     try {
       if (!map.getSource(SAT_SOURCE_ID)) {
