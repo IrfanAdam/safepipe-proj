@@ -19,7 +19,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { VEX } from './site.js';
 import { ensureField, getStatus } from './field.js';
 import { mountMapBase, assertTerrainOn, releaseMap } from './mapbase.js';
-import { applyTwinToMap, assertTerrainVex, pitchForPose, bearingForPose, groundResForZoom, niceScale, MAP_TRUE_FOV_DEG, aspectMismatch } from './sync.js';
+import { applyTwinToMap, assertTerrainVex, pitchForPose, bearingForPose, groundResForZoom, niceScale, MAP_TRUE_FOV_DEG, TWIN_MAX_RANGE_M, aspectMismatch } from './sync.js';
 import { createOverlayTwin } from './overlays.js';
 import * as THREE from 'three';
 import { buildT0, buildT1, buildBackdrops } from './facilities/index.js';
@@ -486,7 +486,7 @@ async function boot() {
   //   network/TOP: high zenith ~0 over target (straight-down survey view)
   //   segment/ISO: mid oblique (45° polar) covering the segment reach
   //   asset/NEAR:  close low oblique (60° polar, 3 km) on the terminal
-  // Ranges sit inside the twin orbit clamps (1500 m … 32000 m) and polars
+  // Ranges sit inside the twin orbit clamps (1500 m … TWIN_MAX_RANGE_M) and polars
   // inside the 65° tilt clamp, so a preset never fights OrbitControls.
   const VIEW_PRESETS = {
     network: { range: 28000, polarDeg: 0, azimDeg: 0 },
@@ -819,7 +819,9 @@ async function boot() {
       const vp = viewportPxNow();
       let r = frameRange(handoff.frame.z, { viewportPx: vp, lat: handoff.frame.cy });
       if (!Number.isFinite(r) || r <= 0) return false;
-      r = Math.min(32000, Math.max(1500, r));
+      // Handoff-5-close: clamp to the shared orbit rails (sync.js) — the
+      // ceiling fits the 10 km ring + margin in short viewports.
+      r = Math.min(TWIN_MAX_RANGE_M, Math.max(1500, r));
       const old = handoff.start?.range;
       if (Number.isFinite(old) && Math.abs(old - r) < 1) return false;
       const s = pinTopDown(handoff.anchor.x, handoff.anchor.z, r, handoff.frame.bearing ?? 0);
@@ -1225,7 +1227,8 @@ async function boot() {
           startRange = frameRange(sectorQ.frame.z, { viewportPx: vp, lat: sectorQ.frame.cy });
         }
         if (!Number.isFinite(startRange) || startRange <= 0) startRange = 12000;
-        startRange = Math.min(32000, Math.max(1500, startRange));
+        // Handoff-5-close: shared orbit rails — ceiling fits the ring + margin.
+        startRange = Math.min(TWIN_MAX_RANGE_M, Math.max(1500, startRange));
         const bearing = sectorQ.frame?.bearing ?? 0;
         const azim = -(((Number(bearing) || 0) * Math.PI) / 180);
         // Ring-frame iso: the swoop target — same ring center/range as the

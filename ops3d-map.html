@@ -149,11 +149,13 @@
   /* LANE A recede: twin overlay fades instead of cutting.
    * Handoff-4 seeded reveal: forward crossfade map->twin ~600ms
    * (.prewarm holds opacity 0 while the iframe boots); reverse
-   * twin->map-sat ~500ms (.closing). */
+   * twin->map-sat ~600ms (.closing, symmetric with the forward reveal).
+   * Handoff-5-close: the recede (sat->flat + zoom-out) starts after the
+   * fade — never a cut at any step. */
   #twin-overlay { opacity: 1; transition: opacity 0.6s ease; }
   #twin-overlay[hidden] { display: none; }
   #twin-overlay.prewarm { opacity: 0; pointer-events: none; }
-  #twin-overlay.closing { opacity: 0; transition-duration: 0.5s; }
+  #twin-overlay.closing { opacity: 0; transition-duration: 0.6s; }
   @media (prefers-reduced-motion: reduce) {
     #twin-overlay { transition: none; }
   }

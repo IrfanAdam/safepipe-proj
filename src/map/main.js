@@ -93,6 +93,12 @@ let mapRef = null;
 let setSatRef = null;
 let transitId = null;
 let twinFs = false;
+// Handoff-5-close: single close chain. CLOSE_FADE_MS mirrors the forward
+// ~600ms reveal; RECEDE_DELAY_MS starts sat->flat + zoom-out after the fade.
+// closeSeq invalidates a pending hide/recede when a fresh open lands first.
+const CLOSE_FADE_MS = 600;
+const RECEDE_DELAY_MS = 680;
+let closeSeq = 0;
 // Handoff-4 Lane A seeded reveal: prewarm state. pendingReveal = { id, timer,
 // revealed } or null. twinReady mirrors the Lane B {type:TWIN_READY_MSG}
 // signal; prewarm is true while the overlay iframe loads hidden at opacity 0.
@@ -107,6 +113,7 @@ window.__mapProbe = {
   blips: 1, siteWorst, siteSector, site: { lat: SITE.lat, lon: SITE.lon, name: 'SANGACHAL' },
   transit: null, handoff: null, vignette: false, mapFs: false, twinFs: false,
   prewarm: false, twinReady: false, reveal: null, revealFallback: false,
+  recede: null, mapZoom: null,
   errors, openTwin, closeTwin, selectSector, flyToSectorThenTwin,
   toggleMapFs, setTwinFs, prewarmThenReveal, revealTwin,
 };
@@ -390,8 +397,24 @@ function wideFitPadding() {
   }
 }
 
+/** Handoff-5-close wide destination: padded ring-bounds fit, then back off
+ * 3.5 levels so the 10 km survey ring (20 km across) + margin fits the
+ * viewport's short side — centered, never bleeding off edges. (MapLibre
+ * reports zoom in 512-px tiles: res halves per level from 78271.5 m/px, so
+ * the ring needs ~3.5 levels past the 1 km-hex fit to fill ~75% of a
+ * ~577 px side.) Null when uncomputable (caller keeps the padded fit). */
+function wideZoomForBounds(bounds) {
+  try {
+    if (!mapRef || !bounds) return null;
+    const cam = mapRef.cameraForBounds(bounds, { padding: wideFitPadding() });
+    if (!cam || !Number.isFinite(cam.zoom)) return null;
+    return { center: cam.center, zoom: Math.min(cam.zoom - 3.5, 14) };
+  } catch {
+    return null;
+  }
+}
 /** Handoff-3 outbound choreography: ease to the clicked H3 RING bounds (the
- * hex bounds — wider than the terminal footprint) with WIDE padding (~28%
+  * hex bounds — wider than the terminal footprint) with WIDE padding (~28%
  * of viewport: ring + generous context margin in view, never terminal-tight)
  * + center lock (strictly vertical top view). Sat tiles pre-warm AND the
  * flat->sat crossfade ramps DURING the zoom flight (together, not after);
@@ -416,8 +439,13 @@ function flyToSectorThenTwin(id, opts = {}) {
   })();
   if (!mapRef || !bounds || reduced) {
     if (reduced && mapRef && bounds) {
+      // Handoff-5-close: reduced-motion jumps straight to the SAME wide
+      // destination (never the tight padded fit — the ring + margin rule
+      // holds animated or not).
+      const w = wideZoomForBounds(bounds);
       try {
-        mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: wideFitPadding(), maxZoom: 14 });
+        if (w) mapRef.easeTo({ center: w.center, zoom: w.zoom, bearing: 0, pitch: 0, duration: 0 });
+        else mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: wideFitPadding(), maxZoom: 14 });
       } catch { /* instant-fit is best-effort */ }
       setSatForced(true);
       showVignette(true);
@@ -461,6 +489,10 @@ function flyToSectorThenTwin(id, opts = {}) {
     // crossfade ran during the zoom). Handoff-4: HOLD the map end-frame and
     // PRE-WARM the twin hidden (opacity 0) until it posts
     // {type:'safepipe-twin-ready'} (or the ~4s fallback), then crossfade.
+    // Handoff-5-close: publish the staged zoom for the framing probe.
+    try {
+      window.__mapProbe.mapZoom = liveFrame()?.z ?? null;
+    } catch { /* probe cosmetic */ }
     setTimeout(() => {
       transitId = null;
       window.__mapProbe.transit = null;
@@ -474,16 +506,16 @@ function flyToSectorThenTwin(id, opts = {}) {
   }
   setTimeout(finish, 3500); // fallback if moveend never fires
   try {
-    // Handoff-5 wide first zoom: padded ring-bounds fit sets the framing,
-    // then back off ~2 levels so the flight stops WIDE (whole flat map /
-    // ring + generous context margin) and the flat→sat crossfade plays
+    // Handoff-5-close wide first zoom: padded ring-bounds fit sets the framing,
+    // then back off 3.5 levels so the flight stops WIDE (10 km survey ring +
+    // margin in frame, never bleeding) and the flat→sat crossfade plays
     // over the full map. Single easeTo, still centered on the ring.
     // liveFrame() then carries this wider z into ?cx&cy&z for the twin.
-    const cam = mapRef.cameraForBounds(bounds, { padding: wideFitPadding() });
-    const wideZ = Math.min(cam.zoom - 2, 14);
+    const w = wideZoomForBounds(bounds);
+    if (!w) throw new Error('wide-fit-unavailable');
     mapRef.easeTo({
-      center: cam.center,
-      zoom: wideZ,
+      center: w.center,
+      zoom: w.zoom,
       bearing: 0,
       pitch: 0,
       duration: 900,
@@ -521,6 +553,8 @@ function prewarmThenReveal(id, frame, opts = {}) {
   const h3 = h3map[id];
   const { root, frame: frameEl, label } = ensureOverlay();
   const url = twinUrl(h3, frame);
+  // Handoff-5-close: a fresh open cancels any pending close hide/recede.
+  closeSeq++;
   // Reset + publish prewarm probe state.
   try {
     if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
@@ -623,6 +657,8 @@ function openTwin(id, opts = {}) {
   if (!s) return false;
   selectSector(id);
   const h3 = h3map[id];
+  // Handoff-5-close: a fresh open cancels any pending close hide/recede.
+  closeSeq++;
   const { root, frame, label } = ensureOverlay();
   const handoff = opts.frame === undefined ? liveFrame() : opts.frame;
   const url = twinUrl(h3, handoff);
@@ -662,10 +698,12 @@ function openTwin(id, opts = {}) {
 }
 
 /** Actual teardown: fades the overlay out (never an abrupt cut), keeps hex
- * + selection (Task 19). Handoff-4 reverse: the twin has already returned to
- * top-down sat, so fade twin->map-sat (~500ms, sat stays ON underneath),
- * then the caller chains sat->flat + zoom-out. announce=true resolves when
- * hidden (LANE A recede chains the map animation underneath the fade). */
+ * + selection (Task 19). Handoff-5-close single chain: EVERY close path
+ * (X/Esc/back/twin-Esc) runs the same reverse — twin->map-sat fade over
+ * CLOSE_FADE_MS (~600ms, symmetric with the forward reveal; sat stays ON
+ * underneath), then sat->flat + zoom-out to the country blip view. Pending
+ * hide/recede steps are seq-guarded so a fresh open inside the fade window
+ * cancels them (no blanked twin, no yanked map). */
 function doCloseTwin() {
   // Handoff-3: if the overlay is the fullscreen element, drop fullscreen
   // silently first (flag cleared so fullscreenchange can't recede twice).
@@ -687,7 +725,15 @@ function doCloseTwin() {
   window.__mapProbe.twinReady = false;
   window.__mapProbe.reveal = null;
   window.__mapProbe.revealFallback = false;
+  // Handoff-5-close: seq-guard + reduced-motion flag for the fade/recede below.
+  const seq = ++closeSeq;
+  const seqGuard = () => closeSeq;
+  let reduced = false;
+  try {
+    reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch { /* cosmetic */ }
   const finishHide = () => {
+    if (seqGuard() !== seq) return; // reopened mid-fade: leave the fresh twin alone
     if (overlayEls) {
       overlayEls.root.hidden = true;
       overlayEls.root.classList.remove('closing');
@@ -698,23 +744,30 @@ function doCloseTwin() {
     }
   };
   if (overlayEls && !overlayEls.root.hidden) {
-    let reduced = false;
-    try {
-      reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch { /* cosmetic */ }
     if (!reduced) {
       try {
         overlayEls.root.classList.remove('prewarm');
         overlayEls.root.classList.add('closing');
       } catch { /* cosmetic */ }
-      setTimeout(finishHide, 520);
+      setTimeout(finishHide, CLOSE_FADE_MS + 20);
     } else {
       finishHide();
     }
   } else {
     finishHide();
   }
-  showVignette(false); // T2: lift the handoff vignette; sat staging stays
+  // Vignette stays through the twin->sat fade (forward-symmetric); the
+  // recede below lifts it while sat->flat + zoom-out run.
+  window.__mapProbe.recede = 'fading';
+  setTimeout(() => {
+    if (seqGuard() !== seq || twinOpen) return;
+    try {
+      showVignette(false);
+    } catch { /* cosmetic */ }
+    try {
+      recedeToCountry();
+    } catch { /* recede is best-effort */ }
+  }, reduced ? 0 : RECEDE_DELAY_MS);
   try {
     document.body.classList.remove('twin-open');
   } catch { /* chrome class is cosmetic */ }
@@ -772,6 +825,8 @@ function recedeToCountry() {
     reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   } catch { /* cosmetic */ }
   setSatForced(false);
+  // Handoff-5-close: probe the recede leg (sat->flat + zoom-out).
+  window.__mapProbe.recede = 'out';
   try {
     if (mapRef) {
       if (reduced) {
@@ -782,6 +837,8 @@ function recedeToCountry() {
           pitch: 0,
           duration: 0,
         });
+        window.__mapProbe.recede = 'home';
+        window.__mapProbe.mapZoom = COUNTRY_ZOOM;
       } else {
         mapRef.easeTo({
           center: COUNTRY_CENTER,
@@ -790,6 +847,14 @@ function recedeToCountry() {
           pitch: 0,
           duration: 1100,
         });
+        try {
+          mapRef.once('moveend', () => {
+            try {
+              window.__mapProbe.recede = 'home';
+              window.__mapProbe.mapZoom = liveFrame()?.z ?? null;
+            } catch { /* probe cosmetic */ }
+          });
+        } catch { /* probe listener is best-effort */ }
       }
     }
   } catch (err) {
@@ -824,16 +889,12 @@ window.addEventListener('message', (e) => {
   if (!twinOpen || !isTwinCloseData(e && e.data)) return;
   const recede = !!(e.data && typeof e.data === 'object' && e.data.recede);
   if (recede) {
-    // Handoff-4 reverse: the twin already returned to top-down sat — keep
-    // map-sat ON underneath the twin fade (~500ms), THEN sat->flat + zoom
-    // out to the blip. Never cut, never fade over flat.
+    // Handoff-5-close: the twin already returned to top-down sat — keep
+    // map-sat ON underneath the twin fade, then closeTwin() runs the single
+    // close chain (fade ~600ms, then sat->flat + zoom out to the blip).
+    // Never cut, never fade over flat.
     setSatForced(true);
     closeTwin();
-    setTimeout(() => {
-      try {
-        recedeToCountry();
-      } catch { /* recede is best-effort */ }
-    }, 540);
     return;
   }
   closeTwin();

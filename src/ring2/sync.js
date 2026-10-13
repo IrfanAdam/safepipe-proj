@@ -60,6 +60,13 @@ export const TWIN_MAX_ZOOM = TERRAIN_DEM_MAXZOOM + TWIN_MAX_DEM_OVERZOOM; // 16
  * so minDistance 1500 keeps map zoom ≤16 (≤1 DEM-overzoom level) on viewport
  * heights ≤ ~1096 px — every owner device. */
 export const TWIN_MIN_RANGE_M = 1500;
+/* Widest legal twin pull-back (handoff-5-close): the 10 km survey ring
+ * (RING_RADIUS_M, 20 km across) + margin must fit the twin top-down hold in
+ * short viewports (~577 px). 20 km at ≤80% of 577 px → footprint ≥25 km →
+ * range ≥37.5 km at the map true fov. 42000 m ceilings the handoff hold +
+ * free-orbit pull-back with headroom; the handoff clamp + OrbitControls
+ * maxDistance both read this (single source of truth). */
+export const TWIN_MAX_RANGE_M = 42000;
 /* 512-px tile convention (MapLibre default tileSize 512): metres per pixel
  * at zoom 0 on the equator. The 256-px constant (156543.03392) is WRONG
  * here — using it halves every zoom (v1's 2x-zoom class). */

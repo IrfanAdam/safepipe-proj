@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T13:27:03.222Z",
+  "generated": "2026-10-13T13:56:16.990Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "f396699",
+      "full": "f396699bc4d28735857efb2d774182250ab96933",
+      "date": "2026-10-13",
+      "time": "18:59",
+      "subject": "fix(handoff): wide first zoom, fade over full map [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "b0989c3",
       "full": "b0989c3dded8dee16cd1f08fc5810f80ebf01e85",
@@ -3113,9 +3122,13 @@
     }
   ],
   "wip": [
+    "ops3d-map.html",
     "src/changelog/changelog-cards.css",
     "src/changelog/changelog-drawer.css",
     "src/changelog/changelog.css",
-    "src/map/main.js"
+    "src/map/main.js",
+    "src/ring2/main.js",
+    "src/ring2/overlays.js",
+    "src/ring2/sync.js"
   ]
 }

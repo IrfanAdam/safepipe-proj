@@ -29,7 +29,7 @@ import * as THREE from 'three';
 import { pickGLPrecision } from '../glprecision.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { SANGACHAL, VEX, RING_RADIUS_M, EXTENT_M } from './site.js';
-import { MAP_MAX_PITCH_DEG, MAP_TRUE_FOV_DEG, TWIN_MIN_RANGE_M, tiltFadeForPitch } from './sync.js';
+import { MAP_MAX_PITCH_DEG, MAP_TRUE_FOV_DEG, TWIN_MIN_RANGE_M, TWIN_MAX_RANGE_M, tiltFadeForPitch } from './sync.js';
 import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
 import { DRAPE_LIFTS, RIM_FADE_IN, RIM_TILT_GAIN } from './drape.js';
 import { TIER } from './facilities/dims.js';
@@ -344,7 +344,11 @@ export function createOverlayTwin(container, opts = {}) {
    * Derived in sync.js (TWIN_MIN_RANGE_M) — single source of truth.
    * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
   controls.minDistance = TWIN_MIN_RANGE_M;
-  controls.maxDistance = 32000; // user call: a touch past the lens frame, never deep void
+  /* Handoff-5-close: ceiling is TWIN_MAX_RANGE_M (sync.js single source) so
+   * the ring-frame hold (10 km ring + margin, ~40 km range in short
+   * viewports) never fights OrbitControls. Free orbit may pull back to the
+   * full ring view, never deep void. */
+  controls.maxDistance = TWIN_MAX_RANGE_M;
 
   const group = new THREE.Group();
   group.name = 'ring2-overlays';
