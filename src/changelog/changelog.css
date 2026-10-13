@@ -11,7 +11,7 @@
   --border-hairline:var(--cl-1) solid var(--color-border);
   --z-ds-scrim:100; --z-ds-drawer:200; --z-ds-controls:300;
   --shadow-viewer:var(--sp-elevation-2); --shadow-sm:var(--sp-elevation-1);
-  --size-ds-drawer:calc(var(--sp-spacing-base) * 280);
+  --size-ds-drawer:calc(var(--sp-spacing-base) * 215);
   --font-mono:var(--sp-font-mono); --font-display:var(--sp-font-display);
   --text-micro:var(--sp-text-xs); --text-h2:var(--sp-text-2xl); --text-h3:var(--sp-text-lg);
   --text-ds-body:calc(var(--sp-text-md) - 1px);
