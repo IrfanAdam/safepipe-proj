@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T13:56:16.990Z",
+  "generated": "2026-10-13T14:18:56.703Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "db67a2b",
+      "full": "db67a2b55bc3b3c0e1f6646686589128fe8de8c6",
+      "date": "2026-10-13",
+      "time": "19:29",
+      "subject": "fix(handoff): ring in frame, gradual close, full rewind to flat [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "f396699",
       "full": "f396699bc4d28735857efb2d774182250ab96933",
@@ -3122,13 +3131,11 @@
     }
   ],
   "wip": [
-    "ops3d-map.html",
     "src/changelog/changelog-cards.css",
     "src/changelog/changelog-drawer.css",
     "src/changelog/changelog.css",
     "src/map/main.js",
     "src/ring2/main.js",
-    "src/ring2/overlays.js",
-    "src/ring2/sync.js"
+    "src/ring2/sector.js"
   ]
 }

@@ -113,7 +113,7 @@ window.__mapProbe = {
   blips: 1, siteWorst, siteSector, site: { lat: SITE.lat, lon: SITE.lon, name: 'SANGACHAL' },
   transit: null, handoff: null, vignette: false, mapFs: false, twinFs: false,
   prewarm: false, twinReady: false, reveal: null, revealFallback: false,
-  recede: null, mapZoom: null,
+  recede: null, mapZoom: null, reverseWait: false, reverseFallback: false,
   errors, openTwin, closeTwin, selectSector, flyToSectorThenTwin,
   toggleMapFs, setTwinFs, prewarmThenReveal, revealTwin,
 };
@@ -555,6 +555,12 @@ function prewarmThenReveal(id, frame, opts = {}) {
   const url = twinUrl(h3, frame);
   // Handoff-5-close: a fresh open cancels any pending close hide/recede.
   closeSeq++;
+  // Handoff-6-retrace: also settle a reverse-first wait (stale reply must
+  // not tear down the fresh twin).
+  clearReverseWait();
+  try {
+    window.__mapProbe.reverseFallback = false;
+  } catch { /* probe cosmetic */ }
   // Reset + publish prewarm probe state.
   try {
     if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
@@ -659,6 +665,12 @@ function openTwin(id, opts = {}) {
   const h3 = h3map[id];
   // Handoff-5-close: a fresh open cancels any pending close hide/recede.
   closeSeq++;
+  // Handoff-6-retrace: also settle a reverse-first wait (stale reply must
+  // not tear down the fresh twin).
+  clearReverseWait();
+  try {
+    window.__mapProbe.reverseFallback = false;
+  } catch { /* probe cosmetic */ }
   const { root, frame, label } = ensureOverlay();
   const handoff = opts.frame === undefined ? liveFrame() : opts.frame;
   const url = twinUrl(h3, handoff);
@@ -777,9 +789,13 @@ function doCloseTwin() {
 
 /** Task 19: X/Esc/twin-Esc close. Direct teardown + replaceState — never
  * history.back(): subframe loads share the joint history, so back() can
- * step the twin instead of the parent entry. */
-function closeTwin() {
+ * step the twin instead of the parent entry.
+ * Handoff-6-retrace: EVERY map-side close entry (X/Esc/back) goes through
+ * closeTwin() (reverse-first) — never straight to finishTwinClose(), which
+ * would skip the twin's staged inbound. */
+function finishTwinClose() {
   if (!twinOpen) return;
+  clearReverseWait();
   doCloseTwin();
   try {
     if (history.state && history.state.twin) {
@@ -790,10 +806,75 @@ function closeTwin() {
   }
 }
 
+/* Handoff-6-retrace reverse-first close: X/Esc/back must NOT tear the
+ * overlay down directly — that jumps straight to the map satellite view and
+ * skips the twin's inbound stages. Instead ask the live twin to walk back
+ * through every stage actually passed (pull to ring frame -> pitch back to
+ * top-down -> slider 100->0); its {recede:true} reply then runs the single
+ * fade+recede chain. Timeout fallback tears down anyway so a dead twin can
+ * never strand the map. Probe: __mapProbe.reverseWait/reverseFallback. */
+const TWIN_REVERSE_WAIT_MS = 8000;
+let reverseWait = null; // { timer } while a twin reverse flight is awaited
+function clearReverseWait() {
+  try {
+    if (reverseWait && reverseWait.timer) clearTimeout(reverseWait.timer);
+  } catch { /* timer teardown is best-effort */ }
+  reverseWait = null;
+  try {
+    window.__mapProbe.reverseWait = false;
+  } catch { /* probe cosmetic */ }
+}
+/* Post the reverse request to the live twin iframe: the object form WITHOUT
+ * recede — the twin matches it as a reverse request and replies with
+ * {recede:true} after the stage walk. True when posted. */
+function postTwinReverseRequest() {
+  try {
+    const fr = overlayEls && overlayEls.frame;
+    if (!fr) return false;
+    if (fr.getAttribute('data-url') === 'about:blank') return false;
+    const win = fr.contentWindow;
+    if (!win) return false;
+    win.postMessage({ type: TWIN_CLOSE_MSG }, '*');
+    return true;
+  } catch {
+    return false;
+  }
+}
+/* Reverse-first entry for X/Esc/back: request the twin's stage walk, defer
+ * teardown to its {recede:true} reply (or the timeout fallback). Repeat
+ * entries while a reverse is awaited are ignored — the flight already runs. */
+function closeTwin() {
+  if (!twinOpen) return;
+  if (reverseWait) return;
+  try {
+    if (postTwinReverseRequest()) {
+      const seq = closeSeq;
+      try {
+        window.__mapProbe.reverseWait = true;
+      } catch { /* probe cosmetic */ }
+      reverseWait = {
+        timer: setTimeout(() => {
+          if (seq !== closeSeq) return; // fresh open landed first
+          if (!twinOpen) {
+            clearReverseWait();
+            return;
+          }
+          try {
+            window.__mapProbe.reverseFallback = true;
+          } catch { /* probe cosmetic */ }
+          finishTwinClose();
+        }, TWIN_REVERSE_WAIT_MS),
+      };
+      return;
+    }
+  } catch { /* request is best-effort; fall through to teardown */ }
+  finishTwinClose();
+}
+
 window.addEventListener('popstate', (e) => {
   const id = e && e.state && e.state.twin;
   if (id && !twinOpen) openTwin(id, { replace: true });
-  else if (!id && twinOpen) doCloseTwin();
+  else if (!id && twinOpen) closeTwin();
 });
 
 window.addEventListener('keydown', (e) => {
@@ -890,14 +971,15 @@ window.addEventListener('message', (e) => {
   const recede = !!(e.data && typeof e.data === 'object' && e.data.recede);
   if (recede) {
     // Handoff-5-close: the twin already returned to top-down sat — keep
-    // map-sat ON underneath the twin fade, then closeTwin() runs the single
-    // close chain (fade ~600ms, then sat->flat + zoom out to the blip).
-    // Never cut, never fade over flat.
+    // map-sat ON underneath the twin fade, then finishTwinClose() runs the
+    // single close chain (fade ~600ms, then sat->flat + zoom out to the
+    // blip). Never cut, never fade over flat. Handoff-6-retrace: the reply
+    // also settles the reverse-first wait armed by closeTwin().
     setSatForced(true);
-    closeTwin();
+    finishTwinClose();
     return;
   }
-  closeTwin();
+  finishTwinClose();
 });
 
 function mountChrome(map, overlay, setSat) {

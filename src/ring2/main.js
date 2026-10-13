@@ -30,6 +30,11 @@ import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
 import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, easeInOutCubic, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
+/* Namespace read of the inbound stage table (Handoff-6-closewalk): the
+ * generic reverse walker resolves stage ORDER + values through here so a
+ * Lane A constant move applies with no further edits. Named imports above
+ * stay the static contract; this is the forward-compatible lookup. */
+import * as sectorNs from './sector.js';
 import {
   createCtxMon,
   ctxLive,
@@ -78,7 +83,7 @@ let lastConsoleStatus = '';
 const FOV_DEG = MAP_TRUE_FOV_DEG;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'b61ringpush';
+const BUILD_ID = 'b64closewalk';
 // Shared GL-context + tile telemetry registry (see ctxmon.js: one
 // real-Safari screenshot of the six tokens discriminates every hypothesis
 // in the defect-hunt report).
@@ -616,6 +621,7 @@ async function boot() {
     from: null, // flight segment start { eye, target, mix }
     to: null, // terminal iso { eye, target, mix }
     revMode: null, // reverse plan for THIS close: snap|pitch|full (sector.js reversePlanForPhase)
+    walk: null, // generic reverse walk: { legs:[{name,eye,target,mix,ms,from,fromMix}], i, legT0 } or null
     frame: null, // handed-off { cx, cy, z, bearing } (range refit source)
     anchor: null, // ring-frame center { x, z } (range refit source)
     azim: 0, // attached-angle azimuth rad (range refit source)
@@ -712,6 +718,7 @@ async function boot() {
     handoff.to = terminal;
     handoff.from = null;
     handoff.revMode = null;
+    handoff.walk = null;
     handoff.readyPosted = false;
     handoff.closePosted = false;
     handoff.phase = 'hold';
@@ -736,6 +743,7 @@ async function boot() {
   }
   function endHandoffFlight() {
     handoff.phase = 'done';
+    handoff.walk = null;
     try {
       twin.controls.enabled = true;
     } catch { /* input stays as-is */ }
@@ -835,14 +843,107 @@ async function boot() {
       return false;
     }
   }
+  /* Generic reverse-walk table (Handoff-6-closewalk): the inbound flight is
+   * an ordered list of NAMED stages. The order is read from sector.js when
+   * it names one (HANDOFF_STAGE_ORDER / INBOUND_STAGES / STAGE_ORDER),
+   * else the canonical hold->swoop->push->done. Every value below comes
+   * from the sector.js imports or the live handoff anchors — no pose
+   * numbers live here, so Lane A moves apply with no further edits. */
+  function inboundStageOrder() {
+    try {
+      const o = sectorNs.HANDOFF_STAGE_ORDER ?? sectorNs.INBOUND_STAGES ?? sectorNs.STAGE_ORDER;
+      if (Array.isArray(o) && o.length) return o.map((s) => String(s).toLowerCase());
+    } catch { /* canonical fallback below */ }
+    return ['hold', 'swoop', 'push', 'done'];
+  }
+  /* Forward ms for undoing a stage (its own replay duration, sector-owned). */
+  function stageUndoMs(name) {
+    if (name === 'push' || name === 'done') return HANDOFF_PUSH_MS;
+    if (name === 'hold') return HANDOFF_HOLD_MS;
+    return HANDOFF_SWOOP_MS; // swoop + any future pitch-scale stage
+  }
+  /* Named stage pose at close time (null when its anchor is unknown — the
+   * walker skips that leg and the final pin still guarantees top-down).
+   * A Lane A resolver (sectorNs.stagePoseFor / *_STAGE_POSES) wins when
+   * present; otherwise poses resolve from the live anchors. */
+  function stagePose(name) {
+    try {
+      if (typeof sectorNs.stagePoseFor === 'function') {
+        const p = sectorNs.stagePoseFor(name, { start: handoff.start, mid: handoff.mid, to: handoff.to });
+        if (p && p.eye && p.target) {
+          return {
+            name,
+            eye: { ...p.eye },
+            target: { ...p.target },
+            mix: Number.isFinite(p.mix) ? p.mix : HANDOFF_START_MIX,
+          };
+        }
+      }
+      const table = sectorNs.HANDOFF_STAGE_POSES ?? sectorNs.STAGE_POSES;
+      if (table && typeof table === 'object' && table[name] && table[name].eye && table[name].target) {
+        const p = table[name];
+        return {
+          name,
+          eye: { ...p.eye },
+          target: { ...p.target },
+          mix: Number.isFinite(p.mix) ? p.mix : HANDOFF_START_MIX,
+        };
+      }
+    } catch { /* live-anchor resolution below */ }
+    try {
+      if (name === 'hold') {
+        const s = handoff.start;
+        if (!s) return null;
+        const se = startEye(s);
+        return { name, eye: se, target: { x: s.tx, y: s.ty, z: s.tz }, mix: HANDOFF_START_MIX };
+      }
+      if (name === 'swoop') {
+        const mid = handoff.mid;
+        if (!mid) return null;
+        return { name, eye: { ...mid.eye }, target: { ...mid.target }, mix: HANDOFF_START_MIX };
+      }
+      if (name === 'push' || name === 'done') {
+        const to = handoff.to;
+        if (!to) return null;
+        return { name, eye: { ...to.eye }, target: { ...to.target }, mix: HANDOFF_END_MIX };
+      }
+    } catch { /* null below */ }
+    return null;
+  }
+  /* Build the close-time walk: every inbound stage actually passed, newest
+   * first, each leg undoing its stage over that stage's forward ms. Done
+   * rests AT the push end pose, so it undoes push (no terminal leg — the
+   * pull starts from wherever the camera is, never a canned start). An
+   * unknown phase walks everything (terminal-side full walk). Zero legs =
+   * still top-down in hold: the engine pins + posts immediately. */
+  function buildReverseWalk(closePhase) {
+    const order = inboundStageOrder();
+    const phase = String(closePhase ?? '').toLowerCase();
+    let idx = order.indexOf(phase);
+    if (phase === 'done') idx = order.indexOf('push');
+    if (idx < 0) idx = order.length - 1;
+    const cur = capturePose();
+    const curMix = Number.isFinite(cur?.mix) ? cur.mix : HANDOFF_START_MIX;
+    const legs = [];
+    let from = cur;
+    let fromMix = curMix;
+    for (let i = idx - 1; i >= 0; i--) {
+      const pose = stagePose(order[i]);
+      if (!pose) continue;
+      const undone = order[i + 1] ?? order[idx];
+      legs.push({ ...pose, ms: stageUndoMs(undone), from, fromMix });
+      from = { eye: { ...pose.eye }, target: { ...pose.target } };
+      fromMix = pose.mix;
+    }
+    return { legs, order: order.slice(0, idx), from: cur };
+  }
   /* Per-frame flight step (runs at the top of the render loop, before the
    * damped controls settle — the flight IS the pose source while active).
    * Forward: hold (ring top-down, mix 0) -> swoop (ring top-down -> ring
    * iso at the attached angle, mix STAYS 0) -> push (ring iso -> terminal
    * iso, mix 0->100 with the push-in). Reverse mirrors exactly inside the
-   * single 'reverse' phase: pull (terminal -> ring iso, mix ->0 over
-   * PUSH_MS) then pitch-back (ring iso -> ring top-down over SWOOP_MS),
-   * then the {recede:true} close posts. */
+   * single 'reverse' phase by stepping the close-time leg list (see
+   * buildReverseWalk), then the {recede:true} close posts. */
   function stepHandoff() {
     if (!handoff || handoff.phase === 'idle' || handoff.phase === 'done') return;
     try {
@@ -931,82 +1032,52 @@ async function boot() {
         return;
       }
       if (handoff.phase === 'reverse') {
-        // Stage-aware mirror: revMode was picked at close time from the
-        // ACTUAL phase (sector.js reversePlanForPhase) and `from` is the
-        // captured live pose — never a canned start.
-        //   snap:  closed in hold (still top-down): pin + mix 0, post.
-        //   pitch: closed mid-swoop: current -> ring top-down over SWOOP_MS.
-        //   full:  closed terminal-side: pull to ring iso (PUSH_MS, mix ->0)
-        //          then pitch-back to ring top-down (SWOOP_MS).
-        const f = handoff.from, mid = handoff.mid, s = handoff.start;
-        const mode = handoff.revMode || 'full';
-        if (!f || !s || (mode === 'full' && !mid)) {
-          endHandoffFlight();
-          postTwinClose();
-          return;
-        }
-        const se = startEye(s);
-        const st = { x: s.tx, y: s.ty, z: s.tz };
-        if (mode === 'snap') {
-          try {
-            pinTopDown(s.tx, s.tz, s.range, s.bearing);
-          } catch { /* pin is best-effort */ }
+        // Generic reverse walk: step the leg list built at close time from
+        // the named inbound stages actually passed. Each leg flies from the
+        // previous waypoint to the next stage pose over that stage's own
+        // forward ms with the slider riding down to full satellite; the
+        // final pin guarantees top-down + slider 0 even if an anchor went
+        // missing mid-walk — then the {recede:true} close posts.
+        const walk = handoff.walk;
+        if (!walk || !Array.isArray(walk.legs) || walk.i >= walk.legs.length) {
+          const s = handoff.start;
+          if (s) {
+            try {
+              pinTopDown(s.tx, s.tz, s.range, s.bearing);
+            } catch { /* pin is best-effort */ }
+          }
           driveMix(HANDOFF_START_MIX);
           endHandoffFlight();
           postTwinClose();
           return;
         }
-        if (mode === 'pitch') {
-          // Direct pitch-back from the captured mid-swoop pose: the pull
-          // stage was never entered, so there is nothing to pull back from.
-          const elapsed = now - handoff.t0;
-          const t = Math.min(1, Math.max(0, elapsed / HANDOFF_SWOOP_MS));
-          const k = easeInOutCubic(t);
-          try {
-            applyFlightPose(
-              { x: lerp(f.eye.x, se.x, k), y: lerp(f.eye.y, se.y, k), z: lerp(f.eye.z, se.z, k) },
-              { x: lerp(f.target.x, st.x, k), y: lerp(f.target.y, st.y, k), z: lerp(f.target.z, st.z, k) },
-            );
-          } catch { /* pose drive is best-effort */ }
-          driveMix(lerp(Number.isFinite(f.mix) ? f.mix : HANDOFF_START_MIX, HANDOFF_START_MIX, k));
-          if (t >= 1) {
-            try {
-              pinTopDown(s.tx, s.tz, s.range, s.bearing);
-            } catch { /* pin is best-effort */ }
+        const leg = walk.legs[walk.i];
+        const span = Number.isFinite(leg.ms) && leg.ms > 0 ? leg.ms : HANDOFF_SWOOP_MS;
+        const t = Math.min(1, Math.max(0, (now - walk.legT0) / span));
+        const k = easeInOutCubic(t);
+        const fe = (leg.from && leg.from.eye) || leg.eye;
+        const ft = (leg.from && leg.from.target) || leg.target;
+        try {
+          applyFlightPose(
+            { x: lerp(fe.x, leg.eye.x, k), y: lerp(fe.y, leg.eye.y, k), z: lerp(fe.z, leg.eye.z, k) },
+            { x: lerp(ft.x, leg.target.x, k), y: lerp(ft.y, leg.target.y, k), z: lerp(ft.z, leg.target.z, k) },
+          );
+        } catch { /* pose drive is best-effort */ }
+        driveMix(lerp(Number.isFinite(leg.fromMix) ? leg.fromMix : HANDOFF_START_MIX, leg.mix, k));
+        if (t >= 1) {
+          walk.i += 1;
+          walk.legT0 = now;
+          if (walk.i >= walk.legs.length) {
+            const s = handoff.start;
+            if (s) {
+              try {
+                pinTopDown(s.tx, s.tz, s.range, s.bearing);
+              } catch { /* pin is best-effort */ }
+            }
             driveMix(HANDOFF_START_MIX);
             endHandoffFlight();
             postTwinClose();
           }
-          return;
-        }
-        const elapsed = now - handoff.t0;
-        if (elapsed < HANDOFF_PUSH_MS) {
-          const k = easeInOutCubic(elapsed / HANDOFF_PUSH_MS);
-          try {
-            applyFlightPose(
-              { x: lerp(f.eye.x, mid.eye.x, k), y: lerp(f.eye.y, mid.eye.y, k), z: lerp(f.eye.z, mid.eye.z, k) },
-              { x: lerp(f.target.x, mid.target.x, k), y: lerp(f.target.y, mid.target.y, k), z: lerp(f.target.z, mid.target.z, k) },
-            );
-          } catch { /* pose drive is best-effort */ }
-          driveMix(lerp(f.mix, HANDOFF_START_MIX, k));
-          return;
-        }
-        const t2 = Math.min(1, Math.max(0, (elapsed - HANDOFF_PUSH_MS) / HANDOFF_SWOOP_MS));
-        const k2 = easeInOutCubic(t2);
-        try {
-          applyFlightPose(
-            { x: lerp(mid.eye.x, se.x, k2), y: lerp(mid.eye.y, se.y, k2), z: lerp(mid.eye.z, se.z, k2) },
-            { x: lerp(mid.target.x, st.x, k2), y: lerp(mid.target.y, st.y, k2), z: lerp(mid.target.z, st.z, k2) },
-          );
-        } catch { /* pose drive is best-effort */ }
-        driveMix(HANDOFF_START_MIX);
-        if (t2 >= 1) {
-          try {
-            pinTopDown(s.tx, s.tz, s.range, s.bearing);
-          } catch { /* pin is best-effort */ }
-          driveMix(HANDOFF_START_MIX);
-          endHandoffFlight();
-          postTwinClose();
         }
       }
     } catch { /* flight never breaks the frame */ }
@@ -1045,29 +1116,32 @@ async function boot() {
         return true;
       }
       const prevPhase = handoff.phase;
-      const plan = reversePlanForPhase(prevPhase);
-      if (plan === 'snap') {
-        // Still top-down at the ring frame: no stage was entered, so the
-        // mirror is a pin + mix 0 + immediate post.
+      // Generic reverse walk over the named inbound stages actually passed
+      // (sector.js order + poses — never a jump to a canned start). The
+      // sector-owned plan label stays on the probe for compat.
+      handoff.revMode = reversePlanForPhase(prevPhase);
+      const walk = buildReverseWalk(prevPhase);
+      if (!walk.legs.length) {
+        // Still top-down at the ring frame (hold): no stage was entered, so
+        // the mirror is a pin + mix 0 + immediate post.
         try {
           const s = handoff.start;
           pinTopDown(s.tx, s.tz, s.range, s.bearing);
           driveMix(HANDOFF_START_MIX);
         } catch { /* pin is best-effort */ }
-        handoff.revMode = 'snap';
+        handoff.walk = null;
         endHandoffFlight();
         postTwinClose();
         return true;
       }
-      const cur = capturePose();
-      if (!cur) {
+      const cur = walk.from;
+      if (!cur || !cur.eye || !cur.target) {
         postTwinClose();
         return false;
       }
       handoff.from = cur;
-      handoff.revMode = plan; // 'pitch' (mid-swoop) or 'full' (terminal-side)
+      handoff.walk = { legs: walk.legs, i: 0, legT0: handoffNow() };
       handoff.phase = 'reverse';
-      handoff.t0 = handoffNow();
       try {
         twin.controls.enabled = false;
       } catch { /* flight still drives the camera */ }
@@ -1166,6 +1240,7 @@ async function boot() {
     handoffPhase: () => handoff.phase,
     ready: () => handoff.readyPosted,
     revMode: () => handoff.revMode,
+    revWalk: () => (handoff.walk ? handoff.walk.legs.map((l) => l.name) : null),
     twinReadyMsg: TWIN_READY_MSG,
     fs: { delegated: fsDelegated, on: fsOn },
     diag: () => ({
@@ -1288,9 +1363,12 @@ async function boot() {
         }
       }, true);
       // Back/parent-teardown path: no frame budget for the reverse flight on
-      // unload — the close (with recede) still fires synchronously.
+      // unload — the close (with recede) still fires synchronously, unless
+      // the reverse already posted it (Handoff-6-retrace: no duplicate echo —
+      // a stale echo landing in a fresh open's window could tear it down).
       window.addEventListener('pagehide', () => {
         try {
+          if (handoff.closePosted) return;
           postTwinClose();
         } catch { /* parent notify is best-effort */ }
       });

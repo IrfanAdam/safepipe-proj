@@ -52,8 +52,10 @@ export const HANDOFF_REVERSE_MS = HANDOFF_PUSH_MS + HANDOFF_SWOOP_MS;
 /* Slider drive: overlay opens at full satellite, swoops to full twin. */
 export const HANDOFF_START_MIX = 0;
 export const HANDOFF_END_MIX = 100;
-/* Iso terminal view (matches the sector reframe in main.js). */
-export const HANDOFF_ISO_RANGE_M = 4500;
+/* Iso terminal view (matches the sector reframe in main.js): two zoom levels
+ * out from the old 4500 m stance — ~12 km footprint holds the ~3 km facility
+ * + margin in frame at the same iso angle. Slider still drives to 100. */
+export const HANDOFF_ISO_RANGE_M = 18000;
 export const HANDOFF_ISO_POLAR_DEG = 50;
 
 /** Raw ?sector= / ?embed= values from a search string. Frame params
