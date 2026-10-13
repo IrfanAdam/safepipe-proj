@@ -78,12 +78,6 @@ const OVERLAY_MODES = [null, 'weather', 'tectonic', 'forecast'];
 const FSTOPS = [1.4, 1.8, 2, 2.8, 4, 5.6, 8, 11, 16];
 const fstopFmt = (v) => `ƒ/${FSTOPS[Math.round(v)] ?? v}`;
 
-/* Twin→map affordance: quiet MAP button beside FULLSCREEN. Standalone
- * loads navigate to the launcher map; ?embed=1 (map overlay iframe)
- * notifies the parent to close instead — the map is already underneath
- * with hex + selection intact, so an iframe navigation would strand it. */
-const MAP_URL = './ops3d-map.html';
-const MAP_CLOSE_MSG = 'safepipe-twin-close'; // matches sector.js TWIN_CLOSE_MSG; local const keeps this lane import-light
 /* Legend toggle sits beside ? bottom-left (v1: inline 42px). Token-only
  * equivalent — no raw px. */
 const LEGEND_BTN_OFFSET = 'calc(var(--ops-inset) + var(--ops-cut-lg) + var(--ops-cut-sm))';
@@ -274,27 +268,6 @@ export function buildOverlays(root, opts = {}) {
   camToggles.appendChild(dofBtn);
   camPanel.appendChild(camToggles);
 
-  // — MAP: twin→launcher affordance. Embedded (?embed=1) asks the parent
-  // map to close the overlay (it sits underneath already); standalone
-  // navigates to the launcher map. Quiet by design: same token-only
-  // ops-hud__fs treatment as FULLSCREEN, first in the cluster.
-  const mapBtn = el('button', 'ops-hud__fs ops-hud__map', 'MAP');
-  mapBtn.type = 'button';
-  mapBtn.setAttribute('aria-label', 'Back to launcher map');
-  mapBtn.setAttribute('data-testid', 'ops-hud-map');
-  mapBtn.addEventListener('click', () => {
-    try {
-      const q = new URLSearchParams(location.search);
-      if (q.get('embed') === '1' && window.parent && window.parent !== window) {
-        window.parent.postMessage(MAP_CLOSE_MSG, '*');
-        return;
-      }
-    } catch { /* query read never breaks the click */ }
-    try {
-      location.href = MAP_URL;
-    } catch { /* navigation is best-effort */ }
-  });
-
   // — FULLSCREEN: real. Targets the explicit container, else root's
   // parent; guarded when neither can go fullscreen (null container).
   const fsBtn = el('button', 'ops-hud__fs', 'FULLSCREEN');
@@ -321,7 +294,6 @@ export function buildOverlays(root, opts = {}) {
   sys.appendChild(moreBtn);
   sys.appendChild(camBtn);
   sys.appendChild(camPanel);
-  sys.appendChild(mapBtn);
   sys.appendChild(fsBtn);
 
   root.appendChild(legend);
@@ -427,7 +399,6 @@ export function buildOverlays(root, opts = {}) {
     camPanel,
     afBtn,
     dofBtn,
-    mapBtn,
     fsBtn,
   };
   return {

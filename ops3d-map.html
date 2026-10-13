@@ -109,6 +109,19 @@
     color: var(--ops-ink, #cfd4d6);
   }
   #twin-close:hover { color: var(--ops-amber, #ffd9a0); }
+  /* T2 handoff: black periphery vignette staging the twin open. Token-only
+   * where possible (outer wash falls back to --ops-bg); pointer-transparent
+   * so blip/toggle hit-testing is unchanged. Sits above pins, below twin. */
+  #map-vignette {
+    position: absolute; inset: 0; z-index: 3; pointer-events: none;
+    background: radial-gradient(ellipse at center,
+      transparent 52%, rgba(0, 0, 0, 0.28) 78%, var(--ops-bg, #0b0c0c) 100%);
+    opacity: 0; transition: opacity 0.6s ease;
+  }
+  #map-vignette.on { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    #map-vignette { transition: none; }
+  }
   #map-fatal {
     display: none; position: fixed; left: 12px; bottom: 12px; z-index: 99;
     max-width: 80vw; padding: 8px 14px;
@@ -118,7 +131,7 @@
 </style>
 </head>
 <body>
-<div id="app"><div id="map"></div></div>
+<div id="app"><div id="map"></div><div id="map-vignette"></div></div>
 <div id="map-fatal"></div>
 <script>
 (function () {

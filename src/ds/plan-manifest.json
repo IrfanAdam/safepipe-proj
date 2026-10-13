@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T09:52:42.991Z",
+  "generated": "2026-10-13T10:14:09.296Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "77970f0",
+      "full": "77970f0cc4f23b8e2f148e0470b514b4b7e82405",
+      "date": "2026-10-13",
+      "time": "15:23",
+      "subject": "feat(twin): MAP affordance in HUD closes the map-twin loop [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "7634bbe",
       "full": "7634bbedf20ab330b9e2db5b75972c97efe9a188",
@@ -3050,7 +3059,12 @@
     }
   ],
   "wip": [
+    "ops3d-map.html",
+    "src/map/main.js",
+    "src/map/twinlink.js",
     "src/ops3d/hud.css",
-    "src/ring2/hud-overlays.js"
+    "src/ring2/hud-overlays.js",
+    "src/ring2/main.js",
+    "src/ring2/sector.js"
   ]
 }

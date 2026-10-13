@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, frameTarget, frameRange, easeInOutCubic, buildTwinCloseMessage, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import {
   createCtxMon,
@@ -594,6 +594,259 @@ async function boot() {
     requestAnimationFrame(tickChrome);
   } catch { /* live chrome never breaks boot */ }
 
+  /* LANE 3 twinlink handoff (twin-side inbound + reverse): the map overlay
+   * opens this page as ?sector=<h3>&cx=<lng>&cy=<lat>&z=<zoom>[&bearing=].
+   * On open with frame params the camera starts at that exact footprint
+   * (pitch 0, bearing matching the map, slider at full satellite), holds a
+   * beat top-down, then slow-eases to the isometric terminal view while the
+   * SAT->TWIN slider drives satellite->twin. Close plays the exact reverse
+   * (iso -> top-down satellite frame) then posts the close message with
+   * {recede:true} so the parent fades sat->flat + zooms back out.
+   * Pure math (parse/ease/message) lives in sector.js (node-checkable);
+   * this block owns the camera/slider flight. Never breaks boot. */
+  const handoff = {
+    phase: 'idle', // idle|hold|swoop|reverse|done
+    t0: 0,
+    start: null, // pinned top-down footprint { tx, ty, tz, range, bearing }
+    from: null, // flight segment start { eye, target, mix }
+    to: null, // flight segment end { eye, target, mix }
+  };
+  const handoffNow = () => {
+    try {
+      return performance.now();
+    } catch {
+      return Date.now();
+    }
+  };
+  function viewportPxNow() {
+    try {
+      return Math.max(twinDiv.clientHeight || window.innerHeight, 1);
+    } catch {
+      return 600;
+    }
+  }
+  function groundYNear(x, z) {
+    try {
+      return sampleH(x, z) * VEX;
+    } catch {
+      return 0;
+    }
+  }
+  /* Analytic top-down eye for a pinned start (matches pinTopDown exactly). */
+  function startEye(s) {
+    const b = ((s.bearing || 0) * Math.PI) / 180;
+    const e = Math.max(s.range * 1e-4, 0.01);
+    return { x: s.tx - e * Math.sin(b), y: s.ty + s.range, z: s.tz + e * Math.cos(b) };
+  }
+  /* Top-down pin at the exact handoff footprint: pitch ~0, epsilon offset
+   * along the map bearing so bearingForPose reports the map's bearing. */
+  function pinTopDown(tx, tz, range, bearingDeg) {
+    const ty = groundYNear(tx, tz);
+    const s = { tx, ty, tz, range, bearing: (((Number(bearingDeg) || 0) % 360) + 360) % 360 };
+    try {
+      twin.controls.target.set(tx, ty, tz);
+      const e = startEye(s);
+      twin.camera.position.set(e.x, e.y, e.z);
+      twin.updateControls();
+    } catch { /* flight steps pin per-frame anyway */ }
+    return s;
+  }
+  function poseAt(tx, ty, tz, range, polarDeg, azimRad) {
+    const pol = (polarDeg * Math.PI) / 180;
+    const sp = Math.sin(pol), cp = Math.cos(pol);
+    return {
+      x: tx + range * sp * Math.sin(azimRad),
+      y: ty + range * cp,
+      z: tz + range * sp * Math.cos(azimRad),
+    };
+  }
+  function driveMix(v) {
+    try {
+      mixCtl.setMix(Math.round(v), { silent: true });
+    } catch { /* slider drive never breaks the frame */ }
+  }
+  function capturePose() {
+    let eye = null, tgt = null;
+    try {
+      const p = twin?.getPose?.();
+      eye = p?.eye;
+      tgt = p?.target;
+    } catch { /* fall back to live objects below */ }
+    try {
+      return {
+        eye: {
+          x: eye?.x ?? twin.camera.position.x,
+          y: eye?.y ?? twin.camera.position.y,
+          z: eye?.z ?? twin.camera.position.z,
+        },
+        target: {
+          x: tgt?.x ?? twin.controls.target.x,
+          y: tgt?.y ?? twin.controls.target.y,
+          z: tgt?.z ?? twin.controls.target.z,
+        },
+        mix: mixCtl?.getMix?.() ?? HANDOFF_END_MIX,
+      };
+    } catch {
+      return null;
+    }
+  }
+  function beginHandoffFlight(pinnedStart, to) {
+    handoff.start = pinnedStart;
+    handoff.to = to;
+    handoff.from = null;
+    handoff.phase = 'hold';
+    handoff.t0 = handoffNow();
+    try {
+      twin.controls.enabled = false;
+    } catch { /* flight still drives the camera */ }
+    try {
+      pinTopDown(pinnedStart.tx, pinnedStart.tz, pinnedStart.range, pinnedStart.bearing);
+      driveMix(HANDOFF_START_MIX);
+    } catch { /* flight steps pin per-frame anyway */ }
+    // User takeover: any orbit input cancels the intro flight (never the
+    // reverse — a requested close always completes).
+    try {
+      const c = twin?.canvas;
+      const cancel = () => {
+        if (handoff.phase === 'hold' || handoff.phase === 'swoop') endHandoffFlight();
+      };
+      c?.addEventListener?.('pointerdown', cancel, { once: true });
+      c?.addEventListener?.('wheel', cancel, { once: true });
+    } catch { /* user-takeover is best-effort */ }
+  }
+  function endHandoffFlight() {
+    handoff.phase = 'done';
+    try {
+      twin.controls.enabled = true;
+    } catch { /* input stays as-is */ }
+  }
+  const lerp = (a, b, k) => a + (b - a) * k;
+  function applyFlightPose(eye, target) {
+    twin.controls.target.set(target.x, target.y, target.z);
+    twin.camera.position.set(eye.x, eye.y, eye.z);
+  }
+  /* Per-frame flight step (runs at the top of the render loop, before the
+   * damped controls settle — the flight IS the pose source while active). */
+  function stepHandoff() {
+    if (!handoff || handoff.phase === 'idle' || handoff.phase === 'done') return;
+    try {
+      const now = handoffNow();
+      if (handoff.phase === 'hold') {
+        const s = handoff.start;
+        if (s) {
+          try {
+            pinTopDown(s.tx, s.tz, s.range, s.bearing);
+          } catch { /* pin is best-effort */ }
+        }
+        driveMix(HANDOFF_START_MIX);
+        if (now - handoff.t0 >= HANDOFF_HOLD_MS) {
+          handoff.from = capturePose();
+          if (!handoff.from || !handoff.to) {
+            endHandoffFlight();
+            return;
+          }
+          handoff.phase = 'swoop';
+          handoff.t0 = now;
+        }
+        return;
+      }
+      if (handoff.phase === 'swoop') {
+        const t = Math.min(1, Math.max(0, (now - handoff.t0) / HANDOFF_SWOOP_MS));
+        const k = easeInOutCubic(t);
+        const f = handoff.from, to = handoff.to;
+        if (!f || !to) {
+          endHandoffFlight();
+          return;
+        }
+        try {
+          applyFlightPose(
+            { x: lerp(f.eye.x, to.eye.x, k), y: lerp(f.eye.y, to.eye.y, k), z: lerp(f.eye.z, to.eye.z, k) },
+            { x: lerp(f.target.x, to.target.x, k), y: lerp(f.target.y, to.target.y, k), z: lerp(f.target.z, to.target.z, k) },
+          );
+        } catch { /* pose drive is best-effort */ }
+        driveMix(lerp(HANDOFF_START_MIX, HANDOFF_END_MIX, k));
+        if (t >= 1) {
+          try {
+            applyFlightPose(to.eye, to.target);
+          } catch { /* snap is best-effort */ }
+          driveMix(HANDOFF_END_MIX);
+          endHandoffFlight();
+        }
+        return;
+      }
+      if (handoff.phase === 'reverse') {
+        const t = Math.min(1, Math.max(0, (now - handoff.t0) / HANDOFF_REVERSE_MS));
+        const k = easeInOutCubic(t);
+        const f = handoff.from, s = handoff.start;
+        if (!f || !s) {
+          postTwinClose();
+          return;
+        }
+        const se = startEye(s);
+        const st = { x: s.tx, y: s.ty, z: s.tz };
+        try {
+          applyFlightPose(
+            { x: lerp(f.eye.x, se.x, k), y: lerp(f.eye.y, se.y, k), z: lerp(f.eye.z, se.z, k) },
+            { x: lerp(f.target.x, st.x, k), y: lerp(f.target.y, st.y, k), z: lerp(f.target.z, st.z, k) },
+          );
+        } catch { /* pose drive is best-effort */ }
+        driveMix(lerp(f.mix, HANDOFF_START_MIX, k));
+        if (t >= 1) {
+          try {
+            pinTopDown(s.tx, s.tz, s.range, s.bearing);
+          } catch { /* pin is best-effort */ }
+          driveMix(HANDOFF_START_MIX);
+          handoff.phase = 'done';
+          try {
+            twin.controls.enabled = true;
+          } catch { /* input stays as-is */ }
+          postTwinClose();
+        }
+      }
+    } catch { /* flight never breaks the frame */ }
+  }
+  function postTwinClose() {
+    // Extended payload first (parent recedes on {recede:true}), then the
+    // legacy bare string — the current parent closes only on strict string
+    // equality, so both fire until the parent learns the object form.
+    try {
+      window.parent?.postMessage(buildTwinCloseMessage(true), '*');
+    } catch { /* parent notify is best-effort */ }
+    try {
+      window.parent?.postMessage(TWIN_CLOSE_MSG, '*');
+    } catch { /* parent notify is best-effort */ }
+  }
+  /* Close entry: plays the EXACT reverse (iso -> top-down satellite frame)
+   * then signals the parent. X (parent chrome) + browser-back are
+   * parent-owned — the parent tears the iframe down directly; Esc and the
+   * sister HUD lane call this. Safe standalone (no frame): notifies now. */
+  function requestTwinClose() {
+    try {
+      if (handoff.phase === 'reverse') return true; // already running
+      if (!handoff.start) {
+        postTwinClose(); // standalone: no frame to reverse to
+        return true;
+      }
+      const cur = capturePose();
+      if (!cur) {
+        postTwinClose();
+        return false;
+      }
+      handoff.from = cur;
+      handoff.phase = 'reverse';
+      handoff.t0 = handoffNow();
+      try {
+        twin.controls.enabled = false;
+      } catch { /* flight still drives the camera */ }
+      return true;
+    } catch {
+      try {
+        postTwinClose();
+      } catch { /* parent notify is best-effort */ }
+      return false;
+    }
+  }
+
   window.__ring2 = {
     map,
     twin,
@@ -606,6 +859,9 @@ async function boot() {
     setLevel: handleLevel,
     onLevel: handleLevel,
     getStatus,
+    handoff,
+    requestTwinClose,
+    handoffPhase: () => handoff.phase,
     diag: () => ({
       build: BUILD_ID,
       canvases: canvasDims(),
@@ -618,60 +874,94 @@ async function boot() {
     }),
   };
 
-  /* Phase 03 Tasks 18+19 (?sector=<h3> preselect + embed close round-trip).
-   * The launcher map opens this page as ?sector=<h3>&embed=1: the camera
-   * reframes onto the sector's worst asset and Esc notifies the parent
-   * (postMessage) instead of touching history. Standalone loads with
-   * ?sector= only reframe. Unmatched/absent params boot normally — the
+  /* Phase 03 Tasks 18+19 (?sector=<h3> preselect + embed close round-trip)
+   * + LANE 3 twinlink handoff: ?sector=<h3>&cx=<lng>&cy=<lat>&z=<zoom>.
+   * Overlay open with frame params starts the camera at that exact footprint
+   * (pitch 0, bearing matching the map, slider at full satellite), holds a
+   * beat top-down, then slow-eases to the isometric terminal view while the
+   * slider drives satellite->twin. Sector-only (no frame) flies a wide
+   * top-down survey -> iso fallback. Standalone loads boot normally — the
    * preselect never breaks boot. Probe: window.__ring2.sector. */
   try {
     const sectorQ = parseSectorQuery(location.search);
     const hit = resolveSector(sectorQ.sector);
     let sectorSel = null;
+    // Anchor: the map's handed-off frame center, else the sector pin.
+    let anchor = null;
+    if (sectorQ.frame) anchor = frameTarget(sectorQ.frame);
+    if (!anchor && hit) anchor = { x: hit.sector.dx, z: hit.sector.dz };
     if (hit) {
-      const wx = hit.sector.dx;
-      const wz = hit.sector.dz;
-      let wy = 0;
-      try {
-        wy = sampleH(wx, wz) * VEX;
-      } catch { /* procedural height fallback keeps y=0 */ }
-      try {
-        const RANGE_M = 4500;
-        const POL = (50 * Math.PI) / 180;
-        const cur = twin.camera.position.clone().sub(twin.controls.target);
-        let az = Math.atan2(cur.x, cur.z);
-        if (!Number.isFinite(az)) az = (35 * Math.PI) / 180;
-        twin.controls.target.set(wx, wy, wz);
-        twin.camera.position.set(
-          wx + RANGE_M * Math.sin(POL) * Math.sin(az),
-          wy + RANGE_M * Math.cos(POL),
-          wz + RANGE_M * Math.sin(POL) * Math.cos(az),
-        );
-        twin.updateControls();
-      } catch { /* reframe is best-effort; probe still reports the sector */ }
       sectorSel = {
         h3: hit.h3, sectorId: hit.sector.id,
         assetId: hit.worstAsset, worst: hit.worst, embedded: sectorQ.embed,
+        frame: sectorQ.frame,
       };
     } else if (sectorQ.sector) {
       sectorSel = {
         h3: sectorQ.sector, sectorId: null, assetId: null,
-        worst: null, embedded: sectorQ.embed,
+        worst: null, embedded: sectorQ.embed, frame: sectorQ.frame,
       };
     } else if (sectorQ.embed) {
-      sectorSel = { h3: null, sectorId: null, assetId: null, worst: null, embedded: true };
+      sectorSel = { h3: null, sectorId: null, assetId: null, worst: null, embedded: true, frame: sectorQ.frame };
     }
     try {
       window.__ring2.sector = sectorSel;
     } catch { /* probe write is best-effort */ }
+    // Handoff flight: frame handoff, or sector-only fallback (wide top-down
+    // survey -> iso). Standalone (no frame, no sector): no flight, the
+    // boot camera + persisted mix stand.
+    try {
+      if (anchor) {
+        const vp = viewportPxNow();
+        let startRange = null;
+        if (sectorQ.frame) {
+          startRange = frameRange(sectorQ.frame.z, { viewportPx: vp, lat: sectorQ.frame.cy });
+        }
+        if (!Number.isFinite(startRange) || startRange <= 0) startRange = 12000;
+        startRange = Math.min(32000, Math.max(1500, startRange));
+        const bearing = sectorQ.frame?.bearing ?? 0;
+        // Iso terminal: the sector's worst asset when known, else the anchor.
+        const etx = hit ? hit.sector.dx : anchor.x;
+        const etz = hit ? hit.sector.dz : anchor.z;
+        const ety = groundYNear(etx, etz);
+        const azim = -(((Number(bearing) || 0) * Math.PI) / 180);
+        const isoEye = poseAt(etx, ety, etz, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, azim);
+        const pinned = pinTopDown(anchor.x, anchor.z, startRange, bearing);
+        beginHandoffFlight(pinned, {
+          eye: isoEye,
+          target: { x: etx, y: ety, z: etz },
+          mix: HANDOFF_END_MIX,
+        });
+      }
+    } catch { /* flight never breaks boot; probe still reports the sector */ }
     if (sectorQ.embed) {
+      // Esc: play the exact reverse (iso -> top-down satellite frame) then
+      // notify the parent with {recede:true}. Capture phase runs before the
+      // HUD popover manager's bubble handler; a popover-claimed Esc
+      // (defaultPrevented there) is left alone.
       window.addEventListener('keydown', (e) => {
         if (!e || e.key !== 'Escape') return;
+        if (e.defaultPrevented) return;
         if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-        // The HUD popover manager registered first and swallows this Esc
-        // when a popover is open — this fires only when nothing claimed it.
         try {
-          window.parent?.postMessage(TWIN_CLOSE_MSG, '*');
+          e.preventDefault();
+        } catch { /* key handling is best-effort */ }
+        try {
+          e.stopPropagation();
+        } catch { /* key handling is best-effort */ }
+        try {
+          requestTwinClose();
+        } catch {
+          try {
+            postTwinClose();
+          } catch { /* parent notify is best-effort */ }
+        }
+      }, true);
+      // Back/parent-teardown path: no frame budget for the reverse flight on
+      // unload — the close (with recede) still fires synchronously.
+      window.addEventListener('pagehide', () => {
+        try {
+          postTwinClose();
         } catch { /* parent notify is best-effort */ }
       });
     }
@@ -942,6 +1232,7 @@ async function boot() {
    * through every zoom. */
   const loop = () => {
     try {
+      stepHandoff();
       twin.updateControls();
       twinFrames++;
       const pose = twin.getPose();

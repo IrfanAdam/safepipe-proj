@@ -20,6 +20,7 @@ import { buildPinData } from './rings.js';
 import {
   sectorH3Map,
   twinUrl,
+  h3Bounds,
   parseSectorParam,
   findSector,
   worstAssetId,
@@ -80,6 +81,13 @@ let deckOverlay = null;
 let deckFeats = [];
 let deckPins = [];
 let overlayEls = null;
+// T2 handoff choreography refs: live map + sat setter (assigned on load),
+// sat chrome refs (assigned in mountChrome), in-flight sector id or null.
+let mapRef = null;
+let setSatRef = null;
+let satBtnRef = null;
+let satMetaRef = null;
+let transitId = null;
 
 window.__mapProbe = {
   ready: false, base: 'positron', satOn: false,
@@ -87,7 +95,8 @@ window.__mapProbe = {
   worst, worstAsset: worstBySector, sectorH3: null,
   selected: selectedId, twinOpen: false,
   blips: 1, siteWorst, siteSector, site: { lat: SITE.lat, lon: SITE.lon, name: 'SANGACHAL' },
-  errors, openTwin, closeTwin, selectSector,
+  transit: null, handoff: null, vignette: false,
+  errors, openTwin, closeTwin, selectSector, flyToSectorThenTwin,
 };
 
 function fallbackStyle() {
@@ -116,7 +125,7 @@ async function loadStyle() {
 function deckLayers() {
   const onPick = (info) => {
     const s = info && info.object && info.object.sector;
-    if (s) openTwin(s);
+    if (s) flyToSectorThenTwin(s);
   };
   return [
     new PolygonLayer({
@@ -242,14 +251,125 @@ function selectSector(id) {
   return true;
 }
 
-/** Task 18: open the twin overlay pre-selected on the sector's worst asset. */
+/** Live handoff frame: map center + zoom rounded for URL params. Null pre-load. */
+function liveFrame() {
+  try {
+    if (!mapRef) return null;
+    const c = mapRef.getCenter();
+    return {
+      cx: +c.lng.toFixed(6),
+      cy: +c.lat.toFixed(6),
+      z: +mapRef.getZoom().toFixed(2),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** T2 vignette: black periphery radial overlay over the map chrome. */
+function showVignette(on) {
+  try {
+    const v = document.getElementById('map-vignette');
+    if (v) v.classList.toggle('on', !!on);
+  } catch { /* cosmetic */ }
+  window.__mapProbe.vignette = !!on;
+}
+
+/** Force the sat toggle (choreography path): layer + button + probe stay in sync. */
+function setSatForced(on) {
+  try {
+    if (setSatRef) setSatRef(!!on);
+  } catch (err) {
+    errors.push('SAT-FORCE: ' + (err && err.message));
+  }
+  try {
+    if (satBtnRef) satBtnRef.setAttribute('aria-pressed', String(!!on));
+    if (satMetaRef) satMetaRef.textContent = on ? 'satellite' : 'positron';
+  } catch { /* chrome sync is cosmetic */ }
+  window.__mapProbe.satOn = !!on;
+}
+
+/** T2 handoff choreography: ease to the H3 ring bounds (strictly vertical
+ * top view), then crossfade flat->satellite + vignette, then open the twin
+ * with the staged frame. Falls back to a direct open when the map isn't
+ * ready, bounds fail, or motion is reduced. Re-entrant clicks are ignored. */
+function flyToSectorThenTwin(id, opts = {}) {
+  const s = sectors.find((x) => x.id === id);
+  if (!s) return false;
+  let bounds = null;
+  try {
+    bounds = h3Bounds(h3map[id]);
+  } catch (err) {
+    errors.push('BOUNDS: ' + (err && err.message));
+  }
+  const reduced = (() => {
+    try {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      return false;
+    }
+  })();
+  if (!mapRef || !bounds || reduced) {
+    if (reduced && mapRef && bounds) {
+      try {
+        mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: 60, maxZoom: 14 });
+      } catch { /* instant-fit is best-effort */ }
+      setSatForced(true);
+      showVignette(true);
+      openTwin(id, { ...opts, frame: liveFrame() });
+      return true;
+    }
+    return openTwin(id, opts);
+  }
+  if (transitId) return false;
+  transitId = id;
+  window.__mapProbe.transit = id;
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    try {
+      mapRef.off('moveend', finish);
+    } catch { /* listener teardown is best-effort */ }
+    setSatForced(true);
+    showVignette(true);
+    setTimeout(() => {
+      transitId = null;
+      window.__mapProbe.transit = null;
+      openTwin(id, { ...opts, frame: liveFrame() });
+    }, 650);
+  };
+  try {
+    mapRef.once('moveend', finish);
+  } catch {
+    return openTwin(id, opts);
+  }
+  setTimeout(finish, 3500); // fallback if moveend never fires
+  try {
+    mapRef.fitBounds(bounds, {
+      bearing: 0,
+      pitch: 0,
+      duration: 900,
+      padding: 60,
+      maxZoom: 14,
+    });
+  } catch (err) {
+    errors.push('FLY: ' + (err && err.message));
+    finish();
+  }
+  return true;
+}
+
+/** Task 18: open the twin overlay pre-selected on the sector's worst asset.
+ * opts.frame (default: live map frame) rides as ?cx=&cy=&z= handoff params. */
 function openTwin(id, opts = {}) {
   const s = sectors.find((x) => x.id === id);
   if (!s) return false;
   selectSector(id);
   const h3 = h3map[id];
   const { root, frame, label } = ensureOverlay();
-  const url = twinUrl(h3);
+  const handoff = opts.frame === undefined ? liveFrame() : opts.frame;
+  const url = twinUrl(h3, handoff);
   setFrameUrl(frame, url);
   root.hidden = false;
   try {
@@ -259,6 +379,7 @@ function openTwin(id, opts = {}) {
   twinOpen = true;
   window.__mapProbe.twinOpen = true;
   window.__mapProbe.sectorH3 = h3;
+  window.__mapProbe.handoff = handoff ?? null;
   if (!opts.replace) {
     try {
       history.pushState({ twin: id }, '', mapUrlWithSector(h3));
@@ -280,6 +401,7 @@ function doCloseTwin() {
       setFrameUrl(overlayEls.frame, 'about:blank');
     } catch { /* frame teardown is best-effort */ }
   }
+  showVignette(false); // T2: lift the handoff vignette; sat staging stays
   try {
     document.body.classList.remove('twin-open');
   } catch { /* chrome class is cosmetic */ }
@@ -316,9 +438,38 @@ window.addEventListener('keydown', (e) => {
 });
 
 // Twin-iframe Esc (focus lives in the iframe while orbiting): the embedded
-// twin posts TWIN_CLOSE_MSG instead of touching history.
+// twin posts TWIN_CLOSE_MSG instead of touching history. LANE 3 also posts
+// the extended { type, recede } object — accept either form. recede:true
+// rewinds the T2 staging: sat->flat crossfade + zoom back out to country.
+function isTwinCloseData(d) {
+  if (d === TWIN_CLOSE_MSG) return true;
+  try {
+    return !!d && typeof d === 'object' && d.type === TWIN_CLOSE_MSG;
+  } catch {
+    return false;
+  }
+}
+function recedeToCountry() {
+  setSatForced(false);
+  try {
+    if (mapRef) {
+      mapRef.easeTo({
+        center: COUNTRY_CENTER,
+        zoom: COUNTRY_ZOOM,
+        bearing: 0,
+        pitch: 0,
+        duration: 900,
+      });
+    }
+  } catch (err) {
+    errors.push('RECEDE: ' + (err && err.message));
+  }
+}
 window.addEventListener('message', (e) => {
-  if (e && e.data === TWIN_CLOSE_MSG && twinOpen) closeTwin();
+  if (!twinOpen || !isTwinCloseData(e && e.data)) return;
+  const recede = !!(e.data && typeof e.data === 'object' && e.data.recede);
+  closeTwin();
+  if (recede) recedeToCountry();
 });
 
 function mountChrome(map, overlay, setSat) {
@@ -330,13 +481,11 @@ function mountChrome(map, overlay, setSat) {
     '<span class="map-toggle__meta" id="map-meta">positron</span>';
   document.getElementById('app').appendChild(bar);
   const btn = bar.querySelector('#sat-toggle');
+  satBtnRef = btn;
+  satMetaRef = bar.querySelector('#map-meta');
   btn.addEventListener('click', () => {
     const on = btn.getAttribute('aria-pressed') !== 'true';
-    btn.setAttribute('aria-pressed', String(on));
-    setSat(on);
-    window.__mapProbe.satOn = on;
-    const meta = document.getElementById('map-meta');
-    if (meta) meta.textContent = on ? 'satellite' : 'positron';
+    setSatForced(on);
   });
   // GATE 3: single pulsing Sangachal DOM blip — always visible (screen
   // reader + no-WebGL path + deck pulse overlay). Colored by site worst.
@@ -353,7 +502,7 @@ function mountChrome(map, overlay, setSat) {
   b.innerHTML = '<span class="map-pin__dot"></span><span class="map-pin__tag">SANGACHAL</span>';
   if (selectedId) b.setAttribute('data-sel', 'true');
   b.addEventListener('click', () => {
-    openTwin(siteSector);
+    flyToSectorThenTwin(siteSector);
   });
   pinLayer.appendChild(b);
   document.getElementById('app').appendChild(pinLayer);
@@ -398,7 +547,17 @@ async function boot() {
         });
       }
       if (!map.getLayer(SAT_LAYER_ID)) {
-        map.addLayer({ id: SAT_LAYER_ID, type: 'raster', source: SAT_SOURCE_ID, layout: { visibility: 'none' } });
+        map.addLayer({
+          id: SAT_LAYER_ID,
+          type: 'raster',
+          source: SAT_SOURCE_ID,
+          layout: { visibility: 'none' },
+          // T2: staged crossfade — opacity animates, visibility flips.
+          paint: {
+            'raster-opacity': 0,
+            'raster-opacity-transition': { duration: 600, delay: 0 },
+          },
+        });
       }
     } catch (err) {
       errors.push('SAT-SOURCE: ' + (err && err.message));
@@ -406,13 +565,36 @@ async function boot() {
 
     const setSat = (on) => {
       try {
-        if (map.getLayer(SAT_LAYER_ID)) {
-          map.setLayoutProperty(SAT_LAYER_ID, 'visibility', on ? 'visible' : 'none');
+        if (!map.getLayer(SAT_LAYER_ID)) return;
+        if (on) {
+          map.setLayoutProperty(SAT_LAYER_ID, 'visibility', 'visible');
+          requestAnimationFrame(() => {
+            try {
+              map.setPaintProperty(SAT_LAYER_ID, 'raster-opacity', 1);
+            } catch (err) {
+              errors.push('SAT-TOGGLE: ' + (err && err.message));
+            }
+          });
+        } else {
+          try {
+            map.setPaintProperty(SAT_LAYER_ID, 'raster-opacity', 0);
+          } catch (err) {
+            errors.push('SAT-TOGGLE: ' + (err && err.message));
+          }
+          setTimeout(() => {
+            try {
+              if (!window.__mapProbe.satOn) {
+                map.setLayoutProperty(SAT_LAYER_ID, 'visibility', 'none');
+              }
+            } catch { /* delayed hide is best-effort */ }
+          }, 650);
         }
       } catch (err) {
         errors.push('SAT-TOGGLE: ' + (err && err.message));
       }
     };
+    mapRef = map;
+    setSatRef = setSat;
 
     // GATE 3 single blip: one deck pin at SITE colored by site worst.
     let mode = pinMode ? 'pins' : 'rings';

@@ -63,7 +63,6 @@
 .ops-hud__wo,
 .ops-hud__level-btn,
 .ops-hud__fs,
-.ops-hud__map,
 .ops-hud__more,
 .ops-hud__help-btn,
 .ops-hud__chip,
@@ -92,7 +91,6 @@
 .ops-hud__wo::after,
 .ops-hud__level-btn::after,
 .ops-hud__fs::after,
-.ops-hud__map::after,
 .ops-hud__more::after,
 .ops-hud__help-btn::after,
 .ops-hud__chip::after,
@@ -666,7 +664,6 @@
 }
 
 .ops-hud__fs,
-.ops-hud__map,
 .ops-hud__more,
 .ops-hud__sys .ops-hud__cam-btn {
   font: inherit;
@@ -680,7 +677,6 @@
 }
 
 .ops-hud__fs:hover,
-.ops-hud__map:hover,
 .ops-hud__more:hover,
 .ops-hud__sys .ops-hud__cam-btn:hover {
   border-color: var(--ops-ink);
@@ -727,7 +723,6 @@
 .ops-hud__wo,
 .ops-hud__level-btn,
 .ops-hud__fs,
-.ops-hud__map,
 .ops-hud__more,
 .ops-hud__help-btn {
   position: relative;
