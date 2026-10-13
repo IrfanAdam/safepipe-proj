@@ -32,7 +32,7 @@ Each phase has: a one-line *what the demo gains*, the task table (unchanged scop
 
 ## TLDR
 
-Build the geographically grounded twin of the REAL Sangachal Terminal on the shipped Ring-2 chassis: Phase 00 ports v1 control panels (parity first — markers wait for the models); Phase 01 researches/acquires/processes real Sangachal source data and builds real-DEM terrain with aligned imagery; Phase 02 builds the twin geometry in owner order (terrain detail → backdrops → pipelines → facilities) with evidence loops + honest 3-tier provenance, no new interactivity; Phases 03–06 carry the 153000 scope (launcher map → time+sim → ops → lock). Every phase ends at a **REF GATE**, every gate scored by the parity rubric.
+Build the geographically grounded twin of the REAL Sangachal Terminal on the shipped Ring-2 chassis: Phase 00 ports v1 control panels (parity first — markers wait for the models); Phase 01 researches/acquires/processes real Sangachal source data and builds real-DEM terrain with aligned imagery; Phase 02 builds the twin geometry in owner order (terrain detail → backdrops → pipelines → facilities) with evidence loops + honest 3-tier provenance, no new interactivity; Phase 03 launcher map + Phase 06 lock stay here. Time, sim, and ops moved 2026-10-13 to `2026-10-13_233337-ops3d-twin-work.md` (make-it-real → asset layer → time → sim → operations). Every phase ends at a **REF GATE**, every gate scored by the parity rubric.
 
 **Non-negotiable (from spec):** real place from real data — never a generic facility. Implement end-to-end, don't stop at a research report. Never invent files, coverage, coordinates, or findings: if a dataset can't be obtained, name the exact missing file + its official download page, use the best alternative, and document the limitation.
 
@@ -169,69 +169,13 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 - REF GATE 3 · rev 2026-10-13 review-feedback (owner): "make it a little faster, smoother choreography"; "trigger the openstreetmap-to-twin transition and back by user scroll instead of click — gesture-based, intuitive". Verdict: OPEN — tempo + scroll-drive land as a revision on this gate, then proceed.
 - REF GATE 3 · rev 2026-10-13 scroll-scrub feedback (owner): sat→vector zoom-out unsmooth (cache vector tiles); zoom-in trigger erratic; auto-center hotspot on approach; fade must follow the scroll, not its own rhythm; twin zoom-out-at-max must trigger the reverse; scroll-listening reverse in twin. Verdict: OPEN — scrub revision lands on this gate.
 
-## Phase 04 — Time variance + sim
+## Phase 04 — Time variance + sim → MOVED
 <!-- {#phase-04} -->
-*What the demo gains: the demo moves through time — history, live, and an honest simulation. (153000 Phase 4.)*
+*Moved 2026-10-13 to `2026-10-13_233337-ops3d-twin-work.md` — time and sim separated into their own phases there (Phase 03 time, Phase 04 sim), realism handled differently per owner. No tasks remain here.*
 
-| # | Task | Done when |
-|---|---|---|
-| 20 | `feedAt(t)` + time slider (30 d history, live tick, +72 h sim) | scrub moves infra + weather + WOs + sim together |
-| 21 | Open-Meteo weather overlays (rain tint, wind, temp shift) | cached fixtures offline; live fetch keyless |
-| 22 | USGS seismic markers + risk-gated pulse | pulse fires only above threshold; markers match feed |
-| 23 | Subsidence field (seeded now, labeled modeled) + sim presets + SIM watermark | same seed → same outcome; watermark whenever sim time active |
-
-### Task 20: scrub through time
-**Objective:** One slider moves the whole scene — infrastructure, weather, work orders, sim together across 30 d back and 72 h forward.
-**Verify:** Drag the slider — all four layers move together; live tick resumes on release.
-### Task 21: show the weather
-**Objective:** Rain, wind, temperature visibly shift the scene from keyless Open-Meteo data.
-**Verify:** Offline — cached fixtures render; online — live fetch, no key.
-### Task 22: mark the quakes
-**Objective:** USGS seismic markers that pulse only when risk crosses threshold — no crying wolf.
-**Verify:** Below threshold — silent; above — pulse; markers match feed entries.
-### Task 23: model the ground honestly
-**Objective:** A seeded subsidence field clearly labeled modeled, with presets — and a SIM watermark whenever sim time is active so nobody mistakes it for live.
-**Verify:** Same seed twice — same outcome; watermark visible in every sim-time capture.
-
-- REF GATE 4 (OPEN): owner approves slider feel + sim honesty. How to judge: scrub the slider, trigger a preset, go offline; pass = feel approved + watermark present in sim + fixtures hold offline.
-
-## Phase 05 — Operations layer
+## Phase 05 — Operations layer → MOVED
 <!-- {#phase-05} -->
-*What the demo gains: the demo becomes operable — select things, work them, approve actions. (153000 Phase 5.)*
-
-| # | Task | Done when |
-|---|---|---|
-| 24 | Map markers port (v1 marker set → map + twin overlay, pinned to Phase 02 geometry) | positions match facility models; survive SAT↔TWIN slide |
-| 25 | Panel↔marker wiring (select/hover/focus round-trip) | click marker → panel; panel action → focus lands <5px @ NEAR |
-| 26 | Twin selection + panel round-trip (deferred from Phase 02: click facility object → panel; panel action → focus) | click object → panel; panel action → focus lands <5px @ NEAR |
-| 27 | WO fixtures + spatial markers/trails (survive map↔twin trip) | markers match fixtures; list survives trip |
-| 28 | Field crews + activity (live pos, heading, ping age) | crews move; stale pings visibly age |
-| 29 | Approval-gated actions (request → approve → execute → audit) | unapproved action never executes; audit entry each |
-| 30 | Sonic + tactile (confirms, chime, pulse; `M` mutes) | all sounds post-gesture; mute covers all |
-
-### Task 24: plant the markers on the models
-**Objective:** The v1 marker set lives on the Phase 02 geometry — and survives the SAT↔TWIN slide.
-**Verify:** Slide 0→100 — markers stay glued to their facilities.
-### Task 25: wire panels to markers both ways
-**Objective:** Click marker → panel; panel action → camera lands within 5 px at NEAR. Round trip, no dead ends.
-**Verify:** Both directions measured <5 px @ NEAR.
-### Task 26: make facility objects clickable
-**Objective:** The deferred Phase 02 promise — click a tank/block → its panel; panel action → focus.
-**Verify:** Click each facility class once; panel action lands <5 px @ NEAR.
-### Task 27: show the work orders in space
-**Objective:** WO fixtures as spatial markers + trails that survive the map↔twin trip.
-**Verify:** Trip map→twin→map — markers match fixtures, list intact.
-### Task 28: show the crews alive
-**Objective:** Field crews with live position, heading, and visibly aging pings — stale is obvious.
-**Verify:** Watch a crew move; age a ping — staleness reads at a glance.
-### Task 29: gate actions behind approval
-**Objective:** Request → approve → execute → audit, with unapproved actions never executing.
-**Verify:** Attempt an unapproved action — blocked; audit holds one entry per action.
-### Task 30: add sound that respects the user
-**Objective:** Confirms, chime, pulse — all post-gesture, all killed by `M`.
-**Verify:** Mute on — total silence; sounds never fire pre-gesture.
-
-- REF GATE 5 (OPEN): owner approves the gate flow. How to judge: request → approve → execute an action, trip a marker map→twin→map, press M; pass = flow approved + audit complete + silence on mute.
+*Moved 2026-10-13 to `2026-10-13_233337-ops3d-twin-work.md` (Phase 05 operations, after make-it-real → asset layer → time → sim). No tasks remain here.*
 
 ## Phase 06 — Lock
 <!-- {#phase-06} -->
