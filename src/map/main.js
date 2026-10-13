@@ -376,10 +376,24 @@ function warmSatTiles() {
   } catch { /* pre-ready */ }
 }
 
+/** Handoff-5 wide first zoom: pixel padding ≈28% of the viewport's smaller
+ * side, so the ring-bounds fit stops WIDE (whole flat map / ring + generous
+ * context margin) and the flat→sat crossfade plays over the full map. */
+function wideFitPadding() {
+  try {
+    const el = mapRef ? mapRef.getContainer() : null;
+    const w = (el && el.clientWidth) || window.innerWidth || 800;
+    const h = (el && el.clientHeight) || window.innerHeight || 600;
+    return Math.round(Math.min(w, h) * 0.28);
+  } catch {
+    return 180;
+  }
+}
+
 /** Handoff-3 outbound choreography: ease to the clicked H3 RING bounds (the
- * hex bounds — wider than the terminal footprint) with ~0 padding (ring
- * tangent to the viewport edges, never tighter) + center lock (strictly
- * vertical top view). Sat tiles pre-warm AND the
+ * hex bounds — wider than the terminal footprint) with WIDE padding (~28%
+ * of viewport: ring + generous context margin in view, never terminal-tight)
+ * + center lock (strictly vertical top view). Sat tiles pre-warm AND the
  * flat->sat crossfade ramps DURING the zoom flight (together, not after);
  * then the twin opens with the staged ring frame (?sector&cx&cy&z).
  * Falls back to a direct open when the map isn't ready, bounds fail, or
@@ -403,7 +417,7 @@ function flyToSectorThenTwin(id, opts = {}) {
   if (!mapRef || !bounds || reduced) {
     if (reduced && mapRef && bounds) {
       try {
-        mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: 0, maxZoom: 14 });
+        mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: wideFitPadding(), maxZoom: 14 });
       } catch { /* instant-fit is best-effort */ }
       setSatForced(true);
       showVignette(true);
@@ -460,19 +474,35 @@ function flyToSectorThenTwin(id, opts = {}) {
   }
   setTimeout(finish, 3500); // fallback if moveend never fires
   try {
-    mapRef.fitBounds(bounds, {
+    // Handoff-5 wide first zoom: padded ring-bounds fit sets the framing,
+    // then back off ~2 levels so the flight stops WIDE (whole flat map /
+    // ring + generous context margin) and the flat→sat crossfade plays
+    // over the full map. Single easeTo, still centered on the ring.
+    // liveFrame() then carries this wider z into ?cx&cy&z for the twin.
+    const cam = mapRef.cameraForBounds(bounds, { padding: wideFitPadding() });
+    const wideZ = Math.min(cam.zoom - 2, 14);
+    mapRef.easeTo({
+      center: cam.center,
+      zoom: wideZ,
       bearing: 0,
       pitch: 0,
       duration: 900,
-      // LANE A outbound: ~0 padding stops the zoom where the H3 ring
-      // touches the viewport edges (ring tangent to the clip) — never
-      // tighter to the terminal. maxZoom stays as a never-tighter guard.
-      padding: 0,
-      maxZoom: 14,
     });
-  } catch (err) {
+  } catch {
+    try {
+      mapRef.fitBounds(bounds, {
+        bearing: 0,
+        pitch: 0,
+        duration: 900,
+        // Fallback keeps the wide padded fit when cameraForBounds is
+        // unavailable; liveFrame() still carries the wider z to the twin.
+        padding: wideFitPadding(),
+        maxZoom: 14,
+      });
+    } catch (err) {
     errors.push('FLY: ' + (err && err.message));
     finish();
+    }
   }
   return true;
 }
