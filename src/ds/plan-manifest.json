@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T14:47:52.554Z",
+  "generated": "2026-10-13T15:00:53.756Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "c2e28e9",
+      "full": "c2e28e9b90012d8611a717a889e5a2d58d444c2d",
+      "date": "2026-10-13",
+      "time": "20:18",
+      "subject": "feat(handoff): faster choreography plus scroll-driven trigger [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "76d2155",
       "full": "76d21551b7c2dd506a500f315ec2c925e93c5d78",
@@ -3154,8 +3163,8 @@
     "src/changelog/changelog-drawer.css",
     "src/changelog/changelog.css",
     "src/map/main.js",
+    "src/map/scrolltrigger.js",
     "src/ring2/main.js",
-    "src/ring2/sector.js",
-    "src/map/scrolltrigger.js"
+    "src/ring2/sector.js"
   ]
 }

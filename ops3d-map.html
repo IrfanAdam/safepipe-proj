@@ -124,6 +124,15 @@
     opacity: 0; transition: opacity 0.45s ease; /* GATE-3 REVISION tempo */
   }
   #map-vignette.on { opacity: 1; }
+  /* GATE-9-A(1): warm vector return — flat hold veil over the map while the
+   * zoom-out tile refill lands (same flat tone, instant on, short fade off).
+   * Below vignette/pins so chrome never pops; pointer-transparent. */
+  #vector-hold {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    background: #f2f1ec;
+    opacity: 0; transition: opacity 0.3s ease;
+  }
+  #vector-hold.on { opacity: 1; transition: none; }
   @media (prefers-reduced-motion: reduce) {
     #map-vignette { transition: none; }
   }

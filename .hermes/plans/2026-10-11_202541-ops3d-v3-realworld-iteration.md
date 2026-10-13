@@ -167,6 +167,7 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 - REF GATE 3 (OPEN): owner picks map look + confirms ring reads right. How to judge: open the map, toggle satellite, click a ring, Esc back; pass = look approved + ring matches feed worst-health per sector.
 - REF GATE 3 · rev 2026-10-13 review-feedback (owner): "make it a little faster, smoother choreography"; "trigger the openstreetmap-to-twin transition and back by user scroll instead of click — gesture-based, intuitive". Verdict: OPEN — tempo + scroll-drive land as a revision on this gate, then proceed.
+- REF GATE 3 · rev 2026-10-13 scroll-scrub feedback (owner): sat→vector zoom-out unsmooth (cache vector tiles); zoom-in trigger erratic; auto-center hotspot on approach; fade must follow the scroll, not its own rhythm; twin zoom-out-at-max must trigger the reverse; scroll-listening reverse in twin. Verdict: OPEN — scrub revision lands on this gate.
 
 ## Phase 04 — Time variance + sim
 <!-- {#phase-04} -->

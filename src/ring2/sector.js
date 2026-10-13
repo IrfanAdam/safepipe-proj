@@ -5,7 +5,7 @@
 import { latLngToCell } from 'h3-js';
 import { H3_RES, SECTORS, worstHealth, HEALTH_RANK } from '../map/feed.js';
 import { geoToWorld } from './site.js';
-import { rangeForZoom, MAP_TRUE_FOV_DEG } from './sync.js';
+import { rangeForZoom, MAP_TRUE_FOV_DEG, TWIN_MAX_RANGE_M } from './sync.js';
 
 export const SECTOR_PARAM = 'sector';
 export const EMBED_PARAM = 'embed';
@@ -221,6 +221,168 @@ export function reversePlanForPhase(phase) {
   if (p === 'hold') return 'snap';
   if (p === 'swoop') return 'pitch';
   return 'full';
+}
+
+/* GATE-3 SCROLL-SCRUB, twin side — wheel-delta-to-progress convention.
+ * No map-side handoff9-A scrub report exists in scratch, so this defines the
+ * shared convention (map-side handoff8-B fires one transition per 120px
+ * accumulated wheel; this matches that notch): one 120px outward wheel notch
+ * advances the reverse journey by 120/TWIN_SCRUB_WHEEL_PX, i.e. the full
+ * terminal-iso -> ring-top-down journey (push + swoop legs) takes
+ * TWIN_SCRUB_WHEEL_PX px of accumulated outward wheel (~5 notches).
+ * Outward (reverse intent) = wheel-UP (deltaY < 0) — the same sign the
+ * map-side scroll trigger treats as close/reverse, so the gesture reads
+ * symmetric flying in and out. Pinch wheels (ctrlKey/metaKey) never count
+ * (they stay with OrbitControls pinch-zoom). Inward wheels (deltaY > 0)
+ * subtract — symmetric scrub back toward the terminal. All pure +
+ * node-checkable. */
+export const TWIN_SCRUB_WHEEL_PX = 600;
+/* A decisive wheel AT the zoom clamp crosses into scrub-reverse (trackpad
+ * dust below this is ignored so resting fingers at max don't trip it). */
+export const TWIN_SCRUB_ENTER_DELTA = 40;
+/* Dwell fallback: consecutive done-phase frames pinned at max that auto-enter
+ * scrub-reverse even with no further wheel (covers reaching max via
+ * drag/pinch/keyboard zoom). ~0.4 s at 60fps. */
+export const TWIN_SCRUB_DWELL_FRAMES = 24;
+/* Range within this fraction of the max clamp counts as at-max (damping
+ * hover just under the rail still reads as the limit). */
+export const TWIN_MAXZOOM_TOL_FRAC = 0.01;
+
+/** Pure: camera range at the zoom-out clamp? False on non-finite input. */
+export function isAtMaxZoom(range, max = TWIN_MAX_RANGE_M, tolFrac = TWIN_MAXZOOM_TOL_FRAC) {
+  try {
+    const r = Number(range);
+    const m = Number(max);
+    let tol = Number(tolFrac);
+    if (!Number.isFinite(r) || !Number.isFinite(m) || !(m > 0) || r < 0) return false;
+    if (!Number.isFinite(tol) || tol < 0) tol = TWIN_MAXZOOM_TOL_FRAC;
+    return r >= m * (1 - tol);
+  } catch {
+    return false;
+  }
+}
+
+const clamp01 = (v) => Math.min(1, Math.max(0, Number(v) ?? 0));
+
+/** Pure: fold one wheel event's deltaY into scrub progress (0..1).
+ * progress = current journey position (0 terminal-side, 1 ring top-down).
+ * Pinch (opts.pinch) returns progress unchanged. Non-finite deltaY returns
+ * progress unchanged (clamped). Never throws. */
+export function scrubProgressForWheel(progress, deltaY, { pinch = false, totalPx = TWIN_SCRUB_WHEEL_PX } = {}) {
+  try {
+    const p = clamp01(progress);
+    if (pinch) return p;
+    const d = Number(deltaY);
+    if (!Number.isFinite(d) || d === 0) return p;
+    let total = Number(totalPx);
+    if (!Number.isFinite(total) || !(total > 0)) total = TWIN_SCRUB_WHEEL_PX;
+    // Wheel-up (dY<0) = outward/reverse intent: advance. Wheel-down: retreat.
+    return clamp01(p + -d / total);
+  } catch {
+    return clamp01(progress);
+  }
+}
+
+/** Pure: total ms across close-time walk legs (their time weights). 0 when
+ * no leg carries a positive ms — callers then treat the walk as a snap. */
+export function scrubTotalMs(legs) {
+  try {
+    if (!Array.isArray(legs)) return 0;
+    let total = 0;
+    for (const l of legs) {
+      const ms = Number(l?.ms);
+      if (Number.isFinite(ms) && ms > 0) total += ms;
+    }
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
+/** Pure: journey progress 0..1 -> interpolated { eye, target, mix } across
+ * the close-time walk legs, each leg weighted by its forward ms (same
+ * smootherstep curve as the timed engine, so scrub and timed renders agree
+ * pose-for-pose). progress 0 = walk start (live close pose), 1 = ring
+ * top-down. Null on empty/invalid legs — caller pins + posts. */
+export function poseForScrubProgress(legs, progress) {
+  try {
+    if (!Array.isArray(legs) || !legs.length) return null;
+    const p = clamp01(progress);
+    const total = scrubTotalMs(legs);
+    const first = legs[0];
+    const last = legs[legs.length - 1];
+    if (!(total > 0)) {
+      if (!last?.eye || !last?.target) return null;
+      return { eye: { ...last.eye }, target: { ...last.target }, mix: last.mix, legIndex: legs.length - 1, t: 1 };
+    }
+    const startPose = (leg) => ({
+      eye: { ...((leg?.from?.eye) ?? leg?.eye) },
+      target: { ...((leg?.from?.target) ?? leg?.target) },
+      mix: Number.isFinite(leg?.fromMix) ? leg.fromMix : HANDOFF_START_MIX,
+    });
+    if (p <= 0) {
+      if (!first?.eye || !first?.target) return null;
+      const s = startPose(first);
+      return { ...s, legIndex: 0, t: 0 };
+    }
+    if (p >= 1) {
+      if (!last?.eye || !last?.target) return null;
+      return { eye: { ...last.eye }, target: { ...last.target }, mix: last.mix, legIndex: legs.length - 1, t: 1 };
+    }
+    let acc = 0;
+    for (let i = 0; i < legs.length; i++) {
+      const leg = legs[i];
+      const ms = Number(leg?.ms);
+      const w = Number.isFinite(ms) && ms > 0 ? ms / total : 0;
+      if (p <= acc + w || i === legs.length - 1) {
+        if (!leg?.eye || !leg?.target) return null;
+        const t = w > 0 ? clamp01((p - acc) / w) : 1;
+        const k = easeInOutSmoother(t);
+        const fe = leg.from?.eye ?? leg.eye;
+        const ft = leg.from?.target ?? leg.target;
+        const fm = Number.isFinite(leg.fromMix) ? leg.fromMix : HANDOFF_START_MIX;
+        const lerp = (a, b, kk) => a + (b - a) * kk;
+        return {
+          eye: { x: lerp(fe.x, leg.eye.x, k), y: lerp(fe.y, leg.eye.y, k), z: lerp(fe.z, leg.eye.z, k) },
+          target: { x: lerp(ft.x, leg.target.x, k), y: lerp(ft.y, leg.target.y, k), z: lerp(ft.z, leg.target.z, k) },
+          mix: lerp(fm, leg.mix, k),
+          legIndex: i,
+          t,
+        };
+      }
+      acc += w;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Pure: estimate current journey progress from timed-engine state (for
+ * wheel takeover of a running timed reverse with no pose jump): completed
+ * legs + elapsed fraction of the live leg, over total ms. */
+export function scrubProgressForWalk(legs, i, legT0, now) {
+  try {
+    if (!Array.isArray(legs) || !legs.length) return 0;
+    const total = scrubTotalMs(legs);
+    if (!(total > 0)) return 0;
+    const idx = Math.min(Math.max(0, Number(i) | 0), legs.length);
+    let done = 0;
+    for (let k = 0; k < idx; k++) {
+      const ms = Number(legs[k]?.ms);
+      if (Number.isFinite(ms) && ms > 0) done += ms;
+    }
+    if (idx < legs.length) {
+      const ms = Number(legs[idx]?.ms);
+      if (Number.isFinite(ms) && ms > 0) {
+        const el = clamp01((Number(now) - Number(legT0)) / ms);
+        done += ms * el;
+      }
+    }
+    return clamp01(done / total);
+  } catch {
+    return 0;
+  }
 }
 
 /** Twin close message with the recede flag (LANE 3): the parent map fades

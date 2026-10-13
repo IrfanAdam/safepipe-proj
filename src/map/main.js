@@ -116,6 +116,11 @@ window.__mapProbe = {
   transit: null, handoff: null, vignette: false, mapFs: false, twinFs: false,
   prewarm: false, twinReady: false, reveal: null, revealFallback: false, revealLate: false,
   recede: null, mapZoom: null, reverseWait: false, reverseFallback: false,
+  // GATE-9-A scrub probe: journey progress driving zoom/center/fade.
+  scrub: { progress: 0, zoom: null, opacity: 0, centerDist: null },
+  centerEase: 0, autoCenter: false, satOpacity: 0,
+  vectorWarm: false, vectorCache: null, vectorSnapshot: false, vectorHold: false,
+  vectorReturnMs: null,
   errors, openTwin, closeTwin, selectSector, flyToSectorThenTwin,
   toggleMapFs, setTwinFs, prewarmThenReveal, revealTwin,
 };
@@ -385,6 +390,162 @@ function warmSatTiles() {
   } catch { /* pre-ready */ }
 }
 
+/* GATE-9-A scroll-scrub journey (map side, 4 defects).
+ * (2) One journey progress 0..1 accumulates wheel delta (owned by
+ *     scrolltrigger.js); it drives zoom depth continuously — no jumps.
+ * (4) Sat fade tracks that same progress (scrubbed opacity, duration-0
+ *     paint so it never runs on its own rhythm once triggered).
+ * (3) Past CENTER_START the center eases onto the Sangachal spot
+ *     automatically before the handoff edge (progress 1) flies.
+ * (1) The vector style is HELD warm: cached style JSON + retained sources
+ *     + a flat hold veil covering the zoom-out tile refill, timed in
+ *     vectorReturnMs. The sat source/layer is never removed. */
+const SCRUB_HOTSPOT_ZOOM = 11;
+const SCRUB_CENTER_START = 0.55;
+const SITE_LNGLAT = [SITE.lon, SITE.lat];
+let scrubProgress = 0;
+let scrubFired = false;
+let cachedVectorStyle = null;
+let recedeStartT = 0;
+
+function clamp01(v) {
+  const n = +v;
+  if (!Number.isFinite(n)) return 0;
+  return n < 0 ? 0 : n > 1 ? 1 : n;
+}
+function smooth01(t) {
+  const c = clamp01(t);
+  return c * c * (3 - 2 * c);
+}
+function scrubCenterFor(p) {
+  if (p <= SCRUB_CENTER_START) return COUNTRY_CENTER.slice();
+  const k = smooth01((p - SCRUB_CENTER_START) / (1 - SCRUB_CENTER_START));
+  return [
+    COUNTRY_CENTER[0] + (SITE_LNGLAT[0] - COUNTRY_CENTER[0]) * k,
+    COUNTRY_CENTER[1] + (SITE_LNGLAT[1] - COUNTRY_CENTER[1]) * k,
+  ];
+}
+function scrubZoomFor(p) {
+  return COUNTRY_ZOOM + (SCRUB_HOTSPOT_ZOOM - COUNTRY_ZOOM) * clamp01(p);
+}
+/** Hold the vector style/tiles warm: cache the style JSON, keep every
+ * source+layer mounted, and repaint so country tiles stay resident. */
+function holdVectorWarm(reason) {
+  try {
+    if (mapRef && typeof mapRef.getStyle === 'function' && !cachedVectorStyle) {
+      try {
+        cachedVectorStyle = JSON.parse(JSON.stringify(mapRef.getStyle()));
+      } catch {
+        try { cachedVectorStyle = mapRef.getStyle(); } catch { /* best-effort */ }
+      }
+    }
+  } catch { /* cache is best-effort */ }
+  try {
+    if (mapRef && typeof mapRef.triggerRepaint === 'function') mapRef.triggerRepaint();
+  } catch { /* repaint is best-effort */ }
+  try {
+    window.__mapProbe.vectorWarm = true;
+    window.__mapProbe.vectorCache = 'held';
+    window.__mapProbe.vectorSnapshot = true;
+    window.__mapProbe.vectorSnapshotT = Date.now();
+    window.__mapProbe.vectorHoldReason = reason || null;
+  } catch { /* probe cosmetic */ }
+}
+/** Scrubbed sat opacity: tracks scroll progress exactly (duration-0 paint).
+ * Visibility stays on through the journey so tiles never reload mid-fade. */
+function setSatScrubbed(p) {
+  const v = clamp01(p);
+  try {
+    if (mapRef && mapRef.getLayer(SAT_LAYER_ID)) {
+      try {
+        mapRef.setLayoutProperty(SAT_LAYER_ID, 'visibility', 'visible');
+      } catch { /* layout is best-effort */ }
+      try {
+        try {
+          mapRef.setPaintProperty(SAT_LAYER_ID, 'raster-opacity-transition', { duration: 0, delay: 0 });
+        } catch { /* transition reset is best-effort */ }
+        mapRef.setPaintProperty(SAT_LAYER_ID, 'raster-opacity', v);
+      } catch (err) {
+        errors.push('SAT-SCRUB: ' + (err && err.message));
+      }
+    }
+  } catch { /* pre-ready */ }
+  try {
+    window.__mapProbe.satOpacity = +v.toFixed(4);
+    window.__mapProbe.satOn = v > 0.02;
+  } catch { /* probe cosmetic */ }
+  return v;
+}
+/** Flat hold veil covering the zoom-out vector refill (same flat bg tone,
+ * so a tile pop reads as one continuous surface, never a reload flash). */
+function showVectorHold(on) {
+  try {
+    let veil = document.getElementById('vector-hold');
+    if (!veil) {
+      veil = document.createElement('div');
+      veil.id = 'vector-hold';
+      const app = document.getElementById('app');
+      if (app) app.appendChild(veil);
+      else return;
+    }
+    veil.classList.toggle('on', !!on);
+  } catch { /* cosmetic */ }
+  try {
+    window.__mapProbe.vectorHold = !!on;
+  } catch { /* probe cosmetic */ }
+}
+/** Apply one scrub step: zoom depth + auto-center + scrubbed fade, all from
+ * the single journey progress. Uses jumpTo (no animation) so the wheel —
+ * never an autonomous flight — owns the motion until the handoff edge. */
+function applyScrubProgress(p) {
+  const v = clamp01(p);
+  scrubProgress = v;
+  holdVectorWarm('scrub');
+  const zoom = scrubZoomFor(v);
+  const center = scrubCenterFor(v);
+  const k = v <= SCRUB_CENTER_START ? 0 : smooth01((v - SCRUB_CENTER_START) / (1 - SCRUB_CENTER_START));
+  try {
+    if (mapRef && typeof mapRef.jumpTo === 'function') {
+      mapRef.jumpTo({ center, zoom, bearing: 0, pitch: 0 });
+    } else if (mapRef) {
+      mapRef.easeTo({ center, zoom, bearing: 0, pitch: 0, duration: 0 });
+    }
+  } catch (err) {
+    errors.push('SCRUB-MOVE: ' + (err && err.message));
+  }
+  try {
+    if (typeof positionDomPins === 'function' && mapRef) positionDomPins(mapRef);
+  } catch { /* pins cosmetic */ }
+  const opacity = setSatScrubbed(v);
+  let dist = null;
+  try {
+    const dx = center[0] - SITE_LNGLAT[0];
+    const dy = center[1] - SITE_LNGLAT[1];
+    dist = +Math.sqrt(dx * dx + dy * dy).toFixed(5);
+  } catch { /* probe cosmetic */ }
+  try {
+    window.__mapProbe.scrub = { progress: +v.toFixed(4), zoom: +zoom.toFixed(3), opacity: +opacity.toFixed(4), centerDist: dist };
+    window.__mapProbe.centerEase = +k.toFixed(4);
+    window.__mapProbe.autoCenter = k > 0;
+    window.__mapProbe.mapZoom = +zoom.toFixed(2);
+  } catch { /* probe cosmetic */ }
+  return v;
+}
+/** Reset the journey after a close lands home (progress + edge re-arm). */
+function resetScrubJourney() {
+  scrubProgress = 0;
+  scrubFired = false;
+  try {
+    const app = document.getElementById('app');
+    if (app && typeof app.__scrollScrubReset === 'function') app.__scrollScrubReset();
+  } catch { /* reset is best-effort */ }
+  try {
+    window.__mapProbe.scrub = { progress: 0, zoom: +COUNTRY_ZOOM.toFixed(3), opacity: 0, centerDist: null };
+    window.__mapProbe.centerEase = 0;
+    window.__mapProbe.autoCenter = false;
+  } catch { /* probe cosmetic */ }
+}
+
 /** Handoff-5 wide first zoom: pixel padding ≈28% of the viewport's smaller
  * side, so the ring-bounds fit stops WIDE (whole flat map / ring + generous
  * context margin) and the flat→sat crossfade plays over the full map. */
@@ -426,6 +587,9 @@ function wideZoomForBounds(bounds) {
 function flyToSectorThenTwin(id, opts = {}) {
   const s = sectors.find((x) => x.id === id);
   if (!s) return false;
+  // GATE-9-A(1): hold the vector style warm BEFORE leaving the flat view,
+  // so the way back never refetches it.
+  holdVectorWarm('outbound');
   let bounds = null;
   try {
     bounds = h3Bounds(h3map[id]);
@@ -910,6 +1074,35 @@ function recedeToCountry() {
   try {
     reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   } catch { /* cosmetic */ }
+  // GATE-9-A(1): veil up + clock starts — the flat return is timed in
+  // vectorReturnMs and the veil covers the vector tile refill (no jank).
+  // The vector style/sources are never reloaded: the zoom runs over the
+  // HELD style (cached in holdVectorWarm), so the way back is instant.
+  holdVectorWarm('recede');
+  showVectorHold(true);
+  try {
+    recedeStartT = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  } catch {
+    recedeStartT = Date.now();
+  }
+  const landHome = () => {
+    try {
+      let ms = null;
+      try {
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        ms = Math.round(now - recedeStartT);
+      } catch { /* timing is best-effort */ }
+      window.__mapProbe.recede = 'home';
+      window.__mapProbe.mapZoom = liveFrame()?.z ?? null;
+      window.__mapProbe.vectorReturnMs = ms;
+    } catch { /* probe cosmetic */ }
+    try {
+      showVectorHold(false);
+    } catch { /* cosmetic */ }
+    try {
+      resetScrubJourney();
+    } catch { /* reset is best-effort */ }
+  };
   setSatForced(false);
   // Handoff-5-close: probe the recede leg (sat->flat + zoom-out).
   window.__mapProbe.recede = 'out';
@@ -923,8 +1116,7 @@ function recedeToCountry() {
           pitch: 0,
           duration: 0,
         });
-        window.__mapProbe.recede = 'home';
-        window.__mapProbe.mapZoom = COUNTRY_ZOOM;
+        landHome();
       } else {
         mapRef.easeTo({
           center: COUNTRY_CENTER,
@@ -934,13 +1126,14 @@ function recedeToCountry() {
           duration: 800, // GATE-3 REVISION tempo: quicker recede, same home
         });
         try {
-          mapRef.once('moveend', () => {
-            try {
-              window.__mapProbe.recede = 'home';
-              window.__mapProbe.mapZoom = liveFrame()?.z ?? null;
-            } catch { /* probe cosmetic */ }
-          });
+          mapRef.once('moveend', landHome);
         } catch { /* probe listener is best-effort */ }
+        // Fallback: never strand the veil/journey if moveend is missed.
+        setTimeout(() => {
+          try {
+            if (window.__mapProbe.recede === 'out') landHome();
+          } catch { /* fallback is best-effort */ }
+        }, 2500);
       }
     }
   } catch (err) {
@@ -1258,6 +1451,8 @@ async function boot() {
     positionDomPins(map);
     window.__mapProbe.ready = true;
     window.__mapProbe.satLayer = !!map.getLayer(SAT_LAYER_ID);
+    // GATE-9-A(1): country flat view is the held frame — cache it now.
+    holdVectorWarm('boot');
   });
 
   map.on('error', (e) => {
@@ -1266,18 +1461,51 @@ async function boot() {
     errors.push('MAP: ' + msg);
   });
 
-  /* GATE-8-B scroll trigger (trigger only): wheel DOWN over the map fires
-   * the existing forward flight, wheel UP fires the existing reverse-first
-   * close. Timing/easing/staging/pose untouched; blip click fallback intact.
-   * Installed once on #app (overlay root lives inside #app, so overlay
-   * wheels bubble here; scrolltrigger.js exempts the live twin frame so
-   * twin canvas gestures are never hijacked). */
+  /* GATE-9-A scroll SCRUB (replaces GATE-8-B threshold firing): wheel delta
+   * accumulates into ONE journey progress driving zoom depth + auto-center
+   * + scrubbed sat fade (applyScrubProgress); the handoff flight fires only
+   * at the progress-1 edge, the reverse-first close only at progress-0 while
+   * open. No autonomous jumps; blip click fallback intact. Installed once on
+   * #app (overlay root lives inside #app; scrolltrigger.js exempts the live
+   * twin frame so twin canvas gestures are never hijacked). */
   try {
     installScrollTrigger({
       el: document.getElementById('app'),
       isOpen: () => twinOpen,
       isBusy: () => !!transitId || !!pendingReveal || !!reverseWait,
-      onDown: () => flyToSectorThenTwin(siteSector),
+      onProgress: (p) => {
+        try {
+          if (!twinOpen) applyScrubProgress(p);
+          else {
+            // Open: wheel-up scrubs the fade back down before the edge
+            // close fires — the fade still tracks scroll, never itself.
+            try {
+              const v = p < 0 ? 0 : p > 1 ? 1 : p;
+              setSatScrubbed(v);
+              try {
+                window.__mapProbe.scrub = {
+                  progress: +v.toFixed(4),
+                  zoom: window.__mapProbe.mapZoom ?? null,
+                  opacity: +v.toFixed(4),
+                  centerDist: 0,
+                };
+              } catch { /* probe cosmetic */ }
+            } catch { /* open scrub is best-effort */ }
+          }
+        } catch (err) {
+          errors.push('SCRUB: ' + (err && err.message));
+        }
+      },
+      onDown: () => {
+        try {
+          if (!scrubFired) {
+            scrubFired = true;
+            flyToSectorThenTwin(siteSector);
+          }
+        } catch (err) {
+          errors.push('SCRUB-DOWN: ' + (err && err.message));
+        }
+      },
       onUp: () => closeTwin(),
     });
   } catch { /* trigger install is best-effort */ }
