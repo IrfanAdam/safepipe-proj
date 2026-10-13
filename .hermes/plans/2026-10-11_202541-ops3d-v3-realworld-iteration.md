@@ -169,14 +169,6 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 - REF GATE 3 · rev 2026-10-13 review-feedback (owner): "make it a little faster, smoother choreography"; "trigger the openstreetmap-to-twin transition and back by user scroll instead of click — gesture-based, intuitive". Verdict: OPEN — tempo + scroll-drive land as a revision on this gate, then proceed.
 - REF GATE 3 · rev 2026-10-13 scroll-scrub feedback (owner): sat→vector zoom-out unsmooth (cache vector tiles); zoom-in trigger erratic; auto-center hotspot on approach; fade must follow the scroll, not its own rhythm; twin zoom-out-at-max must trigger the reverse; scroll-listening reverse in twin. Verdict: OPEN — scrub revision lands on this gate.
 
-## Phase 04 — Time variance + sim → MOVED
-<!-- {#phase-04} -->
-*Moved 2026-10-13 to `2026-10-13_233337-ops3d-twin-work.md` — time and sim separated into their own phases there (Phase 03 time, Phase 04 sim), realism handled differently per owner. No tasks remain here.*
-
-## Phase 05 — Operations layer → MOVED
-<!-- {#phase-05} -->
-*Moved 2026-10-13 to `2026-10-13_233337-ops3d-twin-work.md` (Phase 05 operations, after make-it-real → asset layer → time → sim). No tasks remain here.*
-
 ## Phase 06 — Lock
 <!-- {#phase-06} -->
 *What the demo gains: it ships clean and stays clean. Spec §9 deliverables land here. (153000 Phase 6.)*
