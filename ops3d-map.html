@@ -121,7 +121,7 @@
     position: absolute; inset: 0; z-index: 3; pointer-events: none;
     background: radial-gradient(ellipse at center,
       transparent 52%, rgba(0, 0, 0, 0.28) 78%, var(--ops-bg, #0b0c0c) 100%);
-    opacity: 0; transition: opacity 0.6s ease;
+    opacity: 0; transition: opacity 0.45s ease; /* GATE-3 REVISION tempo */
   }
   #map-vignette.on { opacity: 1; }
   @media (prefers-reduced-motion: reduce) {
@@ -147,15 +147,16 @@
   .maplibregl-ctrl-attrib, .maplibre-ctrl-attrib,
   .maplibregl-ctrl-attrib-button { display: none !important; }
   /* LANE A recede: twin overlay fades instead of cutting.
-   * Handoff-4 seeded reveal: forward crossfade map->twin ~600ms
+   * Handoff-4 seeded reveal: forward crossfade map->twin ~450ms
    * (.prewarm holds opacity 0 while the iframe boots); reverse
-   * twin->map-sat ~600ms (.closing, symmetric with the forward reveal).
+   * twin->map-sat ~450ms (.closing, symmetric with the forward reveal).
+   * GATE-3 REVISION tempo: fades overlap the recede for one gesture.
    * Handoff-5-close: the recede (sat->flat + zoom-out) starts after the
    * fade — never a cut at any step. */
-  #twin-overlay { opacity: 1; transition: opacity 0.6s ease; }
+  #twin-overlay { opacity: 1; transition: opacity 0.45s ease; }
   #twin-overlay[hidden] { display: none; }
   #twin-overlay.prewarm { opacity: 0; pointer-events: none; }
-  #twin-overlay.closing { opacity: 0; transition-duration: 0.6s; }
+  #twin-overlay.closing { opacity: 0; transition-duration: 0.45s; }
   @media (prefers-reduced-motion: reduce) {
     #twin-overlay { transition: none; }
   }

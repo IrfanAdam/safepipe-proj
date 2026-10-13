@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T14:33:27.836Z",
+  "generated": "2026-10-13T14:47:52.554Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "76d2155",
+      "full": "76d21551b7c2dd506a500f315ec2c925e93c5d78",
+      "date": "2026-10-13",
+      "time": "20:04",
+      "subject": "feat(handoff): matched reveal with late-ready sync, settled ready signal [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "d828308",
       "full": "d828308c953dd0beb78faf6904b6b59639f66812",
@@ -3140,11 +3149,13 @@
     }
   ],
   "wip": [
+    "ops3d-map.html",
     "src/changelog/changelog-cards.css",
     "src/changelog/changelog-drawer.css",
     "src/changelog/changelog.css",
     "src/map/main.js",
     "src/ring2/main.js",
-    "src/ring2/sector.js"
+    "src/ring2/sector.js",
+    "src/map/scrolltrigger.js"
   ]
 }

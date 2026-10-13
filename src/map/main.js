@@ -19,6 +19,7 @@ import { MapLibreOverlay } from 'deck.gl';
 import { PolygonLayer, ScatterplotLayer } from 'deck.gl';
 import { SITE, sectorsWithOverride, worstHealth, HEALTH_COLORS, HEALTH_RANK } from './feed.js';
 import { buildPinData } from './rings.js';
+import { installScrollTrigger } from './scrolltrigger.js';
 import {
   sectorH3Map,
   twinUrl,
@@ -94,10 +95,11 @@ let setSatRef = null;
 let transitId = null;
 let twinFs = false;
 // Handoff-5-close: single close chain. CLOSE_FADE_MS mirrors the forward
-// ~600ms reveal; RECEDE_DELAY_MS starts sat->flat + zoom-out after the fade.
+// reveal; RECEDE_DELAY_MS starts sat->flat + zoom-out after the fade.
+// GATE-3 REVISION tempo: 450ms fades overlap the recede for one gesture.
 // closeSeq invalidates a pending hide/recede when a fresh open lands first.
-const CLOSE_FADE_MS = 600;
-const RECEDE_DELAY_MS = 680;
+const CLOSE_FADE_MS = 450;
+const RECEDE_DELAY_MS = 500;
 let closeSeq = 0;
 // Handoff-4 Lane A seeded reveal: prewarm state. pendingReveal = { id, timer,
 // revealed } or null. twinReady mirrors the Lane B {type:TWIN_READY_MSG}
@@ -481,7 +483,7 @@ function flyToSectorThenTwin(id, opts = {}) {
       const dy = Math.abs(c.lat - mid[1]);
       if (dx > 1e-6 || dy > 1e-6) {
         try {
-          mapRef.easeTo({ center: mid, bearing: 0, pitch: 0, duration: 250 });
+          mapRef.easeTo({ center: mid, bearing: 0, pitch: 0, duration: 180 });
         } catch { /* center nudge is best-effort */ }
       }
     } catch { /* center lock is best-effort */ }
@@ -497,7 +499,7 @@ function flyToSectorThenTwin(id, opts = {}) {
       transitId = null;
       window.__mapProbe.transit = null;
       prewarmThenReveal(id, liveFrame(), opts);
-    }, 350);
+    }, 180); // GATE-3 REVISION tempo: tight settle — sat already staged
   };
   try {
     mapRef.once('moveend', finish);
@@ -518,14 +520,14 @@ function flyToSectorThenTwin(id, opts = {}) {
       zoom: w.zoom,
       bearing: 0,
       pitch: 0,
-      duration: 900,
+      duration: 650, // GATE-3 REVISION tempo: faster flight, same wide frame
     });
   } catch {
     try {
       mapRef.fitBounds(bounds, {
         bearing: 0,
         pitch: 0,
-        duration: 900,
+        duration: 650, // GATE-3 REVISION tempo: mirrors the easeTo above
         // Fallback keeps the wide padded fit when cameraForBounds is
         // unavailable; liveFrame() still carries the wider z to the twin.
         padding: wideFitPadding(),
@@ -544,7 +546,7 @@ function flyToSectorThenTwin(id, opts = {}) {
  * ?sector&cx&cy&z&embed=1) and HOLD the map end-frame until the twin posts
  * {type:'safepipe-twin-ready'} (Lane B). Timeout fallback (~4s) reveals
  * anyway so a silent twin can never strand the map. On ready, CROSSFADE
- * map->twin over ~600ms (overlay opacity 0->1 above the matched sat frame).
+ * map->twin over ~450ms (overlay opacity 0->1 above the matched sat frame).
  * Reduced-motion: reveal instantly. */
 function prewarmThenReveal(id, frame, opts = {}) {
   const s = sectors.find((x) => x.id === id);
@@ -622,7 +624,7 @@ function prewarmThenReveal(id, frame, opts = {}) {
   return true;
 }
 
-/** Crossfade the pre-warmed overlay in (opacity 0->1, ~600ms). Idempotent. */
+/** Crossfade the pre-warmed overlay in (opacity 0->1, ~450ms). Idempotent. */
 function revealTwin(instant = false) {
   try {
     if (pendingReveal && pendingReveal.revealed) return true;
@@ -633,7 +635,7 @@ function revealTwin(instant = false) {
     if (!overlayEls || overlayEls.root.hidden) return false;
     if (!instant) {
       // Force a frame at opacity 0, then drop .prewarm so the CSS
-      // opacity transition (~600ms) crossfades map->twin with no flash.
+      // opacity transition (~450ms) crossfades map->twin with no flash.
       try {
         void overlayEls.root.offsetWidth;
       } catch { /* reflow nudge is best-effort */ }
@@ -714,7 +716,7 @@ function openTwin(id, opts = {}) {
 /** Actual teardown: fades the overlay out (never an abrupt cut), keeps hex
  * + selection (Task 19). Handoff-5-close single chain: EVERY close path
  * (X/Esc/back/twin-Esc) runs the same reverse — twin->map-sat fade over
- * CLOSE_FADE_MS (~600ms, symmetric with the forward reveal; sat stays ON
+ * CLOSE_FADE_MS (~450ms, symmetric with the forward reveal; sat stays ON
  * underneath), then sat->flat + zoom-out to the country blip view. Pending
  * hide/recede steps are seq-guarded so a fresh open inside the fade window
  * cancels them (no blanked twin, no yanked map). */
@@ -929,7 +931,7 @@ function recedeToCountry() {
           zoom: COUNTRY_ZOOM,
           bearing: 0,
           pitch: 0,
-          duration: 1100,
+          duration: 800, // GATE-3 REVISION tempo: quicker recede, same home
         });
         try {
           mapRef.once('moveend', () => {
@@ -957,7 +959,7 @@ window.addEventListener('message', (e) => {
 });
 // Handoff-4 Lane A seeded reveal: Lane B posts { type:'safepipe-twin-ready' }
 // when its top-down sat frame matches the staged map end-frame. Reveal (the
-// ~600ms crossfade) on that signal; the ~4s fallback in prewarmThenReveal
+// ~450ms crossfade) on that signal; the ~4s fallback in prewarmThenReveal
 // covers a silent twin. A ready that lands AFTER the fallback already
 // revealed is still accepted (late-sync: twinReady=true + revealLate flag)
 // instead of being dropped — the fallback guarantee is untouched, but the
@@ -992,7 +994,7 @@ window.addEventListener('message', (e) => {
   if (recede) {
     // Handoff-5-close: the twin already returned to top-down sat — keep
     // map-sat ON underneath the twin fade, then finishTwinClose() runs the
-    // single close chain (fade ~600ms, then sat->flat + zoom out to the
+    // single close chain (fade ~450ms, then sat->flat + zoom out to the
     // blip). Never cut, never fade over flat. Handoff-6-retrace: the reply
     // also settles the reverse-first wait armed by closeTwin().
     setSatForced(true);
@@ -1175,9 +1177,10 @@ async function boot() {
           source: SAT_SOURCE_ID,
           layout: { visibility: 'none' },
           // T2: staged crossfade — opacity animates, visibility flips.
+          // GATE-3 REVISION tempo: 450ms ramp completes inside the flight.
           paint: {
             'raster-opacity': 0,
-            'raster-opacity-transition': { duration: 600, delay: 0 },
+            'raster-opacity-transition': { duration: 450, delay: 0 },
           },
         });
       }
@@ -1209,7 +1212,7 @@ async function boot() {
                 map.setLayoutProperty(SAT_LAYER_ID, 'visibility', 'none');
               }
             } catch { /* delayed hide is best-effort */ }
-          }, 650);
+          }, 500); // GATE-3 REVISION tempo: tracks the 450ms ramp
         }
       } catch (err) {
         errors.push('SAT-TOGGLE: ' + (err && err.message));
@@ -1262,6 +1265,22 @@ async function boot() {
     // Tile blips (offline sandbox) must not fail the probe: record, don't throw.
     errors.push('MAP: ' + msg);
   });
+
+  /* GATE-8-B scroll trigger (trigger only): wheel DOWN over the map fires
+   * the existing forward flight, wheel UP fires the existing reverse-first
+   * close. Timing/easing/staging/pose untouched; blip click fallback intact.
+   * Installed once on #app (overlay root lives inside #app, so overlay
+   * wheels bubble here; scrolltrigger.js exempts the live twin frame so
+   * twin canvas gestures are never hijacked). */
+  try {
+    installScrollTrigger({
+      el: document.getElementById('app'),
+      isOpen: () => twinOpen,
+      isBusy: () => !!transitId || !!pendingReveal || !!reverseWait,
+      onDown: () => flyToSectorThenTwin(siteSector),
+      onUp: () => closeTwin(),
+    });
+  } catch { /* trigger install is best-effort */ }
 }
 
 boot();

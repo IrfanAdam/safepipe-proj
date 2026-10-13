@@ -13,8 +13,8 @@ export const EMBED_PARAM = 'embed';
  * ?sector=<h3>&cx=<lng>&cy=<lat>&z=<zoom>[&bearing=<deg>] at vertical
  * top-down. The frame is the RING bounds (wider than the terminal) at
  * satellite; bearing defaults to 0 (map north-up). Forward flight is
- * three stages: hold top-down at the ring frame, slow ease to iso at the
- * attached angle (same ring center/range, mix stays 0), then a slow tiny
+ * three stages: hold top-down at the ring frame, ease to iso at the
+ * attached angle (same ring center/range, mix stays 0), then a tiny
  * push-in to the terminal while the slider drives satellite->twin
  * (0->100) — the push-in and the slider move together. Reverse mirrors
  * exactly: pull back to the ring frame + slider->0 + pitch->0, then post
@@ -37,14 +37,17 @@ export const TWIN_READY_MSG = 'safepipe-twin-ready';
  * Lane-1 owned — this file only names the wire format. */
 export const TWIN_FULLSCREEN_MSG = 'safepipe-twin-fullscreen';
 
-/* Handoff flight timing (ms): hold a beat top-down at the ring frame, slow
- * ease to iso at the attached angle (ring center/range, slider stays 0),
- * then a slow tiny push-in to the terminal with the slider driving 0->100.
- * Reverse mirrors exactly: pull back (push reversed) + pitch back (swoop
- * reversed) with the slider ->0, then the {recede:true} close posts. */
-export const HANDOFF_HOLD_MS = 900;
-export const HANDOFF_SWOOP_MS = 2800;
-export const HANDOFF_PUSH_MS = 2600;
+/* Handoff flight timing (ms) — GATE-3 REVISION tempo: the full transition
+ * must read as ONE continuous gesture, so holds are short and legs overlap
+ * end-to-end with zero end-acceleration easing (see easeInOutSmoother):
+ * hold a beat top-down at the ring frame, ease to iso at the attached angle
+ * (ring center/range, slider stays 0), then push in to the terminal with the
+ * slider driving 0->100. Reverse mirrors exactly: pull back (push reversed)
+ * + pitch back (swoop reversed) with the slider ->0, then the {recede:true}
+ * close posts. Forward total 3850ms; reverse 3300ms. */
+export const HANDOFF_HOLD_MS = 550;
+export const HANDOFF_SWOOP_MS = 1700;
+export const HANDOFF_PUSH_MS = 1600;
 /* Reverse is the exact two-segment mirror: pull (PUSH_MS) then pitch-back
  * (SWOOP_MS). Single source of truth for the total so the flight and any
  * probe margin agree. */
@@ -126,10 +129,21 @@ export function frameRange(z, { viewportPx = 600, fovDeg = MAP_TRUE_FOV_DEG, lat
   }
 }
 
-/** Pure: easeInOutCubic flight easing (0..1 -> 0..1). */
+/** Pure: easeInOutCubic flight easing (0..1 -> 0..1). Kept as the static
+ * contract — existing callers/tests import this name. */
 export function easeInOutCubic(t) {
   const x = Math.min(1, Math.max(0, Number(t) ?? 0));
   return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+}
+
+/** Pure: quintic smootherstep easing (0..1 -> 0..1) — GATE-3 REVISION tempo
+ * curve for the handoff flight legs (swoop/push/reverse). Zero velocity AND
+ * zero acceleration at both ends, so consecutive legs join with no staged
+ * lurch — the three stages read as one continuous gesture. Same signature
+ * and clamping contract as easeInOutCubic. Node-checkable. */
+export function easeInOutSmoother(t) {
+  const x = Math.min(1, Math.max(0, Number(t) ?? 0));
+  return x * x * x * (x * (x * 6 - 15) + 10);
 }
 
 /** Twin ready message (LANE 4 Lane B -> Lane A): the matched sat frame has

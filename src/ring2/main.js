@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, easeInOutCubic, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -604,8 +604,8 @@ async function boot() {
    * where the frame is the RING bounds (wider than the terminal).
    * Forward flight is three stages: open at the ring frame top-down
    * satellite (pitch 0, bearing matching the map, slider at full
-   * satellite), hold a beat, slow-ease to iso at the attached angle (same
-   * ring center/range, slider STAYS at 0), then a slow tiny push-in to the
+   * satellite), hold a beat, ease to iso at the attached angle (same
+   * ring center/range, slider STAYS at 0), then a tiny push-in to the
    * terminal while the SAT->TWIN slider drives satellite->twin — the
    * push-in and the slider move together. Close plays the exact mirror:
    * pull back to the ring frame + slider->0 + pitch->0 (pull segment, then
@@ -1014,8 +1014,9 @@ async function boot() {
       if (handoff.phase === 'swoop') {
         // Ease to iso AT the ring frame: same center/range, pitch only.
         // The slider stays at full satellite through the whole swoop.
+        // GATE-3 REVISION tempo: smootherstep joins legs with no lurch.
         const t = Math.min(1, Math.max(0, (now - handoff.t0) / HANDOFF_SWOOP_MS));
-        const k = easeInOutCubic(t);
+        const k = easeInOutSmoother(t);
         const f = handoff.from, mid = handoff.mid;
         if (!f || !mid) {
           endHandoffFlight();
@@ -1040,9 +1041,10 @@ async function boot() {
         return;
       }
       if (handoff.phase === 'push') {
-        // Slow tiny push-in to the terminal while the slider drives 0->100.
+        // Push-in to the terminal while the slider drives 0->100 (together).
+        // GATE-3 REVISION tempo: smootherstep, same overlap.
         const t = Math.min(1, Math.max(0, (now - handoff.t0) / HANDOFF_PUSH_MS));
-        const k = easeInOutCubic(t);
+        const k = easeInOutSmoother(t);
         const f = handoff.from, to = handoff.to;
         if (!f || !to) {
           endHandoffFlight();
@@ -1087,7 +1089,7 @@ async function boot() {
         const leg = walk.legs[walk.i];
         const span = Number.isFinite(leg.ms) && leg.ms > 0 ? leg.ms : HANDOFF_SWOOP_MS;
         const t = Math.min(1, Math.max(0, (now - walk.legT0) / span));
-        const k = easeInOutCubic(t);
+        const k = easeInOutSmoother(t); // GATE-3 REVISION tempo: mirror curve
         const fe = (leg.from && leg.from.eye) || leg.eye;
         const ft = (leg.from && leg.from.target) || leg.target;
         try {
