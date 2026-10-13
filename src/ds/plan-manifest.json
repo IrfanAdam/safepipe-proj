@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T09:38:16.614Z",
+  "generated": "2026-10-13T09:52:42.991Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "7634bbe",
+      "full": "7634bbedf20ab330b9e2db5b75972c97efe9a188",
+      "date": "2026-10-13",
+      "time": "15:08",
+      "subject": "feat(map): flat Azerbaijan canvas with pulsing Sangachal blip [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "798d0f1",
       "full": "798d0f1a6cf1cab64b47659cc5eb78c0b071dd54",
@@ -3041,9 +3050,7 @@
     }
   ],
   "wip": [
-    "ops3d-map.html",
-    "src/map/feed.js",
-    "src/map/main.js",
-    "src/map/rings.js"
+    "src/ops3d/hud.css",
+    "src/ring2/hud-overlays.js"
   ]
 }
