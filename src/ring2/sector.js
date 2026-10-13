@@ -149,6 +149,53 @@ export function isTwinReadyMessage(data) {
   }
 }
 
+/* Ready settle depth (Lane B): the hold posts {type:'safepipe-twin-ready'}
+ * only after this many CONSECUTIVE frames agree the live twin camera sits
+ * on the requested hold frame (twin pose + map pose both matched). A single
+ * agreeing frame withholds — the check re-runs every hold frame and the
+ * counter resets on any mismatch, so the post lands exactly when the pose
+ * has settled, never on a transient pin. Node-checkable. */
+export const READY_SETTLE_FRAMES = 2;
+
+/** Pure: live twin pose { eye:{x,y,z}, target:{x,y,z} } agrees with the
+ * pinned hold start { tx, ty, tz, range, bearing } (top-down at the ring
+ * frame). Tolerances scale with range and mirror the map-side gates
+ * (0.5° pitch/bearing): target within 0.2% of range, range within 1%,
+ * pitch ~0, bearing ~start bearing. False on any non-finite input —
+ * withhold, never guess. Node-checkable. */
+export function twinHoldPoseMatch(pose, start, tol = {}) {
+  try {
+    const eye = pose?.eye;
+    const tgt = pose?.target;
+    if (!eye || !tgt) return false;
+    const range = Number(start?.range);
+    if (!Number.isFinite(range) || range <= 0) return false;
+    if (![eye.x, eye.y, eye.z, tgt.x, tgt.z, start.tx, start.tz].every(Number.isFinite)) return false;
+    const ty = Number.isFinite(tgt.y) ? tgt.y : start.ty;
+    if (!Number.isFinite(ty)) return false;
+    const posTol = Number.isFinite(tol.posM) && tol.posM >= 0 ? tol.posM : Math.max(0.5, range * 0.002);
+    if (Math.abs(tgt.x - start.tx) > posTol) return false;
+    if (Math.abs(tgt.z - start.tz) > posTol) return false;
+    const liveRange = Math.hypot(eye.x - tgt.x, eye.y - ty, eye.z - tgt.z);
+    if (!Number.isFinite(liveRange)) return false;
+    const rngTol = Number.isFinite(tol.rangeM) && tol.rangeM >= 0 ? tol.rangeM : range * 0.01;
+    if (Math.abs(liveRange - range) > rngTol) return false;
+    const h = Math.hypot(eye.x - tgt.x, eye.z - tgt.z);
+    const v = eye.y - ty;
+    if (!(v > 0)) return false;
+    const pitchTol = Number.isFinite(tol.pitchDeg) ? tol.pitchDeg : 0.5;
+    if ((Math.atan2(h, v) * 180) / Math.PI > pitchTol) return false;
+    const want = ((Number(start.bearing) || 0) % 360 + 360) % 360;
+    const got = ((Math.atan2(-(eye.x - tgt.x), eye.z - tgt.z) * 180) / Math.PI + 360) % 360;
+    const bearingTol = Number.isFinite(tol.bearingDeg) ? tol.bearingDeg : 0.5;
+    const d = Math.abs((((got - want + 540) % 360) + 360) % 360 - 180);
+    if (d > bearingTol) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Pure: close-time flight phase -> reverse plan through the stages actually
  * passed (never a jump to a canned start).
  *   hold  -> 'snap'  (still top-down at the ring frame: pin + mix 0, post)

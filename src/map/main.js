@@ -112,7 +112,7 @@ window.__mapProbe = {
   selected: selectedId, twinOpen: false,
   blips: 1, siteWorst, siteSector, site: { lat: SITE.lat, lon: SITE.lon, name: 'SANGACHAL' },
   transit: null, handoff: null, vignette: false, mapFs: false, twinFs: false,
-  prewarm: false, twinReady: false, reveal: null, revealFallback: false,
+  prewarm: false, twinReady: false, reveal: null, revealFallback: false, revealLate: false,
   recede: null, mapZoom: null, reverseWait: false, reverseFallback: false,
   errors, openTwin, closeTwin, selectSector, flyToSectorThenTwin,
   toggleMapFs, setTwinFs, prewarmThenReveal, revealTwin,
@@ -570,6 +570,7 @@ function prewarmThenReveal(id, frame, opts = {}) {
   window.__mapProbe.twinReady = false;
   window.__mapProbe.reveal = 'prewarm';
   window.__mapProbe.revealFallback = false;
+  window.__mapProbe.revealLate = false;
   // Hidden-but-loading: overlay mounted (hidden=false) at opacity 0 so the
   // twin boots its matched top-down sat frame underneath the held map frame.
   try {
@@ -688,6 +689,7 @@ function openTwin(id, opts = {}) {
   window.__mapProbe.twinReady = false;
   window.__mapProbe.reveal = 'revealed';
   window.__mapProbe.revealFallback = false;
+  window.__mapProbe.revealLate = false;
   try {
     document.body.classList.add('twin-open');
   } catch { /* chrome class is cosmetic */ }
@@ -737,6 +739,7 @@ function doCloseTwin() {
   window.__mapProbe.twinReady = false;
   window.__mapProbe.reveal = null;
   window.__mapProbe.revealFallback = false;
+  window.__mapProbe.revealLate = false;
   // Handoff-5-close: seq-guard + reduced-motion flag for the fade/recede below.
   const seq = ++closeSeq;
   const seqGuard = () => closeSeq;
@@ -955,16 +958,33 @@ window.addEventListener('message', (e) => {
 // Handoff-4 Lane A seeded reveal: Lane B posts { type:'safepipe-twin-ready' }
 // when its top-down sat frame matches the staged map end-frame. Reveal (the
 // ~600ms crossfade) on that signal; the ~4s fallback in prewarmThenReveal
-// covers a silent twin. Accepted only while a prewarm is pending.
+// covers a silent twin. A ready that lands AFTER the fallback already
+// revealed is still accepted (late-sync: twinReady=true + revealLate flag)
+// instead of being dropped — the fallback guarantee is untouched, but the
+// probe no longer reports a permanently UNMATCHED reveal on slow twins.
+// A ready on the direct-open path (no prewarm pending) is recorded the
+// same way. Stale readies with no open twin are ignored.
+// Handoff-7-A: late-ready gap close (audit aid3 section 2).
 window.addEventListener('message', (e) => {
   let rdy = null;
   try { rdy = parseTwinReadyMessage(e && e.data); } catch { rdy = null; }
   if (!rdy) return;
-  if (!twinOpen || !pendingReveal || pendingReveal.revealed) return;
+  if (!twinOpen) return;
   try {
     window.__mapProbe.twinReady = true;
   } catch { /* probe cosmetic */ }
-  revealTwin(false);
+  if (pendingReveal && !pendingReveal.revealed) {
+    revealTwin(false);
+    return;
+  }
+  // Late ready: the fallback (or a direct open) already revealed. Re-assert
+  // the matched end-state so the crossfade lands synced, never re-hidden.
+  try {
+    window.__mapProbe.revealLate = true;
+    window.__mapProbe.prewarm = false;
+    window.__mapProbe.reveal = 'revealed';
+    if (overlayEls && overlayEls.root) overlayEls.root.classList.remove('prewarm');
+  } catch { /* late-sync is best-effort */ }
 });
 window.addEventListener('message', (e) => {
   if (!twinOpen || !isTwinCloseData(e && e.data)) return;

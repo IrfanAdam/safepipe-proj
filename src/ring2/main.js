@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, easeInOutCubic, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, easeInOutCubic, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -626,13 +626,17 @@ async function boot() {
     anchor: null, // ring-frame center { x, z } (range refit source)
     azim: 0, // attached-angle azimuth rad (range refit source)
     readyPosted: false, // {type:'safepipe-twin-ready'} sent once per handoff
+    readyHits: 0, // consecutive agreed hold frames (settle gate before post)
     closePosted: false, // {recede:true} close sent (later closes re-post, never re-fly)
   };
   /* Hold cap: the inbound waits in hold for the matched sat frame (map up +
-   * first painted frame at mix 0) before the swoop may start — but never
-   * forever. Past HOLD + CAP the flight proceeds unposted; Lane A's own
-   * reveal timeout (4 s) owns the fallback reveal. */
-  const HANDOFF_READY_CAP_MS = 8000;
+   * first painted frame at mix 0, twin + map poses both on the hold frame)
+   * before the swoop may start — but never forever. Past HOLD + CAP the
+   * flight proceeds unposted; Lane A's own reveal timeout (~4 s) owns the
+   * fallback reveal. The cap sits just under the 30 s map-mount timeout so
+   * cold-cache / throttled-CPU boots still post on agreement instead of
+   * timing out into an unposted swoop. */
+  const HANDOFF_READY_CAP_MS = 25000;
   const handoffNow = () => {
     try {
       return performance.now();
@@ -720,6 +724,7 @@ async function boot() {
     handoff.revMode = null;
     handoff.walk = null;
     handoff.readyPosted = false;
+    handoff.readyHits = 0;
     handoff.closePosted = false;
     handoff.phase = 'hold';
     handoff.t0 = handoffNow();
@@ -770,6 +775,16 @@ async function boot() {
       if (!(twinFrames >= 1)) return false;
       const m = mixCtl?.getMix?.();
       if (m !== HANDOFF_START_MIX) return false;
+      // The LIVE twin camera must itself sit on the requested hold frame —
+      // not just the pin command having been issued. A pose still settling
+      // (damping residue, a viewport refit that just rebuilt the start, a
+      // user input mid-flight) withholds the post; the hold re-runs this
+      // every frame until it agrees (settle gate in stepHandoff).
+      try {
+        if (!twinHoldPoseMatch(capturePose(), handoff.start)) return false;
+      } catch {
+        return false;
+      }
       // The live map camera must actually SHOW the frame (not just the twin
       // pin): same center/zoom within tolerance. When terrain is still off
       // the per-frame twin->map sync skips (assertTerrainVex) and the map
@@ -958,16 +973,34 @@ async function boot() {
         driveMix(HANDOFF_START_MIX);
         // FRAME-MATCH + ready: keep the box honest (viewport settle refit),
         // then declare the matched sat frame the moment it is really on
-        // screen. The swoop starts only after the ready signal — staged
+        // screen. A refit rebuilds the pinned start, so the settle count
+        // restarts — the post must track the CURRENT pin, never a stale one.
+        // The swoop starts only after the ready signal — staged
         // inbound runs post-match — or past the hold cap (Lane A fallback).
         try {
-          refitHandoffRange();
+          if (refitHandoffRange()) handoff.readyHits = 0;
         } catch { /* refit is best-effort */ }
+        // Settle gate: a single agreeing frame withholds — post only after
+        // READY_SETTLE_FRAMES consecutive agreements, so the signal lands
+        // exactly when the live camera has settled on the hold frame. Any
+        // mismatch resets the count; the check re-runs every hold frame
+        // (slow boot simply takes more frames, never a false post).
         try {
-          if (readyMatch()) postTwinReady();
+          if (readyMatch()) {
+            handoff.readyHits += 1;
+            if (handoff.readyHits >= READY_SETTLE_FRAMES) postTwinReady();
+          } else {
+            handoff.readyHits = 0;
+          }
         } catch { /* ready is best-effort */ }
         const heldMs = now - handoff.t0;
-        if (heldMs >= HANDOFF_HOLD_MS && (handoff.readyPosted || heldMs >= HANDOFF_HOLD_MS + HANDOFF_READY_CAP_MS)) {
+        // Cap expiry also needs a few pumped frames: on a fully-stalled loop
+        // (frozen rAF, cold-boot jank) wall time alone must never retire the
+        // hold into an unposted swoop — the match simply hasn't been
+        // evaluated yet. Slow boot then holds top-down until agreement (or
+        // Lane A's own reveal timeout), never a blind advance.
+        const capDue = heldMs >= HANDOFF_HOLD_MS + HANDOFF_READY_CAP_MS && twinFrames >= 3;
+        if (heldMs >= HANDOFF_HOLD_MS && (handoff.readyPosted || capDue)) {
           handoff.from = capturePose();
           if (!handoff.from || !handoff.mid) {
             endHandoffFlight();
@@ -1239,6 +1272,12 @@ async function boot() {
     requestTwinClose,
     handoffPhase: () => handoff.phase,
     ready: () => handoff.readyPosted,
+    readyDetail: () => ({
+      posted: handoff.readyPosted,
+      hits: handoff.readyHits,
+      phase: handoff.phase,
+      out: (window.__ring2readyOut ?? []).length,
+    }),
     revMode: () => handoff.revMode,
     revWalk: () => (handoff.walk ? handoff.walk.legs.map((l) => l.name) : null),
     twinReadyMsg: TWIN_READY_MSG,
