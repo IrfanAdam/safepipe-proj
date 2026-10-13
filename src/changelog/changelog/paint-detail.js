@@ -115,7 +115,23 @@ import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../ch
 import { isDone, state, parseGates } from '../changelog-parse.js';
 import { esc } from './esc.js';
 import { paintRevs } from './paint-revs.js';
-import { paintGates } from './paint-gates.js';
+// Inline gate tag (Task 12): the phase's own REF GATE verdict as quiet text
+// after DONE in the panel head — no rail, no seals, no popovers.
+const gateTagOf = (gates, phaseN) => {
+  if (!gates || !gates.length) return '';
+  const gs = [...gates].sort((a, b) => a.n - b.n);
+  let idx = gs.findIndex((g) => g.n === phaseN);
+  if (idx < 0 && Number.isInteger(phaseN)) idx = Math.min(Math.max(phaseN, 0), gs.length - 1);
+  if (idx < 0) return '';
+  const g = gs[idx];
+  const firstOpen = gs.findIndex((x) => x.state === 'open' || x.state === 'failed');
+  const disp = (g.state === 'passed' || g.state === 'waiver') ? g.state
+    : (idx === firstOpen ? g.state : 'locked');
+  const txt = (disp === 'passed' || disp === 'waiver') ? 'GATE PASSED'
+    : disp === 'failed' ? 'GATE FAILED'
+    : disp === 'open' ? 'GATE OPEN' : '';
+  return txt ? ` <span class="ds-gate-tag" data-gate-tag="${disp}">${txt}</span>` : '';
+};
 export function paintDetail(root, ctx){
   const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts, edited, revs } = ctx;
   const scrim = root.querySelector('[data-scrim]'), drawer = root.querySelector('[data-drawer]');
@@ -148,13 +164,17 @@ export function paintDetail(root, ctx){
     `</div>`,
   ].join('');
   const hs = hits(plan.file, sprint.body, plan.sprints.indexOf(sprint) === 0);
+  const pm = (sprint.head || '').match(/Phase\s+(\d+)/i);
+  const phaseN = pm ? Number(pm[1]) : si;
+  const doneTag = isDone(state(sprint.body)) ? ` <span class="ds-done">DONE</span>` : '';
   root.querySelector('[data-col="tasks"]').innerHTML = [
     `<div class="ds-drawer-head"><b>`,
     esc(unitLabel(sprint.head, si)),
     ` · `,
     esc(short(sprint.head)),
+    doneTag,
+    gateTagOf(parseGates(plan.raw || ''), phaseN),
     `</b><button data-close aria-label="Close detail">✕</button></div>`,
-    paintGates(parseGates(plan.raw || '')),
     `<div class="ds-md">`,
     marked.parse(sprint.body) + paintRevs(revs) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : ''),
     `</div>`,

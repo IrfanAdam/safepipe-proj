@@ -151,7 +151,7 @@
 
 **Design:**
 - Parse gate lines from plan markdown into structured data (name, state passed|waiver|open|failed, reviewer, date, note, evidence) in `changelog-parse.js` (additive; existing section parsing untouched).
-- New `paint-gates.js` renderer: a simple horizontal progress stepper — one node per phase, and the node's check IS its gate (checked = reviewer passed/waived, hollow = gate awaiting review, dot = tasks in progress). Styling is deliberately subtle and speaks the design-system visual language: token type scale and colors only, thin rail, small quiet nodes — no heavy fills. Clicking a phase node opens a popover with the gate read: verdict, "reviewed by <name> · <date>", evidence one-liner, next-phase unlock. Token-only styling, data-gate attributes for probes.
+- Gate verdict goes INLINE, no visualization: in the phase panel head, directly after the existing DONE marker, render a quiet gate tag from the parsed gate for that phase — "GATE PASSED" (passed + waiver), "GATE FAILED" (failed), "GATE OPEN" (open, tasks done but unreviewed), nothing when the phase is locked or gateless. Same mono micro treatment as DONE, token-only. Remove the stepper rail and seal/popover rendering (`paintGates` rail output) from the panel; keep `parseGates` (additive parsing stays). Reviewer + evidence stay in the plan file, not on screen.
 - Kit update: document the gate seal in the changelog-kit skill (View roles) with the same rules (no counters-as-content, reviewer + verdict lead).
 - Mockup approved by owner before build (scratch sketch, previewed in chat).
 
