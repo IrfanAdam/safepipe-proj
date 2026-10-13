@@ -195,7 +195,7 @@ export function paintDetail(root, ctx){
     marked.parse(sprint.body, {
       phaseDone: isDone(state(sprint.body)),
       gateSuffix: gateSuffixOf(parseGates(plan.raw || ''), phaseN),
-    }) + paintRevs(revs) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : ''),
+    }) + paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head) }) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : ''),
     `</div>`,
   ].join('');
   const u = unlinked(texts);

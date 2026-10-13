@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T18:06:51.771Z",
+  "generated": "2026-10-13T18:35:29.624Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -16,6 +16,15 @@
     "2026-10-13_233337-ops3d-twin-work.md"
   ],
   "commits": [
+    {
+      "sha": "8ebdef6",
+      "full": "8ebdef69fb065bc29fbdae7d1f204293b5943296",
+      "date": "2026-10-13",
+      "time": "23:36",
+      "subject": "docs(plans): drop moved-phase pointers, twin-work plan is the record [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-06]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-06"
+    },
     {
       "sha": "4deb429",
       "full": "4deb4295277605248f085a96abf8b137b152b8af",
@@ -3185,5 +3194,8 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "src/changelog/changelog/paint-detail.js",
+    "src/changelog/changelog/paint-revs.js"
+  ]
 }

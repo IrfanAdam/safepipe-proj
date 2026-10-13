@@ -17,6 +17,17 @@ const raws = import.meta.glob('../../../.hermes/plans/*.md', { query: '?raw', im
 // flush-left, sharing the date line's indent.
 // Changed rule mirrors rail · edited (section hash differs from previous
 // rev's same-head hash; unseen head = added; vanished head = removed).
+// Phase attribution shared with commit `[plan:file#anchor]` trailers and the
+// `{#…}` tokens in plan files. Digits kept as written (`Phase 03` → `phase-03`)
+// so rev sections match trailer anchors exactly; an explicit `{#…}` token in
+// the head wins verbatim. Heads with no number (prose) yield null.
+export const revAnchor = (head) => {
+  const t = String(head || '');
+  const m = t.match(/\{#([A-Za-z]+-\d+)\}/);
+  if (m) return m[1].toLowerCase();
+  const n = t.match(/^(Phase|Task|Step)\s+(\d+)/i);
+  return n ? `${n[1].toLowerCase()}-${n[2]}` : null;
+};
 const frac = (s) => {
   const m = String(s || '').match(/(\d+)\/(\d+)/);
   return m ? [+m[1], +m[2]] : null;
@@ -127,53 +138,92 @@ const lineFor = (head, oldSt, newSt, oldHead) => {
   if (oldSt !== newSt) return `${name} — ${esc(oldSt || '–')} → ${esc(newSt || '–')}`;
   return `Edited ${name}`;
 };
-export function paintRevs(revs){
+// Per-rev changed parts with phase attribution. Each part carries the anchors
+// of the section(s) it describes (rename lines carry both sides) so the caller
+// can scope the feed to the open phase. Rendering (flat, newest-first,
+// token-only `.ds-rev*` markup) is unchanged.
+const partsOf = (r, prev, fb) => {
+  const parts = [];
+  if (!prev) {
+    for (const s of r.sections || [])
+      parts.push({
+        anchors: [revAnchor(s.head)],
+        heads: [s.head],
+        html: fb(s.head) ||
+          `<li class="ds-rev-sec">${esc(clean(s.head))}${s.state ? ` — tasks ${esc(s.state)}` : ''}</li>`,
+      });
+    return parts;
+  }
+  const ph = {}, ps = {}, phead = {};
+  for (const s of prev.sections || []) { ph[s.head] = s.hash; ps[s.head] = s.state; phead[s.head] = s.head; }
+  const cur = r.sections || [];
+  const removed = (prev.sections || []).filter((s) => !cur.some((c) => c.head === s.head));
+  const added = cur.filter((s) => ph[s.head] === undefined);
+  // 1:1 swap reads as a rename (one head out, one head in, same step).
+  if (removed.length === 1 && added.length === 1) {
+    parts.push({
+      anchors: [revAnchor(removed[0].head), revAnchor(added[0].head)],
+      heads: [removed[0].head, added[0].head],
+      html: `<li class="ds-rev-sec">Renamed ${esc(clean(removed[0].head))} → ${esc(clean(added[0].head))}</li>`,
+    });
+    const rfb = fb(added[0].head);
+    if (rfb) parts.push({ anchors: [revAnchor(added[0].head)], heads: [added[0].head], html: rfb });
+  } else {
+    for (const s of removed) parts.push({
+      anchors: [revAnchor(s.head)], heads: [s.head],
+      html: `<li class="ds-rev-sec">Removed ${esc(clean(s.head))}</li>`,
+    });
+    for (const s of added) parts.push({
+      anchors: [revAnchor(s.head)], heads: [s.head],
+      html: fb(s.head) || `<li class="ds-rev-sec">Added ${esc(clean(s.head))}${s.state ? ` — ${esc(s.state)} tasks` : ''}</li>`,
+    });
+  }
+  const renamed = removed.length === 1 && added.length === 1;
+  const skip = renamed ? added[0].head : null;
+  for (const s of cur) {
+    if (s.head === skip || ph[s.head] === undefined || ph[s.head] === s.hash) continue;
+    parts.push({
+      anchors: [revAnchor(s.head)], heads: [s.head],
+      html: fb(s.head) || `<li class="ds-rev-sec">${lineFor(s.head, ps[s.head], s.state, phead[s.head])}</li>`,
+    });
+  }
+  if (!parts.length) return parts;
+  return parts;
+};
+const OUTSIDE = `<li class="ds-rev-sec">Edited plan text outside tracked sections</li>`;
+export function paintRevs(revs, scope){
   if (!revs || !revs.length) return '';
   const src = fileFor(revs);
   const fb = (head) => (isFb(head) ? fbLines(src, head) : null);
+  // No scope (no phase panel context): whole-plan feed, as before.
+  // With scope: strict per-phase feed for the open phase's anchor.
+  const open = scope && scope.head ? revAnchor(scope.head) : null;
   const rows = [];
   for (let i = revs.length - 1; i >= 0; i--) {
     const r = revs[i], prev = i ? revs[i - 1] : null;
     const when = esc(r.time ? `${fmtDate(r.date || '')} · ${fmtTime(r.time)}` : fmtDate(r.date || ''));
-    let lines = '';
-    if (!prev) {
-      lines = (r.sections || []).map((s) =>
-        fb(s.head) ||
-        `<li class="ds-rev-sec">${esc(clean(s.head))}${s.state ? ` — tasks ${esc(s.state)}` : ''}</li>`,
-      ).join('');
-    } else {
-      const ph = {}, ps = {}, phead = {};
-      for (const s of prev.sections || []) { ph[s.head] = s.hash; ps[s.head] = s.state; phead[s.head] = s.head; }
-      const cur = r.sections || [];
-      const removed = (prev.sections || []).filter((s) => !cur.some((c) => c.head === s.head));
-      const added = cur.filter((s) => ph[s.head] === undefined);
-      const parts = [];
-      // 1:1 swap reads as a rename (one head out, one head in, same step).
-      if (removed.length === 1 && added.length === 1) {
-        parts.push(`<li class="ds-rev-sec">Renamed ${esc(clean(removed[0].head))} → ${esc(clean(added[0].head))}</li>`);
-        const rfb = fb(added[0].head);
-        if (rfb) parts.push(rfb);
-      } else {
-        for (const s of removed) parts.push(`<li class="ds-rev-sec">Removed ${esc(clean(s.head))}</li>`);
-        for (const s of added) parts.push(fb(s.head) || `<li class="ds-rev-sec">Added ${esc(clean(s.head))}${s.state ? ` — ${esc(s.state)} tasks` : ''}</li>`);
-      }
-      const renamed = removed.length === 1 && added.length === 1;
-      const skip = renamed ? added[0].head : null;
-      for (const s of cur) {
-        if (s.head === skip || ph[s.head] === undefined || ph[s.head] === s.hash) continue;
-        parts.push(fb(s.head) || `<li class="ds-rev-sec">${lineFor(s.head, ps[s.head], s.state, phead[s.head])}</li>`);
-      }
-      lines = parts.join('') || `<li class="ds-rev-sec">Edited plan text outside tracked sections</li>`;
+    let all = partsOf(r, prev, fb);
+    if (open) {
+      // Strict per-phase scope on clean data: only lines for the open phase.
+      // (History carries no moved-phase entries anymore — they were migrated
+      // to their new plan — so there is nothing stale to surface.)
+      all = all.filter((p) => p.anchors.filter(Boolean).some((a) => a === open));
+      if (!all.length) continue;
+    } else if (!all.length) {
+      all = [{ anchors: [null], heads: [], html: OUTSIDE }];
     }
+    const lines = all.map((p) => p.html).join('');
     rows.push(
       `<div class="ds-rev" data-rev="${i + 1}" data-rev-date="${esc(r.date || '')}">` +
       `<div class="ds-rev-date">${when}</div>` +
       `<ul class="ds-rev-secs">${lines}</ul></div>`,
     );
   }
+  if (!rows.length) return '';
+  const n = open ? rows.length : revs.length;
   return [
-    `<hr class="ds-hr"><div class="ds-revs" data-revs="${revs.length}">`,
-    `<div class="ds-revs-title">Revisions · ${revs.length}</div>`,
+    `<hr class="ds-hr"><div class="ds-revs" data-revs="${n}">`,
+    `<div class="ds-revs-title">Revisions · ${n}</div>`,
     rows.join(''),
     `</div>`,
   ].join('');
