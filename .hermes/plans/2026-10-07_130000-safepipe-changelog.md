@@ -144,3 +144,15 @@
 - Never invent feedback — every quoted line traces to a real section diff.
 
 **Verify:** a plan with recorded review feedback (e.g. 153000 Ops3D v2) shows the feedback bullets in its revision entries; lines trace to diffs; build green; 0 page errors.
+
+## Task 12: Gate seals — reviewer approval visualized in the changelog ✓ done
+
+**Objective:** Owner steer 2026-10-12: gates need a visualization in the changelog (kit element) that communicates a REVIEWER approved the gate before the next phase proceeded — reviewer identity, verdict, date, evidence, and the unlock of the next phase.
+
+**Design:**
+- Parse gate lines from plan markdown into structured data (name, state passed|waiver|open|failed, reviewer, date, note, evidence) in `changelog-parse.js` (additive; existing section parsing untouched).
+- New `paint-gates.js` renderer: a simple horizontal progress stepper — one node per phase, and the node's check IS its gate (checked = reviewer passed/waived, hollow = gate awaiting review, dot = tasks in progress). Styling is deliberately subtle and speaks the design-system visual language: token type scale and colors only, thin rail, small quiet nodes — no heavy fills. Clicking a phase node opens a popover with the gate read: verdict, "reviewed by <name> · <date>", evidence one-liner, next-phase unlock. Token-only styling, data-gate attributes for probes.
+- Kit update: document the gate seal in the changelog-kit skill (View roles) with the same rules (no counters-as-content, reviewer + verdict lead).
+- Mockup approved by owner before build (scratch sketch, previewed in chat).
+
+**Verify:** a gated plan (e.g. 202541) shows seals between phases with reviewer + verdict + date; open gates read "awaiting review"; every seal traces to a real gate line; build green; 0 page errors.

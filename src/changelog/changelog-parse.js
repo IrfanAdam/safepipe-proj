@@ -137,4 +137,37 @@ export const parseMeta = (file) => {
   return { date: '', id: '', slug: file.replace(/\.md$/, '') };
 };
 
+// Gate seals (Task 12, additive): `- REF GATE N (...)` lines → structured
+// [{n, state, reviewer, date, note, evidence, judge}]. Section parsing above
+// is untouched — this scans raw lines only.
+// state: passed (✓ PASSED) | waiver (PASSED by owner waiver) | failed | open.
+export const parseGates = (md) => {
+  const gates = [];
+  const lines = String(md || '').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^\s*-\s*REF GATE\s+(\d+)\s*(?:\(([^)]*)\))?\s*[:—–-]?\s*(.*)$/i);
+    if (!m) continue;
+    const n = Number(m[1]);
+    const paren = (m[2] || '').trim();
+    const rest = (m[3] || '').trim();
+    const line = lines[i];
+    let st = 'open';
+    if (/PASSED by owner waiver/i.test(line)) st = 'waiver';
+    else if (/✓\s*PASSED/i.test(line)) st = 'passed';
+    else if (/FAIL/i.test(line)) st = 'failed';
+    const dm = `${paren} ${rest}`.match(/(\d{4}-\d{2}-\d{2})/);
+    const reviewer = /owner/i.test(line) ? 'owner' : '';
+    let evidence = '';
+    for (let j = i + 1; j < lines.length; j++) {
+      if (/REF GATE/i.test(lines[j])) break;
+      if (/^#{1,4}\s/.test(lines[j])) break;
+      const em = lines[j].match(/^\s*-\s*(Evidence\b[\s\S]*)$/i);
+      if (em) { evidence = em[1].replace(/\s+/g, ' ').trim(); break; }
+    }
+    const jm = rest.match(/how (?:it was judged|to judge):\s*([\s\S]*)$/i);
+    gates.push({ n, state: st, reviewer, date: dm ? dm[1] : '', note: rest, evidence, judge: jm ? jm[1].trim() : '' });
+  }
+  return gates.sort((a, b) => a.n - b.n);
+};
+
 export { MONTHS, fmtDate, fmtTime, pDay, isoDay } from './changelog-format.js';

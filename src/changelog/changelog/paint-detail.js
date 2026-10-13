@@ -112,9 +112,10 @@ const marked = {
 };
 import { hits, badges, unlinked } from '../changelog-links.js';
 import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../changelog-titles.js';
-import { isDone, state } from '../changelog-parse.js';
+import { isDone, state, parseGates } from '../changelog-parse.js';
 import { esc } from './esc.js';
 import { paintRevs } from './paint-revs.js';
+import { paintGates } from './paint-gates.js';
 export function paintDetail(root, ctx){
   const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts, edited, revs } = ctx;
   const scrim = root.querySelector('[data-scrim]'), drawer = root.querySelector('[data-drawer]');
@@ -152,7 +153,9 @@ export function paintDetail(root, ctx){
     esc(unitLabel(sprint.head, si)),
     ` · `,
     esc(short(sprint.head)),
-    `</b><button data-close aria-label="Close detail">✕</button></div><div class="ds-md">`,
+    `</b><button data-close aria-label="Close detail">✕</button></div>`,
+    paintGates(parseGates(plan.raw || '')),
+    `<div class="ds-md">`,
     marked.parse(sprint.body) + paintRevs(revs) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : ''),
     `</div>`,
   ].join('');

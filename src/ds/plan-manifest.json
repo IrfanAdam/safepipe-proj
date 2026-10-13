@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-12T17:34:39.088Z",
+  "generated": "2026-10-13T09:01:13.629Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,24 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "11b9e39",
+      "full": "11b9e3984353d2bb51feb618117db67d5aa1dac2",
+      "date": "2026-10-12",
+      "time": "23:06",
+      "subject": "feat(changelog): revisions quote recorded review feedback [plan:2026-10-07_130000-safepipe-changelog.md#task-11]",
+      "plan": "2026-10-07_130000-safepipe-changelog.md",
+      "anchor": "task-11"
+    },
+    {
+      "sha": "a9cf9ee",
+      "full": "a9cf9eed71669b376e2ed8963e9a4651611804b2",
+      "date": "2026-10-12",
+      "time": "23:06",
+      "subject": "feat(map): click-to-twin preselect + Esc round-trip, tasks 18-19 done [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "096f423",
       "full": "096f4231b792b4a7ea9694895c993c15f1a90b3a",
@@ -2996,11 +3014,10 @@
     }
   ],
   "wip": [
-    "ops3d-map.html",
-    "src/changelog/changelog/paint-revs.js",
-    "src/map/main.js",
-    "src/ring2/main.js",
-    "src/map/twinlink.js",
-    "src/ring2/sector.js"
+    ".agents/skills/changelog-kit/SKILL.md",
+    "src/changelog/changelog-drawer.css",
+    "src/changelog/changelog-parse.js",
+    "src/changelog/changelog/paint-detail.js",
+    "src/changelog/changelog/paint-gates.js"
   ]
 }

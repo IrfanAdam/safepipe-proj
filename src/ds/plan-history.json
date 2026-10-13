@@ -1063,6 +1063,142 @@
      "state": "1/1"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-13",
+   "time": "14:29",
+   "hash": "6a5e23bf",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "7ba9e648",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Data-sanity pass ✓ done",
+     "hash": "087948f8",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
+     "hash": "0442a299",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
+     "hash": "c8e8534e",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
+     "hash": "2113de07",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
+     "hash": "96017c20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed ✓ done",
+     "hash": "14b3108f",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 11: Revisions surface the review feedback itself (starts after Lane J lands",
+     "hash": "9db188c7",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 12: Gate seals — reviewer approval visualized in the changelog",
+     "hash": "ec2e0a99",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-13",
+   "time": "14:31",
+   "hash": "8d3d14c0",
+   "sections": [
+    {
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
+     "hash": "b9376bd0",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
+     "hash": "93389863",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
+     "hash": "af719f20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Wire + verify + close ✓ done",
+     "hash": "7ba9e648",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 5: Data-sanity pass ✓ done",
+     "hash": "087948f8",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
+     "hash": "0442a299",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
+     "hash": "c8e8534e",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
+     "hash": "2113de07",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
+     "hash": "96017c20",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed ✓ done",
+     "hash": "14b3108f",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 11: Revisions surface the review feedback itself (starts after Lane J lands",
+     "hash": "9db188c7",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 12: Gate seals — reviewer approval visualized in the changelog ✓ done",
+     "hash": "f0298ace",
+     "state": "1/1"
+    }
+   ]
   }
  ],
  "2026-10-07_153000-ops3d-realworld-twin.md": [

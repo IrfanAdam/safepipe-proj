@@ -61,3 +61,26 @@
 /* beat .ds-md ul (higher specificity, same file scope) — zero indentation */
 .ds-md .ds-rev-secs{padding-left:0;margin-left:0}
 .ds-rev-sec{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding:var(--cl-1) 0;overflow-wrap:anywhere}
+/* gate seals stepper (Task 12): one quiet node per phase; the sealed node's
+   check is the inlined library glyph (small, thin, muted — never a badge),
+   awaiting review is a hollow ring, locked/future a muted dot. Popover opens
+   on focus/click via :focus-within — no JS, survives drawer repaints. */
+.ds-gates{margin:var(--cl-8) 0 var(--cl-4)}
+.ds-gates-title{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin-bottom:var(--cl-2)}
+.ds-gate-rail{list-style:none;display:flex;align-items:flex-start;margin:0;padding:var(--cl-4) 0 0;position:relative}
+.ds-gate-rail::before{content:"";position:absolute;left:var(--cl-9);right:var(--cl-9);top:calc(var(--cl-4) + var(--cl-9));height:var(--cl-1);background:var(--color-border)}
+.ds-gate-wrap{position:relative;flex:1 1 0;display:flex;flex-direction:column;align-items:center}
+.ds-gate{display:flex;flex-direction:column;align-items:center;gap:var(--cl-2);background:none;border:none;padding:0;cursor:pointer;font:inherit}
+.ds-gate-node{display:grid;place-items:center;width:var(--cl-18);height:var(--cl-18);border-radius:var(--sp-radius-full);background:var(--color-bg);border:var(--cl-1) solid var(--color-border);color:var(--sp-text-muted);position:relative}
+.ds-gate-node svg{width:var(--text-micro);height:var(--text-micro);flex:none}
+.ds-gate[data-gate-state="passed"] .ds-gate-node,.ds-gate[data-gate-state="waiver"] .ds-gate-node{border-color:var(--sp-border-strong);color:var(--sp-text-secondary)}
+.ds-gate[data-gate-state="open"] .ds-gate-node{border-color:var(--sp-text-muted);color:var(--sp-text-muted)}
+.ds-gate[data-gate-state="locked"] .ds-gate-node,.ds-gate[data-gate-state="failed"] .ds-gate-node{border-color:var(--color-border);color:var(--sp-neutral-6)}
+.ds-gate-ring{display:block;width:40%;height:40%;border-radius:var(--sp-radius-full);border:var(--cl-1) solid currentColor}
+.ds-gate-dot{display:block;width:30%;height:30%;border-radius:var(--sp-radius-full);background:currentColor}
+.ds-gate-label{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
+.ds-gate[data-gate-state="passed"] .ds-gate-label,.ds-gate[data-gate-state="waiver"] .ds-gate-label{color:var(--color-ink)}
+.ds-gate-pop{display:none;position:absolute;top:calc(100% + var(--cl-6));left:50%;transform:translateX(-50%);z-index:var(--z-ds-controls);width:max-content;max-width:calc(var(--sp-spacing-base) * 60);background:var(--color-surface);border:var(--border-hairline);border-radius:var(--sp-radius-md);box-shadow:var(--shadow-sm);padding:var(--cl-8) var(--cl-12)}
+.ds-gate-pop b{display:block;font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink)}
+.ds-gate-pop span{display:block;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);margin-top:var(--cl-2);overflow-wrap:anywhere}
+.ds-gate-wrap:focus-within .ds-gate-pop{display:block}
