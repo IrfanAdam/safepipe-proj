@@ -11,18 +11,39 @@ export const SECTOR_PARAM = 'sector';
 export const EMBED_PARAM = 'embed';
 /* Twinlink handoff frame params (LANE 3): the map overlay opens the twin as
  * ?sector=<h3>&cx=<lng>&cy=<lat>&z=<zoom>[&bearing=<deg>] at vertical
- * top-down. Bearing defaults to 0 (map north-up). */
+ * top-down. The frame is the RING bounds (wider than the terminal) at
+ * satellite; bearing defaults to 0 (map north-up). Forward flight is
+ * three stages: hold top-down at the ring frame, slow ease to iso at the
+ * attached angle (same ring center/range, mix stays 0), then a slow tiny
+ * push-in to the terminal while the slider drives satellite->twin
+ * (0->100) — the push-in and the slider move together. Reverse mirrors
+ * exactly: pull back to the ring frame + slider->0 + pitch->0, then post
+ * the close with {recede:true}. */
 export const CX_PARAM = 'cx';
 export const CY_PARAM = 'cy';
 export const ZOOM_PARAM = 'z';
 export const BEARING_PARAM = 'bearing';
 export const TWIN_CLOSE_MSG = 'safepipe-twin-close';
+/* Delegated fullscreen (twin-side): when embedded (?embed=1) the twin
+ * FULLSCREEN button must NOT fullscreen its own document (that would hide
+ * the parent's CLOSE chrome). It posts { type, on } to the parent instead
+ * and syncs its label from the parent's echoed state. Standalone keeps
+ * native self-fullscreen. Map-side receipt + fullscreen target are
+ * Lane-1 owned — this file only names the wire format. */
+export const TWIN_FULLSCREEN_MSG = 'safepipe-twin-fullscreen';
 
-/* Handoff flight timing (ms): hold a beat top-down, slow ease to the iso
- * terminal view; close plays the exact reverse, slightly quicker. */
+/* Handoff flight timing (ms): hold a beat top-down at the ring frame, slow
+ * ease to iso at the attached angle (ring center/range, slider stays 0),
+ * then a slow tiny push-in to the terminal with the slider driving 0->100.
+ * Reverse mirrors exactly: pull back (push reversed) + pitch back (swoop
+ * reversed) with the slider ->0, then the {recede:true} close posts. */
 export const HANDOFF_HOLD_MS = 900;
 export const HANDOFF_SWOOP_MS = 2800;
-export const HANDOFF_REVERSE_MS = 1400;
+export const HANDOFF_PUSH_MS = 2600;
+/* Reverse is the exact two-segment mirror: pull (PUSH_MS) then pitch-back
+ * (SWOOP_MS). Single source of truth for the total so the flight and any
+ * probe margin agree. */
+export const HANDOFF_REVERSE_MS = HANDOFF_PUSH_MS + HANDOFF_SWOOP_MS;
 /* Slider drive: overlay opens at full satellite, swoops to full twin. */
 export const HANDOFF_START_MIX = 0;
 export const HANDOFF_END_MIX = 100;
@@ -109,6 +130,24 @@ export function easeInOutCubic(t) {
  * clone safe. */
 export function buildTwinCloseMessage(recede = true) {
   return { type: TWIN_CLOSE_MSG, recede: !!recede };
+}
+
+/** Delegated-fullscreen request posted to the parent when embedded:
+ * { type:'safepipe-twin-fullscreen', on:true/false }. Plain object —
+ * structured-clone safe. The parent owns the fullscreen target and echoes
+ * the same shape back so the twin can sync its label. */
+export function buildTwinFullscreenMessage(on = true) {
+  return { type: TWIN_FULLSCREEN_MSG, on: !!on };
+}
+
+/** True for the delegated-fullscreen object form (request or parent echo).
+ * Never matches the legacy bare close string. */
+export function isTwinFullscreenMessage(data) {
+  try {
+    return !!data && typeof data === 'object' && data.type === TWIN_FULLSCREEN_MSG;
+  } catch {
+    return false;
+  }
 }
 
 /** True for either close payload: the legacy bare string (current parent)

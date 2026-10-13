@@ -7,6 +7,20 @@ import { H3_RES, HEALTH_RANK, worstHealth } from './feed.js';
 export const TWIN_PAGE = './ops3d-ring2.html';
 export const SECTOR_PARAM = 'sector';
 export const TWIN_CLOSE_MSG = 'safepipe-twin-close';
+// Handoff-3 Lane 1: twin->parent fullscreen protocol. The twin iframe posts
+// { type: TWIN_FS_MSG, on: true/false }; the parent fullscreen-toggles the
+// #twin-overlay element ITSELF so the CLOSE bar stays visible. Pure.
+export const TWIN_FS_MSG = 'safepipe-twin-fullscreen';
+
+/** Parse a twin fullscreen message. { on } when matched, else null. */
+export function parseTwinFsMessage(d) {
+  try {
+    if (!d || typeof d !== 'object' || d.type !== TWIN_FS_MSG) return null;
+    return { on: !!d.on };
+  } catch {
+    return null;
+  }
+}
 
 /** Sectors -> { sectorId: h3index } (H3 derived live, same res as rings). */
 export function sectorH3Map(sectors) {

@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, frameTarget, frameRange, easeInOutCubic, buildTwinCloseMessage, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, easeInOutCubic, buildTwinCloseMessage, buildTwinFullscreenMessage, isTwinFullscreenMessage, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import {
   createCtxMon,
@@ -78,7 +78,7 @@ let lastConsoleStatus = '';
 const FOV_DEG = MAP_TRUE_FOV_DEG;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'b60linefade';
+const BUILD_ID = 'b61ringpush';
 // Shared GL-context + tile telemetry registry (see ctxmon.js: one
 // real-Safari screenshot of the six tokens discriminates every hypothesis
 // in the defect-hunt report).
@@ -595,21 +595,26 @@ async function boot() {
   } catch { /* live chrome never breaks boot */ }
 
   /* LANE 3 twinlink handoff (twin-side inbound + reverse): the map overlay
-   * opens this page as ?sector=<h3>&cx=<lng>&cy=<lat>&z=<zoom>[&bearing=].
-   * On open with frame params the camera starts at that exact footprint
-   * (pitch 0, bearing matching the map, slider at full satellite), holds a
-   * beat top-down, then slow-eases to the isometric terminal view while the
-   * SAT->TWIN slider drives satellite->twin. Close plays the exact reverse
-   * (iso -> top-down satellite frame) then posts the close message with
-   * {recede:true} so the parent fades sat->flat + zooms back out.
+   * opens this page as ?sector=<h3>&cx=<lng>&cy=<lat>&z=<zoom>[&bearing=],
+   * where the frame is the RING bounds (wider than the terminal).
+   * Forward flight is three stages: open at the ring frame top-down
+   * satellite (pitch 0, bearing matching the map, slider at full
+   * satellite), hold a beat, slow-ease to iso at the attached angle (same
+   * ring center/range, slider STAYS at 0), then a slow tiny push-in to the
+   * terminal while the SAT->TWIN slider drives satellite->twin — the
+   * push-in and the slider move together. Close plays the exact mirror:
+   * pull back to the ring frame + slider->0 + pitch->0 (pull segment, then
+   * pitch-back segment), then posts the close message with {recede:true}
+   * so the parent fades sat->flat + zooms back out.
    * Pure math (parse/ease/message) lives in sector.js (node-checkable);
    * this block owns the camera/slider flight. Never breaks boot. */
   const handoff = {
-    phase: 'idle', // idle|hold|swoop|reverse|done
+    phase: 'idle', // idle|hold|swoop|push|reverse|done
     t0: 0,
-    start: null, // pinned top-down footprint { tx, ty, tz, range, bearing }
+    start: null, // pinned top-down ring footprint { tx, ty, tz, range, bearing }
+    mid: null, // ring-frame iso { eye, target } (swoop end / push start)
     from: null, // flight segment start { eye, target, mix }
-    to: null, // flight segment end { eye, target, mix }
+    to: null, // terminal iso { eye, target, mix }
   };
   const handoffNow = () => {
     try {
@@ -690,9 +695,10 @@ async function boot() {
       return null;
     }
   }
-  function beginHandoffFlight(pinnedStart, to) {
+  function beginHandoffFlight(pinnedStart, ringIso, terminal) {
     handoff.start = pinnedStart;
-    handoff.to = to;
+    handoff.mid = ringIso;
+    handoff.to = terminal;
     handoff.from = null;
     handoff.phase = 'hold';
     handoff.t0 = handoffNow();
@@ -708,7 +714,7 @@ async function boot() {
     try {
       const c = twin?.canvas;
       const cancel = () => {
-        if (handoff.phase === 'hold' || handoff.phase === 'swoop') endHandoffFlight();
+        if (handoff.phase === 'hold' || handoff.phase === 'swoop' || handoff.phase === 'push') endHandoffFlight();
       };
       c?.addEventListener?.('pointerdown', cancel, { once: true });
       c?.addEventListener?.('wheel', cancel, { once: true });
@@ -726,7 +732,13 @@ async function boot() {
     twin.camera.position.set(eye.x, eye.y, eye.z);
   }
   /* Per-frame flight step (runs at the top of the render loop, before the
-   * damped controls settle — the flight IS the pose source while active). */
+   * damped controls settle — the flight IS the pose source while active).
+   * Forward: hold (ring top-down, mix 0) -> swoop (ring top-down -> ring
+   * iso at the attached angle, mix STAYS 0) -> push (ring iso -> terminal
+   * iso, mix 0->100 with the push-in). Reverse mirrors exactly inside the
+   * single 'reverse' phase: pull (terminal -> ring iso, mix ->0 over
+   * PUSH_MS) then pitch-back (ring iso -> ring top-down over SWOOP_MS),
+   * then the {recede:true} close posts. */
   function stepHandoff() {
     if (!handoff || handoff.phase === 'idle' || handoff.phase === 'done') return;
     try {
@@ -741,7 +753,7 @@ async function boot() {
         driveMix(HANDOFF_START_MIX);
         if (now - handoff.t0 >= HANDOFF_HOLD_MS) {
           handoff.from = capturePose();
-          if (!handoff.from || !handoff.to) {
+          if (!handoff.from || !handoff.mid) {
             endHandoffFlight();
             return;
           }
@@ -751,7 +763,36 @@ async function boot() {
         return;
       }
       if (handoff.phase === 'swoop') {
+        // Ease to iso AT the ring frame: same center/range, pitch only.
+        // The slider stays at full satellite through the whole swoop.
         const t = Math.min(1, Math.max(0, (now - handoff.t0) / HANDOFF_SWOOP_MS));
+        const k = easeInOutCubic(t);
+        const f = handoff.from, mid = handoff.mid;
+        if (!f || !mid) {
+          endHandoffFlight();
+          return;
+        }
+        try {
+          applyFlightPose(
+            { x: lerp(f.eye.x, mid.eye.x, k), y: lerp(f.eye.y, mid.eye.y, k), z: lerp(f.eye.z, mid.eye.z, k) },
+            { x: lerp(f.target.x, mid.target.x, k), y: lerp(f.target.y, mid.target.y, k), z: lerp(f.target.z, mid.target.z, k) },
+          );
+        } catch { /* pose drive is best-effort */ }
+        driveMix(HANDOFF_START_MIX);
+        if (t >= 1) {
+          try {
+            applyFlightPose(mid.eye, mid.target);
+          } catch { /* snap is best-effort */ }
+          driveMix(HANDOFF_START_MIX);
+          handoff.from = { eye: { ...mid.eye }, target: { ...mid.target }, mix: HANDOFF_START_MIX };
+          handoff.phase = 'push';
+          handoff.t0 = now;
+        }
+        return;
+      }
+      if (handoff.phase === 'push') {
+        // Slow tiny push-in to the terminal while the slider drives 0->100.
+        const t = Math.min(1, Math.max(0, (now - handoff.t0) / HANDOFF_PUSH_MS));
         const k = easeInOutCubic(t);
         const f = handoff.from, to = handoff.to;
         if (!f || !to) {
@@ -775,24 +816,39 @@ async function boot() {
         return;
       }
       if (handoff.phase === 'reverse') {
-        const t = Math.min(1, Math.max(0, (now - handoff.t0) / HANDOFF_REVERSE_MS));
-        const k = easeInOutCubic(t);
-        const f = handoff.from, s = handoff.start;
-        if (!f || !s) {
+        // Exact mirror: pull (terminal -> ring iso, slider ->0) then
+        // pitch-back (ring iso -> ring top-down). HANDOFF_REVERSE_MS is the
+        // PUSH+SWOOP total by construction (sector.js).
+        const f = handoff.from, mid = handoff.mid, s = handoff.start;
+        if (!f || !mid || !s) {
           endHandoffFlight();
           postTwinClose();
           return;
         }
+        const elapsed = now - handoff.t0;
         const se = startEye(s);
         const st = { x: s.tx, y: s.ty, z: s.tz };
+        if (elapsed < HANDOFF_PUSH_MS) {
+          const k = easeInOutCubic(elapsed / HANDOFF_PUSH_MS);
+          try {
+            applyFlightPose(
+              { x: lerp(f.eye.x, mid.eye.x, k), y: lerp(f.eye.y, mid.eye.y, k), z: lerp(f.eye.z, mid.eye.z, k) },
+              { x: lerp(f.target.x, mid.target.x, k), y: lerp(f.target.y, mid.target.y, k), z: lerp(f.target.z, mid.target.z, k) },
+            );
+          } catch { /* pose drive is best-effort */ }
+          driveMix(lerp(f.mix, HANDOFF_START_MIX, k));
+          return;
+        }
+        const t2 = Math.min(1, Math.max(0, (elapsed - HANDOFF_PUSH_MS) / HANDOFF_SWOOP_MS));
+        const k2 = easeInOutCubic(t2);
         try {
           applyFlightPose(
-            { x: lerp(f.eye.x, se.x, k), y: lerp(f.eye.y, se.y, k), z: lerp(f.eye.z, se.z, k) },
-            { x: lerp(f.target.x, st.x, k), y: lerp(f.target.y, st.y, k), z: lerp(f.target.z, st.z, k) },
+            { x: lerp(mid.eye.x, se.x, k2), y: lerp(mid.eye.y, se.y, k2), z: lerp(mid.eye.z, se.z, k2) },
+            { x: lerp(mid.target.x, st.x, k2), y: lerp(mid.target.y, st.y, k2), z: lerp(mid.target.z, st.z, k2) },
           );
         } catch { /* pose drive is best-effort */ }
-        driveMix(lerp(f.mix, HANDOFF_START_MIX, k));
-        if (t >= 1) {
+        driveMix(HANDOFF_START_MIX);
+        if (t2 >= 1) {
           try {
             pinTopDown(s.tx, s.tz, s.range, s.bearing);
           } catch { /* pin is best-effort */ }
@@ -814,10 +870,11 @@ async function boot() {
       window.parent?.postMessage(TWIN_CLOSE_MSG, '*');
     } catch { /* parent notify is best-effort */ }
   }
-  /* Close entry: plays the EXACT reverse (iso -> top-down satellite frame)
-   * then signals the parent. X (parent chrome) + browser-back are
-   * parent-owned — the parent tears the iframe down directly; Esc and the
-   * sister HUD lane call this. Safe standalone (no frame): notifies now. */
+  /* Close entry: plays the EXACT mirror reverse (pull back to the ring
+   * frame + slider->0 + pitch->0) then signals the parent. X (parent
+   * chrome) + browser-back are parent-owned — the parent tears the iframe
+   * down directly; Esc and the sister HUD lane call this. Safe standalone
+   * (no frame): notifies now. */
   function requestTwinClose() {
     try {
       if (handoff.phase === 'reverse') return true; // already running
@@ -845,6 +902,75 @@ async function boot() {
     }
   }
 
+  /* Delegated fullscreen state (twin-side). Embedded (?embed=1): the HUD
+   * FULLSCREEN button posts { type:'safepipe-twin-fullscreen', on } to the
+   * parent and its label follows the parent's echoed state — the twin never
+   * fullscreens its own document (that would hide the parent's CLOSE).
+   * Standalone: native self-fullscreen stands, this stays inert. Probe:
+   * window.__ring2.fs { delegated, on }, window.__ring2fsOut[] (posted). */
+  let fsDelegated = false;
+  let fsOn = false;
+  function paintDelegatedFsLabel(btn, on) {
+    try {
+      btn.textContent = on ? 'EXIT FULL' : 'FULLSCREEN';
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    } catch { /* label sync never breaks boot */ }
+  }
+  function wireDelegatedFullscreen(embedded) {
+    fsDelegated = !!embedded;
+    let btn = null;
+    try {
+      btn = hud?.els?.fsBtn ?? document.querySelector('.ops-hud__fs') ?? null;
+    } catch { /* probe ref is best-effort */ }
+    try {
+      window.__ring2.fs = { delegated: fsDelegated, on: fsOn };
+    } catch { /* probe write is best-effort */ }
+    if (!btn) return false;
+    try {
+      window.__ring2.fsBtn = btn;
+    } catch { /* probe ref is best-effort */ }
+    if (!embedded) return false; // standalone: native self-fullscreen stands
+    // Ancestor capture runs before hud-overlays.js' bubble-phase native
+    // handler on the button itself (a same-node capture listener would lose
+    // the registration-order race at target). stopPropagation at this level
+    // keeps requestFullscreen from ever firing while embedded.
+    window.addEventListener('click', (e) => {
+      try {
+        const t = e?.target?.closest?.('.ops-hud__fs');
+        if (!t) return;
+        e.preventDefault();
+        e.stopPropagation();
+        let cur = false;
+        try {
+          cur = t.getAttribute('aria-pressed') === 'true';
+        } catch { /* default to requesting on */ }
+        const next = !cur;
+        try {
+          window.parent?.postMessage(buildTwinFullscreenMessage(next), '*');
+        } catch { /* parent notify is best-effort */ }
+        try {
+          (window.__ring2fsOut ?? (window.__ring2fsOut = [])).push(
+            buildTwinFullscreenMessage(next),
+          );
+        } catch { /* probe log is best-effort */ }
+      } catch { /* delegation never breaks input */ }
+    }, true);
+    // The parent's echo is the label's single source of truth while
+    // embedded (map-side Lane-1 owns the target + state).
+    window.addEventListener('message', (e) => {
+      try {
+        if (!isTwinFullscreenMessage(e?.data)) return;
+        fsOn = !!e.data.on;
+        const b = hud?.els?.fsBtn ?? document.querySelector('.ops-hud__fs') ?? btn;
+        if (b) paintDelegatedFsLabel(b, fsOn);
+        try {
+          window.__ring2.fs = { delegated: true, on: fsOn };
+        } catch { /* probe write is best-effort */ }
+      } catch { /* label sync never breaks the frame */ }
+    });
+    return true;
+  }
+
   window.__ring2 = {
     map,
     twin,
@@ -860,6 +986,7 @@ async function boot() {
     handoff,
     requestTwinClose,
     handoffPhase: () => handoff.phase,
+    fs: { delegated: fsDelegated, on: fsOn },
     diag: () => ({
       build: BUILD_ID,
       canvases: canvasDims(),
@@ -873,13 +1000,16 @@ async function boot() {
   };
 
   /* Phase 03 Tasks 18+19 (?sector=<h3> preselect + embed close round-trip)
-   * + LANE 3 twinlink handoff: ?sector=<h3>&cx=<lng>&cy=<lat>&z=<zoom>.
-   * Overlay open with frame params starts the camera at that exact footprint
-   * (pitch 0, bearing matching the map, slider at full satellite), holds a
-   * beat top-down, then slow-eases to the isometric terminal view while the
-   * slider drives satellite->twin. Sector-only (no frame) flies a wide
-   * top-down survey -> iso fallback. Standalone loads boot normally — the
-   * preselect never breaks boot. Probe: window.__ring2.sector. */
+   * + LANE 3 twinlink handoff: ?sector=<h3>&cx=<lng>&cy=<lat>&z=<zoom>,
+   * where the frame is the RING bounds (wider than the terminal).
+   * Overlay open with frame params starts the camera at the ring frame
+   * top-down (pitch 0, bearing matching the map, slider at full
+   * satellite), holds a beat, slow-eases to iso at the attached angle
+   * (same ring center/range, slider stays 0), then slow-pushes into the
+   * terminal while the slider drives satellite->twin. Sector-only (no
+   * frame) flies a wide top-down survey -> iso -> terminal fallback.
+   * Standalone loads boot normally — the preselect never breaks boot.
+   * Probe: window.__ring2.sector. */
   try {
     const sectorQ = parseSectorQuery(location.search);
     const hit = resolveSector(sectorQ.sector);
@@ -906,8 +1036,8 @@ async function boot() {
       window.__ring2.sector = sectorSel;
     } catch { /* probe write is best-effort */ }
     // Handoff flight: frame handoff, or sector-only fallback (wide top-down
-    // survey -> iso). Standalone (no frame, no sector): no flight, the
-    // boot camera + persisted mix stand.
+    // survey -> ring iso -> terminal). Standalone (no frame, no sector): no
+    // flight, the boot camera + persisted mix stand.
     try {
       if (anchor) {
         const vp = viewportPxNow();
@@ -918,14 +1048,25 @@ async function boot() {
         if (!Number.isFinite(startRange) || startRange <= 0) startRange = 12000;
         startRange = Math.min(32000, Math.max(1500, startRange));
         const bearing = sectorQ.frame?.bearing ?? 0;
-        // Iso terminal: the sector's worst asset when known, else the anchor.
+        const azim = -(((Number(bearing) || 0) * Math.PI) / 180);
+        // Ring-frame iso: the swoop target — same ring center/range as the
+        // pinned start, pitched to iso at the attached angle. Slider stays
+        // at full satellite through the swoop.
+        const aty = groundYNear(anchor.x, anchor.z);
+        const ringIsoEye = poseAt(anchor.x, aty, anchor.z, startRange, HANDOFF_ISO_POLAR_DEG, azim);
+        // Iso terminal: the sector's worst asset when known, else the
+        // anchor. The push-in (ring iso -> terminal iso) is the tiny leg —
+        // the ring frame is wider than the terminal — and the slider rides
+        // it 0->100.
         const etx = hit ? hit.sector.dx : anchor.x;
         const etz = hit ? hit.sector.dz : anchor.z;
         const ety = groundYNear(etx, etz);
-        const azim = -(((Number(bearing) || 0) * Math.PI) / 180);
         const isoEye = poseAt(etx, ety, etz, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, azim);
         const pinned = pinTopDown(anchor.x, anchor.z, startRange, bearing);
         beginHandoffFlight(pinned, {
+          eye: ringIsoEye,
+          target: { x: anchor.x, y: aty, z: anchor.z },
+        }, {
           eye: isoEye,
           target: { x: etx, y: ety, z: etz },
           mix: HANDOFF_END_MIX,
@@ -933,12 +1074,13 @@ async function boot() {
       }
     } catch { /* flight never breaks boot; probe still reports the sector */ }
     if (sectorQ.embed) {
-      // Esc: play the exact reverse (iso -> top-down satellite frame) then
-      // notify the parent with {recede:true}. Popover-first: the HUD popover
-      // manager owns Esc while a popover is open (bubble-phase handler) and
-      // this capture listener runs first — so when a popover is open, yield
-      // (no preventDefault/stopPropagation) and let it close the popover.
-      // The next Esc then drives the reverse close.
+      // Esc: play the exact mirror reverse (pull back to the ring frame +
+      // slider->0 + pitch->0) then notify the parent with {recede:true}.
+      // Popover-first: the HUD popover manager owns Esc while a popover is
+      // open (bubble-phase handler) and this capture listener runs first —
+      // so when a popover is open, yield (no preventDefault/stopPropagation)
+      // and let it close the popover. The next Esc then drives the reverse
+      // close.
       window.addEventListener('keydown', (e) => {
         if (!e || e.key !== 'Escape') return;
         if (e.defaultPrevented) return;
@@ -967,6 +1109,25 @@ async function boot() {
           postTwinClose();
         } catch { /* parent notify is best-effort */ }
       });
+      /* Delegated fullscreen (embedded only): the twin FULLSCREEN button
+       * must NOT fullscreen its own document — that would hide the parent's
+       * CLOSE chrome. Instead the click posts
+       * { type:'safepipe-twin-fullscreen', on } to the parent (map-side
+       * Lane-1 owns the target + state) and the label syncs from the
+       * parent's echoed state. Standalone keeps native self-fullscreen, so
+       * this whole block is embed-gated. hud-overlays.js is untouched: the
+       * capture-phase interceptor runs before its bubble-phase native
+       * handler and stopImmediatePropagation keeps requestFullscreen from
+       * ever firing while embedded. Its fullscreenchange sync only fires on
+       * own-document changes (never, while embedded), so it can't fight the
+       * parent-driven label. */
+      try {
+        wireDelegatedFullscreen(true);
+      } catch { /* native button stands when delegation can't wire */ }
+    } else {
+      try {
+        wireDelegatedFullscreen(false);
+      } catch { /* standalone label is native-owned */ }
     }
   } catch { /* preselect never breaks boot */ }
 

@@ -1,7 +1,9 @@
-// src/map/main.js — Phase 03 Tasks 16-19 + GATE 3 look pass: flat light
-// Azerbaijan country map (Carto Positron GL, keyless; Esri satellite raster
-// toggle, flat default) with a single pulsing SANGACHAL monitoring blip
-// (40.201262N 49.481270E). Blip color = site worst-health from ./feed.js
+// src/map/main.js — Phase 03 Tasks 16-19 + GATE 3 look pass + Handoff-3
+// Lane 1: flat light Azerbaijan country map (Carto Positron GL, keyless;
+// Esri satellite raster, flat default, NO toggle ribbon — sat is
+// transition-only: pre-warmed + ramped DURING the outbound zoom flight to
+// the clicked H3 ring bounds, reversed on recede) with a single pulsing
+// SANGACHAL monitoring blip (40.201262N 49.481270E). Blip color = site worst-health from ./feed.js
 // (existing HEALTH_COLORS; ?force=<sector>:<health> override still works).
 // Click-to-twin overlay (?sector=<h3>) + X/Esc/back round-trip wiring is
 // UNTOUCHED from Tasks 18+19. Single blip opens the twin for the worst
@@ -25,6 +27,7 @@ import {
   findSector,
   worstAssetId,
   TWIN_CLOSE_MSG,
+  parseTwinFsMessage,
 } from './twinlink.js';
 
 const POSITRON_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
@@ -82,12 +85,12 @@ let deckFeats = [];
 let deckPins = [];
 let overlayEls = null;
 // T2 handoff choreography refs: live map + sat setter (assigned on load),
-// sat chrome refs (assigned in mountChrome), in-flight sector id or null.
+// in-flight sector id or null. Handoff-3: twinFs tracks overlay-fullscreen
+// requested via the twin {type:'safepipe-twin-fullscreen'} protocol.
 let mapRef = null;
 let setSatRef = null;
-let satBtnRef = null;
-let satMetaRef = null;
 let transitId = null;
+let twinFs = false;
 
 window.__mapProbe = {
   ready: false, base: 'positron', satOn: false,
@@ -95,8 +98,9 @@ window.__mapProbe = {
   worst, worstAsset: worstBySector, sectorH3: null,
   selected: selectedId, twinOpen: false,
   blips: 1, siteWorst, siteSector, site: { lat: SITE.lat, lon: SITE.lon, name: 'SANGACHAL' },
-  transit: null, handoff: null, vignette: false,
+  transit: null, handoff: null, vignette: false, mapFs: false, twinFs: false,
   errors, openTwin, closeTwin, selectSector, flyToSectorThenTwin,
+  toggleMapFs, setTwinFs,
 };
 
 function fallbackStyle() {
@@ -340,17 +344,14 @@ function showVignette(on) {
   window.__mapProbe.vignette = !!on;
 }
 
-/** Force the sat toggle (choreography path): layer + button + probe stay in sync. */
+/** Force the sat layer (choreography path only — no toggle chrome exists).
+ * Layer + probe stay in sync. */
 function setSatForced(on) {
   try {
     if (setSatRef) setSatRef(!!on);
   } catch (err) {
     errors.push('SAT-FORCE: ' + (err && err.message));
   }
-  try {
-    if (satBtnRef) satBtnRef.setAttribute('aria-pressed', String(!!on));
-    if (satMetaRef) satMetaRef.textContent = on ? 'satellite' : 'positron';
-  } catch { /* chrome sync is cosmetic */ }
   window.__mapProbe.satOn = !!on;
 }
 
@@ -367,10 +368,11 @@ function warmSatTiles() {
   } catch { /* pre-ready */ }
 }
 
-/** T2 handoff choreography: ease to the H3 ring bounds with symmetric
- * padding + center lock (strictly vertical top view), pre-warming sat
- * tiles during the zoom; then crossfade flat->sat over the cached zoomed
- * flat frame + vignette; then open the twin with the staged frame.
+/** Handoff-3 outbound choreography: ease to the clicked H3 RING bounds (the
+ * hex bounds — wider than the terminal footprint) with symmetric padding +
+ * center lock (strictly vertical top view). Sat tiles pre-warm AND the
+ * flat->sat crossfade ramps DURING the zoom flight (together, not after);
+ * then the twin opens with the staged ring frame (?sector&cx&cy&z).
  * Falls back to a direct open when the map isn't ready, bounds fail, or
  * motion is reduced. Re-entrant clicks are ignored. */
 function flyToSectorThenTwin(id, opts = {}) {
@@ -404,9 +406,11 @@ function flyToSectorThenTwin(id, opts = {}) {
   if (transitId) return false;
   transitId = id;
   window.__mapProbe.transit = id;
-  // LANE A: pre-warm sat tiles during the zoom so the crossfade has cached
-  // tiles and never flashes over the zoomed flat frame.
+  // Handoff-3: pre-warm sat tiles AND ramp the flat->sat crossfade TOGETHER
+  // with the zoom flight — the ramp runs during the zoom, never after it.
   warmSatTiles();
+  setSatForced(true);
+  showVignette(true);
   let done = false;
   const finish = () => {
     if (done) return;
@@ -430,15 +434,13 @@ function flyToSectorThenTwin(id, opts = {}) {
         } catch { /* center nudge is best-effort */ }
       }
     } catch { /* center lock is best-effort */ }
-    // Crossfade flat->sat OVER the cached zoomed flat frame (sat layer was
-    // pre-warmed visible@0; this opacity ramp is the visible crossfade).
-    setSatForced(true);
-    showVignette(true);
+    // Flight is done and the sat frame is already staged underneath (the
+    // crossfade ran during the zoom). Short settle, then open the twin.
     setTimeout(() => {
       transitId = null;
       window.__mapProbe.transit = null;
       openTwin(id, { ...opts, frame: liveFrame() });
-    }, 650);
+    }, 350);
   };
   try {
     mapRef.once('moveend', finish);
@@ -503,6 +505,18 @@ function openTwin(id, opts = {}) {
  * + selection (Task 19). announce=true resolves when hidden (LANE A recede
  * chains the map animation underneath the fade). */
 function doCloseTwin() {
+  // Handoff-3: if the overlay is the fullscreen element, drop fullscreen
+  // silently first (flag cleared so fullscreenchange can't recede twice).
+  try {
+    if (overlayEls && document.fullscreenElement === overlayEls.root) {
+      twinFs = false;
+      try { window.__mapProbe.twinFs = false; } catch { /* probe cosmetic */ }
+      if (document.exitFullscreen) {
+        const r = document.exitFullscreen();
+        if (r && r.catch) r.catch(() => {});
+      }
+    }
+  } catch { /* fullscreen teardown is best-effort */ }
   const finishHide = () => {
     if (overlayEls) {
       overlayEls.root.hidden = true;
@@ -610,6 +624,16 @@ function recedeToCountry() {
     errors.push('RECEDE: ' + (err && err.message));
   }
 }
+// Handoff-3 Lane 1: twin fullscreen protocol (sister Lane 2 sends
+// { type:'safepipe-twin-fullscreen', on }). Separate listener so the close
+// path below is untouched.
+window.addEventListener('message', (e) => {
+  let fs = null;
+  try { fs = parseTwinFsMessage(e && e.data); } catch { fs = null; }
+  if (!fs) return;
+  if (!twinOpen) return;
+  setTwinFs(fs.on);
+});
 window.addEventListener('message', (e) => {
   if (!twinOpen || !isTwinCloseData(e && e.data)) return;
   const recede = !!(e.data && typeof e.data === 'object' && e.data.recede);
@@ -618,20 +642,7 @@ window.addEventListener('message', (e) => {
 });
 
 function mountChrome(map, overlay, setSat) {
-  const bar = document.createElement('div');
-  bar.className = 'map-toggle';
-  bar.innerHTML =
-    '<span class="map-toggle__label">MAP</span>' +
-    '<button id="sat-toggle" aria-pressed="false" title="Toggle satellite imagery">SAT</button>' +
-    '<span class="map-toggle__meta" id="map-meta">positron</span>';
-  document.getElementById('app').appendChild(bar);
-  const btn = bar.querySelector('#sat-toggle');
-  satBtnRef = btn;
-  satMetaRef = bar.querySelector('#map-meta');
-  btn.addEventListener('click', () => {
-    const on = btn.getAttribute('aria-pressed') !== 'true';
-    setSatForced(on);
-  });
+  mountFlatFs();
   // GATE 3: single pulsing Sangachal DOM blip — always visible (screen
   // reader + no-WebGL path + deck pulse overlay). Colored by site worst.
   const pinLayer = document.createElement('div');
@@ -652,7 +663,101 @@ function mountChrome(map, overlay, setSat) {
   pinLayer.appendChild(b);
   document.getElementById('app').appendChild(pinLayer);
   positionDomPins(map);
-  return { btn, pinLayer };
+  return { pinLayer };
+}
+
+/* Handoff-3 Lane 1: flat-view FULLSCREEN button (quiet mono, bottom-right).
+ * Fullscreen-toggles the map root (#app) so the flat view fills the screen;
+ * the button rides inside #app so it stays visible in map-fullscreen. */
+function mountFlatFs() {
+  try {
+    if (document.getElementById('map-fs')) return;
+    const app = document.getElementById('app');
+    if (!app) return;
+    const b = document.createElement('button');
+    b.id = 'map-fs';
+    b.textContent = '\u26F6 FULLSCREEN';
+    b.title = 'Toggle fullscreen map';
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => toggleMapFs());
+    app.appendChild(b);
+    document.addEventListener('fullscreenchange', syncFsProbe);
+  } catch { /* chrome is cosmetic */ }
+}
+
+function toggleMapFs() {
+  try {
+    const app = document.getElementById('app');
+    if (!app) return false;
+    if (document.fullscreenElement === app) {
+      if (document.exitFullscreen) {
+        const r = document.exitFullscreen();
+        if (r && r.catch) r.catch((err) => errors.push('MAP-FS: ' + (err && err.message)));
+      }
+      return true;
+    }
+    if (app.requestFullscreen) {
+      const r = app.requestFullscreen();
+      if (r && r.catch) r.catch((err) => errors.push('MAP-FS: ' + (err && err.message)));
+      return true;
+    }
+    return false;
+  } catch (err) {
+    errors.push('MAP-FS: ' + (err && err.message));
+    return false;
+  }
+}
+
+/* Handoff-3 Lane 1: parent-side fullscreen protocol. The twin iframe posts
+ * { type:'safepipe-twin-fullscreen', on } — request/exit fullscreen on the
+ * #twin-overlay element ITSELF so the CLOSE bar stays visible inside
+ * fullscreen (windowed, map-fullscreen, overlay-fullscreen). */
+function setTwinFs(on) {
+  try {
+    if (!twinOpen || !overlayEls) return false;
+    const root = overlayEls.root;
+    if (on) {
+      twinFs = true;
+      try { window.__mapProbe.twinFs = true; } catch { /* probe cosmetic */ }
+      if (document.fullscreenElement === root) return true;
+      if (root.requestFullscreen) {
+        const r = root.requestFullscreen();
+        if (r && r.catch) r.catch((err) => errors.push('TWIN-FS: ' + (err && err.message)));
+        return true;
+      }
+      return false;
+    }
+    twinFs = false;
+    try { window.__mapProbe.twinFs = false; } catch { /* probe cosmetic */ }
+    if (document.fullscreenElement === root && document.exitFullscreen) {
+      const r = document.exitFullscreen();
+      if (r && r.catch) r.catch((err) => errors.push('TWIN-FS: ' + (err && err.message)));
+    }
+    return true;
+  } catch (err) {
+    errors.push('TWIN-FS: ' + (err && err.message));
+    return false;
+  }
+}
+
+/* Esc exits overlay-fullscreen natively (the page never sees the key): on
+ * fullscreenchange, if the overlay ended up closed by that exit, run the
+ * normal recede reverse. Otherwise just sync the probe + flat button. */
+function syncFsProbe() {
+  try {
+    const fsEl = document.fullscreenElement || null;
+    const app = document.getElementById('app');
+    try { window.__mapProbe.mapFs = fsEl === app; } catch { /* probe cosmetic */ }
+    try { window.__mapProbe.twinFs = fsEl === (overlayEls && overlayEls.root); } catch { /* probe cosmetic */ }
+    const b = document.getElementById('map-fs');
+    if (b) b.setAttribute('aria-pressed', String(fsEl === app));
+  } catch { /* probe sync is cosmetic */ }
+  try {
+    if (!document.fullscreenElement && twinFs) {
+      twinFs = false;
+      if (!twinOpen) recedeToCountry();
+    }
+  } catch { /* recede fallback is best-effort */ }
 }
 
 function positionDomPins(map) {
