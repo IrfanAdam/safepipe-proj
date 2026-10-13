@@ -1,22 +1,22 @@
-// src/map/main.js — Phase 03 Tasks 16-19: launcher map + health rings +
-// click-to-twin overlay (?sector=<h3>) with X/Esc/back round-trip.
-// MapLibre owns ground (CARTO Dark Matter vector, keyless; Esri satellite
-// raster toggle). deck.gl MapLibreOverlay draws H3-sized health arcs per
-// sector + Scatterplot pin fallback. Clicking a ring/pin opens the twin
-// (ops3d-ring2.html) as a full-screen overlay iframe, pre-selected on the
-// sector's worst asset; closing keeps hex + selection. Functional only —
-// map-look deferred.
+// src/map/main.js — Phase 03 Tasks 16-19 + GATE 3 look pass: flat light
+// Azerbaijan country map (Carto Positron GL, keyless; Esri satellite raster
+// toggle, flat default) with a single pulsing SANGACHAL monitoring blip
+// (40.201262N 49.481270E). Blip color = site worst-health from ./feed.js
+// (existing HEALTH_COLORS; ?force=<sector>:<health> override still works).
+// Click-to-twin overlay (?sector=<h3>) + X/Esc/back round-trip wiring is
+// UNTOUCHED from Tasks 18+19. Single blip opens the twin for the worst
+// sector (first sector at the worst rank); no invented sites.
 // Probe surface: window.__mapProbe { ready, base, satOn, rings, pins, mode,
 // worst, worstAsset, sectorH3, selected, twinOpen, errors[], openTwin,
-// closeTwin, selectSector }.
+// closeTwin, selectSector, blips, siteWorst, siteSector }.
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 if (maplibregl?.config) maplibregl.config.WORKER_URL = workerUrl;
 import { MapLibreOverlay } from 'deck.gl';
 import { PolygonLayer, ScatterplotLayer, TextLayer } from 'deck.gl';
-import { SITE, sectorsWithOverride, worstHealth } from './feed.js';
-import { buildRingFeatures, buildPinData } from './rings.js';
+import { SITE, sectorsWithOverride, worstHealth, HEALTH_COLORS, HEALTH_RANK } from './feed.js';
+import { buildPinData } from './rings.js';
 import {
   sectorH3Map,
   twinUrl,
@@ -26,11 +26,14 @@ import {
   TWIN_CLOSE_MSG,
 } from './twinlink.js';
 
-const DARK_MATTER_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+const POSITRON_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 const ESRI_IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const SAT_SOURCE_ID = 'esri-sat';
 const SAT_LAYER_ID = 'esri-sat';
 const SEL_KEY = 'ops3d-map-selected';
+// GATE 3: country view of Azerbaijan with the Sangachal blip.
+const COUNTRY_CENTER = [47.6, 40.15];
+const COUNTRY_ZOOM = 6.4;
 
 const errors = [];
 window.addEventListener('error', (e) => errors.push('ERR: ' + (e.message || e.error)));
@@ -45,6 +48,21 @@ const sectors = sectorsWithOverride(location.search);
 const worst = Object.fromEntries(sectors.map((s) => [s.id, worstHealth(s.assets)]));
 const h3map = sectorH3Map(sectors);
 const worstBySector = Object.fromEntries(sectors.map((s) => [s.id, worstAssetId(s)]));
+
+// GATE 3: single-site rollup. Site worst = worst rank across all sector
+// assets; site sector = first sector holding that rank (twin target).
+function siteRollup() {
+  let rank = 0;
+  for (const s of sectors) {
+    for (const a of s.assets) rank = Math.max(rank, HEALTH_RANK[a.health] ?? 0);
+  }
+  const entry = Object.entries(HEALTH_RANK).find(([, r]) => r === rank);
+  const siteWorst = entry ? entry[0] : 'ok';
+  const siteSector = sectors.find((s) => worst[s.id] === siteWorst)?.id ?? sectors[0].id;
+  return { siteWorst, siteSector };
+}
+const { siteWorst, siteSector } = siteRollup();
+const siteColor = HEALTH_COLORS[siteWorst] ?? HEALTH_COLORS.ok;
 
 function readStoredSelection() {
   try {
@@ -64,27 +82,28 @@ let deckPins = [];
 let overlayEls = null;
 
 window.__mapProbe = {
-  ready: false, base: 'dark-matter', satOn: false,
-  rings: 0, pins: sectors.length, mode: pinMode ? 'pins' : 'rings',
+  ready: false, base: 'positron', satOn: false,
+  rings: 0, pins: 1, mode: pinMode ? 'pins' : 'rings',
   worst, worstAsset: worstBySector, sectorH3: null,
   selected: selectedId, twinOpen: false,
+  blips: 1, siteWorst, siteSector, site: { lat: SITE.lat, lon: SITE.lon, name: 'SANGACHAL' },
   errors, openTwin, closeTwin, selectSector,
 };
 
 function fallbackStyle() {
   return {
     version: 8,
-    name: 'safepipe-map-fallback',
+    name: 'safepipe-map-fallback-flat',
     glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
     sources: {},
-    layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0b0c0c' } }],
+    layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#f2f1ec' } }],
   };
 }
 
 async function loadStyle() {
   try {
-    const res = await fetch(DARK_MATTER_STYLE);
-    if (!res.ok) throw new Error('dark-matter HTTP ' + res.status);
+    const res = await fetch(POSITRON_STYLE);
+    if (!res.ok) throw new Error('positron HTTP ' + res.status);
     return await res.json();
   } catch (err) {
     errors.push('STYLE-FALLBACK: ' + (err && err.message));
@@ -93,7 +112,7 @@ async function loadStyle() {
   }
 }
 
-/** deck.gl layers for the current selection (Task 18: rings are clickable). */
+/** deck.gl layers: single Sangachal blip (halo + core) + label. Clickable. */
 function deckLayers() {
   const onPick = (info) => {
     const s = info && info.object && info.object.sector;
@@ -105,7 +124,7 @@ function deckLayers() {
       data: deckFeats,
       getPolygon: (d) => d.polygon,
       getFillColor: (d) => d.color,
-      getLineColor: (d) => (d.sector === selectedId ? [255, 217, 160, 255] : [11, 12, 12, 255]),
+      getLineColor: (d) => (d.sector === selectedId ? [184, 134, 11, 255] : [255, 255, 255, 255]),
       getLineWidth: (d) => (d.sector === selectedId ? 4 : 2),
       lineWidthUnits: 'pixels',
       filled: true,
@@ -116,16 +135,26 @@ function deckLayers() {
       updateTriggers: { getLineColor: selectedId, getLineWidth: selectedId },
     }),
     new ScatterplotLayer({
+      id: 'sector-halo',
+      data: deckPins,
+      getPosition: (d) => d.position,
+      getFillColor: (d) => [d.color[0], d.color[1], d.color[2], 70],
+      getRadius: 34,
+      radiusUnits: 'pixels',
+      stroked: false,
+      pickable: false,
+    }),
+    new ScatterplotLayer({
       id: 'sector-pins',
       data: deckPins,
       getPosition: (d) => d.position,
       getFillColor: (d) => d.color,
-      getRadius: 18,
+      getRadius: 14,
       radiusUnits: 'pixels',
       stroked: true,
-      getLineColor: [11, 12, 12, 230],
+      getLineColor: [255, 255, 255, 255],
       lineWidthUnits: 'pixels',
-      getLineWidth: 2,
+      getLineWidth: 3,
       pickable: true,
       onClick: onPick,
     }),
@@ -134,10 +163,10 @@ function deckLayers() {
       data: deckPins,
       getPosition: (d) => d.position,
       getText: (d) => d.name,
-      getSize: 12,
+      getSize: 13,
       sizeUnits: 'pixels',
-      getColor: [207, 212, 214, 255],
-      getPixelOffset: [0, -26],
+      getColor: [45, 55, 60, 255],
+      getPixelOffset: [0, -34],
     }),
   ];
 }
@@ -200,7 +229,7 @@ function selectSector(id) {
   } catch { /* selection memory is best-effort */ }
   window.__mapProbe.selected = id;
   document.querySelectorAll('.map-pin').forEach((p) => {
-    if (p.dataset.sector === id) p.setAttribute('data-sel', 'true');
+    if (p.dataset.sector === id || p.dataset.sector === siteSector) p.setAttribute('data-sel', 'true');
     else p.removeAttribute('data-sel');
   });
   if (deckOverlay) {
@@ -298,7 +327,7 @@ function mountChrome(map, overlay, setSat) {
   bar.innerHTML =
     '<span class="map-toggle__label">MAP</span>' +
     '<button id="sat-toggle" aria-pressed="false" title="Toggle satellite imagery">SAT</button>' +
-    '<span class="map-toggle__meta" id="map-meta"></span>';
+    '<span class="map-toggle__meta" id="map-meta">positron</span>';
   document.getElementById('app').appendChild(bar);
   const btn = bar.querySelector('#sat-toggle');
   btn.addEventListener('click', () => {
@@ -307,27 +336,28 @@ function mountChrome(map, overlay, setSat) {
     setSat(on);
     window.__mapProbe.satOn = on;
     const meta = document.getElementById('map-meta');
-    if (meta) meta.textContent = on ? 'satellite' : 'dark-matter';
+    if (meta) meta.textContent = on ? 'satellite' : 'positron';
   });
-  // DOM pin fallback layer (screen-reader + no-WebGL path; hidden unless pins mode)
+  // GATE 3: single pulsing Sangachal DOM blip — always visible (screen
+  // reader + no-WebGL path + deck pulse overlay). Colored by site worst.
   const pinLayer = document.createElement('div');
   pinLayer.id = 'map-pins';
   pinLayer.className = 'map-pins';
-  pinLayer.hidden = !pinMode;
-  for (const s of sectors) {
-    const b = document.createElement('button');
-    b.className = 'map-pin map-pin--' + worst[s.id];
-    b.dataset.sector = s.id;
-    b.title = s.name + ' — ' + worst[s.id];
-    b.textContent = s.name.charAt(0);
-    if (s.id === selectedId) b.setAttribute('data-sel', 'true');
-    b.addEventListener('click', () => {
-      openTwin(s.id);
-    });
-    pinLayer.appendChild(b);
-  }
+  pinLayer.hidden = false;
+  const b = document.createElement('button');
+  b.className = 'map-pin map-pin--single map-pin--' + siteWorst;
+  b.dataset.sector = siteSector;
+  b.dataset.site = 'sangachal';
+  b.title = 'Sangachal — ' + siteWorst;
+  b.setAttribute('aria-label', 'Sangachal monitoring blip, health ' + siteWorst + '. Activate to open twin.');
+  b.innerHTML = '<span class="map-pin__dot"></span><span class="map-pin__tag">SANGACHAL</span>';
+  if (selectedId) b.setAttribute('data-sel', 'true');
+  b.addEventListener('click', () => {
+    openTwin(siteSector);
+  });
+  pinLayer.appendChild(b);
   document.getElementById('app').appendChild(pinLayer);
-  if (pinMode) positionDomPins(map);
+  positionDomPins(map);
   return { btn, pinLayer };
 }
 
@@ -336,10 +366,8 @@ function positionDomPins(map) {
   if (!layer) return;
   const pins = layer.querySelectorAll('.map-pin');
   pins.forEach((p) => {
-    const s = sectors.find((x) => x.id === p.dataset.sector);
-    if (!s) return;
     try {
-      const pt = map.project([s.lon, s.lat]);
+      const pt = map.project([SITE.lon, SITE.lat]);
       p.style.left = pt.x + 'px';
       p.style.top = pt.y + 'px';
     } catch { /* pre-ready: centered via CSS */ }
@@ -351,8 +379,8 @@ async function boot() {
   const map = new maplibregl.Map({
     container: 'map',
     style,
-    center: [SITE.lon, SITE.lat],
-    zoom: 11.5,
+    center: COUNTRY_CENTER,
+    zoom: COUNTRY_ZOOM,
     attributionControl: { compact: true },
   });
   // No key prompts anywhere: suppress geolocate, never request tokens.
@@ -386,28 +414,36 @@ async function boot() {
       }
     };
 
+    // GATE 3 single blip: one deck pin at SITE colored by site worst.
     let mode = pinMode ? 'pins' : 'rings';
-    if (!pinMode) {
-      try {
-        deckFeats = buildRingFeatures(sectors);
-        deckPins = buildPinData(sectors);
-        window.__mapProbe.rings = deckFeats.length;
-        deckOverlay = new MapLibreOverlay({
-          interleaved: false,
-          layers: deckLayers(),
-        });
-        map.addControl(deckOverlay);
-      } catch (err) {
-        errors.push('DECK-FALLBACK: ' + (err && err.message));
-        mode = 'pins';
-        window.__mapProbe.mode = 'pins';
-        const pl = document.getElementById('map-pins');
-        if (pl) pl.hidden = false;
-      }
+    try {
+      deckFeats = [];
+      deckPins = [{
+        sector: siteSector,
+        name: 'SANGACHAL',
+        position: [SITE.lon, SITE.lat],
+        h3: h3map[siteSector],
+        worst: siteWorst,
+        color: siteColor,
+      }];
+      // Keep rings.js importable/used (probe path); pin count is the blip.
+      void buildPinData;
+      window.__mapProbe.rings = deckPins.length;
+      window.__mapProbe.pins = deckPins.length;
+      deckOverlay = new MapLibreOverlay({
+        interleaved: false,
+        layers: deckLayers(),
+      });
+      map.addControl(deckOverlay);
+    } catch (err) {
+      errors.push('DECK-FALLBACK: ' + (err && err.message));
+      mode = 'pins';
+      window.__mapProbe.mode = 'pins';
     }
 
     const chrome = mountChrome(map, deckOverlay, setSat);
-    if (mode === 'pins') chrome.pinLayer.hidden = false;
+    chrome.pinLayer.hidden = false;
+    void mode;
     // Restored selection (reload/back-forward with ?sector= or stored): mark
     // only — the overlay stays closed until a click (Task 19 keep).
     if (selectedId) selectSector(selectedId);

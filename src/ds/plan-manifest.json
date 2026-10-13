@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T09:24:43.695Z",
+  "generated": "2026-10-13T09:38:16.614Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "798d0f1",
+      "full": "798d0f1a6cf1cab64b47659cc5eb78c0b071dd54",
+      "date": "2026-10-13",
+      "time": "14:55",
+      "subject": "feat(changelog): gate verdict alongside DONE in below-title status line [plan:2026-10-07_130000-safepipe-changelog.md#task-12]",
+      "plan": "2026-10-07_130000-safepipe-changelog.md",
+      "anchor": "task-12"
+    },
     {
       "sha": "7cdbb42",
       "full": "7cdbb4254bd72c123e074d8b6e697dbcc3da9cf4",
@@ -3032,6 +3041,9 @@
     }
   ],
   "wip": [
-    "src/changelog/changelog/paint-detail.js"
+    "ops3d-map.html",
+    "src/map/feed.js",
+    "src/map/main.js",
+    "src/map/rings.js"
   ]
 }

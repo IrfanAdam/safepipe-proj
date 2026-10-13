@@ -4,7 +4,7 @@
 // Pin fallback: sector centers + worst-health color (used when deck.gl
 // can't render or ?pins=1).
 import { cellArea, latLngToCell } from 'h3-js';
-import { HEALTH_COLORS, H3_RES, worstHealth } from './feed.js';
+import { HEALTH_COLORS, H3_RES, SITE, worstHealth, siteRollup } from './feed.js';
 
 export const RING_SCALE = 1.15; // ring outer radius vs hex circumradius
 export const RING_INNER_FRac = 0.62;
@@ -68,6 +68,37 @@ export function buildRingFeatures(sectors) {
     }
   }
   return feats;
+}
+
+/** GATE 3 single monitoring blip (pure, node-checkable): one datum pinned to
+ * SITE (Sangachal), colored by the site worst-health rollup. The deck halo
+ * (quiet, low-alpha) + core radii ship here so the blip reads as monitoring
+ * — a small dot with a pulse ring — never a pin blob. Click -> twin target
+ * is the rolled-up worst sector (twinlink.js wiring untouched). */
+export const BLIP_CORE_R_PX = 6;
+export const BLIP_HALO_R_PX = 22;
+export const BLIP_HALO_ALPHA = 70;
+
+/** Health color with a quiet halo alpha (deck ScatterplotLayer fill). */
+export function haloColor(color, alpha = BLIP_HALO_ALPHA) {
+  return [color[0], color[1], color[2], alpha];
+}
+
+/** Sectors -> the single SITE blip datum. */
+export function buildSiteBlip(sectors) {
+  const { siteWorst, siteSector } = siteRollup(sectors);
+  const color = HEALTH_COLORS[siteWorst] ?? HEALTH_COLORS.ok;
+  return {
+    sector: siteSector,
+    name: 'SANGACHAL',
+    position: [SITE.lon, SITE.lat],
+    h3: latLngToCell(SITE.lat, SITE.lon, H3_RES),
+    worst: siteWorst,
+    color,
+    halo: haloColor(color),
+    coreR: BLIP_CORE_R_PX,
+    haloR: BLIP_HALO_R_PX,
+  };
 }
 
 /** Pin fallback data: one pin per sector, colored by worst-health. */

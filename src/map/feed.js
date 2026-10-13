@@ -62,6 +62,20 @@ export function worstHealth(assets) {
   return w;
 }
 
+/** GATE 3 single-blip rollup (pure): worst rank across every sector asset;
+ * first sector holding that rank is the twin target. Mirrors the rollup the
+ * launcher canvas applies, so rings/feed stay the single source of truth. */
+export function siteRollup(sectors) {
+  let rank = 0;
+  for (const s of sectors) {
+    for (const a of s.assets) rank = Math.max(rank, HEALTH_RANK[a.health] ?? 0);
+  }
+  const entry = Object.entries(HEALTH_RANK).find(([, r]) => r === rank);
+  const siteWorst = entry ? entry[0] : 'ok';
+  const siteSector = sectors.find((s) => worstHealth(s.assets) === siteWorst)?.id ?? sectors[0].id;
+  return { siteWorst, siteSector };
+}
+
 /** Apply ?force=<sectorId>:<health> override (probe path). Returns a deep copy. */
 export function sectorsWithOverride(search = '') {
   const q = new URLSearchParams(search.replace(/^[?]/, ''));

@@ -38,6 +38,48 @@
   .map-pin--warn { background: #e8a33d; }
   .map-pin--crit { background: #e05252; }
   .map-pin[data-sel="true"] { outline: 2px solid var(--ops-amber, #ffd9a0); }
+  /* GATE 3 look pass (Lane Q): single monitoring blip. Quiet 8px health dot
+   * + expanding pulse ring + tag chip — reads as monitoring, never a pin
+   * blob. Scoped to .map-pin--single only; multi-pin + twin overlay styles
+   * above/below are untouched, and hit-testing/click wiring is unchanged. */
+  .map-pin--single {
+    width: 14px; height: 14px; padding: 0;
+    background: transparent; border: 0; border-radius: 50%;
+  }
+  .map-pin--ok.map-pin--single { color: #3eb46e; }
+  .map-pin--warn.map-pin--single { color: #e8a33d; }
+  .map-pin--crit.map-pin--single { color: #e05252; }
+  .map-pin--single .map-pin__dot {
+    position: absolute; left: 50%; top: 50%;
+    width: 8px; height: 8px; transform: translate(-50%, -50%);
+    border-radius: 50%; background: currentColor;
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9), 0 0 6px rgba(0, 0, 0, 0.35);
+  }
+  .map-pin--single::after {
+    content: ""; position: absolute; inset: -9px; border-radius: 50%;
+    border: 2px solid currentColor; opacity: 0;
+    animation: map-blip-ping 2.4s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes map-blip-ping {
+    0% { transform: scale(0.45); opacity: 0.6; }
+    70% { transform: scale(1); opacity: 0.12; }
+    100% { transform: scale(1); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .map-pin--single::after { animation: none; opacity: 0.35; transform: scale(1); }
+  }
+  .map-pin--single .map-pin__tag {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    font: 10px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.14em;
+    color: #2d373c; background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(45, 55, 60, 0.25); border-radius: 3px;
+    padding: 3px 7px; white-space: nowrap;
+  }
+  .map-pin--single[data-sel="true"] { outline: none; }
+  .map-pin--single[data-sel="true"] .map-pin__dot {
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9), 0 0 0 3.5px var(--ops-amber, #ffd9a0);
+  }
   /* Task 18+19: full-screen twin overlay (iframe). The map stays mounted
    * underneath, so close (X/Esc/back) returns with hex + selection intact. */
   body.twin-open { overflow: hidden; }
