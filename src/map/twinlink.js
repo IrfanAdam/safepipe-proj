@@ -11,6 +11,20 @@ export const TWIN_CLOSE_MSG = 'safepipe-twin-close';
 // { type: TWIN_FS_MSG, on: true/false }; the parent fullscreen-toggles the
 // #twin-overlay element ITSELF so the CLOSE bar stays visible. Pure.
 export const TWIN_FS_MSG = 'safepipe-twin-fullscreen';
+// Handoff-4 Lane A / Lane B agreement: the twin posts
+// { type: TWIN_READY_MSG } when its top-down satellite frame matches the
+// staged map end-frame and is ready to be revealed. Pure.
+export const TWIN_READY_MSG = 'safepipe-twin-ready';
+
+/** Parse a twin ready message. { ready:true } when matched, else null. */
+export function parseTwinReadyMessage(d) {
+  try {
+    if (!d || typeof d !== 'object' || d.type !== TWIN_READY_MSG) return null;
+    return { ready: true };
+  } catch {
+    return null;
+  }
+}
 
 /** Parse a twin fullscreen message. { on } when matched, else null. */
 export function parseTwinFsMessage(d) {

@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, easeInOutCubic, buildTwinCloseMessage, buildTwinFullscreenMessage, isTwinFullscreenMessage, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, easeInOutCubic, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import {
   createCtxMon,
@@ -615,7 +615,18 @@ async function boot() {
     mid: null, // ring-frame iso { eye, target } (swoop end / push start)
     from: null, // flight segment start { eye, target, mix }
     to: null, // terminal iso { eye, target, mix }
+    revMode: null, // reverse plan for THIS close: snap|pitch|full (sector.js reversePlanForPhase)
+    frame: null, // handed-off { cx, cy, z, bearing } (range refit source)
+    anchor: null, // ring-frame center { x, z } (range refit source)
+    azim: 0, // attached-angle azimuth rad (range refit source)
+    readyPosted: false, // {type:'safepipe-twin-ready'} sent once per handoff
+    closePosted: false, // {recede:true} close sent (later closes re-post, never re-fly)
   };
+  /* Hold cap: the inbound waits in hold for the matched sat frame (map up +
+   * first painted frame at mix 0) before the swoop may start — but never
+   * forever. Past HOLD + CAP the flight proceeds unposted; Lane A's own
+   * reveal timeout (4 s) owns the fallback reveal. */
+  const HANDOFF_READY_CAP_MS = 8000;
   const handoffNow = () => {
     try {
       return performance.now();
@@ -700,6 +711,9 @@ async function boot() {
     handoff.mid = ringIso;
     handoff.to = terminal;
     handoff.from = null;
+    handoff.revMode = null;
+    handoff.readyPosted = false;
+    handoff.closePosted = false;
     handoff.phase = 'hold';
     handoff.t0 = handoffNow();
     try {
@@ -731,6 +745,94 @@ async function boot() {
     twin.controls.target.set(target.x, target.y, target.z);
     twin.camera.position.set(eye.x, eye.y, eye.z);
   }
+  /* FRAME-MATCH read (Lane B): true once the top-down satellite start frame
+   * is actually on screen — map instance up, at least one twin frame
+   * painted, flight still pinned top-down in hold, slider at full satellite.
+   * Satellite purity at mix 0 is mapbase-owned (Esri World Imagery primary +
+   * backup at raster-opacity 1, reference 0.85, hillshade at base
+   * exaggeration) with the twin takeover gated to 0 at effective mix 0, so
+   * mix 0 here means the bare Esri photo under a transparent twin. Zoom
+   * parity is by construction: the pinned range came from frameRange(z) with
+   * this camera's own viewport/fov/lat, and the per-frame applyTwinToMap
+   * drives the map from the same pose with the same viewport/fov. */
+  function readyMatch() {
+    try {
+      if (!handoff.start || !handoff.frame || handoff.phase !== 'hold') return false;
+      if (!map) return false;
+      if (!(twinFrames >= 1)) return false;
+      const m = mixCtl?.getMix?.();
+      if (m !== HANDOFF_START_MIX) return false;
+      // The live map camera must actually SHOW the frame (not just the twin
+      // pin): same center/zoom within tolerance. When terrain is still off
+      // the per-frame twin->map sync skips (assertTerrainVex) and the map
+      // sits at its mount camera — claiming a match then would be false, so
+      // hold runs to the cap instead and Lane A's timeout owns the reveal.
+      try {
+        const c = map.getCenter?.();
+        const z = map.getZoom?.();
+        const clon = Array.isArray(c) ? c[0] : c?.lng;
+        const clat = Array.isArray(c) ? c[1] : c?.lat;
+        if (![clon, clat, z].every(Number.isFinite)) return false;
+        if (Math.abs(clon - handoff.frame.cx) > 2e-4) return false;
+        if (Math.abs(clat - handoff.frame.cy) > 2e-4) return false;
+        if (Math.abs(z - handoff.frame.z) > 0.05) return false;
+        const b = map.getBearing?.();
+        if (Number.isFinite(b)) {
+          const want = ((Number(handoff.frame.bearing) || 0) % 360 + 360) % 360;
+          const d = Math.abs((((b - want + 540) % 360) + 360) % 360 - 180);
+          if (d > 0.5) return false;
+        }
+        const p = map.getPitch?.();
+        if (Number.isFinite(p) && Math.abs(p) > 0.5) return false;
+      } catch {
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /* Post {type:'safepipe-twin-ready'} ONCE per handoff (Lane A reveals the
+   * pre-warmed overlay on this). Probe: window.__ring2.ready() +
+   * window.__ring2readyOut[]. Never breaks the frame. */
+  function postTwinReady() {
+    if (handoff.readyPosted) return true;
+    handoff.readyPosted = true;
+    try {
+      window.parent?.postMessage(buildTwinReadyMessage(), '*');
+    } catch { /* parent notify is best-effort */ }
+    try {
+      (window.__ring2readyOut ?? (window.__ring2readyOut = [])).push(buildTwinReadyMessage());
+    } catch { /* probe log is best-effort */ }
+    return true;
+  }
+  /* Zoom-offset refit: the pinned range was computed at boot with the boot
+   * viewport height, but the live loop drives the map from the LIVE height.
+   * If the box settled differently (iframe show, orientation, gallery
+   * display:none->block), the start range — and the ring-iso mid derived
+   * from it — would hold a stale zoom. While still in hold (pre-swoop),
+   * recompute from the stored frame z with the live viewport and rebuild
+   * start + mid so the match is pixel-close at reveal time. */
+  function refitHandoffRange() {
+    try {
+      if (!handoff.frame || !handoff.anchor || handoff.phase !== 'hold') return false;
+      const vp = viewportPxNow();
+      let r = frameRange(handoff.frame.z, { viewportPx: vp, lat: handoff.frame.cy });
+      if (!Number.isFinite(r) || r <= 0) return false;
+      r = Math.min(32000, Math.max(1500, r));
+      const old = handoff.start?.range;
+      if (Number.isFinite(old) && Math.abs(old - r) < 1) return false;
+      const s = pinTopDown(handoff.anchor.x, handoff.anchor.z, r, handoff.frame.bearing ?? 0);
+      handoff.start = s;
+      const aty = groundYNear(handoff.anchor.x, handoff.anchor.z);
+      const eye = poseAt(handoff.anchor.x, aty, handoff.anchor.z, r, HANDOFF_ISO_POLAR_DEG, handoff.azim);
+      handoff.mid = { eye, target: { x: handoff.anchor.x, y: aty, z: handoff.anchor.z } };
+      driveMix(HANDOFF_START_MIX);
+      return true;
+    } catch {
+      return false;
+    }
+  }
   /* Per-frame flight step (runs at the top of the render loop, before the
    * damped controls settle — the flight IS the pose source while active).
    * Forward: hold (ring top-down, mix 0) -> swoop (ring top-down -> ring
@@ -751,7 +853,18 @@ async function boot() {
           } catch { /* pin is best-effort */ }
         }
         driveMix(HANDOFF_START_MIX);
-        if (now - handoff.t0 >= HANDOFF_HOLD_MS) {
+        // FRAME-MATCH + ready: keep the box honest (viewport settle refit),
+        // then declare the matched sat frame the moment it is really on
+        // screen. The swoop starts only after the ready signal — staged
+        // inbound runs post-match — or past the hold cap (Lane A fallback).
+        try {
+          refitHandoffRange();
+        } catch { /* refit is best-effort */ }
+        try {
+          if (readyMatch()) postTwinReady();
+        } catch { /* ready is best-effort */ }
+        const heldMs = now - handoff.t0;
+        if (heldMs >= HANDOFF_HOLD_MS && (handoff.readyPosted || heldMs >= HANDOFF_HOLD_MS + HANDOFF_READY_CAP_MS)) {
           handoff.from = capturePose();
           if (!handoff.from || !handoff.mid) {
             endHandoffFlight();
@@ -816,18 +929,55 @@ async function boot() {
         return;
       }
       if (handoff.phase === 'reverse') {
-        // Exact mirror: pull (terminal -> ring iso, slider ->0) then
-        // pitch-back (ring iso -> ring top-down). HANDOFF_REVERSE_MS is the
-        // PUSH+SWOOP total by construction (sector.js).
+        // Stage-aware mirror: revMode was picked at close time from the
+        // ACTUAL phase (sector.js reversePlanForPhase) and `from` is the
+        // captured live pose — never a canned start.
+        //   snap:  closed in hold (still top-down): pin + mix 0, post.
+        //   pitch: closed mid-swoop: current -> ring top-down over SWOOP_MS.
+        //   full:  closed terminal-side: pull to ring iso (PUSH_MS, mix ->0)
+        //          then pitch-back to ring top-down (SWOOP_MS).
         const f = handoff.from, mid = handoff.mid, s = handoff.start;
-        if (!f || !mid || !s) {
+        const mode = handoff.revMode || 'full';
+        if (!f || !s || (mode === 'full' && !mid)) {
           endHandoffFlight();
           postTwinClose();
           return;
         }
-        const elapsed = now - handoff.t0;
         const se = startEye(s);
         const st = { x: s.tx, y: s.ty, z: s.tz };
+        if (mode === 'snap') {
+          try {
+            pinTopDown(s.tx, s.tz, s.range, s.bearing);
+          } catch { /* pin is best-effort */ }
+          driveMix(HANDOFF_START_MIX);
+          endHandoffFlight();
+          postTwinClose();
+          return;
+        }
+        if (mode === 'pitch') {
+          // Direct pitch-back from the captured mid-swoop pose: the pull
+          // stage was never entered, so there is nothing to pull back from.
+          const elapsed = now - handoff.t0;
+          const t = Math.min(1, Math.max(0, elapsed / HANDOFF_SWOOP_MS));
+          const k = easeInOutCubic(t);
+          try {
+            applyFlightPose(
+              { x: lerp(f.eye.x, se.x, k), y: lerp(f.eye.y, se.y, k), z: lerp(f.eye.z, se.z, k) },
+              { x: lerp(f.target.x, st.x, k), y: lerp(f.target.y, st.y, k), z: lerp(f.target.z, st.z, k) },
+            );
+          } catch { /* pose drive is best-effort */ }
+          driveMix(lerp(Number.isFinite(f.mix) ? f.mix : HANDOFF_START_MIX, HANDOFF_START_MIX, k));
+          if (t >= 1) {
+            try {
+              pinTopDown(s.tx, s.tz, s.range, s.bearing);
+            } catch { /* pin is best-effort */ }
+            driveMix(HANDOFF_START_MIX);
+            endHandoffFlight();
+            postTwinClose();
+          }
+          return;
+        }
+        const elapsed = now - handoff.t0;
         if (elapsed < HANDOFF_PUSH_MS) {
           const k = easeInOutCubic(elapsed / HANDOFF_PUSH_MS);
           try {
@@ -863,23 +1013,48 @@ async function boot() {
     // Extended payload first (parent recedes on {recede:true}), then the
     // legacy bare string — the current parent closes only on strict string
     // equality, so both fire until the parent learns the object form.
+    handoff.closePosted = true;
     try {
       window.parent?.postMessage(buildTwinCloseMessage(true), '*');
     } catch { /* parent notify is best-effort */ }
     try {
       window.parent?.postMessage(TWIN_CLOSE_MSG, '*');
     } catch { /* parent notify is best-effort */ }
+    try {
+      (window.__ring2closeOut ?? (window.__ring2closeOut = [])).push(buildTwinCloseMessage(true));
+    } catch { /* probe log is best-effort */ }
   }
-  /* Close entry: plays the EXACT mirror reverse (pull back to the ring
-   * frame + slider->0 + pitch->0) then signals the parent. X (parent
-   * chrome) + browser-back are parent-owned — the parent tears the iframe
-   * down directly; Esc and the sister HUD lane call this. Safe standalone
-   * (no frame): notifies now. */
+  /* Close entry: REVERSE-FROM-ANYWHERE — captures the live pose + mix at
+   * close time and walks back through the stages actually passed (never a
+   * jump to a canned start), then signals the parent with {recede:true}.
+   * X (parent chrome) + browser-back are parent-owned — the parent tears the
+   * iframe down directly; Esc, the sister HUD lane, and parent close
+   * messages call this. Safe standalone (no frame): notifies now.
+   * Idempotent: a close after the post re-posts without re-flying. */
   function requestTwinClose() {
     try {
       if (handoff.phase === 'reverse') return true; // already running
       if (!handoff.start) {
         postTwinClose(); // standalone: no frame to reverse to
+        return true;
+      }
+      if (handoff.closePosted && handoff.phase === 'done') {
+        postTwinClose(); // repeat close: re-post, never re-fly
+        return true;
+      }
+      const prevPhase = handoff.phase;
+      const plan = reversePlanForPhase(prevPhase);
+      if (plan === 'snap') {
+        // Still top-down at the ring frame: no stage was entered, so the
+        // mirror is a pin + mix 0 + immediate post.
+        try {
+          const s = handoff.start;
+          pinTopDown(s.tx, s.tz, s.range, s.bearing);
+          driveMix(HANDOFF_START_MIX);
+        } catch { /* pin is best-effort */ }
+        handoff.revMode = 'snap';
+        endHandoffFlight();
+        postTwinClose();
         return true;
       }
       const cur = capturePose();
@@ -888,6 +1063,7 @@ async function boot() {
         return false;
       }
       handoff.from = cur;
+      handoff.revMode = plan; // 'pitch' (mid-swoop) or 'full' (terminal-side)
       handoff.phase = 'reverse';
       handoff.t0 = handoffNow();
       try {
@@ -986,6 +1162,9 @@ async function boot() {
     handoff,
     requestTwinClose,
     handoffPhase: () => handoff.phase,
+    ready: () => handoff.readyPosted,
+    revMode: () => handoff.revMode,
+    twinReadyMsg: TWIN_READY_MSG,
     fs: { delegated: fsDelegated, on: fsOn },
     diag: () => ({
       build: BUILD_ID,
@@ -1063,6 +1242,9 @@ async function boot() {
         const ety = groundYNear(etx, etz);
         const isoEye = poseAt(etx, ety, etz, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, azim);
         const pinned = pinTopDown(anchor.x, anchor.z, startRange, bearing);
+        handoff.frame = sectorQ.frame;
+        handoff.anchor = { x: anchor.x, z: anchor.z };
+        handoff.azim = azim;
         beginHandoffFlight(pinned, {
           eye: ringIsoEye,
           target: { x: anchor.x, y: aty, z: anchor.z },
@@ -1130,6 +1312,36 @@ async function boot() {
       } catch { /* standalone label is native-owned */ }
     }
   } catch { /* preselect never breaks boot */ }
+  /* Parent close-message path (Lane B, embed or standalone): the parent may
+   * request the mirrored reverse via postMessage (legacy bare string or the
+   * extended { type, recede } object) instead of tearing the iframe down.
+   * Runs the same REVERSE-FROM-ANYWHERE as Esc — capture + walk back + post.
+   * Own posts go to window.parent, never back here, so no self-loop. */
+  try {
+    window.addEventListener('message', (e) => {
+      try {
+        if (!isTwinCloseMessage(e?.data)) return;
+      } catch {
+        return;
+      }
+      // Self-echo guard: own close posts target window.parent, which IS this
+      // window when running top-level (standalone/probe) — without this the
+      // post would re-trigger this listener forever (post -> request ->
+      // post...). Parent-sent requests arrive with e.source === the parent
+      // window, never own window, so only the echo is dropped. Embedded
+      // (real iframe) posts never echo back and are unaffected.
+      try {
+        if (e && e.source === window) return;
+      } catch { /* source check is best-effort */ }
+      try {
+        requestTwinClose();
+      } catch {
+        try {
+          postTwinClose();
+        } catch { /* parent notify is best-effort */ }
+      }
+    });
+  } catch { /* message close never breaks boot */ }
 
   // Rendering-first: the loop starts NOW, not after the map. A hung tile
   // host used to gate every painted frame behind mountMapBase (map:- +
@@ -1396,59 +1608,7 @@ async function boot() {
    * through every zoom. */
   const loop = () => {
     try {
-      stepHandoff();
-      twin.updateControls();
-      twinFrames++;
-      const pose = twin.getPose();
-      const viewportPx = Math.max(twinDiv.clientHeight || window.innerHeight, 1);
-      // Aspect parity (Phase 00): twin + map containers fill the same box,
-      // but if layout ever splits them the equal-fov cameras still shear.
-      // Warn once per session; the node suite pins the pure helper.
-      if (!aspectWarned) {
-        try {
-          const m = aspectMismatch(
-            twinDiv.clientWidth || 1, viewportPx,
-            mapDiv.clientWidth || 1, Math.max(mapDiv.clientHeight || 0, 1),
-          );
-          if (m > 0.01) {
-            aspectWarned = true;
-            // eslint-disable-next-line no-console
-            console.warn(`[ring2] twin/map aspect mismatch ${m} — mix fade will shear`);
-          }
-        } catch { /* telemetry never breaks the frame */ }
-      }
-      // Twin owns the camera at every mix — sync always runs, so orbit
-      // input on the twin canvas moves the map with it (satellite mode
-      // included). The map is non-interactive and can never fight this.
-      if (map) {
-        try {
-          applyTwinToMap(map, pose, { viewportPx, fovDeg: FOV_DEG });
-        } catch (err) {
-          if (!vexWarned) {
-            vexWarned = true;
-            // eslint-disable-next-line no-console
-            console.warn('[ring2] sync skipped:', err?.message ?? err);
-          }
-        }
-      }
-      const pitch = pitchForPose(pose.eye, pose.target, pose.target.y ?? 0);
-      const rangeM = Math.hypot(
-        pose.eye.x - pose.target.x,
-        pose.eye.y - (pose.target.y ?? 0),
-        pose.eye.z - pose.target.z,
-      );
-      mixCtl.updateForCamera(pitch, rangeM);
-      // Tilt takeover (owner verdict 2026-10-12): the mix control merges
-      // steep-tilt + close-range into the twin-takeover u above, so the
-      // SATELLITE yields while the terrain-coupled lines stay fully lit.
-      // setTiltFade stays driven per frame for API compat (no-op: lines are
-      // mix-only at every pitch now).
-      try {
-        twin.setTiltFade?.(pitch);
-      } catch { /* cosmetic — never breaks the frame */ }
-      // Paint LAST: the map already holds this frame's pose (jumpTo above),
-      // so both GL paints land in the same frame — no catch-up lag.
-      twin.renderTwin();
+      frameOnce();
     } catch (err) {
       /* a torn-down frame never kills the loop — but the first failure is
        * kept and surfaced so a dead twin names its cause. */
@@ -1460,7 +1620,68 @@ async function boot() {
     }
     requestAnimationFrame(loop);
   };
+  const frameOnce = () => {
+    stepHandoff();
+    twin.updateControls();
+    twinFrames++;
+    const pose = twin.getPose();
+    const viewportPx = Math.max(twinDiv.clientHeight || window.innerHeight, 1);
+    // Aspect parity (Phase 00): twin + map containers fill the same box,
+    // but if layout ever splits them the equal-fov cameras still shear.
+    // Warn once per session; the node suite pins the pure helper.
+    if (!aspectWarned) {
+      try {
+        const m = aspectMismatch(
+          twinDiv.clientWidth || 1, viewportPx,
+          mapDiv.clientWidth || 1, Math.max(mapDiv.clientHeight || 0, 1),
+        );
+        if (m > 0.01) {
+          aspectWarned = true;
+          // eslint-disable-next-line no-console
+          console.warn(`[ring2] twin/map aspect mismatch ${m} — mix fade will shear`);
+        }
+      } catch { /* telemetry never breaks the frame */ }
+    }
+    // Twin owns the camera at every mix — sync always runs, so orbit
+    // input on the twin canvas moves the map with it (satellite mode
+    // included). The map is non-interactive and can never fight this.
+    if (map) {
+      try {
+        applyTwinToMap(map, pose, { viewportPx, fovDeg: FOV_DEG });
+      } catch (err) {
+        if (!vexWarned) {
+          vexWarned = true;
+          // eslint-disable-next-line no-console
+          console.warn('[ring2] sync skipped:', err?.message ?? err);
+        }
+      }
+    }
+    const pitch = pitchForPose(pose.eye, pose.target, pose.target.y ?? 0);
+    const rangeM = Math.hypot(
+      pose.eye.x - pose.target.x,
+      pose.eye.y - (pose.target.y ?? 0),
+      pose.eye.z - pose.target.z,
+    );
+    mixCtl.updateForCamera(pitch, rangeM);
+    // Tilt takeover (owner verdict 2026-10-12): the mix control merges
+    // steep-tilt + close-range into the twin-takeover u above, so the
+    // SATELLITE yields while the terrain-coupled lines stay fully lit.
+    // setTiltFade stays driven per frame for API compat (no-op: lines are
+    // mix-only at every pitch now).
+    try {
+      twin.setTiltFade?.(pitch);
+    } catch { /* cosmetic — never breaks the frame */ }
+    // Paint LAST: the map already holds this frame's pose (jumpTo above),
+    // so both GL paints land in the same frame — no catch-up lag.
+    twin.renderTwin();
+  };
   requestAnimationFrame(loop);
+  // Manual pump (diag hook, same pattern as __ring2kick/__ring2remountMap):
+  // headless harnesses often stall rAF while timers run — one frameOnce()
+  // per call drives the identical flight/sync/paint path deterministically.
+  try {
+    window.__ring2step = () => frameOnce();
+  } catch { /* diag hook only */ }
 
   setInterval(paintStatus, 500);
   paintStatus();

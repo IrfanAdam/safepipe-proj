@@ -27,7 +27,9 @@ import {
   findSector,
   worstAssetId,
   TWIN_CLOSE_MSG,
+  TWIN_READY_MSG,
   parseTwinFsMessage,
+  parseTwinReadyMessage,
 } from './twinlink.js';
 
 const POSITRON_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
@@ -91,6 +93,11 @@ let mapRef = null;
 let setSatRef = null;
 let transitId = null;
 let twinFs = false;
+// Handoff-4 Lane A seeded reveal: prewarm state. pendingReveal = { id, timer,
+// revealed } or null. twinReady mirrors the Lane B {type:TWIN_READY_MSG}
+// signal; prewarm is true while the overlay iframe loads hidden at opacity 0.
+let pendingReveal = null;
+const REVEAL_TIMEOUT_MS = 4000;
 
 window.__mapProbe = {
   ready: false, base: 'positron', satOn: false,
@@ -99,8 +106,9 @@ window.__mapProbe = {
   selected: selectedId, twinOpen: false,
   blips: 1, siteWorst, siteSector, site: { lat: SITE.lat, lon: SITE.lon, name: 'SANGACHAL' },
   transit: null, handoff: null, vignette: false, mapFs: false, twinFs: false,
+  prewarm: false, twinReady: false, reveal: null, revealFallback: false,
   errors, openTwin, closeTwin, selectSector, flyToSectorThenTwin,
-  toggleMapFs, setTwinFs,
+  toggleMapFs, setTwinFs, prewarmThenReveal, revealTwin,
 };
 
 function fallbackStyle() {
@@ -369,8 +377,9 @@ function warmSatTiles() {
 }
 
 /** Handoff-3 outbound choreography: ease to the clicked H3 RING bounds (the
- * hex bounds — wider than the terminal footprint) with symmetric padding +
- * center lock (strictly vertical top view). Sat tiles pre-warm AND the
+ * hex bounds — wider than the terminal footprint) with ~0 padding (ring
+ * tangent to the viewport edges, never tighter) + center lock (strictly
+ * vertical top view). Sat tiles pre-warm AND the
  * flat->sat crossfade ramps DURING the zoom flight (together, not after);
  * then the twin opens with the staged ring frame (?sector&cx&cy&z).
  * Falls back to a direct open when the map isn't ready, bounds fail, or
@@ -394,7 +403,7 @@ function flyToSectorThenTwin(id, opts = {}) {
   if (!mapRef || !bounds || reduced) {
     if (reduced && mapRef && bounds) {
       try {
-        mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: { top: 80, bottom: 80, left: 80, right: 80 }, maxZoom: 14 });
+        mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: 0, maxZoom: 14 });
       } catch { /* instant-fit is best-effort */ }
       setSatForced(true);
       showVignette(true);
@@ -435,11 +444,13 @@ function flyToSectorThenTwin(id, opts = {}) {
       }
     } catch { /* center lock is best-effort */ }
     // Flight is done and the sat frame is already staged underneath (the
-    // crossfade ran during the zoom). Short settle, then open the twin.
+    // crossfade ran during the zoom). Handoff-4: HOLD the map end-frame and
+    // PRE-WARM the twin hidden (opacity 0) until it posts
+    // {type:'safepipe-twin-ready'} (or the ~4s fallback), then crossfade.
     setTimeout(() => {
       transitId = null;
       window.__mapProbe.transit = null;
-      openTwin(id, { ...opts, frame: liveFrame() });
+      prewarmThenReveal(id, liveFrame(), opts);
     }, 350);
   };
   try {
@@ -453,9 +464,10 @@ function flyToSectorThenTwin(id, opts = {}) {
       bearing: 0,
       pitch: 0,
       duration: 900,
-      // LANE A outbound: symmetric padding locks the H3 ring at the
-      // viewport bounds AND centered (equal insets all sides).
-      padding: { top: 80, bottom: 80, left: 80, right: 80 },
+      // LANE A outbound: ~0 padding stops the zoom where the H3 ring
+      // touches the viewport edges (ring tangent to the clip) — never
+      // tighter to the terminal. maxZoom stays as a never-tighter guard.
+      padding: 0,
       maxZoom: 14,
     });
   } catch (err) {
@@ -463,6 +475,115 @@ function flyToSectorThenTwin(id, opts = {}) {
     finish();
   }
   return true;
+}
+
+/** Handoff-4 Lane A seeded reveal: PRE-WARM the twin at the ring frame —
+ * create the overlay iframe hidden (opacity 0 via .prewarm, still loading
+ * ?sector&cx&cy&z&embed=1) and HOLD the map end-frame until the twin posts
+ * {type:'safepipe-twin-ready'} (Lane B). Timeout fallback (~4s) reveals
+ * anyway so a silent twin can never strand the map. On ready, CROSSFADE
+ * map->twin over ~600ms (overlay opacity 0->1 above the matched sat frame).
+ * Reduced-motion: reveal instantly. */
+function prewarmThenReveal(id, frame, opts = {}) {
+  const s = sectors.find((x) => x.id === id);
+  if (!s) return false;
+  selectSector(id);
+  const h3 = h3map[id];
+  const { root, frame: frameEl, label } = ensureOverlay();
+  const url = twinUrl(h3, frame);
+  // Reset + publish prewarm probe state.
+  try {
+    if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
+  } catch { /* timer teardown is best-effort */ }
+  pendingReveal = { id, timer: null, revealed: false };
+  window.__mapProbe.prewarm = true;
+  window.__mapProbe.twinReady = false;
+  window.__mapProbe.reveal = 'prewarm';
+  window.__mapProbe.revealFallback = false;
+  // Hidden-but-loading: overlay mounted (hidden=false) at opacity 0 so the
+  // twin boots its matched top-down sat frame underneath the held map frame.
+  try {
+    root.classList.remove('closing');
+    root.classList.add('prewarm');
+  } catch { /* cosmetic */ }
+  // Force the opacity-0 state to apply BEFORE the iframe starts loading, so
+  // the later crossfade always animates from 0 (no flash on fast twins).
+  try {
+    void root.offsetWidth;
+  } catch { /* reflow nudge is best-effort */ }
+  setFrameUrl(frameEl, url);
+  root.hidden = false;
+  try {
+    document.body.classList.add('twin-open');
+  } catch { /* chrome class is cosmetic */ }
+  if (label) label.textContent = s.name + ' — ' + worstAssetId(s) + ' · ' + h3;
+  twinOpen = true;
+  window.__mapProbe.twinOpen = true;
+  window.__mapProbe.sectorH3 = h3;
+  window.__mapProbe.handoff = frame ?? null;
+  if (!opts.replace) {
+    try {
+      history.pushState({ twin: id }, '', mapUrlWithSector(h3));
+    } catch (err) {
+      errors.push('HISTORY: ' + (err && err.message));
+    }
+  }
+  let reduced = false;
+  try {
+    reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch { /* cosmetic */ }
+  if (reduced) {
+    revealTwin(true);
+    return true;
+  }
+  try {
+    pendingReveal.timer = setTimeout(() => {
+      // Fallback: reveal anyway; flag it so the probe distinguishes a real
+      // Lane B ready signal from the timeout path.
+      try {
+        if (pendingReveal && !pendingReveal.revealed) {
+          window.__mapProbe.revealFallback = true;
+          revealTwin(false);
+        }
+      } catch { /* fallback reveal is best-effort */ }
+    }, REVEAL_TIMEOUT_MS);
+  } catch { /* timer is best-effort */ }
+  return true;
+}
+
+/** Crossfade the pre-warmed overlay in (opacity 0->1, ~600ms). Idempotent. */
+function revealTwin(instant = false) {
+  try {
+    if (pendingReveal && pendingReveal.revealed) return true;
+    if (pendingReveal) pendingReveal.revealed = true;
+    try {
+      if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
+    } catch { /* timer teardown is best-effort */ }
+    if (!overlayEls || overlayEls.root.hidden) return false;
+    if (!instant) {
+      // Force a frame at opacity 0, then drop .prewarm so the CSS
+      // opacity transition (~600ms) crossfades map->twin with no flash.
+      try {
+        void overlayEls.root.offsetWidth;
+      } catch { /* reflow nudge is best-effort */ }
+      try {
+        overlayEls.root.classList.remove('prewarm');
+      } catch { /* cosmetic */ }
+    } else {
+      try {
+        overlayEls.root.classList.remove('prewarm');
+      } catch { /* cosmetic */ }
+    }
+    window.__mapProbe.prewarm = false;
+    window.__mapProbe.reveal = 'revealed';
+    try {
+      overlayEls.frame.focus?.();
+    } catch { /* focus is best-effort */ }
+    return true;
+  } catch (err) {
+    errors.push('REVEAL: ' + (err && err.message));
+    return false;
+  }
 }
 
 /** Task 18: open the twin overlay pre-selected on the sector's worst asset.
@@ -479,7 +600,16 @@ function openTwin(id, opts = {}) {
   root.hidden = false;
   try {
     root.classList.remove('closing');
+    root.classList.remove('prewarm');
   } catch { /* cosmetic */ }
+  try {
+    if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
+  } catch { /* timer teardown is best-effort */ }
+  pendingReveal = null;
+  window.__mapProbe.prewarm = false;
+  window.__mapProbe.twinReady = false;
+  window.__mapProbe.reveal = 'revealed';
+  window.__mapProbe.revealFallback = false;
   try {
     document.body.classList.add('twin-open');
   } catch { /* chrome class is cosmetic */ }
@@ -502,8 +632,10 @@ function openTwin(id, opts = {}) {
 }
 
 /** Actual teardown: fades the overlay out (never an abrupt cut), keeps hex
- * + selection (Task 19). announce=true resolves when hidden (LANE A recede
- * chains the map animation underneath the fade). */
+ * + selection (Task 19). Handoff-4 reverse: the twin has already returned to
+ * top-down sat, so fade twin->map-sat (~500ms, sat stays ON underneath),
+ * then the caller chains sat->flat + zoom-out. announce=true resolves when
+ * hidden (LANE A recede chains the map animation underneath the fade). */
 function doCloseTwin() {
   // Handoff-3: if the overlay is the fullscreen element, drop fullscreen
   // silently first (flag cleared so fullscreenchange can't recede twice).
@@ -517,10 +649,19 @@ function doCloseTwin() {
       }
     }
   } catch { /* fullscreen teardown is best-effort */ }
+  try {
+    if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
+  } catch { /* timer teardown is best-effort */ }
+  pendingReveal = null;
+  window.__mapProbe.prewarm = false;
+  window.__mapProbe.twinReady = false;
+  window.__mapProbe.reveal = null;
+  window.__mapProbe.revealFallback = false;
   const finishHide = () => {
     if (overlayEls) {
       overlayEls.root.hidden = true;
       overlayEls.root.classList.remove('closing');
+      overlayEls.root.classList.remove('prewarm');
       try {
         setFrameUrl(overlayEls.frame, 'about:blank');
       } catch { /* frame teardown is best-effort */ }
@@ -533,9 +674,10 @@ function doCloseTwin() {
     } catch { /* cosmetic */ }
     if (!reduced) {
       try {
+        overlayEls.root.classList.remove('prewarm');
         overlayEls.root.classList.add('closing');
       } catch { /* cosmetic */ }
-      setTimeout(finishHide, 380);
+      setTimeout(finishHide, 520);
     } else {
       finishHide();
     }
@@ -634,11 +776,37 @@ window.addEventListener('message', (e) => {
   if (!twinOpen) return;
   setTwinFs(fs.on);
 });
+// Handoff-4 Lane A seeded reveal: Lane B posts { type:'safepipe-twin-ready' }
+// when its top-down sat frame matches the staged map end-frame. Reveal (the
+// ~600ms crossfade) on that signal; the ~4s fallback in prewarmThenReveal
+// covers a silent twin. Accepted only while a prewarm is pending.
+window.addEventListener('message', (e) => {
+  let rdy = null;
+  try { rdy = parseTwinReadyMessage(e && e.data); } catch { rdy = null; }
+  if (!rdy) return;
+  if (!twinOpen || !pendingReveal || pendingReveal.revealed) return;
+  try {
+    window.__mapProbe.twinReady = true;
+  } catch { /* probe cosmetic */ }
+  revealTwin(false);
+});
 window.addEventListener('message', (e) => {
   if (!twinOpen || !isTwinCloseData(e && e.data)) return;
   const recede = !!(e.data && typeof e.data === 'object' && e.data.recede);
+  if (recede) {
+    // Handoff-4 reverse: the twin already returned to top-down sat — keep
+    // map-sat ON underneath the twin fade (~500ms), THEN sat->flat + zoom
+    // out to the blip. Never cut, never fade over flat.
+    setSatForced(true);
+    closeTwin();
+    setTimeout(() => {
+      try {
+        recedeToCountry();
+      } catch { /* recede is best-effort */ }
+    }, 540);
+    return;
+  }
   closeTwin();
-  if (recede) recedeToCountry();
 });
 
 function mountChrome(map, overlay, setSat) {

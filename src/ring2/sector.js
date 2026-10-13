@@ -24,6 +24,11 @@ export const CY_PARAM = 'cy';
 export const ZOOM_PARAM = 'z';
 export const BEARING_PARAM = 'bearing';
 export const TWIN_CLOSE_MSG = 'safepipe-twin-close';
+/* Handoff-4 Lane B ready (twin->parent): posted ONCE when the top-down
+ * satellite start frame matches the staged map end-frame and the first
+ * matched sat frame has painted. Lane A reveals the overlay on this
+ * (pre-warm hold + ~600 ms crossfade are map-side owned). */
+export const TWIN_READY_MSG = 'safepipe-twin-ready';
 /* Delegated fullscreen (twin-side): when embedded (?embed=1) the twin
  * FULLSCREEN button must NOT fullscreen its own document (that would hide
  * the parent's CLOSE chrome). It posts { type, on } to the parent instead
@@ -123,6 +128,36 @@ export function frameRange(z, { viewportPx = 600, fovDeg = MAP_TRUE_FOV_DEG, lat
 export function easeInOutCubic(t) {
   const x = Math.min(1, Math.max(0, Number(t) ?? 0));
   return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+}
+
+/** Twin ready message (LANE 4 Lane B -> Lane A): the matched sat frame has
+ * painted and the staged inbound may be revealed. Plain object —
+ * structured-clone safe. */
+export function buildTwinReadyMessage() {
+  return { type: TWIN_READY_MSG };
+}
+
+/** True for the twin ready payload { type:'safepipe-twin-ready' }. Never
+ * matches the close or fullscreen shapes. */
+export function isTwinReadyMessage(data) {
+  try {
+    return !!data && typeof data === 'object' && data.type === TWIN_READY_MSG;
+  } catch {
+    return false;
+  }
+}
+
+/** Pure: close-time flight phase -> reverse plan through the stages actually
+ * passed (never a jump to a canned start).
+ *   hold  -> 'snap'  (still top-down at the ring frame: pin + mix 0, post)
+ *   swoop -> 'pitch' (midway to iso: current pose -> ring top-down, mix ->0)
+ *   push/done/idle -> 'full' (terminal-side: pull to ring iso with mix ->0,
+ *     then pitch-back to ring top-down). Node-checkable. */
+export function reversePlanForPhase(phase) {
+  const p = String(phase ?? '').toLowerCase();
+  if (p === 'hold') return 'snap';
+  if (p === 'swoop') return 'pitch';
+  return 'full';
 }
 
 /** Twin close message with the recede flag (LANE 3): the parent map fades
