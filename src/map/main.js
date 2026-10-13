@@ -113,12 +113,58 @@ async function loadStyle() {
   try {
     const res = await fetch(POSITRON_STYLE);
     if (!res.ok) throw new Error('positron HTTP ' + res.status);
-    return await res.json();
+    const style = await res.json();
+    // LANE A naked flat view: strip ALL place-name/label layers at runtime
+    // (every symbol layer), keep geometry/roads/water. Filter the fetched
+    // style AND defensively re-apply post-load (see stripLabelLayers).
+    try {
+      const before = Array.isArray(style.layers) ? style.layers.length : 0;
+      style.layers = (style.layers || []).filter((l) => l && l.type !== 'symbol');
+      window.__mapProbe.naked = true;
+      window.__mapProbe.strippedLabels = before - style.layers.length;
+    } catch { /* filter is best-effort */ }
+    return style;
   } catch (err) {
     errors.push('STYLE-FALLBACK: ' + (err && err.message));
     window.__mapProbe.base = 'fallback';
     return fallbackStyle();
   }
+}
+
+/* LANE A: hide any symbol (label) layers that arrive via runtime style
+ * additions. Keeps geometry/roads/water; removes place names. */
+function stripLabelLayers(map) {
+  try {
+    const style = map.getStyle();
+    const layers = (style && style.layers) || [];
+    let n = 0;
+    for (const l of layers) {
+      try {
+        if (l.type === 'symbol') {
+          map.setLayoutProperty(l.id, 'visibility', 'none');
+          n++;
+        }
+      } catch { /* per-layer best-effort */ }
+    }
+    // Accumulate: loadStyle() already recorded the fetch-time strip count;
+    // never overwrite it with a smaller post-load number.
+    try {
+      const prev = +window.__mapProbe.strippedLabels || 0;
+      window.__mapProbe.strippedLabels = Math.max(prev, n);
+    } catch { /* probe cosmetic */ }
+  } catch { /* pre-ready */ }
+}
+
+/* LANE A: minimal micro attribution (replaces the pill + info button).
+ * OSM/CARTO/Esri terms require a credit — tiny bottom-left text only. */
+function mountMicroCredit() {
+  try {
+    if (document.getElementById('map-credit')) return;
+    const el = document.createElement('div');
+    el.id = 'map-credit';
+    el.textContent = '© OpenStreetMap contributors © CARTO · Esri World Imagery';
+    document.getElementById('app').appendChild(el);
+  } catch { /* cosmetic */ }
 }
 
 /** deck.gl layers: single Sangachal blip (halo + core) + label. Clickable. */
@@ -289,10 +335,25 @@ function setSatForced(on) {
   window.__mapProbe.satOn = !!on;
 }
 
-/** T2 handoff choreography: ease to the H3 ring bounds (strictly vertical
- * top view), then crossfade flat->satellite + vignette, then open the twin
- * with the staged frame. Falls back to a direct open when the map isn't
- * ready, bounds fail, or motion is reduced. Re-entrant clicks are ignored. */
+/** LANE A outbound pre-warm: make the sat raster visible at opacity 0 so
+ * tiles load DURING the bounds zoom — the later crossfade never flashes.
+ * Probe satOn stays false until the real crossfade (setSatForced(true)). */
+function warmSatTiles() {
+  try {
+    if (!mapRef || !mapRef.getLayer(SAT_LAYER_ID)) return;
+    mapRef.setLayoutProperty(SAT_LAYER_ID, 'visibility', 'visible');
+    try {
+      mapRef.setPaintProperty(SAT_LAYER_ID, 'raster-opacity', 0);
+    } catch { /* paint warm is best-effort */ }
+  } catch { /* pre-ready */ }
+}
+
+/** T2 handoff choreography: ease to the H3 ring bounds with symmetric
+ * padding + center lock (strictly vertical top view), pre-warming sat
+ * tiles during the zoom; then crossfade flat->sat over the cached zoomed
+ * flat frame + vignette; then open the twin with the staged frame.
+ * Falls back to a direct open when the map isn't ready, bounds fail, or
+ * motion is reduced. Re-entrant clicks are ignored. */
 function flyToSectorThenTwin(id, opts = {}) {
   const s = sectors.find((x) => x.id === id);
   if (!s) return false;
@@ -312,7 +373,7 @@ function flyToSectorThenTwin(id, opts = {}) {
   if (!mapRef || !bounds || reduced) {
     if (reduced && mapRef && bounds) {
       try {
-        mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: 60, maxZoom: 14 });
+        mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: { top: 80, bottom: 80, left: 80, right: 80 }, maxZoom: 14 });
       } catch { /* instant-fit is best-effort */ }
       setSatForced(true);
       showVignette(true);
@@ -324,6 +385,9 @@ function flyToSectorThenTwin(id, opts = {}) {
   if (transitId) return false;
   transitId = id;
   window.__mapProbe.transit = id;
+  // LANE A: pre-warm sat tiles during the zoom so the crossfade has cached
+  // tiles and never flashes over the zoomed flat frame.
+  warmSatTiles();
   let done = false;
   const finish = () => {
     if (done) return;
@@ -331,6 +395,24 @@ function flyToSectorThenTwin(id, opts = {}) {
     try {
       mapRef.off('moveend', finish);
     } catch { /* listener teardown is best-effort */ }
+    // LANE A center lock: fitBounds already centers; re-assert the ring
+    // center at zoom (bearing/pitch 0) so the ring sits at the viewport
+    // bounds AND centered even under asymmetric chrome.
+    try {
+      const c = mapRef.getCenter();
+      const sw = bounds[0];
+      const ne = bounds[1];
+      const mid = [(sw[0] + ne[0]) / 2, (sw[1] + ne[1]) / 2];
+      const dx = Math.abs(c.lng - mid[0]);
+      const dy = Math.abs(c.lat - mid[1]);
+      if (dx > 1e-6 || dy > 1e-6) {
+        try {
+          mapRef.easeTo({ center: mid, bearing: 0, pitch: 0, duration: 250 });
+        } catch { /* center nudge is best-effort */ }
+      }
+    } catch { /* center lock is best-effort */ }
+    // Crossfade flat->sat OVER the cached zoomed flat frame (sat layer was
+    // pre-warmed visible@0; this opacity ramp is the visible crossfade).
     setSatForced(true);
     showVignette(true);
     setTimeout(() => {
@@ -350,7 +432,9 @@ function flyToSectorThenTwin(id, opts = {}) {
       bearing: 0,
       pitch: 0,
       duration: 900,
-      padding: 60,
+      // LANE A outbound: symmetric padding locks the H3 ring at the
+      // viewport bounds AND centered (equal insets all sides).
+      padding: { top: 80, bottom: 80, left: 80, right: 80 },
       maxZoom: 14,
     });
   } catch (err) {
@@ -373,6 +457,9 @@ function openTwin(id, opts = {}) {
   setFrameUrl(frame, url);
   root.hidden = false;
   try {
+    root.classList.remove('closing');
+  } catch { /* cosmetic */ }
+  try {
     document.body.classList.add('twin-open');
   } catch { /* chrome class is cosmetic */ }
   if (label) label.textContent = s.name + ' — ' + worstAssetId(s) + ' · ' + h3;
@@ -393,13 +480,34 @@ function openTwin(id, opts = {}) {
   return true;
 }
 
-/** Actual teardown: hides the overlay, keeps hex + selection (Task 19). */
+/** Actual teardown: fades the overlay out (never an abrupt cut), keeps hex
+ * + selection (Task 19). announce=true resolves when hidden (LANE A recede
+ * chains the map animation underneath the fade). */
 function doCloseTwin() {
-  if (overlayEls) {
-    overlayEls.root.hidden = true;
+  const finishHide = () => {
+    if (overlayEls) {
+      overlayEls.root.hidden = true;
+      overlayEls.root.classList.remove('closing');
+      try {
+        setFrameUrl(overlayEls.frame, 'about:blank');
+      } catch { /* frame teardown is best-effort */ }
+    }
+  };
+  if (overlayEls && !overlayEls.root.hidden) {
+    let reduced = false;
     try {
-      setFrameUrl(overlayEls.frame, 'about:blank');
-    } catch { /* frame teardown is best-effort */ }
+      reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch { /* cosmetic */ }
+    if (!reduced) {
+      try {
+        overlayEls.root.classList.add('closing');
+      } catch { /* cosmetic */ }
+      setTimeout(finishHide, 380);
+    } else {
+      finishHide();
+    }
+  } else {
+    finishHide();
   }
   showVignette(false); // T2: lift the handoff vignette; sat staging stays
   try {
@@ -449,17 +557,35 @@ function isTwinCloseData(d) {
     return false;
   }
 }
+/* LANE A recede (reverse): animate sat->flat fade + smooth zoom back out
+ * to the country view — never an abrupt cut. setSatForced(false) already
+ * ramps raster-opacity 1->0 over the cached sat frame; the easeTo runs
+ * concurrently so flat returns while zooming out. Reduced-motion: instant. */
 function recedeToCountry() {
+  let reduced = false;
+  try {
+    reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch { /* cosmetic */ }
   setSatForced(false);
   try {
     if (mapRef) {
-      mapRef.easeTo({
-        center: COUNTRY_CENTER,
-        zoom: COUNTRY_ZOOM,
-        bearing: 0,
-        pitch: 0,
-        duration: 900,
-      });
+      if (reduced) {
+        mapRef.easeTo({
+          center: COUNTRY_CENTER,
+          zoom: COUNTRY_ZOOM,
+          bearing: 0,
+          pitch: 0,
+          duration: 0,
+        });
+      } else {
+        mapRef.easeTo({
+          center: COUNTRY_CENTER,
+          zoom: COUNTRY_ZOOM,
+          bearing: 0,
+          pitch: 0,
+          duration: 1100,
+        });
+      }
     }
   } catch (err) {
     errors.push('RECEDE: ' + (err && err.message));
@@ -530,12 +656,21 @@ async function boot() {
     style,
     center: COUNTRY_CENTER,
     zoom: COUNTRY_ZOOM,
-    attributionControl: { compact: true },
+    // LANE A naked view: no default attribution pill / info (ⓘ) button.
+    // A minimal micro credit is mounted instead (mountMicroCredit).
+    attributionControl: false,
   });
   // No key prompts anywhere: suppress geolocate, never request tokens.
-  map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: false, showCompass: true }), 'top-right');
 
   map.on('load', () => {
+    // LANE A: belt-and-braces label strip + micro credit + kill any
+    // injected attrib pill (no ⓘ button anywhere).
+    stripLabelLayers(map);
+    mountMicroCredit();
+    try {
+      map.on('styledata', () => stripLabelLayers(map));
+    } catch { /* styledata guard is best-effort */ }
     try {
       if (!map.getSource(SAT_SOURCE_ID)) {
         map.addSource(SAT_SOURCE_ID, {

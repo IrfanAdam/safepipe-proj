@@ -779,6 +779,7 @@ async function boot() {
         const k = easeInOutCubic(t);
         const f = handoff.from, s = handoff.start;
         if (!f || !s) {
+          endHandoffFlight();
           postTwinClose();
           return;
         }
@@ -796,10 +797,7 @@ async function boot() {
             pinTopDown(s.tx, s.tz, s.range, s.bearing);
           } catch { /* pin is best-effort */ }
           driveMix(HANDOFF_START_MIX);
-          handoff.phase = 'done';
-          try {
-            twin.controls.enabled = true;
-          } catch { /* input stays as-is */ }
+          endHandoffFlight();
           postTwinClose();
         }
       }
@@ -936,13 +934,18 @@ async function boot() {
     } catch { /* flight never breaks boot; probe still reports the sector */ }
     if (sectorQ.embed) {
       // Esc: play the exact reverse (iso -> top-down satellite frame) then
-      // notify the parent with {recede:true}. Capture phase runs before the
-      // HUD popover manager's bubble handler; a popover-claimed Esc
-      // (defaultPrevented there) is left alone.
+      // notify the parent with {recede:true}. Popover-first: the HUD popover
+      // manager owns Esc while a popover is open (bubble-phase handler) and
+      // this capture listener runs first — so when a popover is open, yield
+      // (no preventDefault/stopPropagation) and let it close the popover.
+      // The next Esc then drives the reverse close.
       window.addEventListener('keydown', (e) => {
         if (!e || e.key !== 'Escape') return;
         if (e.defaultPrevented) return;
         if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+        try {
+          if (document.querySelector('.ops-hud [aria-expanded="true"]')) return;
+        } catch { /* popover check is best-effort */ }
         try {
           e.preventDefault();
         } catch { /* key handling is best-effort */ }

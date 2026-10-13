@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-13T10:22:26.775Z",
+  "generated": "2026-10-13T10:40:39.869Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -15,6 +15,15 @@
     "2026-10-12_175646-ops3d-geo-triangulation.md"
   ],
   "commits": [
+    {
+      "sha": "d51661c",
+      "full": "d51661c16022696514900449f05d47a788b43e0b",
+      "date": "2026-10-13",
+      "time": "15:53",
+      "subject": "feat(gallery): Ring-2 pattern boots the launcher map [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "b0cff2a",
       "full": "b0cff2afda2dcb915e1ffdd937323984a246e5ea",
@@ -3068,6 +3077,8 @@
     }
   ],
   "wip": [
-    "gallery.html"
+    "ops3d-map.html",
+    "src/map/main.js",
+    "src/ring2/main.js"
   ]
 }

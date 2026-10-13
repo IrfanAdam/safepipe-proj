@@ -128,6 +128,26 @@
     background: rgba(80, 10, 10, 0.94); color: #ffd9a0;
     font: 11px/1.6 ui-monospace, monospace; white-space: pre-wrap;
   }
+  /* LANE A: naked flat view — minimal micro attribution (terms require a
+   * credit; tiny bottom-left text, nothing pill-like, no info button). */
+  #map-credit {
+    position: absolute; left: 6px; bottom: 4px; z-index: 2;
+    font: 8px/1.4 ui-monospace, Menlo, monospace; letter-spacing: 0.02em;
+    color: rgba(45, 55, 60, 0.5); background: transparent;
+    pointer-events: none; user-select: none; max-width: 60vw;
+  }
+  #map-credit a { color: inherit; text-decoration: none; }
+  /* LANE A: never show the maplibre attrib pill / info button even if a
+   * control slips in via a plugin path. */
+  .maplibregl-ctrl-attrib, .maplibre-ctrl-attrib,
+  .maplibregl-ctrl-attrib-button { display: none !important; }
+  /* LANE A recede: twin overlay fades instead of cutting. */
+  #twin-overlay { opacity: 1; transition: opacity 0.35s ease; }
+  #twin-overlay[hidden] { display: none; }
+  #twin-overlay.closing { opacity: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    #twin-overlay { transition: none; }
+  }
 </style>
 </head>
 <body>
