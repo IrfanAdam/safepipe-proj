@@ -6,7 +6,7 @@ const GH = 'https://github.com/IrfanAdam/safepipe-proj/commit/';
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/\"/g, '&quot;').replace(/</g, '&lt;');
 export const commits = manifest.commits || [];
 export const wip = manifest.wip || [];
-const badgeItem = (c, idx) => `<div class="ds-timeline-item"><span class="ds-item-index">${idx}</span><a href="${GH}${c.full}">${c.sha}</a> <span>${esc(c.subject)}</span><small>${esc(c.time ? `${c.date} ${fmtTime(c.time)}` : c.date)}</small></div>`;
+const badgeItem = (c) => `<div class="ds-timeline-item"><a href="${GH}${c.full}">${c.sha}</a> <span>${esc(c.subject)}</span><small>${esc(c.time ? `${c.date} ${fmtTime(c.time)}` : c.date)}</small></div>`;
 export const hits = (file, text, first) => commits
   .filter((c) => c.plan === file && (c.anchor ? anchorHit(text, c.anchor) : first));
 export const badges = (list) => {
@@ -20,17 +20,16 @@ export const badges = (list) => {
     groups.get(d).push(c);
   }
   const dates = [...groups.keys()].sort((a,b)=> b.localeCompare(a));
-  const latestLabel = fmtTimelineDate(dates[0]) || dates[0] || '';
   let inner = '';
-  let globalIdx = 1;
   for (let i = 0; i < dates.length; i++) {
     const d = dates[i];
     const labelDate = fmtTimelineDate(d) || d || 'Undated';
-    const dayLabel = `<span class="ds-caret">››</span><span class="ds-day-num">Day ${i + 1}</span> · ${esc(labelDate)}`;
-    const items = groups.get(d).map((c)=> badgeItem(c, globalIdx++)).join('');
+    const dayNum = dates.length - i;
+    const dayLabel = `<span class="ds-caret">‹›</span><span class="ds-day-num">Day ${dayNum}</span> · ${esc(labelDate)}`;
+    const items = groups.get(d).map((c)=> badgeItem(c)).join('');
     inner += `<details class="ds-timeline-group" open><summary class="ds-timeline-date">${dayLabel}</summary><div class="ds-timeline-items">${items}</div></details>`;
   }
-  return `<hr class="ds-hr"><details class="ds-commits-panel ds-panel" data-commits="${n}" open><summary class="ds-revs-title ds-panel-title">Commits · <span class="ds-panel-num">${n}</span> <span class="ds-panel-date">· ${esc(latestLabel)}</span></summary><div class="ds-timeline">${inner}</div></details>`;
+  return `<hr class="ds-hr"><details class="ds-commits-panel ds-panel" data-commits="${n}" open><summary class="ds-revs-title ds-panel-title">Commits · <span class="ds-panel-num">${n}</span></summary><div class="ds-timeline">${inner}</div></details>`;
 };
 export const unlinked = (texts) => {
   const xs = commits.filter((c) => !c.plan || !texts[c.plan] || (c.anchor && !anchorHit(texts[c.plan], c.anchor)));

@@ -197,8 +197,8 @@ test('map vignette: radius from projected R, brackets retired as enclosure signa
   const main = srcOf('../src/map/main.js');
   assert.ok(main.includes("v.style.setProperty('--vr'"), 'journey writes the vignette radius');
   assert.ok(main.includes('vignetteRadiusPxForZoom(z, SITE.lat'), 'radius is a pure function of live zoom');
-  assert.ok(!main.includes('showVignette(prox.near && blend >= 0.5)'), 'bracket-convergence gate is retired');
-  assert.ok(main.includes('showVignette(prox.near);'), 'proximity owns the enclosure');
+  assert.ok(main.includes('showVignette(prox.near && blend >= 0.5)'), 'enclosure gated on blend: sub-pixel ring never blacks the frame');
+  assert.ok(!main.includes('showVignette(prox.near);'), 'ungated proximity enclosure is gone');
   const html = srcOf('../ops3d-map.html');
   assert.ok(html.includes('circle var(--vr, 260px)'), 'enclosure circle rides the projected radius');
   assert.ok(html.includes('at var(--vx, 50%) var(--vy, 50%)'), 'enclosure stays hotspot-centered');

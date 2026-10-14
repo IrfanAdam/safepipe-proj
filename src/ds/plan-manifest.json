@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-14T11:54:56.688Z",
+  "generated": "2026-10-14T12:08:52.608Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -16,6 +16,15 @@
     "2026-10-13_233337-ops3d-twin-work.md"
   ],
   "commits": [
+    {
+      "sha": "dad5d8c",
+      "full": "dad5d8cce163af52c37302d820d2eac59a182e2a",
+      "date": "2026-10-14",
+      "time": "17:27",
+      "subject": "feat(journey): mirrored reverse, staged-S sync, clip-sized vignette [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "15ce8f4",
       "full": "15ce8f47cb18a304e137d99b51b559717616e82d",
@@ -3258,14 +3267,8 @@
     }
   ],
   "wip": [
-    "ops3d-map.html",
-    "src/changelog/changelog-drawer.css",
     "src/changelog/changelog-links.js",
     "src/changelog/changelog/paint-revs.js",
-    "src/map/main.js",
-    "src/map/scrolltrigger.js",
-    "src/map/twinlink.js",
-    "src/ring2/main.js",
-    "src/ring2/sector.js"
+    "src/map/main.js"
   ]
 }

@@ -861,7 +861,11 @@ function onNativeZoomStep(snap, source) {
           }
         }
       } catch { /* cosmetic */ }
-      showVignette(prox.near);
+      // Gate: enclosure only once the center blend is well underway
+    // (blend>=0.5, z≳9.5) — below that the projected ring is sub-pixel and
+    // the gradient surround would paint the whole frame black on pan or
+    // zoom-out. Restores the pre-Task-37 gate; zoom-out retraces it.
+    showVignette(prox.near && blend >= 0.5);
     }
     // Deep warm for the dissolve: while the spot is tracked in sat range,
     // keep the level AFTER next warm around it — the arriving level streams
