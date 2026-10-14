@@ -168,18 +168,24 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 ### Task 19: make Esc bring you home intact ✓ done
 **Objective:** Closing the twin never loses your place — hex + selection survive X / Esc / back.
 **Verify:** Esc mid-orbit — map returns with selection kept.
-### Task 34: scrub the iso tilt
+### Task 34: scrub the iso tilt ✓ done (`0ddcdab`)
 **Objective:** The top→iso tilt rides the zoom band itself (transform writes, glide never stopped) — zoom-out retraces it.
 **Verify:** Slow-scroll 11→12 tilts 0→45 with the fingers; scroll back flattens it; `map-iso-scrub` tests green.
-### Task 35: scrub the handoff crossfade
+**Evidence:** `pitchTargetForZoom` law + transform driver (`15ce8f4`); restore guarantor — release step zeroes tilt in the landing step, `isoRestoreDue` latch + below-band settle reconcile heal fast flick-outs (`0ddcdab`, headless A/B: 30° stranded before, flat 0° after). Suite 560 green.
+### Task 35: scrub the handoff crossfade ✓ done (`1c0a9f6`)
 **Objective:** Deep scroll past the handoff dissolves map→twin at coinciding angles — no 650ms flight.
 **Verify:** Zoom holds past 12 into the twin pose; map pitch 45 meets twin polar; reverse dissolves back.
-### Task 36: scrub the twin intro; unify enclosing + clip
+**Evidence:** Staged S-walk + `driveStagedOverlay` (`15ce8f4`); reveal never lands on an unpainted frame — Lane B ready now requires tile-idle + draped terrain, unstaged fallback reveals on first-painted-frame (`safepipe-twin-painted`, tile-idle + drape, 8s wall cap, flagged blind escape), blind 4s reveal removed. Headless unaimed run: open→prewarm hold (map beneath)→painted→`revealPaint`, no blind fallback. Suite 560 green.
+### Task 36: scrub the twin intro; unify enclosing + clip ✓ done (`191d0fa`)
 **Objective:** Hold/swoop/push timers become range-scrubbed; enclosing ring and MapLibre clip share one radius.
 **Verify:** Twin zoom drives intro + ring; enclosing overlays the clip circle exactly.
-### Task 37: mirror the reverse
+**Evidence:** `fwdProgressForStagedS` intro scrub + `RING_RADIUS_M` unification (`15ce8f4`); enclosing closes from the screen corners (`enclosureRadiusPxForZoom` vs farthest-corner distance, exact ring at handoff — `191d0fa`, portrait-verified edge-to-edge); `--vr` transition freeze removed (radius tracks the gesture). Suite 560 green.
+### Task 37: mirror the reverse ✓ done (`0ddcdab`)
 **Objective:** Zoom-out retraces every forward checkpoint to global — no erratic recede.
 **Verify:** Twin→map→global on scroll-out alone; same checkpoints, reversed.
+**Evidence:** Gesture-owned reverse scrub + S-producer unwind (`dad5d8c`); headless full out-run returns the load frame (sat→0, vignette off, twin closed). Suite 560 green.
+
+**Probe recipe (staged/iso walk arming — required for evidence runs):** synthetic probes must track the hotspot with the cursor: each step read `__mapProbe.proximity` → `mouse.move(sx, sy)` → wheel. Static-center cursors drift off-site (site leaves the near gate: cursor ≤140px or center ≤90px), so `staged.active`/`isoBridge` stay false and the handoff fires unstaged — that path is valid (paint-gated reveal) but exercises none of Tasks 34–37. Arming checklist: near true → z≥11 iso owns tilt → z=12 clamp + staged S-walk → twin-ready grants dissolve. Unaimed arrivals (handoff frame far from site) can never satisfy Lane B map-cam match — by construction they take the painted-fallback reveal.
 
 - REF GATE 3 (OPEN): owner picks map look + confirms ring reads right. How to judge: open the map, toggle satellite, click a ring, Esc back; pass = look approved + ring matches feed worst-health per sector.
 - REF GATE 3 · rev 2026-10-13 review-feedback (owner): "make it a little faster, smoother choreography"; "trigger the openstreetmap-to-twin transition and back by user scroll instead of click — gesture-based, intuitive". Verdict: OPEN — tempo + scroll-drive land as a revision on this gate, then proceed.
