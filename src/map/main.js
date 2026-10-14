@@ -839,14 +839,15 @@ function onNativeZoomStep(snap, source) {
     // far away it rests at the canvas edges (k=0) so zoom reads the same.
     const clipK = prox && prox.near ? blend : 0;
     updateRingClip(clipK, prox);
-    // Journey enclosure: the vignette circle starts wide and visibly closes
-    // in onto the PROJECTED ring radius across the center-blend band
-    // (enclosureRadiusPxForZoom: R/mpp + (1-blend)*1200, exact R at
-    // blend 1 — the same ground circle the twin clip cuts), so the
+    // Journey enclosure: the vignette circle starts at the hotspot's farthest
+    // screen corner (clear frame, darkness biasing in from the edges) and
+    // closes onto the PROJECTED ring radius across Z_CENTER..Z_HANDOFF
+    // (enclosureRadiusPxForZoom: corner*(1-t) + R/mpp*t, exact R at
+    // handoff — the same ground circle the twin clip cuts), so the
     // enclosing coincides with the twin clip exactly at handoff. The
     // corner brackets stay as dressing only. Gate: blend>0 (z>8) — below
     // that the ring is sub-pixel and the surround would black the frame.
-    // Zoom-out retraces it symmetrically (pure function of z).
+    // Zoom-out retraces it symmetrically (pure function of z + viewport).
     // Twin paths own it while open.
     if (!twinOpen && prox) {
       try {
@@ -854,7 +855,16 @@ function onNativeZoomStep(snap, source) {
         if (v) {
           v.style.setProperty('--vx', prox.sx.toFixed(1) + 'px');
           v.style.setProperty('--vy', prox.sy.toFixed(1) + 'px');
-          const vr = enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M);
+          let corner = null;
+          try {
+            const el = mapRef.getContainer();
+            const w = (el && el.clientWidth) || window.innerWidth || 800;
+            const h = (el && el.clientHeight) || window.innerHeight || 600;
+            const fx = Math.max(prox.sx, w - prox.sx);
+            const fy = Math.max(prox.sy, h - prox.sy);
+            corner = Math.sqrt(fx * fx + fy * fy);
+          } catch { corner = null; }
+          const vr = enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, corner);
           if (Number.isFinite(vr)) {
             v.style.setProperty('--vr', vr.toFixed(1) + 'px');
             try {

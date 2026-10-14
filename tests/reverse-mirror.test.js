@@ -21,7 +21,6 @@ import {
   accumStagedS,
   vignetteRadiusPxForZoom,
   enclosureRadiusPxForZoom,
-  ENCLOSURE_START_PX,
   MAP_VIGNETTE_RING_M,
   metersPerPixel,
 } from '../src/map/scrolltrigger.js';
@@ -101,20 +100,22 @@ test('vignette radius: projected R, coincides with the twin clip at handoff', ()
   assert.equal(vignetteRadiusPxForZoom(12, SITE.lat, -1), null, 'non-positive ring parks');
 });
 
-test('enclosure forming wash: wide start closes onto the clip circle', () => {
-  assert.equal(ENCLOSURE_START_PX, 1200, 'forming wash starts a screen past the ring');
-  assert.equal(enclosureRadiusPxForZoom(7.9, SITE.lat), null, 'parks below the blend band — never blacks the frame');
-  const at8 = enclosureRadiusPxForZoom(8.01, SITE.lat);
-  assert.ok(at8 > 1000, `forming starts wide (got ${at8.toFixed(0)}px)`);
+test('enclosure forming wash: screen corners close onto the clip circle', () => {
+  const C = 900; // hotspot farthest-corner distance on the test viewport
+  assert.equal(enclosureRadiusPxForZoom(7.9, SITE.lat, MAP_VIGNETTE_RING_M, C), null, 'parks below the band — never blacks the frame');
+  assert.equal(enclosureRadiusPxForZoom(9, SITE.lat, MAP_VIGNETTE_RING_M, null), null, 'parks without a viewport corner');
+  assert.equal(enclosureRadiusPxForZoom(9, SITE.lat, MAP_VIGNETTE_RING_M, -4), null, 'parks on a non-positive corner');
+  const at8 = enclosureRadiusPxForZoom(8.01, SITE.lat, MAP_VIGNETTE_RING_M, C);
+  assert.ok(Math.abs(at8 - C) < 5, `forming starts AT the corners (got ${at8.toFixed(1)}px)`);
   let prev = Infinity;
-  for (let z = 8.5; z <= 11; z += 0.5) {
-    const r = enclosureRadiusPxForZoom(z, SITE.lat);
-    assert.ok(r < prev, `z=${z} closes in (${r.toFixed(0)}px < ${prev.toFixed(0)}px)`);
+  for (let z = 8.5; z <= 11.5; z += 0.5) {
+    const r = enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C);
+    assert.ok(r < prev, `z=${z} closes in from the edges (${r.toFixed(0)}px < ${prev === Infinity ? 'inf' : prev.toFixed(0)}px)`);
     prev = r;
   }
-  for (const z of [11, 11.5, 12, 13]) {
+  for (const z of [12, 13]) {
     assert.equal(
-      enclosureRadiusPxForZoom(z, SITE.lat), vignetteRadiusPxForZoom(z, SITE.lat),
+      enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C), vignetteRadiusPxForZoom(z, SITE.lat),
       `z=${z} display IS the projected ring (handoff coincidence)`,
     );
   }

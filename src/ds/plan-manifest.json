@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-14T12:12:46.588Z",
+  "generated": "2026-10-14T12:23:49.041Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -16,6 +16,15 @@
     "2026-10-13_233337-ops3d-twin-work.md"
   ],
   "commits": [
+    {
+      "sha": "f2d514e",
+      "full": "f2d514e01a7eb10983ae314096835d9335b1316d",
+      "date": "2026-10-14",
+      "time": "17:52",
+      "subject": "fix(journey): earlier sat fade, forming enclosure wash, unfreeze vignette radius [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "0cf6013",
       "full": "0cf601353894213028e94ca07328cbcef3de38aa",
@@ -3276,7 +3285,6 @@
     }
   ],
   "wip": [
-    "ops3d-map.html",
     "src/map/main.js",
     "src/map/scrolltrigger.js"
   ]

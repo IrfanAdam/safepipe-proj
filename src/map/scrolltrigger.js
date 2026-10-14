@@ -158,18 +158,24 @@ export function vignetteRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_
   if (!Number.isFinite(mpp) || !(mpp > 0)) return null;
   return R / mpp;
 }
-/* Enclosure forming wash: the displayed vignette circle starts wide and
- * visibly closes in onto the projected ring across the center-blend band —
- * display = projected R + (1-blend)*START. At blend 1 it IS the clip circle
- * exactly (handoff coincidence); below blend 0 it parks at null (ungated
- * surround would black the frame). Pure in z, symmetric on zoom-out. */
-export const ENCLOSURE_START_PX = 1200;
-export function enclosureRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M) {
+/* Enclosure forming wash (map side): the displayed vignette circle starts at
+ * the hotspot's farthest screen corner (clear frame, darkness only biasing
+ * in from the edges) and closes onto the projected ring across the
+ * Z_CENTER..Z_HANDOFF span — display = corner*(1-t) + projected*t. At
+ * handoff t=1 so it IS the clip circle exactly; at/below band start it
+ * parks at null (an ungated surround would black the frame). cornerPx is
+ * viewport-relative (driver passes the hotspot's farthest-corner distance),
+ * so the enclosure always reaches the screen edges on any aspect — never a
+ * peephole. Pure in (z, corner), symmetric on zoom-out. */
+export function enclosureRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M, cornerPx = null) {
   const vr = vignetteRadiusPxForZoom(zoom, latDeg, ringM);
-  if (!Number.isFinite(vr)) return null;
-  const b = centerBlendForZoom(zoom);
-  if (!(b > 0)) return null;
-  return vr + (1 - b) * ENCLOSURE_START_PX;
+  const c = +cornerPx;
+  if (!Number.isFinite(vr) || !Number.isFinite(c) || !(c > 0)) return null;
+  const n = +zoom;
+  if (!Number.isFinite(n)) return null;
+  const t = smooth01((n - Z_CENTER) / (Z_HANDOFF - Z_CENTER));
+  if (!(t > 0)) return null;
+  return c * (1 - t) + vr * t;
 }
 /** At (or below tolerance of) the min-zoom cap — mirrored-reverse home. */
 export function isHomeZoom(z) {
