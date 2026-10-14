@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -100,6 +100,10 @@ let aspectWarned = false;
 // frames, keeps the first frame error. -1 = loop not started yet.
 let twinFrames = -1;
 let twinErr = null;
+// First-painted post (once per boot): the render loop has painted PREWARM
+// frames — Lane A may reveal on this when ready-match cannot agree.
+let paintedPosted = false;
+let paintT0 = 0;
 // Sticky map failure: the 500ms paintStatus interval rebuilds the status
 // line, so a one-shot map FAILED write would be erased within a blink.
 // Kept here, painted every tick until the map lands.
@@ -834,6 +838,19 @@ async function boot() {
       // GATE-3 precache: the scene is warm only after PREWARM frames have
       // painted (damping converged, first live drape on screen) — not one.
       if (!(twinFrames >= HANDOFF_PREWARM_MIN_FRAMES)) return false;
+      // Content gate: pose + cam agreement is not enough — the reveal must
+      // never land on an unpainted frame. Map tile-idle + terrain draped;
+      // a streaming scene withholds exactly like a mismatched pose.
+      try {
+        if (typeof mapLoaded === 'function' && !mapLoaded()) return false;
+      } catch {
+        return false;
+      }
+      try {
+        if (typeof terrainState === 'function' && terrainState() !== 'vex') return false;
+      } catch {
+        return false;
+      }
       const m = mixCtl?.getMix?.();
       if (m !== HANDOFF_START_MIX) return false;
       // The LIVE twin camera must itself sit on the requested hold frame —
@@ -2333,6 +2350,9 @@ async function boot() {
   // unexplained black twin. Count frames, keep the first error, and paint
   // both into the status line — a screenshot then proves loop alive/dead.
   twinFrames = 0;
+  try {
+    paintT0 = Date.now();
+  } catch { paintT0 = 0; }
   /* Sync-first frame order (zoom catch-up fix): the damped controls settle
    * FIRST, the fresh post-damping twin pose drives the map via jumpTo, and
    * only then does EITHER side paint. jumpTo applies synchronously with no
@@ -2382,6 +2402,34 @@ async function boot() {
     } catch { /* ring never breaks the frame */ }
     twin.updateControls();
     twinFrames++;
+    // First-painted signal (twin->parent, once): PREWARM frames are on the
+    // canvas AND the scene is live (map tile-idle + terrain draped;
+    // wall-cap backstop) — no pose/cam match, so off-site arrivals report
+    // too. Never breaks the frame; ready-match below still owns the
+    // matched reveal.
+    try {
+      let mapIdle = false;
+      try {
+        mapIdle = map && typeof map.loaded === 'function' ? !!map.loaded() : true;
+      } catch { mapIdle = false; }
+      let sceneLive = false;
+      try {
+        sceneLive = typeof terrainState === 'function' ? terrainState() === 'vex' : true;
+      } catch { sceneLive = false; }
+      let elapsed = 0;
+      try {
+        elapsed = paintT0 > 0 ? Date.now() - paintT0 : 0;
+      } catch { elapsed = 0; }
+      if (!paintedPosted && firstPaintDue({ frames: twinFrames, mapIdle, sceneLive, elapsedMs: elapsed })) {
+        paintedPosted = true;
+        try {
+          window.parent?.postMessage(buildTwinPaintedMessage(), '*');
+        } catch { /* parent notify is best-effort */ }
+        try {
+          (window.__ring2paintOut ?? (window.__ring2paintOut = [])).push(buildTwinPaintedMessage());
+        } catch { /* probe log is best-effort */ }
+      }
+    } catch { /* painted post never breaks the frame */ }
     const pose = twin.getPose();
     const viewportPx = Math.max(twinDiv.clientHeight || window.innerHeight, 1);
     // Aspect parity (Phase 00): twin + map containers fill the same box,

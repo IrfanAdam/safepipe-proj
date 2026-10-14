@@ -185,6 +185,47 @@ export function isTwinReadyMessage(data) {
   }
 }
 
+/** Twin first-painted message (twin->parent): posted ONCE when the render
+ * loop has painted AND the map is tile-idle (or the wall-clock cap hits) —
+ * no pose/cam match required, so it fires for off-site arrivals whose
+ * ready-match can never agree. It never reveals directly (ready owns the
+ * reveal); it arms the map-side fallback to reveal on paint instead of
+ * blind, so an open sequence never shows an opaque frame before the twin's
+ * first paint. Plain object — structured-clone safe. */
+export const TWIN_PAINTED_MSG = 'safepipe-twin-painted';
+export function buildTwinPaintedMessage() {
+  return { type: TWIN_PAINTED_MSG };
+}
+
+/** Wall-clock backstop for first paint: tile streams must never strand the
+ * signal (a slow network is not a dead twin). */
+export const TWIN_PAINT_MAX_MS = 8000;
+/** Pure: first paint is due once PREWARM frames ran AND the scene is live
+ * (map tile-idle + terrain draped), or once the wall cap hits regardless.
+ * False below PREWARM frames or on any non-finite input — withhold, never
+ * guess. Node-checkable. */
+export function firstPaintDue({ frames = 0, mapIdle = false, sceneLive = false, elapsedMs = 0 } = {}) {
+  try {
+    const f = Number(frames);
+    if (!Number.isFinite(f) || f < HANDOFF_PREWARM_MIN_FRAMES) return false;
+    if (mapIdle === true && sceneLive === true) return true;
+    const ms = Number(elapsedMs);
+    return Number.isFinite(ms) && ms >= TWIN_PAINT_MAX_MS;
+  } catch {
+    return false;
+  }
+}
+
+/** True for the twin painted payload { type:'safepipe-twin-painted' }. Never
+ * matches the ready, close or fullscreen shapes. */
+export function isTwinPaintedMessage(data) {
+  try {
+    return !!data && typeof data === 'object' && data.type === TWIN_PAINTED_MSG;
+  } catch {
+    return false;
+  }
+}
+
 /* Ready settle depth (Lane B): the hold posts {type:'safepipe-twin-ready'}
  * only after this many CONSECUTIVE frames agree the live twin camera sits
  * on the requested hold frame (twin pose + map pose both matched). A single

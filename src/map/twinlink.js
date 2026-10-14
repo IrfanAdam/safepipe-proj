@@ -38,6 +38,22 @@ export function parseTwinReadyMessage(d) {
   }
 }
 
+// First-painted protocol (twin->parent): the twin posts
+// { type: TWIN_PAINTED_MSG } once its render loop has painted PREWARM
+// frames — no pose/cam match, so off-site arrivals report too. Mirrors
+// src/ring2/sector.js (owner); the node suite pins them equal. Pure.
+export const TWIN_PAINTED_MSG = 'safepipe-twin-painted';
+
+/** Parse a twin painted message. { painted:true } when matched, else null. */
+export function parseTwinPaintedMessage(d) {
+  try {
+    if (!d || typeof d !== 'object' || d.type !== TWIN_PAINTED_MSG) return null;
+    return { painted: true };
+  } catch {
+    return null;
+  }
+}
+
 /** Parse a twin fullscreen message. { on } when matched, else null. */
 export function parseTwinFsMessage(d) {
   try {

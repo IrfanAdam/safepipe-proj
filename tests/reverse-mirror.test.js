@@ -24,9 +24,14 @@ import {
   MAP_VIGNETTE_RING_M,
   metersPerPixel,
 } from '../src/map/scrolltrigger.js';
-import { TWIN_STAGED_MSG as MAP_STAGED_MSG, buildTwinStagedMessage } from '../src/map/twinlink.js';
+import { TWIN_STAGED_MSG as MAP_STAGED_MSG, buildTwinStagedMessage, TWIN_PAINTED_MSG as MAP_PAINTED_MSG, parseTwinPaintedMessage } from '../src/map/twinlink.js';
 import {
   TWIN_STAGED_MSG,
+  TWIN_PAINTED_MSG,
+  buildTwinPaintedMessage,
+  isTwinPaintedMessage,
+  firstPaintDue,
+  TWIN_PAINT_MAX_MS,
   isTwinStagedMessage,
   scrubEntryForDelta,
   TWIN_SCRUB_PINCH_ENTER_PX,
@@ -225,6 +230,33 @@ test('map vignette: radius from projected R, brackets retired as enclosure signa
   assert.ok(html.includes('@property --vr'), 'radius is registered animatable so the close-in glides');
   assert.ok(html.includes('circle var(--vr, 260px)'), 'enclosure circle rides the projected radius');
   assert.ok(html.includes('at var(--vx, 50%) var(--vy, 50%)'), 'enclosure stays hotspot-centered');
+});
+
+test('paint-gated reveal: no opaque frame before the twin first paints', () => {
+  assert.equal(MAP_PAINTED_MSG, TWIN_PAINTED_MSG, 'painted wire format agrees both sides');
+  assert.equal(MAP_PAINTED_MSG, 'safepipe-twin-painted', 'painted type pins the wire');
+  assert.deepEqual(buildTwinPaintedMessage(), { type: TWIN_PAINTED_MSG }, 'painted builder is a plain clone-safe object');
+  assert.ok(isTwinPaintedMessage({ type: TWIN_PAINTED_MSG }), 'twin checker accepts painted');
+  assert.ok(!isTwinPaintedMessage({ type: 'safepipe-twin-ready' }), 'checker never matches ready');
+  assert.ok(!isTwinPaintedMessage(null), 'checker parks on null');
+  assert.deepEqual(parseTwinPaintedMessage({ type: MAP_PAINTED_MSG }), { painted: true }, 'map parser mirrors painted');
+  assert.equal(parseTwinPaintedMessage({ type: 'safepipe-twin-ready' }), null, 'map parser never matches ready');
+  const map = srcOf('../src/map/main.js');
+  const twin = srcOf('../src/ring2/main.js');
+  assert.ok(twin.includes('paintedPosted'), 'twin posts painted once per boot');
+  assert.ok(twin.includes('firstPaintDue({ frames: twinFrames'), 'painted requires frames + tile idle, wall-cap backstop');
+  assert.equal(firstPaintDue({ frames: 2, mapIdle: true, sceneLive: true, elapsedMs: 99999 }), false, 'withholds below PREWARM frames');
+  assert.equal(firstPaintDue({ frames: 3, mapIdle: true, sceneLive: true, elapsedMs: 0 }), true, 'live scene reveals without waiting');
+  assert.equal(firstPaintDue({ frames: 30, mapIdle: true, sceneLive: false, elapsedMs: 0 }), false, 'withholds while terrain undraped');
+  assert.equal(firstPaintDue({ frames: 30, mapIdle: false, sceneLive: true, elapsedMs: 0 }), false, 'withholds while tiles stream');
+  assert.equal(firstPaintDue({ frames: 30, mapIdle: false, sceneLive: false, elapsedMs: TWIN_PAINT_MAX_MS }), true, 'wall cap rescues endless loads');
+  assert.equal(firstPaintDue({ frames: NaN }), false, 'parks on non-finite input');
+  assert.ok(map.includes('parseTwinPaintedMessage(e && e.data)'), 'map records painted arrivals');
+  assert.ok(map.includes('armRevealFallback()'), 'unstaged fallback arms through the paint gate');
+  assert.ok(map.includes('REVEAL_PAINT_TRIES'), 'unpainted fallback re-arms instead of revealing blind');
+  assert.ok(twin.includes("terrainState() !== 'vex'"), 'ready-match withholds until terrain drapes');
+  assert.ok(twin.includes('typeof mapLoaded'), 'ready-match withholds while tiles stream');
+  assert.ok(map.includes('revealPaint = true'), 'paint-gated reveal is flagged apart from blind fallback');
 });
 
 test('forward path untouched: staged laws, intro legs, iso ownership, FOV', () => {

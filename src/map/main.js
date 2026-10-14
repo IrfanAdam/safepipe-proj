@@ -58,6 +58,7 @@ import {
   buildTwinStagedMessage,
   parseTwinFsMessage,
   parseTwinReadyMessage,
+  parseTwinPaintedMessage,
 } from './twinlink.js';
 
 const POSITRON_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
@@ -154,7 +155,7 @@ window.__mapProbe = {
   selected: selectedId, twinOpen: false,
   blips: 1, siteWorst, siteSector, site: { lat: SITE.lat, lon: SITE.lon, name: 'SANGACHAL' },
   transit: null, handoff: null, vignette: false, mapFs: false, twinFs: false,
-  prewarm: false, twinReady: false, reveal: null, revealFallback: false, revealLate: false,
+  prewarm: false, twinReady: false, twinPainted: false, reveal: null, revealFallback: false, revealLate: false, revealPaint: false,
   recede: null, mapZoom: null, reverseWait: false, reverseFallback: false,
   view: null, // live ground-scale telemetry { z, tile, frac, w, h, label }
   // GATE-9-A scrub probe: journey progress driving zoom/center/fade.
@@ -1595,12 +1596,14 @@ function prewarmThenReveal(id, frame, opts = {}) {
   try {
     if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
   } catch { /* timer teardown is best-effort */ }
-  pendingReveal = { id, timer: null, revealed: false };
+  pendingReveal = { id, timer: null, revealed: false, tries: 0 };
   window.__mapProbe.prewarm = true;
   window.__mapProbe.twinReady = false;
+  window.__mapProbe.twinPainted = false;
   window.__mapProbe.reveal = 'prewarm';
   window.__mapProbe.revealFallback = false;
   window.__mapProbe.revealLate = false;
+  window.__mapProbe.revealPaint = false;
   // Hidden-but-loading: overlay mounted (hidden=false) at opacity 0 so the
   // twin boots its matched top-down sat frame underneath the held map frame.
   try {
@@ -1641,20 +1644,48 @@ function prewarmThenReveal(id, frame, opts = {}) {
   // forward exit (scroll-up unwinds instead), so a silent twin can never
   // strand the map — the hold simply never dissolves.
   if (!opts.staged) {
-    try {
-      pendingReveal.timer = setTimeout(() => {
-      // Fallback: reveal anyway; flag it so the probe distinguishes a real
-      // Lane B ready signal from the timeout path.
-      try {
-        if (pendingReveal && !pendingReveal.revealed) {
-          window.__mapProbe.revealFallback = true;
-          revealTwin(false);
-        }
-      } catch { /* fallback reveal is best-effort */ }
-      }, REVEAL_TIMEOUT_MS);
-    } catch { /* timer is best-effort */ }
+    armRevealFallback();
   }
   return true;
+}
+
+/* Unstaged fallback reveal, paint-gated: Lane B ready normally reveals via
+ * its message listener; this covers a twin whose ready-match never agrees
+ * (off-site arrivals fail the map-cam check structurally). It reveals on
+ * first-painted-frame (twinPainted), never on a black canvas: unpainted at
+ * fire re-arms (up to REVEAL_PAINT_TRIES), and only a fully silent twin
+ * takes the flagged blind reveal so the map never strands behind a dead
+ * frame. Staged prewarms never arm this (ready-or-unwind only). */
+const REVEAL_PAINT_TRIES = 3;
+function armRevealFallback() {
+  try {
+    if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
+  } catch { /* timer teardown is best-effort */ }
+  if (!pendingReveal) return;
+  try {
+    pendingReveal.timer = setTimeout(() => {
+      try {
+        if (!pendingReveal || pendingReveal.revealed) return;
+        if (window.__mapProbe.twinReady) {
+          revealTwin(false);
+          return;
+        }
+        if (window.__mapProbe.twinPainted) {
+          window.__mapProbe.revealPaint = true;
+          revealTwin(false);
+          return;
+        }
+        const tries = (pendingReveal.tries ?? 0) + 1;
+        pendingReveal.tries = tries;
+        if (tries <= REVEAL_PAINT_TRIES) {
+          armRevealFallback();
+          return;
+        }
+        window.__mapProbe.revealFallback = true;
+        revealTwin(false);
+      } catch { /* fallback reveal is best-effort */ }
+    }, REVEAL_TIMEOUT_MS);
+  } catch { /* timer is best-effort */ }
 }
 
 /** Crossfade the pre-warmed overlay in (opacity 0->1, ~450ms). Idempotent. */
@@ -1728,6 +1759,7 @@ function openTwin(id, opts = {}) {
   pendingReveal = null;
   window.__mapProbe.prewarm = false;
   window.__mapProbe.twinReady = false;
+  window.__mapProbe.twinPainted = false;
   window.__mapProbe.reveal = 'revealed';
   window.__mapProbe.revealFallback = false;
   window.__mapProbe.revealLate = false;
@@ -1778,9 +1810,11 @@ function doCloseTwin() {
   pendingReveal = null;
   window.__mapProbe.prewarm = false;
   window.__mapProbe.twinReady = false;
+  window.__mapProbe.twinPainted = false;
   window.__mapProbe.reveal = null;
   window.__mapProbe.revealFallback = false;
   window.__mapProbe.revealLate = false;
+  window.__mapProbe.revealPaint = false;
   // Handoff-5-close: seq-guard + reduced-motion flag for the fade/recede below.
   const seq = ++closeSeq;
   const seqGuard = () => closeSeq;
@@ -2076,6 +2110,19 @@ window.addEventListener('message', (e) => {
     window.__mapProbe.reveal = 'revealed';
     if (overlayEls && overlayEls.root) overlayEls.root.classList.remove('prewarm');
   } catch { /* late-sync is best-effort */ }
+});
+// Painted-frame arm (twin->parent first-paint, no match required): records
+// paint so the unstaged fallback reveals on a painted frame instead of
+// blind. Never reveals directly — ready owns the reveal; staged dissolves
+// keep waiting for the match. Stale paints with no open twin are ignored.
+window.addEventListener('message', (e) => {
+  let p = null;
+  try { p = parseTwinPaintedMessage(e && e.data); } catch { p = null; }
+  if (!p) return;
+  if (!twinOpen) return;
+  try {
+    window.__mapProbe.twinPainted = true;
+  } catch { /* probe cosmetic */ }
 });
 window.addEventListener('message', (e) => {
   if (!twinOpen || !isTwinCloseData(e && e.data)) return;
