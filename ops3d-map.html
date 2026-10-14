@@ -151,7 +151,13 @@
    * journey driver; 260px fallback) so the enclosing coincides with the
    * twin clip circle (685px across at handoff z=12). Token-only where
    * possible (outer wash falls back to --ops-bg); pointer-transparent
-   * so blip hit-testing is unchanged. Sits above pins, below twin. */
+   * so blip hit-testing is unchanged. Sits above pins, below twin.
+   * --vr is a registered property (typed <length>) so per-step radius writes
+   * always resolve to a length — never fall back to 260px mid-gesture. NOTE:
+   * do NOT put --vr in `transition`: a transition on the property freezes
+   * the gradient at its start value instead of gliding (verified headless).
+   * The close-in reads as animation because the gesture streams steps. */
+  @property --vr { syntax: '<length>'; inherits: false; initial-value: 260px; }
   #map-vignette {
     position: absolute; inset: 0; z-index: 3; pointer-events: none;
     background: radial-gradient(circle var(--vr, 260px) at var(--vx, 50%) var(--vy, 50%),

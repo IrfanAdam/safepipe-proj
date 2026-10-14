@@ -20,8 +20,8 @@
 // Pure helpers are node-checkable: no map imports, callbacks injected.
 
 export const Z_MIN = 6.4; // country home — enforced as map minZoom (the cap)
-export const Z_FADE0 = 7.2; // fade starts: vector->sat keys off zoom only
-export const Z_FADE1 = 10.2; // fade ends: full sat (works at ANY center)
+export const Z_FADE0 = 6.4; // fade starts: vector->sat keys off zoom only
+export const Z_FADE1 = 9.0; // fade ends: full sat well before the handoff (works at ANY center)
 export const Z_CENTER = 8.0; // proximity centering + brackets arm past this zoom
 export const Z_TOP = 11.0; // top-down checkpoint (bearing/pitch -> 0)
 export const Z_HANDOFF = 12.0; // deeper zoom hands to the twin
@@ -157,6 +157,19 @@ export function vignetteRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_
   const mpp = metersPerPixel(zoom, latDeg);
   if (!Number.isFinite(mpp) || !(mpp > 0)) return null;
   return R / mpp;
+}
+/* Enclosure forming wash: the displayed vignette circle starts wide and
+ * visibly closes in onto the projected ring across the center-blend band —
+ * display = projected R + (1-blend)*START. At blend 1 it IS the clip circle
+ * exactly (handoff coincidence); below blend 0 it parks at null (ungated
+ * surround would black the frame). Pure in z, symmetric on zoom-out. */
+export const ENCLOSURE_START_PX = 1200;
+export function enclosureRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M) {
+  const vr = vignetteRadiusPxForZoom(zoom, latDeg, ringM);
+  if (!Number.isFinite(vr)) return null;
+  const b = centerBlendForZoom(zoom);
+  if (!(b > 0)) return null;
+  return vr + (1 - b) * ENCLOSURE_START_PX;
 }
 /** At (or below tolerance of) the min-zoom cap — mirrored-reverse home. */
 export function isHomeZoom(z) {

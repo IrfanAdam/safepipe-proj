@@ -20,6 +20,8 @@ import {
   handoffStagesForScroll,
   accumStagedS,
   vignetteRadiusPxForZoom,
+  enclosureRadiusPxForZoom,
+  ENCLOSURE_START_PX,
   MAP_VIGNETTE_RING_M,
   metersPerPixel,
 } from '../src/map/scrolltrigger.js';
@@ -97,6 +99,25 @@ test('vignette radius: projected R, coincides with the twin clip at handoff', ()
   assert.equal(vignetteRadiusPxForZoom(NaN, SITE.lat), null, 'non-finite zoom parks');
   assert.equal(vignetteRadiusPxForZoom(12, NaN), null, 'non-finite lat parks');
   assert.equal(vignetteRadiusPxForZoom(12, SITE.lat, -1), null, 'non-positive ring parks');
+});
+
+test('enclosure forming wash: wide start closes onto the clip circle', () => {
+  assert.equal(ENCLOSURE_START_PX, 1200, 'forming wash starts a screen past the ring');
+  assert.equal(enclosureRadiusPxForZoom(7.9, SITE.lat), null, 'parks below the blend band — never blacks the frame');
+  const at8 = enclosureRadiusPxForZoom(8.01, SITE.lat);
+  assert.ok(at8 > 1000, `forming starts wide (got ${at8.toFixed(0)}px)`);
+  let prev = Infinity;
+  for (let z = 8.5; z <= 11; z += 0.5) {
+    const r = enclosureRadiusPxForZoom(z, SITE.lat);
+    assert.ok(r < prev, `z=${z} closes in (${r.toFixed(0)}px < ${prev.toFixed(0)}px)`);
+    prev = r;
+  }
+  for (const z of [11, 11.5, 12, 13]) {
+    assert.equal(
+      enclosureRadiusPxForZoom(z, SITE.lat), vignetteRadiusPxForZoom(z, SITE.lat),
+      `z=${z} display IS the projected ring (handoff coincidence)`,
+    );
+  }
 });
 
 test('scrub entry: accumulated outward delta replaces the dwell counter', () => {
@@ -196,10 +217,11 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
 test('map vignette: radius from projected R, brackets retired as enclosure signal', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(main.includes("v.style.setProperty('--vr'"), 'journey writes the vignette radius');
-  assert.ok(main.includes('vignetteRadiusPxForZoom(z, SITE.lat'), 'radius is a pure function of live zoom');
-  assert.ok(main.includes('showVignette(prox.near && blend >= 0.5)'), 'enclosure gated on blend: sub-pixel ring never blacks the frame');
+  assert.ok(main.includes('enclosureRadiusPxForZoom(z, SITE.lat'), 'display radius rides the forming law');
+  assert.ok(main.includes('showVignette(prox.near && blend > 0)'), 'enclosure gated past z=8: sub-pixel ring never blacks the frame');
   assert.ok(!main.includes('showVignette(prox.near);'), 'ungated proximity enclosure is gone');
   const html = srcOf('../ops3d-map.html');
+  assert.ok(html.includes('@property --vr'), 'radius is registered animatable so the close-in glides');
   assert.ok(html.includes('circle var(--vr, 260px)'), 'enclosure circle rides the projected radius');
   assert.ok(html.includes('at var(--vx, 50%) var(--vy, 50%)'), 'enclosure stays hotspot-centered');
 });

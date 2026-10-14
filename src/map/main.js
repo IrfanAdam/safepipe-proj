@@ -30,7 +30,7 @@ import {
   handoffScrubForZoom,
   handoffStagesForScroll,
   accumStagedS,
-  vignetteRadiusPxForZoom,
+  enclosureRadiusPxForZoom,
   MAP_VIGNETTE_RING_M,
   isHomeZoom,
   flipWheelDelta,
@@ -839,12 +839,14 @@ function onNativeZoomStep(snap, source) {
     // far away it rests at the canvas edges (k=0) so zoom reads the same.
     const clipK = prox && prox.near ? blend : 0;
     updateRingClip(clipK, prox);
-    // Journey enclosure: the vignette circle rides on the hotspot with the
-    // PROJECTED ring radius (RING_RADIUS_M / metersPerPixel(z) — the same
-    // ground circle the twin clip cuts, 685px across at handoff z=12), so
-    // the enclosing coincides with the twin clip exactly. The corner
-    // brackets stay as dressing only — they no longer gate the enclosure.
-    // Zoom-out retraces the radius symmetrically (pure function of z).
+    // Journey enclosure: the vignette circle starts wide and visibly closes
+    // in onto the PROJECTED ring radius across the center-blend band
+    // (enclosureRadiusPxForZoom: R/mpp + (1-blend)*1200, exact R at
+    // blend 1 — the same ground circle the twin clip cuts), so the
+    // enclosing coincides with the twin clip exactly at handoff. The
+    // corner brackets stay as dressing only. Gate: blend>0 (z>8) — below
+    // that the ring is sub-pixel and the surround would black the frame.
+    // Zoom-out retraces it symmetrically (pure function of z).
     // Twin paths own it while open.
     if (!twinOpen && prox) {
       try {
@@ -852,7 +854,7 @@ function onNativeZoomStep(snap, source) {
         if (v) {
           v.style.setProperty('--vx', prox.sx.toFixed(1) + 'px');
           v.style.setProperty('--vy', prox.sy.toFixed(1) + 'px');
-          const vr = vignetteRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M);
+          const vr = enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M);
           if (Number.isFinite(vr)) {
             v.style.setProperty('--vr', vr.toFixed(1) + 'px');
             try {
@@ -861,11 +863,7 @@ function onNativeZoomStep(snap, source) {
           }
         }
       } catch { /* cosmetic */ }
-      // Gate: enclosure only once the center blend is well underway
-    // (blend>=0.5, z≳9.5) — below that the projected ring is sub-pixel and
-    // the gradient surround would paint the whole frame black on pan or
-    // zoom-out. Restores the pre-Task-37 gate; zoom-out retraces it.
-    showVignette(prox.near && blend >= 0.5);
+      showVignette(prox.near && blend > 0);
     }
     // Deep warm for the dissolve: while the spot is tracked in sat range,
     // keep the level AFTER next warm around it — the arriving level streams
