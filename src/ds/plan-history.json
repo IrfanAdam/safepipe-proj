@@ -6,32 +6,32 @@
    "hash": "aa458312",
    "sections": [
     {
-     "head": "Step 0 \u2014 Live-fig content mining setup (copy-paste)",
+     "head": "Step 0 — Live-fig content mining setup (copy-paste)",
      "hash": "8301e40d",
      "state": ""
     },
     {
-     "head": "Task 1 \u2014 Fixtures (frozen contract with Plan B)",
+     "head": "Task 1 — Fixtures (frozen contract with Plan B)",
      "hash": "986e53ad",
      "state": ""
     },
     {
-     "head": "Task 2 \u2014 Work-order state machine",
+     "head": "Task 2 — Work-order state machine",
      "hash": "69e780f7",
      "state": ""
     },
     {
-     "head": "Task 3 \u2014 OQ qualifications + workforce rules",
+     "head": "Task 3 — OQ qualifications + workforce rules",
      "hash": "2790c6a2",
      "state": ""
     },
     {
-     "head": "Task 4 \u2014 Questionnaire / QC / inspection logic",
+     "head": "Task 4 — Questionnaire / QC / inspection logic",
      "hash": "c16dc7bb",
      "state": ""
     },
     {
-     "head": "Task 5 \u2014 API freeze + publish",
+     "head": "Task 5 — API freeze + publish",
      "hash": "38f7f36b",
      "state": ""
     }
@@ -44,32 +44,32 @@
    "hash": "8f5dd3f0",
    "sections": [
     {
-     "head": "Step 0 \u2014 Live-fig content mining setup (copy-paste)",
+     "head": "Step 0 — Live-fig content mining setup (copy-paste)",
      "hash": "8301e40d",
      "state": ""
     },
     {
-     "head": "Task 1 \u2014 Fixtures (frozen contract with Plan B) \u2713 done",
+     "head": "Task 1 — Fixtures (frozen contract with Plan B) ✓ done",
      "hash": "7da7e0bf",
      "state": "1/1"
     },
     {
-     "head": "Task 2 \u2014 Work-order state machine \u2713 done",
+     "head": "Task 2 — Work-order state machine ✓ done",
      "hash": "b5c15687",
      "state": "1/1"
     },
     {
-     "head": "Task 3 \u2014 OQ qualifications + workforce rules \u2713 done",
+     "head": "Task 3 — OQ qualifications + workforce rules ✓ done",
      "hash": "2d6f9254",
      "state": "1/1"
     },
     {
-     "head": "Task 4 \u2014 Questionnaire / QC / inspection logic \u2713 done",
+     "head": "Task 4 — Questionnaire / QC / inspection logic ✓ done",
      "hash": "c834b10f",
      "state": "1/1"
     },
     {
-     "head": "Task 5 \u2014 API freeze + publish \u2713 done",
+     "head": "Task 5 — API freeze + publish ✓ done",
      "hash": "311076b4",
      "state": "1/1"
     }
@@ -84,32 +84,32 @@
    "hash": "80131471",
    "sections": [
     {
-     "head": "Step 0 \u2014 Live-fig query setup (copy-paste, independent per agent)",
+     "head": "Step 0 — Live-fig query setup (copy-paste, independent per agent)",
      "hash": "8cdf9f41",
      "state": ""
     },
     {
-     "head": "Task 1 \u2014 Token JSON from live fills, fonts, and styles \u2713 done",
+     "head": "Task 1 — Token JSON from live fills, fonts, and styles ✓ done",
      "hash": "efd9751d",
      "state": "1/1"
     },
     {
-     "head": "Task 2 \u2014 Regenerate `tokens.css` (light, legacy-faithful) \u2713 done",
+     "head": "Task 2 — Regenerate `tokens.css` (light, legacy-faithful) ✓ done",
      "hash": "9135275b",
      "state": "1/1"
     },
     {
-     "head": "Task 3 \u2014 Component specs from live masters (top 12 by instance count) \u2713 done",
+     "head": "Task 3 — Component specs from live masters (top 12 by instance count) ✓ done",
      "hash": "a1662369",
      "state": "1/1"
     },
     {
-     "head": "Task 4 \u2014 Build `src/components/` implementations + gallery proof \u2713 done",
+     "head": "Task 4 — Build `src/components/` implementations + gallery proof ✓ done",
      "hash": "f4fb8e3a",
      "state": "1/1"
     },
     {
-     "head": "Task 5 \u2014 Contract publish + drift gate \u2713 done",
+     "head": "Task 5 — Contract publish + drift gate ✓ done",
      "hash": "c7297004",
      "state": "1/1"
     }
@@ -124,32 +124,32 @@
    "hash": "3680a565",
    "sections": [
     {
-     "head": "Step 0 \u2014 Live-fig setup + screen-frame locator (copy-paste)",
+     "head": "Step 0 — Live-fig setup + screen-frame locator (copy-paste)",
      "hash": "157b534b",
      "state": ""
     },
     {
-     "head": "Task 1 \u2014 Shell + routing + fixtures",
+     "head": "Task 1 — Shell + routing + fixtures",
      "hash": "4660ab80",
      "state": ""
     },
     {
-     "head": "Task 2 \u2014 Operations work-order detail (`#/operations`)",
+     "head": "Task 2 — Operations work-order detail (`#/operations`)",
      "hash": "54580631",
      "state": ""
     },
     {
-     "head": "Task 3 \u2014 Workforce master-detail (`#/workforce`)",
+     "head": "Task 3 — Workforce master-detail (`#/workforce`)",
      "hash": "a739189d",
      "state": ""
     },
     {
-     "head": "Task 4 \u2014 PIP fact-sheet record (`#/pip`) + Assets (`#/assets`)",
+     "head": "Task 4 — PIP fact-sheet record (`#/pip`) + Assets (`#/assets`)",
      "hash": "44842095",
      "state": ""
     },
     {
-     "head": "Task 5 \u2014 Mobile Home (`#/home`) + integration",
+     "head": "Task 5 — Mobile Home (`#/home`) + integration",
      "hash": "de7fc31f",
      "state": ""
     }
@@ -179,7 +179,7 @@
      "state": "0/1"
     },
     {
-     "head": "Task 4: Semantic zoom \u2014 network \u2192 segment \u2192 asset (the twin core)",
+     "head": "Task 4: Semantic zoom — network → segment → asset (the twin core)",
      "hash": "eeb30cce",
      "state": "0/1"
     },
@@ -189,7 +189,7 @@
      "state": "0/1"
     },
     {
-     "head": "Task 6: Post chain \u2014 bloom + CA + grain/vignette",
+     "head": "Task 6: Post chain — bloom + CA + grain/vignette",
      "hash": "f6661208",
      "state": "0/1"
     },
@@ -199,12 +199,12 @@
      "state": "0/1"
     },
     {
-     "head": "Task 9: Realism pass \u2014 terrain, structures, night-vision readability (NEW)",
+     "head": "Task 9: Realism pass — terrain, structures, night-vision readability (NEW)",
      "hash": "9b59555c",
      "state": "0/1"
     },
     {
-     "head": "Task 10: True-scale 20 km pass \u2014 real place, attention hierarchy, capped camera ",
+     "head": "Task 10: True-scale 20 km pass — real place, attention hierarchy, capped camera ",
      "hash": "a710f90e",
      "state": "0/1"
     },
@@ -222,52 +222,52 @@
    "hash": "3d435e8d",
    "sections": [
     {
-     "head": "Task 1 \u2713 done \u2014 shipped 8cbbd27 \u00b7 Pin three.js + twin module API",
+     "head": "Task 1 ✓ done — shipped 8cbbd27 · Pin three.js + twin module API",
      "hash": "ca8263ea",
      "state": "1/1"
     },
     {
-     "head": "Task 2 \u2713 done \u2014 shipped b4e3654 \u00b7 Renderer + camera rig + table",
+     "head": "Task 2 ✓ done — shipped b4e3654 · Renderer + camera rig + table",
      "hash": "9cc5ce1d",
      "state": "1/1"
     },
     {
-     "head": "Task 3 \u2713 done \u2014 shipped ba46a39 \u00b7 Health feed + dotted network layer (faults glo",
+     "head": "Task 3 ✓ done — shipped ba46a39 · Health feed + dotted network layer (faults glo",
      "hash": "46c2c7f4",
      "state": "1/1"
     },
     {
-     "head": "Task 4 \u2713 done \u2014 shipped c557479 \u00b7 Semantic zoom \u2014 network \u2192 segment \u2192 asset (the",
+     "head": "Task 4 ✓ done — shipped c557479 · Semantic zoom — network → segment → asset (the",
      "hash": "06c4a20d",
      "state": "1/1"
     },
     {
-     "head": "Task 5 \u2713 done \u2014 shipped c557479 \u00b7 HUD in DOM (not WebGL)",
+     "head": "Task 5 ✓ done — shipped c557479 · HUD in DOM (not WebGL)",
      "hash": "7b0673b2",
      "state": "1/1"
     },
     {
-     "head": "Task 6 \u2713 done \u2014 shipped ca9fe88 \u00b7 Post chain \u2014 bloom + CA + grain/vignette",
+     "head": "Task 6 ✓ done — shipped ca9fe88 · Post chain — bloom + CA + grain/vignette",
      "hash": "1940c133",
      "state": "1/1"
     },
     {
-     "head": "Task 7 \u2713 done \u2014 shipped 562c476 \u00b7 Drill-down + selection API (you wire it to you",
+     "head": "Task 7 ✓ done — shipped 562c476 · Drill-down + selection API (you wire it to you",
      "hash": "a8040cde",
      "state": "1/1"
     },
     {
-     "head": "Task 9 \u2713 done \u2014 shipped c4fcb61 \u00b7 Realism pass \u2014 terrain, structures, night-visi",
+     "head": "Task 9 ✓ done — shipped c4fcb61 · Realism pass — terrain, structures, night-visi",
      "hash": "25aa3179",
      "state": "1/1"
     },
     {
-     "head": "Task 10 \u2713 done \u2014 shipped 299fe91 (manifest 471a4bf) \u00b7 True-scale 20 km pass \u2014 re",
+     "head": "Task 10 ✓ done — shipped 299fe91 (manifest 471a4bf) · True-scale 20 km pass — re",
      "hash": "22de26c3",
      "state": "1/1"
     },
     {
-     "head": "Task 8 \u2713 done \u2014 shipped dfbe32d \u00b7 Perf + tracker + docs",
+     "head": "Task 8 ✓ done — shipped dfbe32d · Perf + tracker + docs",
      "hash": "44a08d5a",
      "state": "1/1"
     }
@@ -281,42 +281,42 @@
    "hash": "c1568a19",
    "sections": [
     {
-     "head": "Task 1: Pre-flight \u2014 prove the gap and lock the bar",
+     "head": "Task 1: Pre-flight — prove the gap and lock the bar",
      "hash": "f2377972",
      "state": "0/1"
     },
     {
-     "head": "Task 2: Terrain field v2 \u2014 guaranteed relief that survives the void \u2713 done (167a",
+     "head": "Task 2: Terrain field v2 — guaranteed relief that survives the void ✓ done (167a",
      "hash": "15a429d2",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Contour engine \u2014 32-level chained strips with correct weight and glow \u2713 ",
+     "head": "Task 3: Contour engine — 32-level chained strips with correct weight and glow ✓ ",
      "hash": "f7da03fd",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Elevation language \u2014 pills, summits, datum, interval badge \u2713 done (167a6",
+     "head": "Task 4: Elevation language — pills, summits, datum, interval badge ✓ done (167a6",
      "hash": "e76153ca",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Drainage & water \u2014 Vs that prove flow \u2713 done (167a614)",
+     "head": "Task 5: Drainage & water — Vs that prove flow ✓ done (167a614)",
      "hash": "cbfef6b7",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Graticule \u2014 checker parterre + red survey grid, both subordinate \u2713 done ",
+     "head": "Task 6: Graticule — checker parterre + red survey grid, both subordinate ✓ done ",
      "hash": "914216a1",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Camera / fog / post \u2014 let the stacking read \u2713 done (167a614)",
+     "head": "Task 7: Camera / fog / post — let the stacking read ✓ done (167a614)",
      "hash": "c2f4aa93",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Verification, docs, and close-out \u2713 done (wrap-up commit, see log)",
+     "head": "Task 8: Verification, docs, and close-out ✓ done (wrap-up commit, see log)",
      "hash": "70a799a6",
      "state": "7/7"
     }
@@ -329,42 +329,42 @@
    "hash": "707f1ed3",
    "sections": [
     {
-     "head": "Task 1: Pre-flight \u2014 prove the gap and lock the bar \u2713 done (docs/ops3d-terrain-a",
+     "head": "Task 1: Pre-flight — prove the gap and lock the bar ✓ done (docs/ops3d-terrain-a",
      "hash": "a49deaa6",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Terrain field v2 \u2014 guaranteed relief that survives the void \u2713 done (167a",
+     "head": "Task 2: Terrain field v2 — guaranteed relief that survives the void ✓ done (167a",
      "hash": "15a429d2",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Contour engine \u2014 32-level chained strips with correct weight and glow \u2713 ",
+     "head": "Task 3: Contour engine — 32-level chained strips with correct weight and glow ✓ ",
      "hash": "f7da03fd",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Elevation language \u2014 pills, summits, datum, interval badge \u2713 done (167a6",
+     "head": "Task 4: Elevation language — pills, summits, datum, interval badge ✓ done (167a6",
      "hash": "e76153ca",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Drainage & water \u2014 Vs that prove flow \u2713 done (167a614)",
+     "head": "Task 5: Drainage & water — Vs that prove flow ✓ done (167a614)",
      "hash": "cbfef6b7",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Graticule \u2014 checker parterre + red survey grid, both subordinate \u2713 done ",
+     "head": "Task 6: Graticule — checker parterre + red survey grid, both subordinate ✓ done ",
      "hash": "914216a1",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Camera / fog / post \u2014 let the stacking read \u2713 done (167a614)",
+     "head": "Task 7: Camera / fog / post — let the stacking read ✓ done (167a614)",
      "hash": "c2f4aa93",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Verification, docs, and close-out \u2713 done (wrap-up commit, see log)",
+     "head": "Task 8: Verification, docs, and close-out ✓ done (wrap-up commit, see log)",
      "hash": "70a799a6",
      "state": "7/7"
     }
@@ -409,7 +409,7 @@
      "state": "0/1"
     },
     {
-     "head": "Task 7: Rail icons \u2014 real glyphs + a11y names",
+     "head": "Task 7: Rail icons — real glyphs + a11y names",
      "hash": "d9df5294",
      "state": "0/1"
     },
@@ -439,37 +439,37 @@
    "hash": "783cfce3",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     }
@@ -481,7 +481,7 @@
    "hash": "2bb9d8ae",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
@@ -509,22 +509,22 @@
    "hash": "d6ca358b",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "e99ebe6e",
      "state": "1/1"
     }
@@ -537,27 +537,27 @@
    "hash": "6efe0d05",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     }
@@ -570,37 +570,37 @@
    "hash": "2b85885e",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
@@ -617,47 +617,47 @@
    "hash": "96e43654",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     },
     {
-     "head": "Task 9: Revisions block \u2014 above commits, compact scrollable list",
+     "head": "Task 9: Revisions block — above commits, compact scrollable list",
      "hash": "c4c8f750",
      "state": ""
     }
@@ -670,42 +670,42 @@
    "hash": "605117bb",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     }
@@ -718,47 +718,47 @@
    "hash": "835f2841",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     },
     {
-     "head": "Task 9: Revisions block \u2014 above commits, compact scrollable list \u2713 done",
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
      "hash": "96017c20",
      "state": "1/1"
     }
@@ -771,52 +771,52 @@
    "hash": "ceb4a257",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     },
     {
-     "head": "Task 9: Revisions block \u2014 above commits, compact scrollable list \u2713 done",
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
      "hash": "96017c20",
      "state": "1/1"
     },
     {
-     "head": "Task 10: Revisions as semantic feedback \u2014 date, time, what changed",
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed",
      "hash": "8e5053e7",
      "state": ""
     }
@@ -829,52 +829,52 @@
    "hash": "1b186867",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     },
     {
-     "head": "Task 9: Revisions block \u2014 above commits, compact scrollable list \u2713 done",
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
      "hash": "96017c20",
      "state": "1/1"
     },
     {
-     "head": "Task 10: Revisions as semantic feedback \u2014 date, time, what changed",
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed",
      "hash": "a6d6f96f",
      "state": ""
     }
@@ -887,52 +887,52 @@
    "hash": "58334cbc",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     },
     {
-     "head": "Task 9: Revisions block \u2014 above commits, compact scrollable list \u2713 done",
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
      "hash": "96017c20",
      "state": "1/1"
     },
     {
-     "head": "Task 10: Revisions as semantic feedback \u2014 date, time, what changed \u2713 done",
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed ✓ done",
      "hash": "14b3108f",
      "state": "1/1"
     }
@@ -945,52 +945,52 @@
    "hash": "6ca5e733",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     },
     {
-     "head": "Task 9: Revisions block \u2014 above commits, compact scrollable list \u2713 done",
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
      "hash": "96017c20",
      "state": "1/1"
     },
     {
-     "head": "Task 10: Revisions as semantic feedback \u2014 date, time, what changed \u2713 done",
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed ✓ done",
      "hash": "14b3108f",
      "state": "1/1"
     },
@@ -1008,52 +1008,52 @@
    "hash": "09102976",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     },
     {
-     "head": "Task 9: Revisions block \u2014 above commits, compact scrollable list \u2713 done",
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
      "hash": "96017c20",
      "state": "1/1"
     },
     {
-     "head": "Task 10: Revisions as semantic feedback \u2014 date, time, what changed \u2713 done",
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed ✓ done",
      "hash": "14b3108f",
      "state": "1/1"
     },
@@ -1071,52 +1071,52 @@
    "hash": "6a5e23bf",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     },
     {
-     "head": "Task 9: Revisions block \u2014 above commits, compact scrollable list \u2713 done",
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
      "hash": "96017c20",
      "state": "1/1"
     },
     {
-     "head": "Task 10: Revisions as semantic feedback \u2014 date, time, what changed \u2713 done",
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed ✓ done",
      "hash": "14b3108f",
      "state": "1/1"
     },
@@ -1126,7 +1126,7 @@
      "state": "1/1"
     },
     {
-     "head": "Task 12: Gate seals \u2014 reviewer approval visualized in the changelog",
+     "head": "Task 12: Gate seals — reviewer approval visualized in the changelog",
      "hash": "ec2e0a99",
      "state": ""
     }
@@ -1139,52 +1139,52 @@
    "hash": "8d3d14c0",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     },
     {
-     "head": "Task 9: Revisions block \u2014 above commits, compact scrollable list \u2713 done",
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
      "hash": "96017c20",
      "state": "1/1"
     },
     {
-     "head": "Task 10: Revisions as semantic feedback \u2014 date, time, what changed \u2713 done",
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed ✓ done",
      "hash": "14b3108f",
      "state": "1/1"
     },
@@ -1194,7 +1194,7 @@
      "state": "1/1"
     },
     {
-     "head": "Task 12: Gate seals \u2014 reviewer approval visualized in the changelog \u2713 done",
+     "head": "Task 12: Gate seals — reviewer approval visualized in the changelog ✓ done",
      "hash": "f0298ace",
      "state": "1/1"
     }
@@ -1207,52 +1207,52 @@
    "hash": "21fa7f22",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     },
     {
-     "head": "Task 9: Revisions block \u2014 above commits, compact scrollable list \u2713 done",
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
      "hash": "96017c20",
      "state": "1/1"
     },
     {
-     "head": "Task 10: Revisions as semantic feedback \u2014 date, time, what changed \u2713 done",
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed ✓ done",
      "hash": "14b3108f",
      "state": "1/1"
     },
@@ -1262,7 +1262,7 @@
      "state": "1/1"
     },
     {
-     "head": "Task 12: Gate seals \u2014 reviewer approval visualized in the changelog \u2713 done",
+     "head": "Task 12: Gate seals — reviewer approval visualized in the changelog ✓ done",
      "hash": "a393bce4",
      "state": "1/1"
     }
@@ -1275,52 +1275,52 @@
    "hash": "4806993f",
    "sections": [
     {
-     "head": "Task 1: Manifest readiness + plan names \u2713 done",
+     "head": "Task 1: Manifest readiness + plan names ✓ done",
      "hash": "b9376bd0",
      "state": "1/1"
     },
     {
-     "head": "Task 2: Parse + link layers (pure, tested) \u2713 done",
+     "head": "Task 2: Parse + link layers (pure, tested) ✓ done",
      "hash": "93389863",
      "state": "1/1"
     },
     {
-     "head": "Task 3: Shell + views in safepipe visual language \u2713 done",
+     "head": "Task 3: Shell + views in safepipe visual language ✓ done",
      "hash": "af719f20",
      "state": "1/1"
     },
     {
-     "head": "Task 4: Wire + verify + close \u2713 done",
+     "head": "Task 4: Wire + verify + close ✓ done",
      "hash": "7ba9e648",
      "state": "1/1"
     },
     {
-     "head": "Task 5: Data-sanity pass \u2713 done",
+     "head": "Task 5: Data-sanity pass ✓ done",
      "hash": "087948f8",
      "state": "1/1"
     },
     {
-     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) \u2713 done",
+     "head": "Task 6: Plan-iteration history (foolproof + backpropagated) ✓ done",
      "hash": "0442a299",
      "state": "1/1"
     },
     {
-     "head": "Task 7: Skill update (changelog-kit carries history) \u2713 done",
+     "head": "Task 7: Skill update (changelog-kit carries history) ✓ done",
      "hash": "c8e8534e",
      "state": "1/1"
     },
     {
-     "head": "Task 8: Per-plan revision list in the changelog views \u2713 done",
+     "head": "Task 8: Per-plan revision list in the changelog views ✓ done",
      "hash": "2113de07",
      "state": "1/1"
     },
     {
-     "head": "Task 9: Revisions block \u2014 above commits, compact scrollable list \u2713 done",
+     "head": "Task 9: Revisions block — above commits, compact scrollable list ✓ done",
      "hash": "96017c20",
      "state": "1/1"
     },
     {
-     "head": "Task 10: Revisions as semantic feedback \u2014 date, time, what changed \u2713 done",
+     "head": "Task 10: Revisions as semantic feedback — date, time, what changed ✓ done",
      "hash": "14b3108f",
      "state": "1/1"
     },
@@ -1330,7 +1330,7 @@
      "state": "1/1"
     },
     {
-     "head": "Task 12: Gate seals \u2014 reviewer approval visualized in the changelog \u2713 done",
+     "head": "Task 12: Gate seals — reviewer approval visualized in the changelog ✓ done",
      "hash": "d8d0e965",
      "state": "1/1"
     }
@@ -1344,37 +1344,37 @@
    "hash": "2a63949d",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Foundations + bug kill (the unglamorous fix)",
+     "head": "Phase 0 — Foundations + bug kill (the unglamorous fix)",
      "hash": "4b75fe2b",
      "state": "0/1"
     },
     {
-     "head": "Phase 1 \u2014 Terrain you believe + volume + attention light",
+     "head": "Phase 1 — Terrain you believe + volume + attention light",
      "hash": "1845bff6",
      "state": "0/1"
     },
     {
-     "head": "Phase 2 \u2014 Assets as real models (down to the bolt)",
+     "head": "Phase 2 — Assets as real models (down to the bolt)",
      "hash": "b141890e",
      "state": "0/1"
     },
     {
-     "head": "Phase 3 \u2014 Map toggle + real-world grounding",
+     "head": "Phase 3 — Map toggle + real-world grounding",
      "hash": "d888ed7c",
      "state": "0/1"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + simulation",
+     "head": "Phase 4 — Time variance + simulation",
      "hash": "00a65ba3",
      "state": "0/1"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer: work orders, field activity, gated actions",
+     "head": "Phase 5 — Operations layer: work orders, field activity, gated actions",
      "hash": "2524f308",
      "state": "0/1"
     },
     {
-     "head": "Phase 6 \u2014 Lock + docs + perf",
+     "head": "Phase 6 — Lock + docs + perf",
      "hash": "16089eed",
      "state": "0/1"
     }
@@ -1386,37 +1386,37 @@
    "hash": "e597ea47",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation (the old build's bugs; unblocks everything)",
+     "head": "Phase 0 — Fix the foundation (the old build's bugs; unblocks everything)",
      "hash": "937505b4",
      "state": "0/1"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain: DEM, contours, volume, attention light",
+     "head": "Phase 1 — Real terrain: DEM, contours, volume, attention light",
      "hash": "bbb3676d",
      "state": "0/1"
     },
     {
-     "head": "Phase 2 \u2014 Assets as real, inspectable models (to the rivet)",
+     "head": "Phase 2 — Assets as real, inspectable models (to the rivet)",
      "hash": "dd901534",
      "state": "0/1"
     },
     {
-     "head": "Phase 3 \u2014 The real map: hotspots on vector basemap \u2192 twin handoff",
+     "head": "Phase 3 — The real map: hotspots on vector basemap → twin handoff",
      "hash": "5c1efcbb",
      "state": "0/1"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + simulation (the twin breathes)",
+     "head": "Phase 4 — Time variance + simulation (the twin breathes)",
      "hash": "aa47de7f",
      "state": "0/1"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer: work orders, field activity, gated actions",
+     "head": "Phase 5 — Operations layer: work orders, field activity, gated actions",
      "hash": "9d22002f",
      "state": "0/1"
     },
     {
-     "head": "Phase 6 \u2014 Lock + docs + perf",
+     "head": "Phase 6 — Lock + docs + perf",
      "hash": "f40684b7",
      "state": "0/1"
     }
@@ -1428,37 +1428,37 @@
    "hash": "e3288208",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation (the old build's bugs; unblocks everything)",
+     "head": "Phase 0 — Fix the foundation (the old build's bugs; unblocks everything)",
      "hash": "937505b4",
      "state": "0/1"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain: DEM + satellite-audited landscape + volume + attention l",
+     "head": "Phase 1 — Real terrain: DEM + satellite-audited landscape + volume + attention l",
      "hash": "ae302e2d",
      "state": "0/1"
     },
     {
-     "head": "Phase 2 \u2014 Assets as real, inspectable models (to the rivet)",
+     "head": "Phase 2 — Assets as real, inspectable models (to the rivet)",
      "hash": "63da3c72",
      "state": "0/1"
     },
     {
-     "head": "Phase 3 \u2014 Google-Maps-style launcher: circular hotspots \u2192 full-screen twin",
+     "head": "Phase 3 — Google-Maps-style launcher: circular hotspots → full-screen twin",
      "hash": "ff0bb68f",
      "state": "0/1"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + simulation (the twin breathes)",
+     "head": "Phase 4 — Time variance + simulation (the twin breathes)",
      "hash": "aa47de7f",
      "state": "0/1"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer: work orders, field activity, gated actions",
+     "head": "Phase 5 — Operations layer: work orders, field activity, gated actions",
      "hash": "9d22002f",
      "state": "0/1"
     },
     {
-     "head": "Phase 6 \u2014 Lock + docs + perf",
+     "head": "Phase 6 — Lock + docs + perf",
      "hash": "f40684b7",
      "state": "0/1"
     }
@@ -1470,37 +1470,37 @@
    "hash": "c5d28112",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation {#phase-0}",
+     "head": "Phase 0 — Fix the foundation {#phase-0}",
      "hash": "db7e1f8d",
      "state": "0/5"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain {#phase-1}",
+     "head": "Phase 1 — Real terrain {#phase-1}",
      "hash": "c1780e22",
      "state": "0/5"
     },
     {
-     "head": "Phase 2 \u2014 Real inspectable assets {#phase-2}",
+     "head": "Phase 2 — Real inspectable assets {#phase-2}",
      "hash": "187a4d84",
      "state": "0/4"
     },
     {
-     "head": "Phase 3 \u2014 Hotspot launcher map {#phase-3}",
+     "head": "Phase 3 — Hotspot launcher map {#phase-3}",
      "hash": "781b8fcf",
      "state": "0/4"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + sim {#phase-4}",
+     "head": "Phase 4 — Time variance + sim {#phase-4}",
      "hash": "7b7c4b18",
      "state": "0/5"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer {#phase-5}",
+     "head": "Phase 5 — Operations layer {#phase-5}",
      "hash": "c1fc0cd5",
      "state": "0/4"
     },
     {
-     "head": "Phase 6 \u2014 Lock {#phase-6}",
+     "head": "Phase 6 — Lock {#phase-6}",
      "hash": "f7edf25d",
      "state": "0/3"
     }
@@ -1512,37 +1512,37 @@
    "hash": "9da68939",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation",
+     "head": "Phase 0 — Fix the foundation",
      "hash": "991893d7",
      "state": "0/5"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain",
+     "head": "Phase 1 — Real terrain",
      "hash": "1ad33db7",
      "state": "0/5"
     },
     {
-     "head": "Phase 2 \u2014 Real inspectable assets",
+     "head": "Phase 2 — Real inspectable assets",
      "hash": "8e9306a6",
      "state": "0/4"
     },
     {
-     "head": "Phase 3 \u2014 Hotspot launcher map",
+     "head": "Phase 3 — Hotspot launcher map",
      "hash": "693d51f0",
      "state": "0/4"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + sim",
+     "head": "Phase 4 — Time variance + sim",
      "hash": "6b283fba",
      "state": "0/5"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer",
+     "head": "Phase 5 — Operations layer",
      "hash": "240addd8",
      "state": "0/4"
     },
     {
-     "head": "Phase 6 \u2014 Lock",
+     "head": "Phase 6 — Lock",
      "hash": "0913dca9",
      "state": "0/3"
     }
@@ -1554,37 +1554,37 @@
    "hash": "381d1fb3",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation",
+     "head": "Phase 0 — Fix the foundation",
      "hash": "a5319c68",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain",
+     "head": "Phase 1 — Real terrain",
      "hash": "1ad33db7",
      "state": "0/5"
     },
     {
-     "head": "Phase 2 \u2014 Real inspectable assets",
+     "head": "Phase 2 — Real inspectable assets",
      "hash": "8e9306a6",
      "state": "0/4"
     },
     {
-     "head": "Phase 3 \u2014 Hotspot launcher map",
+     "head": "Phase 3 — Hotspot launcher map",
      "hash": "693d51f0",
      "state": "0/4"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + sim",
+     "head": "Phase 4 — Time variance + sim",
      "hash": "6b283fba",
      "state": "0/5"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer",
+     "head": "Phase 5 — Operations layer",
      "hash": "240addd8",
      "state": "0/4"
     },
     {
-     "head": "Phase 6 \u2014 Lock",
+     "head": "Phase 6 — Lock",
      "hash": "0913dca9",
      "state": "0/3"
     }
@@ -1596,37 +1596,37 @@
    "hash": "c485b0db",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation",
+     "head": "Phase 0 — Fix the foundation",
      "hash": "a5319c68",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain",
+     "head": "Phase 1 — Real terrain",
      "hash": "127807cb",
      "state": "5/5"
     },
     {
-     "head": "Phase 2 \u2014 Real inspectable assets",
+     "head": "Phase 2 — Real inspectable assets",
      "hash": "8e9306a6",
      "state": "0/4"
     },
     {
-     "head": "Phase 3 \u2014 Hotspot launcher map",
+     "head": "Phase 3 — Hotspot launcher map",
      "hash": "693d51f0",
      "state": "0/4"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + sim",
+     "head": "Phase 4 — Time variance + sim",
      "hash": "6b283fba",
      "state": "0/5"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer",
+     "head": "Phase 5 — Operations layer",
      "hash": "240addd8",
      "state": "0/4"
     },
     {
-     "head": "Phase 6 \u2014 Lock",
+     "head": "Phase 6 — Lock",
      "hash": "0913dca9",
      "state": "0/3"
     }
@@ -1638,37 +1638,37 @@
    "hash": "d3fdc911",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation",
+     "head": "Phase 0 — Fix the foundation",
      "hash": "a5319c68",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain",
+     "head": "Phase 1 — Real terrain",
      "hash": "6dc64809",
      "state": "5/5"
     },
     {
-     "head": "Phase 2 \u2014 Real inspectable assets",
+     "head": "Phase 2 — Real inspectable assets",
      "hash": "8e9306a6",
      "state": "0/4"
     },
     {
-     "head": "Phase 3 \u2014 Hotspot launcher map",
+     "head": "Phase 3 — Hotspot launcher map",
      "hash": "693d51f0",
      "state": "0/4"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + sim",
+     "head": "Phase 4 — Time variance + sim",
      "hash": "6b283fba",
      "state": "0/5"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer",
+     "head": "Phase 5 — Operations layer",
      "hash": "240addd8",
      "state": "0/4"
     },
     {
-     "head": "Phase 6 \u2014 Lock",
+     "head": "Phase 6 — Lock",
      "hash": "0913dca9",
      "state": "0/3"
     }
@@ -1680,42 +1680,42 @@
    "hash": "f22f9e3e",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation",
+     "head": "Phase 0 — Fix the foundation",
      "hash": "a5319c68",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain",
+     "head": "Phase 1 — Real terrain",
      "hash": "0385dff9",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 iteration \u2014 feedback pass \u2713 done (2026-10-08)",
+     "head": "Phase 1 iteration — feedback pass ✓ done (2026-10-08)",
      "hash": "9a33de77",
      "state": "1/1"
     },
     {
-     "head": "Phase 2 \u2014 Real inspectable assets",
+     "head": "Phase 2 — Real inspectable assets",
      "hash": "8e9306a6",
      "state": "0/4"
     },
     {
-     "head": "Phase 3 \u2014 Hotspot launcher map",
+     "head": "Phase 3 — Hotspot launcher map",
      "hash": "693d51f0",
      "state": "0/4"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + sim",
+     "head": "Phase 4 — Time variance + sim",
      "hash": "6b283fba",
      "state": "0/5"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer",
+     "head": "Phase 5 — Operations layer",
      "hash": "240addd8",
      "state": "0/4"
     },
     {
-     "head": "Phase 6 \u2014 Lock",
+     "head": "Phase 6 — Lock",
      "hash": "0913dca9",
      "state": "0/3"
     }
@@ -1727,42 +1727,42 @@
    "hash": "97f152be",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation",
+     "head": "Phase 0 — Fix the foundation",
      "hash": "a5319c68",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain",
+     "head": "Phase 1 — Real terrain",
      "hash": "5853fcd9",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 iteration \u2014 feedback pass \u2713 done (2026-10-08)",
+     "head": "Phase 1 iteration — feedback pass ✓ done (2026-10-08)",
      "hash": "9a33de77",
      "state": "1/1"
     },
     {
-     "head": "Phase 2 \u2014 Real inspectable assets",
+     "head": "Phase 2 — Real inspectable assets",
      "hash": "8e9306a6",
      "state": "0/4"
     },
     {
-     "head": "Phase 3 \u2014 Hotspot launcher map",
+     "head": "Phase 3 — Hotspot launcher map",
      "hash": "693d51f0",
      "state": "0/4"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + sim",
+     "head": "Phase 4 — Time variance + sim",
      "hash": "6b283fba",
      "state": "0/5"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer",
+     "head": "Phase 5 — Operations layer",
      "hash": "240addd8",
      "state": "0/4"
     },
     {
-     "head": "Phase 6 \u2014 Lock",
+     "head": "Phase 6 — Lock",
      "hash": "0913dca9",
      "state": "0/3"
     }
@@ -1774,42 +1774,42 @@
    "hash": "d67fa070",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation",
+     "head": "Phase 0 — Fix the foundation",
      "hash": "a5319c68",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain",
+     "head": "Phase 1 — Real terrain",
      "hash": "e5ec9025",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 iteration \u2014 feedback pass \u2713 done (2026-10-08)",
+     "head": "Phase 1 iteration — feedback pass ✓ done (2026-10-08)",
      "hash": "9a33de77",
      "state": "1/1"
     },
     {
-     "head": "Phase 2 \u2014 Real inspectable assets",
+     "head": "Phase 2 — Real inspectable assets",
      "hash": "8e9306a6",
      "state": "0/4"
     },
     {
-     "head": "Phase 3 \u2014 Hotspot launcher map",
+     "head": "Phase 3 — Hotspot launcher map",
      "hash": "693d51f0",
      "state": "0/4"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + sim",
+     "head": "Phase 4 — Time variance + sim",
      "hash": "6b283fba",
      "state": "0/5"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer",
+     "head": "Phase 5 — Operations layer",
      "hash": "240addd8",
      "state": "0/4"
     },
     {
-     "head": "Phase 6 \u2014 Lock",
+     "head": "Phase 6 — Lock",
      "hash": "0913dca9",
      "state": "0/3"
     }
@@ -1821,42 +1821,42 @@
    "hash": "70208e12",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation",
+     "head": "Phase 0 — Fix the foundation",
      "hash": "a5319c68",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain",
+     "head": "Phase 1 — Real terrain",
      "hash": "2e714dab",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 iteration \u2014 feedback pass \u2713 done (2026-10-08)",
+     "head": "Phase 1 iteration — feedback pass ✓ done (2026-10-08)",
      "hash": "9a33de77",
      "state": "1/1"
     },
     {
-     "head": "Phase 2 \u2014 Real inspectable assets",
+     "head": "Phase 2 — Real inspectable assets",
      "hash": "8e9306a6",
      "state": "0/4"
     },
     {
-     "head": "Phase 3 \u2014 Hotspot launcher map",
+     "head": "Phase 3 — Hotspot launcher map",
      "hash": "693d51f0",
      "state": "0/4"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + sim",
+     "head": "Phase 4 — Time variance + sim",
      "hash": "6b283fba",
      "state": "0/5"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer",
+     "head": "Phase 5 — Operations layer",
      "hash": "240addd8",
      "state": "0/4"
     },
     {
-     "head": "Phase 6 \u2014 Lock",
+     "head": "Phase 6 — Lock",
      "hash": "0913dca9",
      "state": "0/3"
     }
@@ -1868,42 +1868,42 @@
    "hash": "fa3b02d8",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation",
+     "head": "Phase 0 — Fix the foundation",
      "hash": "a5319c68",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain",
+     "head": "Phase 1 — Real terrain",
      "hash": "c95187d3",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 iteration \u2014 feedback pass \u2713 done (2026-10-08)",
+     "head": "Phase 1 iteration — feedback pass ✓ done (2026-10-08)",
      "hash": "9a33de77",
      "state": "1/1"
     },
     {
-     "head": "Phase 2 \u2014 Real inspectable assets",
+     "head": "Phase 2 — Real inspectable assets",
      "hash": "8e9306a6",
      "state": "0/4"
     },
     {
-     "head": "Phase 3 \u2014 Hotspot launcher map",
+     "head": "Phase 3 — Hotspot launcher map",
      "hash": "693d51f0",
      "state": "0/4"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + sim",
+     "head": "Phase 4 — Time variance + sim",
      "hash": "6b283fba",
      "state": "0/5"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer",
+     "head": "Phase 5 — Operations layer",
      "hash": "240addd8",
      "state": "0/4"
     },
     {
-     "head": "Phase 6 \u2014 Lock",
+     "head": "Phase 6 — Lock",
      "hash": "0913dca9",
      "state": "0/3"
     }
@@ -1916,37 +1916,37 @@
    "hash": "6635eded",
    "sections": [
     {
-     "head": "Phase 0 \u2014 Fix the foundation",
+     "head": "Phase 0 — Fix the foundation",
      "hash": "a5319c68",
      "state": "5/5"
     },
     {
-     "head": "Phase 1 \u2014 Real terrain",
+     "head": "Phase 1 — Real terrain",
      "hash": "8f0464cf",
      "state": "5/5"
     },
     {
-     "head": "Phase 2 \u2014 Real inspectable assets",
+     "head": "Phase 2 — Real inspectable assets",
      "hash": "8e9306a6",
      "state": "0/4"
     },
     {
-     "head": "Phase 3 \u2014 Hotspot launcher map",
+     "head": "Phase 3 — Hotspot launcher map",
      "hash": "693d51f0",
      "state": "0/4"
     },
     {
-     "head": "Phase 4 \u2014 Time variance + sim",
+     "head": "Phase 4 — Time variance + sim",
      "hash": "6b283fba",
      "state": "0/5"
     },
     {
-     "head": "Phase 5 \u2014 Operations layer",
+     "head": "Phase 5 — Operations layer",
      "hash": "240addd8",
      "state": "0/4"
     },
     {
-     "head": "Phase 6 \u2014 Lock",
+     "head": "Phase 6 — Lock",
      "hash": "0913dca9",
      "state": "0/3"
     }
@@ -1960,7 +1960,7 @@
    "hash": "2b6c1d64",
    "sections": [
     {
-     "head": "Phase 1 \u2014 Sangachal site + gallery tab {#phase-1}",
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
      "hash": "be725659",
      "state": "5/5"
     }
@@ -1972,7 +1972,7 @@
    "hash": "6f03270e",
    "sections": [
     {
-     "head": "Phase 1 \u2014 Sangachal site + gallery tab {#phase-1}",
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
      "hash": "e3aa1864",
      "state": "5/5"
     }
@@ -1984,12 +1984,12 @@
    "hash": "adb6c4f9",
    "sections": [
     {
-     "head": "Phase 1 \u2014 Sangachal site + gallery tab {#phase-1}",
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
      "hash": "4daccbf5",
      "state": "5/5"
     },
     {
-     "head": "Phase 2 \u2014 edge-streak fix (apron renders fake terrain) {#phase-2}",
+     "head": "Phase 2 — edge-streak fix (apron renders fake terrain) {#phase-2}",
      "hash": "d39a89b8",
      "state": "1/1"
     }
@@ -2001,17 +2001,17 @@
    "hash": "4630fb7b",
    "sections": [
     {
-     "head": "Phase 1 \u2014 Sangachal site + gallery tab {#phase-1}",
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
      "hash": "4daccbf5",
      "state": "5/5"
     },
     {
-     "head": "Phase 2 \u2014 edge-streak fix (apron renders fake terrain) {#phase-2}",
+     "head": "Phase 2 — edge-streak fix (apron renders fake terrain) {#phase-2}",
      "hash": "d1f29061",
      "state": "1/1"
     },
     {
-     "head": "Phase 3 \u2014 true-scale landmass parity {#phase-3}",
+     "head": "Phase 3 — true-scale landmass parity {#phase-3}",
      "hash": "cdf3f767",
      "state": "1/1"
     }
@@ -2023,22 +2023,22 @@
    "hash": "156fdaaa",
    "sections": [
     {
-     "head": "Phase 1 \u2014 Sangachal site + gallery tab {#phase-1}",
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
      "hash": "4daccbf5",
      "state": "5/5"
     },
     {
-     "head": "Phase 2 \u2014 edge-streak fix (apron renders fake terrain) {#phase-2}",
+     "head": "Phase 2 — edge-streak fix (apron renders fake terrain) {#phase-2}",
      "hash": "d1f29061",
      "state": "1/1"
     },
     {
-     "head": "Phase 3 \u2014 true-scale landmass parity {#phase-3}",
+     "head": "Phase 3 — true-scale landmass parity {#phase-3}",
      "hash": "e175c986",
      "state": "1/1"
     },
     {
-     "head": "Phase 4 \u2014 scope-lens parity (mix snap, disc size, sea read) {#phase-4}",
+     "head": "Phase 4 — scope-lens parity (mix snap, disc size, sea read) {#phase-4}",
      "hash": "c3994f95",
      "state": "1/1"
     }
@@ -2050,27 +2050,27 @@
    "hash": "3bfb5180",
    "sections": [
     {
-     "head": "Phase 1 \u2014 Sangachal site + gallery tab {#phase-1}",
+     "head": "Phase 1 — Sangachal site + gallery tab {#phase-1}",
      "hash": "4daccbf5",
      "state": "5/5"
     },
     {
-     "head": "Phase 2 \u2014 edge-streak fix (apron renders fake terrain) {#phase-2}",
+     "head": "Phase 2 — edge-streak fix (apron renders fake terrain) {#phase-2}",
      "hash": "d1f29061",
      "state": "1/1"
     },
     {
-     "head": "Phase 3 \u2014 true-scale landmass parity {#phase-3}",
+     "head": "Phase 3 — true-scale landmass parity {#phase-3}",
      "hash": "e175c986",
      "state": "1/1"
     },
     {
-     "head": "Phase 4 \u2014 scope-lens parity (mix snap, disc size, sea read) {#phase-4}",
+     "head": "Phase 4 — scope-lens parity (mix snap, disc size, sea read) {#phase-4}",
      "hash": "1517ac74",
      "state": "1/1"
     },
     {
-     "head": "Phase 5 \u2014 TOP-only satellite {#phase-5}",
+     "head": "Phase 5 — TOP-only satellite {#phase-5}",
      "hash": "fe82d406",
      "state": "1/1"
     }
@@ -2084,22 +2084,22 @@
    "hash": "93cd8d95",
    "sections": [
     {
-     "head": "Phase 1 \u2014 Site + field truth (fresh seam) {#phase-1}",
+     "head": "Phase 1 — Site + field truth (fresh seam) {#phase-1}",
      "hash": "58da56e9",
      "state": "0/3"
     },
     {
-     "head": "Phase 2 \u2014 MapLibre ground + camera parity {#phase-2}",
+     "head": "Phase 2 — MapLibre ground + camera parity {#phase-2}",
      "hash": "806d0fc8",
      "state": "0/3"
     },
     {
-     "head": "Phase 3 \u2014 Twin overlays + seamless slider {#phase-3}",
+     "head": "Phase 3 — Twin overlays + seamless slider {#phase-3}",
      "hash": "ce155bdd",
      "state": "0/3"
     },
     {
-     "head": "Phase 4 \u2014 Prove + ship {#phase-4}",
+     "head": "Phase 4 — Prove + ship {#phase-4}",
      "hash": "d78f64ec",
      "state": ""
     }
@@ -2111,22 +2111,22 @@
    "hash": "c60318f2",
    "sections": [
     {
-     "head": "Phase 1 \u2014 Site + field truth (fresh seam) {#phase-1}",
+     "head": "Phase 1 — Site + field truth (fresh seam) {#phase-1}",
      "hash": "70f77c3c",
      "state": "3/3"
     },
     {
-     "head": "Phase 2 \u2014 MapLibre ground + camera parity {#phase-2}",
+     "head": "Phase 2 — MapLibre ground + camera parity {#phase-2}",
      "hash": "34331757",
      "state": "3/3"
     },
     {
-     "head": "Phase 3 \u2014 Twin overlays + seamless slider {#phase-3}",
+     "head": "Phase 3 — Twin overlays + seamless slider {#phase-3}",
      "hash": "0375f0f6",
      "state": "3/3"
     },
     {
-     "head": "Phase 4 \u2014 Prove + ship {#phase-4}",
+     "head": "Phase 4 — Prove + ship {#phase-4}",
      "hash": "d78f64ec",
      "state": ""
     }
@@ -2138,22 +2138,22 @@
    "hash": "32f3b1ea",
    "sections": [
     {
-     "head": "Phase 1 \u2014 Site + field truth (fresh seam) {#phase-1}",
+     "head": "Phase 1 — Site + field truth (fresh seam) {#phase-1}",
      "hash": "70f77c3c",
      "state": "3/3"
     },
     {
-     "head": "Phase 2 \u2014 MapLibre ground + camera parity {#phase-2}",
+     "head": "Phase 2 — MapLibre ground + camera parity {#phase-2}",
      "hash": "34331757",
      "state": "3/3"
     },
     {
-     "head": "Phase 3 \u2014 Twin overlays + seamless slider {#phase-3}",
+     "head": "Phase 3 — Twin overlays + seamless slider {#phase-3}",
      "hash": "0375f0f6",
      "state": "3/3"
     },
     {
-     "head": "Phase 4 \u2014 Prove + ship {#phase-4}",
+     "head": "Phase 4 — Prove + ship {#phase-4}",
      "hash": "d78f64ec",
      "state": ""
     }
@@ -2165,22 +2165,22 @@
    "hash": "d89f7666",
    "sections": [
     {
-     "head": "Phase 1 \u2014 Site + field truth (fresh seam) {#phase-1}",
+     "head": "Phase 1 — Site + field truth (fresh seam) {#phase-1}",
      "hash": "70f77c3c",
      "state": "3/3"
     },
     {
-     "head": "Phase 2 \u2014 MapLibre ground + camera parity {#phase-2}",
+     "head": "Phase 2 — MapLibre ground + camera parity {#phase-2}",
      "hash": "34331757",
      "state": "3/3"
     },
     {
-     "head": "Phase 3 \u2014 Twin overlays + seamless slider {#phase-3}",
+     "head": "Phase 3 — Twin overlays + seamless slider {#phase-3}",
      "hash": "0375f0f6",
      "state": "3/3"
     },
     {
-     "head": "Phase 4 \u2014 Prove + ship \u2713 done {#phase-4}",
+     "head": "Phase 4 — Prove + ship ✓ done {#phase-4}",
      "hash": "d6ecb56e",
      "state": "2/2"
     }
@@ -2194,27 +2194,27 @@
    "hash": "8e661e20",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Fix the foundation (chassis parity)",
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
      "hash": "5c41b72c",
      "state": ""
     },
     {
-     "head": "Phase 01 \u2014 Real terrain (resume + optimize)",
+     "head": "Phase 01 — Real terrain (resume + optimize)",
      "hash": "07a226a3",
      "state": ""
     },
     {
-     "head": "Phase 02 \u2014 Real inspectable assets",
+     "head": "Phase 02 — Real inspectable assets",
      "hash": "eea84d2d",
      "state": ""
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "dc3518ca",
      "state": ""
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "ad69b686",
      "state": ""
     }
@@ -2226,27 +2226,27 @@
    "hash": "56b7ab69",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Fix the foundation (chassis parity)",
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
      "hash": "5c41b72c",
      "state": ""
     },
     {
-     "head": "Phase 01 \u2014 Real Sangachal terrain (source \u2192 DEM \u2192 imagery)",
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
      "hash": "86c1de4e",
      "state": ""
     },
     {
-     "head": "Phase 02 \u2014 Reconstruct the terminal (honest provenance)",
+     "head": "Phase 02 — Reconstruct the terminal (honest provenance)",
      "hash": "f4326a07",
      "state": ""
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "a3c26bfa",
      "state": ""
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "072ee2ca",
      "state": ""
     }
@@ -2258,27 +2258,27 @@
    "hash": "9e112677",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Fix the foundation (chassis parity)",
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
      "hash": "5c41b72c",
      "state": ""
     },
     {
-     "head": "Phase 01 \u2014 Real Sangachal terrain (source \u2192 DEM \u2192 imagery)",
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
      "hash": "86c1de4e",
      "state": ""
     },
     {
-     "head": "Phase 02 \u2014 Reconstruct the terminal (honest provenance)",
+     "head": "Phase 02 — Reconstruct the terminal (honest provenance)",
      "hash": "f4326a07",
      "state": ""
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "a3c26bfa",
      "state": ""
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "072ee2ca",
      "state": ""
     }
@@ -2290,27 +2290,27 @@
    "hash": "f483adca",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Fix the foundation (chassis parity)",
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
      "hash": "8545a43a",
      "state": ""
     },
     {
-     "head": "Phase 01 \u2014 Real Sangachal terrain (source \u2192 DEM \u2192 imagery)",
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
      "hash": "bd41575c",
      "state": ""
     },
     {
-     "head": "Phase 02 \u2014 Build the twin (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
      "hash": "0ba312bf",
      "state": ""
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "cca97ae6",
      "state": ""
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "e3d069a9",
      "state": ""
     }
@@ -2322,27 +2322,27 @@
    "hash": "42a6c446",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "8d03c8e9",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "a6814ebc",
      "state": "0/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "eeab3490",
      "state": "0/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2354,27 +2354,27 @@
    "hash": "4e087f48",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "8d03c8e9",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "a6814ebc",
      "state": "0/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "eeab3490",
      "state": "0/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2386,27 +2386,27 @@
    "hash": "cd041067",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "1e4a56ae",
      "state": "1/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "eeab3490",
      "state": "0/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2418,27 +2418,27 @@
    "hash": "6c199b5f",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "e8fece08",
      "state": "1/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "eeab3490",
      "state": "0/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2450,27 +2450,27 @@
    "hash": "58660d68",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "86cbea4d",
      "state": "1/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "eeab3490",
      "state": "0/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2483,27 +2483,27 @@
    "time": "13:53",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Fix the foundation (chassis parity)",
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
      "hash": "5c41b72c",
      "state": ""
     },
     {
-     "head": "Phase 01 \u2014 Real Sangachal terrain (source \u2192 DEM \u2192 imagery)",
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
      "hash": "86c1de4e",
      "state": ""
     },
     {
-     "head": "Phase 02 \u2014 Reconstruct the terminal (honest provenance)",
+     "head": "Phase 02 — Reconstruct the terminal (honest provenance)",
      "hash": "f4326a07",
      "state": ""
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "a3c26bfa",
      "state": ""
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "072ee2ca",
      "state": ""
     }
@@ -2516,27 +2516,27 @@
    "time": "14:00",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Fix the foundation (chassis parity)",
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
      "hash": "5c41b72c",
      "state": ""
     },
     {
-     "head": "Phase 01 \u2014 Real Sangachal terrain (source \u2192 DEM \u2192 imagery)",
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
      "hash": "86c1de4e",
      "state": ""
     },
     {
-     "head": "Phase 02 \u2014 Build the twin (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
      "hash": "2fe16130",
      "state": ""
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "437c7ed4",
      "state": ""
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "e3d069a9",
      "state": ""
     }
@@ -2549,27 +2549,27 @@
    "time": "14:02",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Fix the foundation (chassis parity)",
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
      "hash": "5c41b72c",
      "state": ""
     },
     {
-     "head": "Phase 01 \u2014 Real Sangachal terrain (source \u2192 DEM \u2192 imagery)",
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
      "hash": "86c1de4e",
      "state": ""
     },
     {
-     "head": "Phase 02 \u2014 Build the twin (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
      "hash": "ab4f0407",
      "state": ""
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "437c7ed4",
      "state": ""
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "e3d069a9",
      "state": ""
     }
@@ -2582,27 +2582,27 @@
    "time": "14:02",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Fix the foundation (chassis parity)",
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
      "hash": "5c41b72c",
      "state": ""
     },
     {
-     "head": "Phase 01 \u2014 Real Sangachal terrain (source \u2192 DEM \u2192 imagery)",
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
      "hash": "86c1de4e",
      "state": ""
     },
     {
-     "head": "Phase 02 \u2014 Build the twin (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
      "hash": "61a63fff",
      "state": ""
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "437c7ed4",
      "state": ""
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "e3d069a9",
      "state": ""
     }
@@ -2615,27 +2615,27 @@
    "time": "14:06",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Fix the foundation (chassis parity)",
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
      "hash": "8545a43a",
      "state": ""
     },
     {
-     "head": "Phase 01 \u2014 Real Sangachal terrain (source \u2192 DEM \u2192 imagery)",
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
      "hash": "0c811176",
      "state": ""
     },
     {
-     "head": "Phase 02 \u2014 Build the twin (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
      "hash": "0ba312bf",
      "state": ""
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "cca97ae6",
      "state": ""
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "e3d069a9",
      "state": ""
     }
@@ -2648,27 +2648,27 @@
    "time": "14:07",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Fix the foundation (chassis parity)",
+     "head": "Phase 00 — Fix the foundation (chassis parity)",
      "hash": "8545a43a",
      "state": ""
     },
     {
-     "head": "Phase 01 \u2014 Real Sangachal terrain (source \u2192 DEM \u2192 imagery)",
+     "head": "Phase 01 — Real Sangachal terrain (source → DEM → imagery)",
      "hash": "bd41575c",
      "state": ""
     },
     {
-     "head": "Phase 02 \u2014 Build the twin (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Build the twin (ordered reconstruction, evidence loops)",
      "hash": "0ba312bf",
      "state": ""
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "cca97ae6",
      "state": ""
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "e3d069a9",
      "state": ""
     }
@@ -2681,27 +2681,27 @@
    "time": "16:04",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "a6814ebc",
      "state": "0/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "eeab3490",
      "state": "0/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2714,27 +2714,27 @@
    "time": "16:12",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "b4feaead",
      "state": "0/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "eeab3490",
      "state": "0/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2747,27 +2747,27 @@
    "hash": "ddc501c8",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "abc35159",
      "state": "1/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "eeab3490",
      "state": "0/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2779,27 +2779,27 @@
    "hash": "61301097",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "8eb70b04",
      "state": "6/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "eeab3490",
      "state": "0/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2812,27 +2812,27 @@
    "hash": "d9aa23de",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "3222adb3",
      "state": "6/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "eeab3490",
      "state": "0/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2845,27 +2845,27 @@
    "hash": "8910c13a",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "3222adb3",
      "state": "6/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "c57e906e",
      "state": "2/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2878,27 +2878,27 @@
    "hash": "cfdfe0ea",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "3222adb3",
      "state": "6/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "f6097f74",
      "state": "4/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2911,27 +2911,27 @@
    "hash": "dc45c7d8",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "3222adb3",
      "state": "6/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "a7be6a84",
      "state": "4/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2944,27 +2944,27 @@
    "hash": "c81a80a0",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "3222adb3",
      "state": "6/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "0a006676",
      "state": "4/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -2977,27 +2977,27 @@
    "hash": "0b30592e",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "3222adb3",
      "state": "6/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "0a006676",
      "state": "4/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -3010,27 +3010,60 @@
    "hash": "ab802e45",
    "sections": [
     {
-     "head": "Phase 00 \u2014 Control panels reach parity with v1 \u2713 done",
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
      "hash": "e5e551f2",
      "state": "2/2"
     },
     {
-     "head": "Phase 01 \u2014 The ground becomes the real Sangachal coast \u2713 done",
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
      "hash": "71804c38",
      "state": "7/7"
     },
     {
-     "head": "Phase 02 \u2014 Raise the terminal (ordered reconstruction, evidence loops)",
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
      "hash": "3222adb3",
      "state": "6/6"
     },
     {
-     "head": "Phase 03 \u2014 Hotspot launcher map",
+     "head": "Phase 03 — Hotspot launcher map",
      "hash": "0a006676",
      "state": "4/4"
     },
     {
-     "head": "Phase 06 \u2014 Lock",
+     "head": "Phase 06 — Lock",
+     "hash": "a3622214",
+     "state": "0/3"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-14",
+   "time": "11:44",
+   "hash": "7a3ef325",
+   "sections": [
+    {
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
+     "hash": "e5e551f2",
+     "state": "2/2"
+    },
+    {
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
+     "hash": "71804c38",
+     "state": "7/7"
+    },
+    {
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
+     "hash": "3222adb3",
+     "state": "6/6"
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "59f50bd8",
+     "state": "4/4"
+    },
+    {
+     "head": "Phase 06 — Lock",
      "hash": "a3622214",
      "state": "0/3"
     }
@@ -3052,12 +3085,12 @@
    "hash": "8e661e20",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "78f5f0f8",
      "state": ""
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "8ff6b022",
      "state": ""
     }
@@ -3069,12 +3102,12 @@
    "hash": "56b7ab69",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "fb99d686",
      "state": ""
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "e2779592",
      "state": ""
     }
@@ -3086,12 +3119,12 @@
    "hash": "9e112677",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "fb99d686",
      "state": ""
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "e2779592",
      "state": ""
     }
@@ -3103,12 +3136,12 @@
    "hash": "f483adca",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "288fca73",
      "state": ""
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "0602fce2",
      "state": ""
     }
@@ -3120,12 +3153,12 @@
    "hash": "42a6c446",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3137,12 +3170,12 @@
    "hash": "4e087f48",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3154,12 +3187,12 @@
    "hash": "cd041067",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3171,12 +3204,12 @@
    "hash": "6c199b5f",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3188,12 +3221,12 @@
    "hash": "58660d68",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3206,12 +3239,12 @@
    "hash": "c73408ca",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "fb99d686",
      "state": ""
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "e2779592",
      "state": ""
     }
@@ -3224,12 +3257,12 @@
    "hash": "42e344ad",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "5efca7d7",
      "state": ""
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "f860438b",
      "state": ""
     }
@@ -3242,12 +3275,12 @@
    "hash": "51341710",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "5efca7d7",
      "state": ""
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "f860438b",
      "state": ""
     }
@@ -3260,12 +3293,12 @@
    "hash": "041d1894",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "5efca7d7",
      "state": ""
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "f860438b",
      "state": ""
     }
@@ -3278,12 +3311,12 @@
    "hash": "42072296",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "288fca73",
      "state": ""
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "0602fce2",
      "state": ""
     }
@@ -3296,12 +3329,12 @@
    "hash": "237faacc",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "288fca73",
      "state": ""
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "0602fce2",
      "state": ""
     }
@@ -3314,12 +3347,12 @@
    "hash": "8e51efd3",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3332,12 +3365,12 @@
    "hash": "f6f950ba",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3350,12 +3383,12 @@
    "hash": "ddc501c8",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3367,12 +3400,12 @@
    "hash": "61301097",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3385,12 +3418,12 @@
    "hash": "d9aa23de",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3403,12 +3436,12 @@
    "hash": "8910c13a",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3421,12 +3454,12 @@
    "hash": "cfdfe0ea",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3439,12 +3472,12 @@
    "hash": "dc45c7d8",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3457,12 +3490,12 @@
    "hash": "c81a80a0",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "599f97a8",
      "state": "0/4"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "838920cf",
      "state": "0/7"
     }
@@ -3475,12 +3508,12 @@
    "hash": "0b30592e",
    "sections": [
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "0151e278",
      "state": ""
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "24e329cc",
      "state": ""
     }
@@ -3493,27 +3526,27 @@
    "hash": "2341fd1a",
    "sections": [
     {
-     "head": "Phase 01 \u2014 Make it real",
+     "head": "Phase 01 — Make it real",
      "hash": "6a4dd82b",
      "state": "0/1"
     },
     {
-     "head": "Phase 02 \u2014 Asset / infrastructure layer",
+     "head": "Phase 02 — Asset / infrastructure layer",
      "hash": "1b838041",
      "state": "0/1"
     },
     {
-     "head": "Phase 03 \u2014 Time variance",
+     "head": "Phase 03 — Time variance",
      "hash": "9619e562",
      "state": "0/3"
     },
     {
-     "head": "Phase 04 \u2014 Simulation",
+     "head": "Phase 04 — Simulation",
      "hash": "a9ba8807",
      "state": "0/1"
     },
     {
-     "head": "Phase 05 \u2014 Operations layer",
+     "head": "Phase 05 — Operations layer",
      "hash": "53581ece",
      "state": "0/7"
     }

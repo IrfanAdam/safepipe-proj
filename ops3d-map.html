@@ -8,7 +8,10 @@
 <style>
   html, body { margin: 0; height: 100%; background: var(--ops-bg, #0b0c0c); }
   #app { position: fixed; inset: 0; overflow: hidden; }
-  #map { position: absolute; inset: 0; background: var(--ops-bg, #0b0c0c); }
+  #map { position: absolute; inset: 0; background: var(--ops-bg, #0b0c0c);
+    /* Handoff-11-A: pinch belongs to the unified journey driver — never let
+     * the browser take the two-finger gesture (pinch-zoom/scroll) natively. */
+    touch-action: none; }
   /* Handoff-3 Lane 1: no MAP/SAT toggle ribbon — satellite switching is
    * transition-only/automatic (outbound flight + recede). Micro attribution
    * credit (see #map-credit) is the only flat-view chrome besides pins. */

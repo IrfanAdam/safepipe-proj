@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_DWELL_FRAMES } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_DWELL_FRAMES } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -83,7 +83,7 @@ let lastConsoleStatus = '';
 const FOV_DEG = MAP_TRUE_FOV_DEG;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'b65twinscrub';
+const BUILD_ID = 'b66twintone';
 // Shared GL-context + tile telemetry registry (see ctxmon.js: one
 // real-Safari screenshot of the six tokens discriminates every hypothesis
 // in the defect-hunt report).
@@ -630,6 +630,7 @@ async function boot() {
     readyPosted: false, // {type:'safepipe-twin-ready'} sent once per handoff
     readyHits: 0, // consecutive agreed hold frames (settle gate before post)
     closePosted: false, // {recede:true} close sent (later closes re-post, never re-fly)
+    precache: null, // GATE-3 predictive precache: { kicked, warmT0, lastErr, lastT, vel, poseOk, scene, pose, warm }
   };
   /* Hold cap: the inbound waits in hold for the matched sat frame (map up +
    * first painted frame at mix 0, twin + map poses both on the hold frame)
@@ -730,6 +731,14 @@ async function boot() {
     handoff.readyPosted = false;
     handoff.readyHits = 0;
     handoff.closePosted = false;
+    handoff.precache = { kicked: true, warmT0: handoffNow(), lastErr: null, lastT: 0, vel: 0, poseOk: false, scene: false, pose: false, warm: false };
+    // GATE-3 predictive precache (defect 6, twin side): promote the DEM fetch
+    // the moment the inbound stages — the live drape + first warm frames land
+    // before the ready post instead of after it. Boot already kicked this;
+    // the re-kick is a deduped no-op when live (field.js inflight guard).
+    try {
+      ensureField().catch(() => {});
+    } catch { /* boot already kicked it */ }
     handoff.phase = 'hold';
     handoff.t0 = handoffNow();
     try {
@@ -776,7 +785,9 @@ async function boot() {
     try {
       if (!handoff.start || !handoff.frame || handoff.phase !== 'hold') return false;
       if (!map) return false;
-      if (!(twinFrames >= 1)) return false;
+      // GATE-3 precache: the scene is warm only after PREWARM frames have
+      // painted (damping converged, first live drape on screen) — not one.
+      if (!(twinFrames >= HANDOFF_PREWARM_MIN_FRAMES)) return false;
       const m = mixCtl?.getMix?.();
       if (m !== HANDOFF_START_MIX) return false;
       // The LIVE twin camera must itself sit on the requested hold frame —
@@ -956,6 +967,36 @@ async function boot() {
     }
     return { legs, order: order.slice(0, idx), from: cur };
   }
+  /* GATE-3 ring-from-corners (defect 5, twin side): flight-phase -> ring
+   * reveal progress 0..1, or null when no flight owns the ring (idle/done/
+   * standalone — the normal mix law stands). Hold 0, swoop 0->1 on the same
+   * smootherstep as the camera, push 1 (settled site ring), reverse mirrors
+   * (walk progress or scrub progress back to 0). */
+  function ringFlightP() {
+    try {
+      const ph = handoff.phase;
+      if (ph === 'hold') return 0;
+      if (ph === 'swoop') {
+        const t = Math.min(1, Math.max(0, (handoffNow() - handoff.t0) / HANDOFF_SWOOP_MS));
+        return easeInOutSmoother(t);
+      }
+      if (ph === 'push') return 1;
+      if (ph === 'reverse') {
+        if (handoff.scrub?.active) return Math.min(1, Math.max(0, 1 - handoff.scrub.progress));
+        const w = handoff.walk;
+        if (w && Array.isArray(w.legs) && w.legs.length) {
+          return Math.min(1, Math.max(0, 1 - scrubProgressForWalk(w.legs, w.i, w.legT0, handoffNow())));
+        }
+        return 0;
+      }
+    } catch { /* normal law below */ }
+    return null;
+  }
+  // Change cache: setToneGrade/setRingReveal re-walk every emphasis mat, so
+  // the per-frame drive only calls on value change (mix steps are integers;
+  // the ring quantizes to 1e-3 — no visible step, no per-frame churn).
+  let lastToneApplied = -1;
+  let lastRingApplied = 'x';
   /* Per-frame flight step (runs at the top of the render loop, before the
    * damped controls settle — the flight IS the pose source while active).
    * Forward: hold (ring top-down, mix 0) -> swoop (ring top-down -> ring
@@ -1010,6 +1051,29 @@ async function boot() {
         try {
           if (refitHandoffRange()) handoff.readyHits = 0;
         } catch { /* refit is best-effort */ }
+        // GATE-3 predictive precache (defect 6, twin side): from inbound hold
+        // progress + pose-settle velocity, track scene-warm / pose-warm /
+        // ready BEFORE the reveal lands (probe: __ring2.precache()). Never
+        // gates the post itself — the settle counter below stays the post's
+        // single owner — and never breaks the frame.
+        try {
+          const pc = handoff.precache;
+          if (pc) {
+            const perr = twinHoldPoseError(capturePose(), handoff.start);
+            const nowMs = handoffNow();
+            if (perr && pc.lastErr && Number.isFinite(pc.lastT) && nowMs > pc.lastT) {
+              const dt = Math.max(1, nowMs - pc.lastT) / 1000;
+              pc.vel = (pc.lastErr.posM - perr.posM) / dt; // +m/s = converging
+            }
+            pc.lastErr = perr;
+            pc.lastT = nowMs;
+            pc.poseOk = twinHoldPoseMatch(capturePose(), handoff.start);
+            const st = precacheStatus({ poseOk: pc.poseOk, mapUp: !!map, frames: twinFrames });
+            pc.scene = st.scene;
+            pc.pose = st.pose;
+            pc.warm = st.ready;
+          }
+        } catch { /* precache telemetry never breaks the frame */ }
         // Settle gate: a single agreeing frame withholds — post only after
         // READY_SETTLE_FRAMES consecutive agreements, so the signal lands
         // exactly when the live camera has settled on the hold frame. Any
@@ -1571,6 +1635,43 @@ async function boot() {
       }
     },
     twinReadyMsg: TWIN_READY_MSG,
+    tone: () => {
+      let m = null;
+      try {
+        m = mixCtl?.getMix?.() ?? null;
+      } catch { m = null; }
+      let sun = null, amb = null;
+      try {
+        twin.scene?.traverse?.((o) => {
+          if (o?.isDirectionalLight) sun = o.intensity;
+          if (o?.isAmbientLight) amb = o.intensity;
+        });
+      } catch { /* lights read is best-effort */ }
+      return { mix: m, grade: toneGradeForMix(m ?? 0), sun, amb };
+    },
+    ring: () => {
+      let scale = null, opacity = null;
+      try {
+        const r = twin.scene?.getObjectByName?.('ring2-ring');
+        scale = r?.scale?.x ?? null;
+        opacity = r?.material?.opacity ?? null;
+      } catch { /* ring read is best-effort */ }
+      return { phase: handoff.phase, scale, opacity };
+    },
+    precache: () => ({
+      kicked: !!handoff.precache?.kicked,
+      frames: twinFrames,
+      phase: handoff.phase,
+      poseOk: handoff.precache?.poseOk ?? null,
+      errM: handoff.precache?.lastErr?.posM ?? null,
+      rangeErrM: handoff.precache?.lastErr?.rangeM ?? null,
+      vel: handoff.precache?.vel ?? null,
+      scene: handoff.precache?.scene ?? null,
+      pose: handoff.precache?.pose ?? null,
+      warm: handoff.precache?.warm ?? null,
+      ready: handoff.readyPosted,
+      out: (window.__ring2readyOut ?? []).length,
+    }),
     fs: { delegated: fsDelegated, on: fsOn },
     diag: () => ({
       build: BUILD_ID,
@@ -2032,6 +2133,28 @@ async function boot() {
   };
   const frameOnce = () => {
     stepHandoff();
+    // GATE-3 twin-tone (defect 4): grade the twin lights across the mix band
+    // so the photo->twin base swap moves tone smoothly (sector.js
+    // toneGradeForMix — sat-matched at 0, canonical full-twin at 100).
+    try {
+      const m = mixCtl?.getMix?.() ?? HANDOFF_START_MIX;
+      const g = toneGradeForMix(m);
+      if (g !== lastToneApplied) {
+        twin.setToneGrade?.(g);
+        lastToneApplied = g;
+      }
+    } catch { /* grade never breaks the frame */ }
+    // GATE-3 ring-from-corners (defect 5): the flight owns the ring look
+    // (corners->site ring in, site ring->corners out); free orbit and the
+    // settled twin stay on the normal mix law (null clears the override).
+    try {
+      const rp = ringFlightP();
+      const key = rp === null ? 'n' : rp.toFixed(3);
+      if (key !== lastRingApplied) {
+        twin.setRingReveal?.(rp);
+        lastRingApplied = key;
+      }
+    } catch { /* ring never breaks the frame */ }
     twin.updateControls();
     twinFrames++;
     const pose = twin.getPose();

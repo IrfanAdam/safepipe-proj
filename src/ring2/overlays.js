@@ -32,6 +32,7 @@ import { SANGACHAL, VEX, RING_RADIUS_M, EXTENT_M } from './site.js';
 import { MAP_MAX_PITCH_DEG, MAP_TRUE_FOV_DEG, TWIN_MIN_RANGE_M, TWIN_MAX_RANGE_M, tiltFadeForPitch } from './sync.js';
 import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
 import { DRAPE_LIFTS, RIM_FADE_IN, RIM_TILT_GAIN } from './drape.js';
+import { ringRevealForProgress } from './sector.js';
 import { TIER } from './facilities/dims.js';
 
 /* REF GATE 2: every overlay renderable carries userData.tier. All overlay
@@ -301,10 +302,33 @@ export function createOverlayTwin(container, opts = {}) {
   // Takeover-ground lights (Issue 2): the Lambert twin terrain is the only
   // lit material in the scene — every overlay is MeshBasicMaterial and
   // ignores lights. Added to the scene (not the rebuilt group) once.
-  scene.add(new THREE.AmbientLight(0xc4cacf, 0.85));
-  const takeSun = new THREE.DirectionalLight(0xfff1dc, 1.5);
+  // Base intensities are the single source of truth for the GATE-3 tone
+  // grade (setToneGrade scales both, never rewrites the bases).
+  const AMBIENT_BASE = 0.85;
+  const SUN_BASE = 1.5;
+  const ambLight = new THREE.AmbientLight(0xc4cacf, AMBIENT_BASE);
+  scene.add(ambLight);
+  const takeSun = new THREE.DirectionalLight(0xfff1dc, SUN_BASE);
   takeSun.position.set(-35000, 52000, 22000);
   scene.add(takeSun);
+  /* GATE-3 TONE GRADE (defect 4, twin side): multiplier on the
+   * takeover-ground lights, driven per frame from the mix band by main.js
+   * (sector.js toneGradeForMix: sat-matched at mix 0 -> 1.0 at mix 100, so
+   * the photo->twin base swap moves tone smoothly). Scene-level — survives
+   * rebuild. Clamped so a bad caller can never black out the twin. */
+  let lastTone = 1;
+  function setToneGrade(g) {
+    let n = Number(g);
+    if (!Number.isFinite(n)) n = 1;
+    n = Math.min(1.1, Math.max(0.5, n));
+    lastTone = n;
+    try {
+      ambLight.intensity = AMBIENT_BASE * n;
+    } catch { /* grade never breaks the frame */ }
+    try {
+      takeSun.intensity = SUN_BASE * n;
+    } catch { /* grade never breaks the frame */ }
+  }
   const camera = new THREE.PerspectiveCamera(
     fovDeg,
     Math.max(container.clientWidth, 1) / Math.max(container.clientHeight, 1),
@@ -391,6 +415,46 @@ export function createOverlayTwin(container, opts = {}) {
     return mats;
   }
 
+  /* GATE-3 RING-FROM-CORNERS (defect 5, twin side): the handoff ring draws
+   * geometrically instead of just fading. While a flight owns the ring
+   * (ringFlight), the line scales from RING_CORNER_SCALE x (frame corners at
+   * the hold footprint) down to the site ring while its stroke draws 0->full
+   * (sector.js ringRevealForProgress); its opacity rides max(mix law,
+   * reveal) so it stays continuous into the push. Standalone/done/idle
+   * clear the override (setRingReveal(null)) and the normal mix law owns
+   * the ring. Scale re-applies in buildRing so a mid-flight redrape keeps
+   * the converge. */
+  let ringLine = null;
+  let lastRingP = 1;
+  let ringFlight = false;
+  function applyRingTransform() {
+    if (!ringLine) return;
+    try {
+      const { scale } = ringRevealForProgress(lastRingP);
+      ringLine.scale.set(scale, 1, scale);
+    } catch { /* ring never breaks the frame */ }
+  }
+  function setRingReveal(p) {
+    if (p === null || p === undefined) {
+      ringFlight = false;
+      lastRingP = 1;
+      if (ringLine) {
+        try {
+          ringLine.scale.set(1, 1, 1);
+        } catch { /* ring never breaks the frame */ }
+      }
+      applyEmphasisFull();
+      return 1;
+    }
+    let x = Number(p);
+    if (!Number.isFinite(x)) x = 1;
+    lastRingP = Math.min(1, Math.max(0, x));
+    ringFlight = true;
+    applyRingTransform();
+    applyEmphasisFull();
+    return lastRingP;
+  }
+
   function groundY(x, z, lift = 0) {
     return sampleH(x, z) * VEX + lift;
   }
@@ -414,6 +478,9 @@ export function createOverlayTwin(container, opts = {}) {
     const ring = tagDerived(new THREE.Line(g, m));
     ring.name = 'ring2-ring';
     ring.frustumCulled = false;
+    ring.material.userData.isHandoffRing = true; // GATE-3 ring-from-corners: flight-owned look
+    ringLine = ring;
+    applyRingTransform(); // mid-flight redrape keeps the converge
     group.add(ring);
     const lbl = makeLabelSprite(`RING-2 · r ${SANGACHAL.radiusKm} km · source:${src}`, { h: 420 });
     reg(lbl.material, 'label');
@@ -1095,8 +1162,12 @@ function edgeFade(x, z) {
     for (const m of emphasisMats) {
       // Every mat is mix-only now (tiltFadeApplies is false for all kinds):
       // the tilt stamp below is dead weight kept for API compat, and pitch
-      // can never dim a line again.
-      m.opacity = emphasisOpacity(m.userData.baseOpacity ?? m.opacity, lastT, m.userData.tiltFade ? lastTiltK : 1);
+      // can never dim a line again. GATE-3 ring-from-corners: while a flight
+      // owns the ring, its stroke rides max(mix law, reveal) so the corner
+      // converge stays continuous into the push.
+      const base = m.userData.baseOpacity ?? m.opacity;
+      const tEff = (m.userData.isHandoffRing && ringFlight) ? Math.max(lastT, lastRingP) : lastT;
+      m.opacity = emphasisOpacity(base, tEff, m.userData.tiltFade ? lastTiltK : 1);
     }
   }
   function applyEmphasis(t) {
@@ -1203,6 +1274,7 @@ function edgeFade(x, z) {
   return {
     renderer, scene, camera, controls, canvas,
     rebuild, setEmphasis, setTiltFade, setTakeover, addEmphasisMats, update, updateControls, renderTwin,
+    setToneGrade, setRingReveal,
     getPose, dispose, onResize,
     getInfo: () => ({ ...(lastInfo ?? {}), takeoverU: lastU, status: getStatus(), pills: getPillState() }),
   };

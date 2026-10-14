@@ -421,6 +421,96 @@ export function isTwinCloseMessage(data) {
   }
 }
 
+/* GATE-3 GESTURE REVISION, TWIN SIDE (defects 4-6) — pure, node-checkable. */
+
+/* (4) TONE CONTINUITY: twin-ground light multiplier keyed to the mix band.
+ * The satellite photo (mapbase setGroundFade) dissolves out exactly as the
+ * Lambert twin ground dissolves in (takeoverU/satBaseV share one smoothstep),
+ * but the two bases have different native tones: full-lit Lambert over the
+ * last of the photo reads as a step. Grading the twin lights from
+ * TWIN_TONE_SAT_MATCH at mix 0 to 1.0 at mix 100 (same smoothstep shape as
+ * the base swap, so grade + dissolve move together) bridges photo tone into
+ * full-twin tone with no step at either end. Endpoints honest: mix 0 ground
+ * is invisible (grade unobservable), mix 100 is exactly the canonical
+ * full-twin look. Non-finite mix returns 1 (neutral — never guess dark). */
+export const TWIN_TONE_SAT_MATCH = 0.82;
+export function toneGradeForMix(mix) {
+  try {
+    const m = Number(mix);
+    if (!Number.isFinite(m)) return 1;
+    const t = Math.min(1, Math.max(0, m / 100));
+    const s = t * t * (3 - 2 * t);
+    return TWIN_TONE_SAT_MATCH + (1 - TWIN_TONE_SAT_MATCH) * s;
+  } catch {
+    return 1;
+  }
+}
+
+/* (5) RING FROM CORNERS: handoff-ring reveal progress 0..1 -> { scale,
+ * opacity }. The ring starts oversized (RING_CORNER_SCALE x site radius —
+ * touching the frame corners at the ring-frame hold footprint) and converges
+ * to the site ring (scale 1) while its stroke draws 0->full. Driven by the
+ * inbound flight (hold 0, swoop 0->1, push 1) and mirrored on reverse
+ * (1->0); idle/done/standalone clear the override and the normal mix law
+ * owns the ring. */
+export const RING_CORNER_SCALE = 1.45;
+export function ringRevealForProgress(p) {
+  try {
+    let x = Number(p);
+    if (!Number.isFinite(x)) x = 1;
+    x = Math.min(1, Math.max(0, x));
+    return { scale: 1 + (1 - x) * (RING_CORNER_SCALE - 1), opacity: x };
+  } catch {
+    return { scale: 1, opacity: 1 };
+  }
+}
+
+/* (6) PREDICTIVE PRECACHE (twin side): the hold already waits for the ready
+ * post, but nothing warms the reveal ahead of it. From inbound hold progress
+ * + pose-settle velocity the flight now tracks scene-warm (map up + first
+ * painted frame), pose-warm (live camera on the hold frame + enough pumped
+ * frames for damping to converge), and ready (both) BEFORE the reveal lands
+ * (the settle-gated post). Pure + node-checkable; main.js feeds it live. */
+export const HANDOFF_PREWARM_MIN_FRAMES = 3;
+export function precacheStatus({ poseOk = false, mapUp = false, frames = 0 } = {}) {
+  try {
+    const f = Number(frames);
+    const scene = !!mapUp && Number.isFinite(f) && f >= 1;
+    const pose = !!poseOk && Number.isFinite(f) && f >= HANDOFF_PREWARM_MIN_FRAMES;
+    const ready = scene && pose;
+    return { scene, pose, ready, warm: ready };
+  } catch {
+    return { scene: false, pose: false, ready: false, warm: false };
+  }
+}
+
+/* Continuous hold-pose error (velocity source for the precache tracker):
+ * { posM, rangeM, pitchDeg, bearingDeg }. Null on any non-finite input —
+ * withhold, never guess. Same geometry as twinHoldPoseMatch. */
+export function twinHoldPoseError(pose, start) {
+  try {
+    const eye = pose?.eye;
+    const tgt = pose?.target;
+    const range = Number(start?.range);
+    if (!eye || !tgt || !Number.isFinite(range) || range <= 0) return null;
+    if (![eye.x, eye.y, eye.z, tgt.x, tgt.z, start.tx, start.tz].every(Number.isFinite)) return null;
+    const ty = Number.isFinite(tgt.y) ? tgt.y : start.ty;
+    if (!Number.isFinite(ty)) return null;
+    const posM = Math.hypot(tgt.x - start.tx, tgt.z - start.tz);
+    const liveRange = Math.hypot(eye.x - tgt.x, eye.y - ty, eye.z - tgt.z);
+    if (!Number.isFinite(liveRange)) return null;
+    const h = Math.hypot(eye.x - tgt.x, eye.z - tgt.z);
+    const v = eye.y - ty;
+    const pitchDeg = v > 0 ? (Math.atan2(h, v) * 180) / Math.PI : 90;
+    const want = ((Number(start.bearing) || 0) % 360 + 360) % 360;
+    const got = ((Math.atan2(-(eye.x - tgt.x), eye.z - tgt.z) * 180) / Math.PI + 360) % 360;
+    const bearingDeg = Math.abs((((got - want + 540) % 360) + 360) % 360 - 180);
+    return { posM, rangeM: Math.abs(liveRange - range), pitchDeg, bearingDeg };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolve a ?sector= value (h3 index preferred, sector id accepted) to
  * { sector, h3, worstAsset }. Null when absent/unmatched — caller boots

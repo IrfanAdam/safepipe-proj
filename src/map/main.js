@@ -94,6 +94,12 @@ let mapRef = null;
 let setSatRef = null;
 let transitId = null;
 let twinFs = false;
+// Handoff-11-A (FM-2): recede leg flag. Set on recede start, cleared ONLY by
+// landHome (idempotent, token-guarded): while set, the gesture trigger
+// swallows wheels/pinches (frame held) so a mid-recede jumpTo can never
+// cancel the recede easeTo and fire landHome early with a POSITION-OFF rest.
+let receding = false;
+let recedeDone = false;
 // Handoff-5-close: single close chain. CLOSE_FADE_MS mirrors the forward
 // reveal; RECEDE_DELAY_MS starts sat->flat + zoom-out after the fade.
 // GATE-3 REVISION tempo: 450ms fades overlap the recede for one gesture.
@@ -121,6 +127,8 @@ window.__mapProbe = {
   centerEase: 0, autoCenter: false, satOpacity: 0,
   vectorWarm: false, vectorCache: null, vectorSnapshot: false, vectorHold: false,
   vectorReturnMs: null,
+  // Handoff-11-A predictive precache: velocity-predicted next frame kept warm.
+  precache: { predicted: 0, velocity: 0, prefetched: 0, hits: 0, tiles: null },
   errors, openTwin, closeTwin, selectSector, flyToSectorThenTwin,
   toggleMapFs, setTwinFs, prewarmThenReveal, revealTwin,
 };
@@ -367,14 +375,25 @@ function showVignette(on) {
 }
 
 /** Force the sat layer (choreography path only — no toggle chrome exists).
- * Layer + probe stay in sync. */
+ * Layer + probe stay in sync (FM-8: satOpacity mirrors the forced state so
+ * the probe never reports 1.0 over a flat frame after a close). Leaving
+ * scrub control restores the 450ms ramp (FM-6c) that setSatScrubbed's
+ * duration-0 paint would otherwise inherit as a snap. */
 function setSatForced(on) {
   try {
     if (setSatRef) setSatRef(!!on);
   } catch (err) {
     errors.push('SAT-FORCE: ' + (err && err.message));
   }
+  try {
+    if (mapRef && mapRef.getLayer(SAT_LAYER_ID)) {
+      mapRef.setPaintProperty(SAT_LAYER_ID, 'raster-opacity-transition', { duration: 450, delay: 0 });
+    }
+  } catch { /* transition restore is best-effort */ }
   window.__mapProbe.satOn = !!on;
+  try {
+    window.__mapProbe.satOpacity = on ? 1 : 0;
+  } catch { /* probe cosmetic */ }
 }
 
 /** LANE A outbound pre-warm: make the sat raster visible at opacity 0 so
@@ -544,6 +563,115 @@ function resetScrubJourney() {
     window.__mapProbe.centerEase = 0;
     window.__mapProbe.autoCenter = false;
   } catch { /* probe cosmetic */ }
+}
+
+/* Handoff-11-A DEFECT 3 — predictive precache (map side): from scroll/zoom
+ * velocity predict the next journey frame (~250ms ahead) and keep it warm.
+ * Vector stays HELD (existing holdVectorWarm — style cached, sources/layers
+ * never removed); satellite tiles along the flight path are pre-fetched as
+ * image preloads into a small capped cache, so travel in EITHER direction
+ * never shows a reload pop. Best-effort throughout: offline tile fetches
+ * must never error the probe. Sibling Lane B owns twin-side precache;
+ * message contract only (no shared code). */
+const PRECACHE_LOOKAHEAD_S = 0.25; // predict 250ms of motion ahead
+const PRECACHE_MIN_P_DELTA = 0.02; // refetch only when prediction moved on
+const PRECACHE_MIN_MS = 600; // ... or this long elapsed
+const PRECACHE_MAX_TILES = 64; // cap the warm image cache
+const satTileSeen = new Set(); // url -> warm (insertion-ordered for evict)
+let precachePrefetched = 0;
+let precacheHits = 0;
+let lastPrecProgP = 0;
+let lastPrecT = 0;
+let precVel = 0; // journey progress per second (EMA)
+let lastPrefetchPred = -1;
+let lastPrefetchT = 0;
+function satTileUrl(z, x, y) {
+  return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + z + '/' + y + '/' + x;
+}
+function lngLatToTile(lon, lat, z) {
+  const n = Math.pow(2, z);
+  const x = Math.floor(((+lon + 180) / 360) * n);
+  const lr = (+lat * Math.PI) / 180;
+  const y = Math.floor(((1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2) * n);
+  return { x, y };
+}
+/** Pre-fetch the 3x3 sat tile patch around center at zoom (best-effort). */
+function prefetchSatTiles(center, zoom) {
+  try {
+    const z = Math.max(0, Math.min(19, Math.floor(+zoom)));
+    if (!Number.isFinite(z)) return;
+    const c = Array.isArray(center) && center.length === 2 ? center : COUNTRY_CENTER;
+    if (!Number.isFinite(+c[0]) || !Number.isFinite(+c[1])) return;
+    const t = lngLatToTile(c[0], c[1], z);
+    const n = Math.pow(2, z);
+    const urls = [];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const x = t.x + dx;
+        const y = t.y + dy;
+        if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= n || y >= n) continue;
+        urls.push(satTileUrl(z, x, y));
+      }
+    }
+    try {
+      window.__mapProbe.precache.tiles = { z, x: t.x, y: t.y, n: urls.length };
+    } catch { /* probe cosmetic */ }
+    for (const url of urls) {
+      try {
+        if (satTileSeen.has(url)) {
+          precacheHits += 1;
+          continue;
+        }
+        satTileSeen.add(url);
+        while (satTileSeen.size > PRECACHE_MAX_TILES) {
+          const oldest = satTileSeen.values().next();
+          if (oldest && !oldest.done) {
+            try { satTileSeen.delete(oldest.value); } catch { break; }
+          } else break;
+        }
+        try {
+          const img = new Image();
+          img.decoding = 'async';
+          img.src = url; // warm the HTTP cache; never inserted in the DOM
+        } catch { /* preload is best-effort */ }
+        precachePrefetched += 1;
+      } catch { /* per-tile best-effort */ }
+    }
+    try {
+      window.__mapProbe.precache.prefetched = precachePrefetched;
+      window.__mapProbe.precache.hits = precacheHits;
+    } catch { /* probe cosmetic */ }
+  } catch { /* precache never breaks the map */ }
+}
+/** Track journey velocity, predict the next frame, keep it warm. Called on
+ * every scrub step (both directions). Vector hold re-asserts on fast
+ * motion (throttled by the prefetch gate); sat tiles pre-fetch along path. */
+function trackAndPrecache(p) {
+  try {
+    let now = 0;
+    try {
+      now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    } catch {
+      now = Date.now();
+    }
+    const dt = Math.max(1, now - (lastPrecT || now));
+    const inst = (p - lastPrecProgP) / (dt / 1000);
+    precVel = Number.isFinite(inst) ? precVel * 0.6 + inst * 0.4 : precVel * 0.6;
+    if (!Number.isFinite(precVel)) precVel = 0;
+    lastPrecT = now;
+    lastPrecProgP = p;
+    const pPred = clamp01(p + precVel * PRECACHE_LOOKAHEAD_S);
+    try {
+      window.__mapProbe.precache.predicted = +pPred.toFixed(4);
+      window.__mapProbe.precache.velocity = +precVel.toFixed(4);
+    } catch { /* probe cosmetic */ }
+    if (Math.abs(pPred - lastPrefetchPred) >= PRECACHE_MIN_P_DELTA || now - lastPrefetchT >= PRECACHE_MIN_MS) {
+      lastPrefetchPred = pPred;
+      lastPrefetchT = now;
+      prefetchSatTiles(scrubCenterFor(pPred), scrubZoomFor(pPred));
+      if (Math.abs(precVel) > 0.5) holdVectorWarm('predict');
+    }
+  } catch { /* precache never breaks the map */ }
 }
 
 /** Handoff-5 wide first zoom: pixel padding ≈28% of the viewport's smaller
@@ -1080,12 +1208,20 @@ function recedeToCountry() {
   // HELD style (cached in holdVectorWarm), so the way back is instant.
   holdVectorWarm('recede');
   showVectorHold(true);
+  // Handoff-11-A (FM-2): arm the recede leg — gestures are swallowed until
+  // landHome, and landHome is idempotent so a jumpTo-sourced moveend can
+  // never strand a POSITION-OFF rest behind a 'home' probe.
+  receding = true;
+  recedeDone = false;
   try {
     recedeStartT = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   } catch {
     recedeStartT = Date.now();
   }
   const landHome = () => {
+    if (recedeDone) return; // idempotent: first arrival wins (FM-2 token)
+    recedeDone = true;
+    receding = false;
     try {
       let ms = null;
       try {
@@ -1336,6 +1472,11 @@ async function boot() {
     style,
     center: COUNTRY_CENTER,
     zoom: COUNTRY_ZOOM,
+    // Handoff-11-A (FM-1): the scrub OWNS the wheel — MapLibre native
+    // scrollZoom must never chase applyScrubProgress jumpTo (judder). Pinch
+    // likewise belongs to the unified journey driver (scrolltrigger.js
+    // touch handlers), not to the native touchZoomRotate handler.
+    scrollZoom: false,
     // LANE A naked view: no default attribution pill / info (ⓘ) button.
     // A minimal micro credit is mounted instead (mountMicroCredit).
     attributionControl: false,
@@ -1451,8 +1592,15 @@ async function boot() {
     positionDomPins(map);
     window.__mapProbe.ready = true;
     window.__mapProbe.satLayer = !!map.getLayer(SAT_LAYER_ID);
+    // Handoff-11-A (FM-1 belt-and-braces): native handlers stay off even if
+    // a control path re-enables them; pinch stays with the journey driver.
+    try { if (map.scrollZoom) map.scrollZoom.disable(); } catch { /* best-effort */ }
+    try { if (map.touchZoomRotate) map.touchZoomRotate.disable(); } catch { /* best-effort */ }
     // GATE-9-A(1): country flat view is the held frame — cache it now.
     holdVectorWarm('boot');
+    // Handoff-11-A DEFECT 3: seed the sat precache at the journey start so
+    // the first scroll-down already travels over warm tiles.
+    try { prefetchSatTiles(COUNTRY_CENTER, COUNTRY_ZOOM); } catch { /* best-effort */ }
   });
 
   map.on('error', (e) => {
@@ -1461,21 +1609,29 @@ async function boot() {
     errors.push('MAP: ' + msg);
   });
 
-  /* GATE-9-A scroll SCRUB (replaces GATE-8-B threshold firing): wheel delta
-   * accumulates into ONE journey progress driving zoom depth + auto-center
-   * + scrubbed sat fade (applyScrubProgress); the handoff flight fires only
-   * at the progress-1 edge, the reverse-first close only at progress-0 while
-   * open. No autonomous jumps; blip click fallback intact. Installed once on
-   * #app (overlay root lives inside #app; scrolltrigger.js exempts the live
-   * twin frame so twin canvas gestures are never hijacked). */
+  /* GATE-9-A scroll SCRUB (replaces GATE-8-B threshold firing), Handoff-11-A
+   * unified gesture revision: wheel + trackpad-pinch (ctrl-wheel) + two-finger
+   * touch pinch accumulate into ONE journey progress driving zoom depth +
+   * auto-center + scrubbed sat fade (applyScrubProgress) + predictive
+   * precache (trackAndPrecache); the handoff flight fires only at the
+   * progress-1 edge, the reverse-first close only at progress-0 while open.
+   * Recede arms the swallow (isReceding) so mid-recede gestures hold the
+   * frame instead of hijacking it. No autonomous jumps; blip click fallback
+   * intact. Installed once on #app (overlay root lives inside #app;
+   * scrolltrigger.js exempts the live twin frame so twin canvas gestures
+   * are never hijacked). */
   try {
     installScrollTrigger({
       el: document.getElementById('app'),
       isOpen: () => twinOpen,
-      isBusy: () => !!transitId || !!pendingReveal || !!reverseWait,
+      isBusy: () => !!transitId || !!pendingReveal || !!reverseWait || receding,
+      isReceding: () => receding,
       onProgress: (p) => {
         try {
-          if (!twinOpen) applyScrubProgress(p);
+          if (!twinOpen) {
+            applyScrubProgress(p);
+            trackAndPrecache(p);
+          }
           else {
             // Open: wheel-up scrubs the fade back down before the edge
             // close fires — the fade still tracks scroll, never itself.
