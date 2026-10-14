@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_DWELL_FRAMES } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_DWELL_FRAMES, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -406,7 +406,23 @@ async function boot() {
   // re-drape live via the status bus (no await — first paint is fast).
   ensureField().catch(() => {}).finally(() => paintStatus());
 
-  twin = createOverlayTwin(twinDiv, { fovDeg: FOV_DEG, startRange: 26000 });
+  twin = createOverlayTwin(twinDiv, {
+    fovDeg: FOV_DEG,
+    startRange: 26000,
+    /* Task-36 flight-idle gate: the DEM auto-redrape disposes + recreates
+     * every overlay mesh (a multi-frame hitch), so while the twin owns the
+     * camera — intro flight or scrub reverse — the rebuild waits for the
+     * settled twin (phase done/idle, no scrub owning the walk). Bounded by
+     * REDRAPE_MAX_DEFERS inside overlays, so a parked hold can never pin a
+     * stale drape forever. */
+    isFlightIdle: () => {
+      try {
+        return (handoff.phase === 'done' || handoff.phase === 'idle') && !handoff.scrub?.active;
+      } catch {
+        return true;
+      }
+    },
+  });
   // Phase-01 OSM vectors: draped roads/tracks/paths/coastline/terminal (osm
   // provenance). Best-effort — a missing asset never breaks boot.
   // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]
@@ -623,6 +639,9 @@ async function boot() {
     revMode: null, // reverse plan for THIS close: snap|pitch|full (sector.js reversePlanForPhase)
     walk: null, // generic reverse walk: { legs:[{name,eye,target,mix,ms,from,fromMix}], i, legT0 } or null
     scrub: null, // scroll-scrub reverse: { progress:0..1, accum, justEntered } or null (wheel owns the walk)
+    fwd: null, // Task-36 intro scrub: { legs:[swoop,push], progress:0..1, t0, staged } or null (pose = pure fn of progress)
+    fwdStagedS: null, // last parent-posted staged scroll S (px); null = no staged driver, autoplay advances the scalar
+    capExpired: false, // hold parked past HOLD+CAP with no ready post (shelved-cap observability for the probe)
     atMaxFrames: 0, // dwell counter: consecutive done-phase frames pinned at the zoom clamp
     frame: null, // handed-off { cx, cy, z, bearing } (range refit source)
     anchor: null, // ring-frame center { x, z } (range refit source)
@@ -727,6 +746,9 @@ async function boot() {
     handoff.mid = ringIso;
     handoff.to = terminal;
     handoff.from = null;
+    handoff.fwd = null;
+    handoff.fwdStagedS = null;
+    handoff.capExpired = false;
     handoff.revMode = null;
     handoff.walk = null;
     handoff.scrub = null;
@@ -1004,11 +1026,12 @@ async function boot() {
     try {
       const ph = handoff.phase;
       if (ph === 'hold') return 0;
-      if (ph === 'swoop') {
-        const t = Math.min(1, Math.max(0, (handoffNow() - handoff.t0) / HANDOFF_SWOOP_MS));
-        return easeInOutSmoother(t);
+      if (ph === 'swoop' || ph === 'push') {
+        // Task-36: the ring reads the SAME scrub progress as the camera
+        // (sector.js forwardRingPForProgress over the fwd legs) — stroke
+        // and pose agree exactly, no second clock.
+        return forwardRingPForProgress(handoff.fwd?.legs, handoff.fwd?.progress ?? 0);
       }
-      if (ph === 'push') return 1;
       if (ph === 'reverse') {
         if (handoff.scrub?.active) return Math.min(1, Math.max(0, 1 - handoff.scrub.progress));
         const w = handoff.walk;
@@ -1146,72 +1169,86 @@ async function boot() {
           }
         } catch { /* ready is best-effort */ }
         const heldMs = now - handoff.t0;
-        // Cap expiry also needs a few pumped frames: on a fully-stalled loop
-        // (frozen rAF, cold-boot jank) wall time alone must never retire the
-        // hold into an unposted swoop — the match simply hasn't been
-        // evaluated yet. Slow boot then holds top-down until agreement (or
-        // Lane A's own reveal timeout), never a blind advance.
-        const capDue = heldMs >= HANDOFF_HOLD_MS + HANDOFF_READY_CAP_MS && twinFrames >= 3;
-        if (heldMs >= HANDOFF_HOLD_MS && (handoff.readyPosted || capDue)) {
-          handoff.from = capturePose();
-          if (!handoff.from || !handoff.mid) {
+        // Task-36: the 25 s cap is SHELVED as an advance trigger — the hold
+        // exits on the ready post only, never blind. Past HOLD+CAP with no
+        // post (fully-stalled loop, map down) the flight parks top-down at
+        // the safe satellite frame and raises capExpired for the probe; a
+        // late post still releases normally, and Lane A's own reveal timeout
+        // owns the fallback reveal either way.
+        if (!handoff.readyPosted && !handoff.capExpired
+          && heldMs >= HANDOFF_HOLD_MS + HANDOFF_READY_CAP_MS && twinFrames >= 3) {
+          handoff.capExpired = true;
+        }
+        if (heldMs >= HANDOFF_HOLD_MS && handoff.readyPosted) {
+          // Task-36 intro scrub: freeze the (refit-final) anchors into one
+          // forward leg list — pose/mix/ring all read it as a pure function
+          // of progress from here on. Staged scroll received during the hold
+          // only seeds the release progress (the pin never moved, so the
+          // ready match stayed honest).
+          const st = handoff.start;
+          const legs = buildForwardLegs({
+            startPose: st ? { eye: startEye(st), target: { x: st.tx, y: st.ty, z: st.tz } } : null,
+            mid: handoff.mid,
+            to: handoff.to,
+          });
+          if (!legs) {
             endHandoffFlight();
             return;
           }
+          handoff.from = capturePose();
+          const staged = handoff.fwdStagedS !== null && handoff.fwdStagedS !== undefined;
+          handoff.fwd = {
+            legs,
+            progress: staged ? fwdProgressForStagedS(handoff.fwdStagedS) : 0,
+            t0: now,
+            staged,
+          };
           handoff.phase = 'swoop';
           handoff.t0 = now;
         }
         return;
       }
-      if (handoff.phase === 'swoop') {
-        // Ease to iso AT the ring frame: same center/range, pitch only.
-        // The slider stays at full satellite through the whole swoop.
-        // GATE-3 REVISION tempo: smootherstep joins legs with no lurch.
-        const t = Math.min(1, Math.max(0, (now - handoff.t0) / HANDOFF_SWOOP_MS));
-        const k = easeInOutSmoother(t);
-        const f = handoff.from, mid = handoff.mid;
-        if (!f || !mid) {
+      if (handoff.phase === 'swoop' || handoff.phase === 'push') {
+        // Task-36 intro scrub: ONE 0..1 progress drives eye/target/mix
+        // through the shared scrub pose law (poseForScrubProgress over the
+        // legs frozen at hold exit) — no per-leg wall clocks. Autoplay
+        // advances the scalar on a single clock until staged scroll takes
+        // over (parent posts S; symmetric — scroll-up retreats the pose).
+        // The phase label follows progress so probes + the close-time
+        // reverse walker (buildReverseWalk) still see swoop vs push.
+        const fwd = handoff.fwd;
+        if (!fwd || !Array.isArray(fwd.legs) || !fwd.legs.length) {
+          endHandoffFlight();
+          return;
+        }
+        if (fwd.staged) {
+          fwd.progress = fwdProgressForStagedS(handoff.fwdStagedS ?? 0);
+        } else {
+          const total = scrubTotalMs(fwd.legs);
+          fwd.progress = total > 0
+            ? Math.min(1, Math.max(0, (now - fwd.t0) / total))
+            : 1;
+        }
+        const fs = poseForScrubProgress(fwd.legs, fwd.progress);
+        if (!fs) {
           endHandoffFlight();
           return;
         }
         try {
-          applyFlightPose(
-            { x: lerp(f.eye.x, mid.eye.x, k), y: lerp(f.eye.y, mid.eye.y, k), z: lerp(f.eye.z, mid.eye.z, k) },
-            { x: lerp(f.target.x, mid.target.x, k), y: lerp(f.target.y, mid.target.y, k), z: lerp(f.target.z, mid.target.z, k) },
-          );
+          applyFlightPose(fs.eye, fs.target);
         } catch { /* pose drive is best-effort */ }
-        driveMix(HANDOFF_START_MIX);
-        if (t >= 1) {
-          try {
-            applyFlightPose(mid.eye, mid.target);
-          } catch { /* snap is best-effort */ }
-          driveMix(HANDOFF_START_MIX);
-          handoff.from = { eye: { ...mid.eye }, target: { ...mid.target }, mix: HANDOFF_START_MIX };
-          handoff.phase = 'push';
-          handoff.t0 = now;
-        }
-        return;
-      }
-      if (handoff.phase === 'push') {
-        // Push-in to the terminal while the slider drives 0->100 (together).
-        // GATE-3 REVISION tempo: smootherstep, same overlap.
-        const t = Math.min(1, Math.max(0, (now - handoff.t0) / HANDOFF_PUSH_MS));
-        const k = easeInOutSmoother(t);
-        const f = handoff.from, to = handoff.to;
-        if (!f || !to) {
-          endHandoffFlight();
-          return;
-        }
+        driveMix(fs.mix);
+        let swoopW = 0.5;
         try {
-          applyFlightPose(
-            { x: lerp(f.eye.x, to.eye.x, k), y: lerp(f.eye.y, to.eye.y, k), z: lerp(f.eye.z, to.eye.z, k) },
-            { x: lerp(f.target.x, to.target.x, k), y: lerp(f.target.y, to.target.y, k), z: lerp(f.target.z, to.target.z, k) },
-          );
-        } catch { /* pose drive is best-effort */ }
-        driveMix(lerp(HANDOFF_START_MIX, HANDOFF_END_MIX, k));
-        if (t >= 1) {
+          const total = scrubTotalMs(fwd.legs);
+          const m0 = Number(fwd.legs[0]?.ms);
+          if (total > 0 && Number.isFinite(m0) && m0 > 0) swoopW = m0 / total;
+        } catch { /* weight is best-effort; the pose above already applied */ }
+        handoff.phase = fwd.progress < swoopW ? 'swoop' : 'push';
+        if (fwd.progress >= 1) {
+          const to = handoff.to;
           try {
-            applyFlightPose(to.eye, to.target);
+            if (to) applyFlightPose(to.eye, to.target);
           } catch { /* snap is best-effort */ }
           driveMix(HANDOFF_END_MIX);
           endHandoffFlight();
@@ -1512,18 +1549,77 @@ async function boot() {
     endHandoffFlight();
     postTwinClose();
   }
+  /* Task-36 staged forward driver (parent -> twin): the map-side staged
+   * scrub posts { type:'safepipe-twin-staged', s } as S accumulates past
+   * the gate. Receiving the first one flips the intro scrub from autoplay
+   * to staged (progress follows the S mapping; symmetric on scroll-up).
+   * In hold the pin never moves — S only seeds the release progress, so
+   * the ready match stays honest. Never breaks boot/input. */
+  function applyTwinStagedS(s) {
+    try {
+      const v = Number(s);
+      if (!Number.isFinite(v)) return false;
+      handoff.fwdStagedS = Math.max(0, v);
+      if (handoff.fwd && (handoff.phase === 'swoop' || handoff.phase === 'push')) {
+        handoff.fwd.staged = true;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  window.addEventListener('message', (e) => {
+    try {
+      if (!isTwinStagedMessage(e?.data)) return;
+      applyTwinStagedS(e.data.s);
+    } catch { /* staged drive never breaks input */ }
+  });
   /* Capture-phase wheel over the twin container (runs before OrbitControls'
    * own canvas listener, so stopPropagation keeps a consumed gesture from
    * fighting the scrubbed pose). Consumes ONLY scrub gestures — every other
-   * wheel passes through untouched: standalone (no handoff start), closing/
-   * closed, pinch (stays with OrbitControls), intro flight, free orbit away
-   * from the clamp, and the timed reverse except outward takeover. */
+   * non-pinch wheel is sign-flipped and re-dispatched to the twin canvas so
+   * OrbitControls dollies the OSM direction (drag-up = out, drag-down = in,
+   * the map-side installWheelFlip convention; pinch stays native on both
+   * sides): free orbit, intro flight, free orbit away from the clamp, and
+   * the timed reverse except outward takeover. */
+  function twinFlipToOrbit(e) {
+    // Fail-open: no canvas, bad delta, or unclonable event => native runs.
+    try {
+      if (!e || e.__zoomFlipped) return;
+      const dY = Number(e?.deltaY);
+      if (!Number.isFinite(dY) || dY === 0) return;
+      let canvas = null;
+      try { canvas = twinDiv?.querySelector?.('canvas') ?? null; } catch { canvas = null; }
+      if (!canvas) return;
+      let clone = null;
+      try {
+        clone = new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          deltaX: -(Number(e.deltaX) || 0),
+          deltaY: -dY,
+          deltaZ: Number(e.deltaZ) || 0,
+          deltaMode: e.deltaMode,
+          clientX: e.clientX, clientY: e.clientY,
+          screenX: e.screenX, screenY: e.screenY,
+          ctrlKey: false, shiftKey: !!e.shiftKey,
+          altKey: !!e.altKey, metaKey: !!e.metaKey,
+        });
+        clone.__zoomFlipped = true;
+      } catch { return; }
+      try { e.preventDefault(); } catch { /* consume is best-effort */ }
+      try { e.stopPropagation(); } catch { /* consume is best-effort */ }
+      canvas.dispatchEvent(clone);
+    } catch { /* flip never breaks input */ }
+  }
   function onTwinScrubWheel(e) {
     try {
-      if (!handoff.start || handoff.closePosted) return;
+      if (e?.__zoomFlipped) return;
       const pinch = !!(e?.ctrlKey || e?.metaKey);
       const dY = Number(e?.deltaY);
       if (!Number.isFinite(dY) || dY === 0) return;
+      if (pinch) return;
+      if (!handoff.start || handoff.closePosted) { twinFlipToOrbit(e); return; }
       if (handoff.phase === 'done') {
         // Free orbit: only a decisive OUTWARD wheel AT the zoom clamp
         // crosses in. (OrbitControls clamps there, so a consumed outward
@@ -1533,12 +1629,12 @@ async function boot() {
         // at progress 0 for no reason. Pinch stays native here too (its
         // exit path is the dwell counter — same frame budget, ~0.2 s).
         if (pinch) return;
-        if (dY >= 0) return;
+        if (dY >= 0) { twinFlipToOrbit(e); return; }
         const r = rangeNow();
-        if (!Number.isFinite(r) || !isAtMaxZoom(r)) return;
-        if (Math.abs(dY) < TWIN_SCRUB_ENTER_DELTA) return;
-        if (!enterScrubReverse()) return;
-        if (handoff.phase !== 'reverse' || !handoff.scrub?.active) return;
+        if (!Number.isFinite(r) || !isAtMaxZoom(r)) { twinFlipToOrbit(e); return; }
+        if (Math.abs(dY) < TWIN_SCRUB_ENTER_DELTA) { twinFlipToOrbit(e); return; }
+        if (!enterScrubReverse()) { twinFlipToOrbit(e); return; }
+        if (handoff.phase !== 'reverse' || !handoff.scrub?.active) { twinFlipToOrbit(e); return; }
       } else if (handoff.phase === 'reverse' && !handoff.scrub?.active) {
         // Timed reverse: outward non-pinch wheels take over at the live progress.
         if (pinch) return;
@@ -1550,10 +1646,10 @@ async function boot() {
           justEntered: false,
         };
       } else if (!(handoff.phase === 'reverse' && handoff.scrub?.active)) {
-        return;
+        twinFlipToOrbit(e); return;
       }
       const sc = handoff.scrub;
-      if (!sc?.active) return;
+      if (!sc?.active) { twinFlipToOrbit(e); return; }
       try {
         e.preventDefault();
       } catch { /* consume is best-effort */ }
@@ -1662,6 +1758,7 @@ async function boot() {
     mix: mixCtl,
     hud,
     build: BUILD_ID,
+    zoomFlip: 'up-out',
     getPose: () => twin.getPose(),
     setMix: (v) => mixCtl.setMix(v),
     setViewPreset: (name) => setViewPreset(name),
@@ -1704,6 +1801,16 @@ async function boot() {
         return false;
       }
     },
+    // Task-36 intro-scrub probe: forward progress + staged driver state.
+    fwd: () => ({
+      phase: handoff.phase,
+      progress: handoff.fwd?.progress ?? null,
+      staged: !!handoff.fwd?.staged,
+      stagedS: handoff.fwdStagedS ?? null,
+      capExpired: !!handoff.capExpired,
+      legs: handoff.fwd ? handoff.fwd.legs.map((l) => l.name) : null,
+    }),
+    setStagedS: (s) => applyTwinStagedS(s),
     // GATE-3 native-zoom entry probe (handoff12-B): handed frame vs pinned
     // hold vs live camera — continuity proof for off-nominal entries.
     entry: () => {

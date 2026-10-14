@@ -57,9 +57,17 @@ export const HANDOFF_START_MIX = 0;
 export const HANDOFF_END_MIX = 100;
 /* Iso terminal view (matches the sector reframe in main.js): two zoom levels
  * out from the old 4500 m stance — ~12 km footprint holds the ~3 km facility
- * + margin in frame at the same iso angle. Slider still drives to 100. */
+ * + margin in frame at the same iso angle. Slider still drives to 100.
+ * Task-35 angle coincidence: 45, not 50 — the map-side iso scrub holds pitch
+ * at ISO_PITCH_DEG (45) through the handoff cut and carries it (nothing on
+ * the forward path resets pitch to 0), so the twin's swoop/terminal iso
+ * lands exactly on the map's held tilt under the shared 36.87deg FOV
+ * (MAP_TRUE_FOV_DEG, sync.js single source) — the old 5deg snap is gone.
+ * The twin hold itself still pins top-down; Task 36 scrubs the intro so the
+ * cut dissolves end-to-end. Decision recorded: carry-45-through + meet at
+ * 45 (this constant), not flatten-to-0. */
 export const HANDOFF_ISO_RANGE_M = 18000;
-export const HANDOFF_ISO_POLAR_DEG = 50;
+export const HANDOFF_ISO_POLAR_DEG = 45;
 
 /** Raw ?sector= / ?embed= values from a search string. Frame params
  * (cx/cy/z/bearing) ride along when the map overlay opens the twin. */
@@ -398,6 +406,125 @@ export function scrubProgressForWalk(legs, i, legT0, now) {
     return clamp01(done / total);
   } catch {
     return 0;
+  }
+}
+
+/* GATE-3 INTRO SCRUB (Task 36, twin side) — the forward flight (hold ->
+ * swoop -> push) as a pure function of ONE 0..1 progress, never wall
+ * clocks. The HANDOFF_*_MS constants survive only as leg WEIGHTS (same
+ * smootherstep curve as the timed engine, so scrub and timed renders agree
+ * pose-for-pose); the pose law is poseForScrubProgress over the legs built
+ * by buildForwardLegs. An autoplay clock may advance the scalar until the
+ * staged driver arrives — the mapping stays pure either way, so scroll
+ * ticks can take over with no pose jump. */
+export const TWIN_STAGED_MSG = 'safepipe-twin-staged';
+/* Map-side staged-scroll contract anchors (scrolltrigger.js owns the
+ * values): S px past the z=12 gate over [0,250,500,750,1250] =
+ * ring/blend/tilt/reveal, overlay opacity = ready ? reveal(S) : 0. The
+ * twin intro consumes S through fwdProgressForStagedS: the swoop completes
+ * exactly where the reveal dissolve starts (750), the push completes where
+ * the dissolve completes (1250) — the cut dissolves onto a settled iso
+ * frame. These mirror the map constants; the node suite pins them equal,
+ * so a Lane A move breaks loudly, never silently. */
+export const TWIN_FWD_REVEAL_START_PX = 750;
+export const TWIN_FWD_STAGED_MAX_PX = 1250;
+
+/** True for the parent->twin staged-scroll shape { type, s } (S px past
+ * the gate). The scroll value itself is validated at the consumer — this
+ * only names the wire format. Never matches close/fullscreen/ready. */
+export function isTwinStagedMessage(data) {
+  try {
+    return !!data && typeof data === 'object' && data.type === TWIN_STAGED_MSG;
+  } catch {
+    return false;
+  }
+}
+
+/** Pure: staged scroll S (px) -> forward intro progress 0..1. Piecewise
+ * linear: [0,revealStart] eases the swoop leg 0->swoopW, [revealStart,max]
+ * the push leg swoopW->1 (the leg easing itself supplies the curve, so the
+ * map stays linear and double-easing never drags). Parks at 0/1 outside.
+ * Non-finite S parks at 0. Never throws. */
+export function fwdProgressForStagedS(
+  s,
+  { revealStartPx = TWIN_FWD_REVEAL_START_PX, stagedMaxPx = TWIN_FWD_STAGED_MAX_PX, swoopW = null } = {},
+) {
+  try {
+    const v = Number(s);
+    if (!Number.isFinite(v) || v <= 0) return 0;
+    let rs = Number(revealStartPx);
+    let mx = Number(stagedMaxPx);
+    if (!Number.isFinite(rs) || rs <= 0) rs = TWIN_FWD_REVEAL_START_PX;
+    if (!Number.isFinite(mx) || mx <= rs) mx = TWIN_FWD_STAGED_MAX_PX;
+    let w = swoopW === null || swoopW === undefined ? NaN : Number(swoopW);
+    if (!Number.isFinite(w) || w <= 0 || w >= 1) {
+      const total = HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS;
+      w = total > 0 ? HANDOFF_SWOOP_MS / total : 0.5;
+    }
+    if (v >= mx) return 1;
+    if (v >= rs) return w + ((v - rs) / (mx - rs)) * (1 - w);
+    return (v / rs) * w;
+  } catch {
+    return 0;
+  }
+}
+
+/** Pure: build the forward intro legs for poseForScrubProgress from the
+ * live anchors. startPose = { eye, target } top-down at the ring frame
+ * (main.js startEye); mid = ring-frame iso (swoop end / push start); to =
+ * terminal iso. Mix rides 0 through the swoop, 0->100 through the push.
+ * Null on any missing anchor — caller ends the flight, never a canned
+ * pose. Node-checkable. */
+export function buildForwardLegs({ startPose, mid, to } = {}) {
+  try {
+    const se = startPose?.eye;
+    const st = startPose?.target;
+    const me = mid?.eye;
+    const mt = mid?.target;
+    const te = to?.eye;
+    const tt = to?.target;
+    if (!se || !st || !me || !mt || !te || !tt) return null;
+    for (const v of [se.x, se.y, se.z, st.x, st.y, st.z, me.x, me.y, me.z, mt.x, mt.y, mt.z, te.x, te.y, te.z]) {
+      if (!Number.isFinite(v)) return null;
+    }
+    const endMix = Number.isFinite(to.mix) ? to.mix : HANDOFF_END_MIX;
+    return [
+      {
+        name: 'swoop',
+        eye: { ...me },
+        target: { ...mt },
+        mix: HANDOFF_START_MIX,
+        ms: HANDOFF_SWOOP_MS,
+        from: { eye: { ...se }, target: { ...st } },
+        fromMix: HANDOFF_START_MIX,
+      },
+      {
+        name: 'push',
+        eye: { ...te },
+        target: { ...tt },
+        mix: endMix,
+        ms: HANDOFF_PUSH_MS,
+        from: { eye: { ...me }, target: { ...mt } },
+        fromMix: HANDOFF_START_MIX,
+      },
+    ];
+  } catch {
+    return null;
+  }
+}
+
+/** Pure: forward intro progress 0..1 -> ring reveal 0..1 on the SAME legs
+ * and progress the camera law reads, so stroke and pose agree exactly:
+ * easing across the swoop leg, settled at 1 through the push. Null on
+ * invalid legs — caller falls back to the normal mix law. */
+export function forwardRingPForProgress(legs, progress) {
+  try {
+    const s = poseForScrubProgress(legs, progress);
+    if (!s) return null;
+    if ((s.legIndex ?? 0) <= 0) return easeInOutSmoother(s.t ?? 0);
+    return 1;
+  } catch {
+    return null;
   }
 }
 

@@ -151,6 +151,10 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 | 17 | Circular hotspot rings (health-divided arcs, H3-hex sized) + pin fallback | ring matches feed worst-health per sector |
 | 18 | Click → full-screen twin overlay (`?sector=<h3>`) | twin opens pre-selected on sector's worst asset |
 | 19 | Close round-trip (X/Esc/back keeps hex + selection) | Esc mid-orbit returns to map, selection kept |
+| 34 | Iso tilt scrubbed by zoom (no latch/ease) | pitch rides Z_TOP..Z_HANDOFF both ways; settle holds it |
+| 35 | Handoff flight → zoom-scrubbed crossfade | deep scroll dissolves into the twin at coinciding angles |
+| 36 | Twin intro flights → range-scrubbed; enclosing = clip circle | no HANDOFF_*_MS timers; one radius source |
+| 37 | Symmetric gesture reverse end-to-end | zoom-out retraces forward checkpoints to global |
 
 ### Task 16: land the map ✓ done
 **Objective:** A map that loads with no keys and flips to satellite.
@@ -164,12 +168,25 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 ### Task 19: make Esc bring you home intact ✓ done
 **Objective:** Closing the twin never loses your place — hex + selection survive X / Esc / back.
 **Verify:** Esc mid-orbit — map returns with selection kept.
+### Task 34: scrub the iso tilt
+**Objective:** The top→iso tilt rides the zoom band itself (transform writes, glide never stopped) — zoom-out retraces it.
+**Verify:** Slow-scroll 11→12 tilts 0→45 with the fingers; scroll back flattens it; `map-iso-scrub` tests green.
+### Task 35: scrub the handoff crossfade
+**Objective:** Deep scroll past the handoff dissolves map→twin at coinciding angles — no 650ms flight.
+**Verify:** Zoom holds past 12 into the twin pose; map pitch 45 meets twin polar; reverse dissolves back.
+### Task 36: scrub the twin intro; unify enclosing + clip
+**Objective:** Hold/swoop/push timers become range-scrubbed; enclosing ring and MapLibre clip share one radius.
+**Verify:** Twin zoom drives intro + ring; enclosing overlays the clip circle exactly.
+### Task 37: mirror the reverse
+**Objective:** Zoom-out retraces every forward checkpoint to global — no erratic recede.
+**Verify:** Twin→map→global on scroll-out alone; same checkpoints, reversed.
 
 - REF GATE 3 (OPEN): owner picks map look + confirms ring reads right. How to judge: open the map, toggle satellite, click a ring, Esc back; pass = look approved + ring matches feed worst-health per sector.
 - REF GATE 3 · rev 2026-10-13 review-feedback (owner): "make it a little faster, smoother choreography"; "trigger the openstreetmap-to-twin transition and back by user scroll instead of click — gesture-based, intuitive". Verdict: OPEN — tempo + scroll-drive land as a revision on this gate, then proceed.
 - REF GATE 3 · rev 2026-10-13 scroll-scrub feedback (owner): sat→vector zoom-out unsmooth (cache vector tiles); zoom-in trigger erratic; auto-center hotspot on approach; fade must follow the scroll, not its own rhythm; twin zoom-out-at-max must trigger the reverse; scroll-listening reverse in twin. Verdict: OPEN — scrub revision lands on this gate.
 - REF GATE 3 · rev 2026-10-14 gesture feedback (owner): pinch in/out broken; scroll clamping unintuitive; precache by predicted next scroll/zoom; tone mismatch top-view vs iso at close-up; ring must animate from corners not fade; goal = magically intuitive scroll-zoom both ways. Verdict: OPEN — gesture revision lands on this gate.
 - REF GATE 3 · rev 2026-10-14 native-zoom iteration (owner): regular scroll/pinch zoom must keep working, enhanced not replaced; vector→sat fade must happen where the user is, never jump; near-hotspot (cursor-near or nearest-to-center) → smooth center + top-down with ring clip converging canvas-edges→ring-edges; further scroll → slow top→iso→twin; identical checkpoints in reverse; fix zoom-out blowing past cap and sticking. Verdict: OPEN — native-zoom-driven journey lands on this gate.
+- REF GATE 3 · rev 2026-10-14 gesture-journey (owner): the whole zoom-in to twin level and back to global must be entirely gesture-based — no timed/choreographed moves; viewer never notices the map swaps; enclosing matches the twin-map clip; handoff angles coincide; reverse mirrors forward checkpoints (today erratic). Verdict: OPEN — timed→scrubbed conversion lands on this gate as Tasks 34–37, then proceed.
 
 ## Phase 06 — Lock
 <!-- {#phase-06} -->

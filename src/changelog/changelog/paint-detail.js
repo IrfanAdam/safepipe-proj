@@ -194,6 +194,22 @@ export function paintDetail(root, ctx){
   const hs = hits(plan.file, sprint.body, plan.sprints.indexOf(sprint) === 0);
   const pm = (sprint.head || '').match(/Phase\s+(\d+)/i);
   const phaseN = pm ? Number(pm[1]) : si;
+  const gates = parseGates(plan.raw || '');
+  // Evals now owns the REF GATE feedback — strip the raw gate thread from the
+  // phase body so Verify doesn't duplicate the same verbatim thread. Collapse
+  // from first "- REF GATE" through to the phase's {#phase-N} anchor.
+  let bodySansGates = String(sprint.body || '');
+  const gateAnchorIdx = bodySansGates.indexOf('- REF GATE');
+  if (gateAnchorIdx !== -1) {
+    const anchorMatch = bodySansGates.slice(gateAnchorIdx).match(/\{#phase[^}]*\}/);
+    if (anchorMatch) {
+      const anchorPos = bodySansGates.indexOf(anchorMatch[0], gateAnchorIdx);
+      bodySansGates = bodySansGates.slice(0, gateAnchorIdx).trimEnd() + '\n' + bodySansGates.slice(anchorPos);
+    } else {
+      // fallback: strip each gate line individually (inline, not newline-anchored)
+      bodySansGates = bodySansGates.replace(/\s*-\s*REF GATE[^\n]*/g, '');
+    }
+  }
   root.querySelector('[data-col="tasks"]').innerHTML = [
     `<div class="ds-drawer-head"><b>`,
     esc(unitLabel(sprint.head, si)),
@@ -201,10 +217,10 @@ export function paintDetail(root, ctx){
     esc(short(sprint.head)),
     `</b><button data-close aria-label="Close detail">✕</button></div>`,
     `<div class="ds-md">`,
-    marked.parse(sprint.body, {
+    marked.parse(bodySansGates, {
       phaseDone: isDone(state(sprint.body)),
-      gateSuffix: gateSuffixOf(parseGates(plan.raw || ''), phaseN),
-    }) + paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head) }) + (hs.length ? `<hr class="ds-hr">` + badges(hs) : ''),
+      gateSuffix: gateSuffixOf(gates, phaseN),
+    }) + paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN }) + (hs.length ? badges(hs) : ''),
     `</div>`,
   ].join('');
   const u = unlinked(texts);

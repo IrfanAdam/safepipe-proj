@@ -68,6 +68,17 @@ export function shouldCenter(z) {
   return Number.isFinite(+z) && +z >= Z_CENTER;
 }
 
+/** Iso scrub target: pitch rides the zoom across the TOP..HANDOFF band (0 at
+ * or below the top-down checkpoint, smooth 0..ISO_PITCH_DEG inside the band,
+ * held at ISO_PITCH_DEG above it). Pure + node-checkable; the driver writes
+ * it straight into the map transform so the gesture owns the tilt forward
+ * AND back — no latch, no ease, no timer. */
+export const ISO_PITCH_DEG = 45;
+export function pitchTargetForZoom(z) {
+  const n = +z;
+  if (!Number.isFinite(n)) return 0;
+  return ISO_PITCH_DEG * smooth01((n - Z_TOP) / (Z_HANDOFF - Z_TOP));
+}
 /** Top-down checkpoint reached (bearing/pitch -> 0). */
 export function isTopDown(z) {
   return Number.isFinite(+z) && +z >= Z_TOP;
@@ -76,6 +87,49 @@ export function isTopDown(z) {
 /** Deep-zoom handoff threshold reached. */
 export function needsHandoff(z) {
   return Number.isFinite(+z) && +z >= Z_HANDOFF;
+}
+
+/* Handoff dissolve band (Task 35): past Z_HANDOFF the map HOLDS its scrubbed
+ * end-frame (pitch carried at ISO_PITCH_DEG, center on the spot — native zoom
+ * still owns z) while further zoom deltas dissolve into the twin pose. 0
+ * at/below handoff, smooth to 1 at full commit — one level past handoff,
+ * inside the Z_MAX cap. Pure + node-checkable; the driver publishes it to
+ * the probe and stages the twin prewarm on arrival (z itself past Z_HANDOFF);
+ * the twin-ready message owns the reveal. Task 36 consumes this band for the
+ * range-scrubbed twin intro. */
+export const Z_TWIN_COMMIT = 13.0;
+export function handoffScrubForZoom(z) {
+  const n = +z;
+  if (!Number.isFinite(n)) return 0;
+  return smooth01((n - Z_HANDOFF) / (Z_TWIN_COMMIT - Z_HANDOFF));
+}
+
+/* Post-gate staged scroll (Task 35, owner refinement): once z is HELD at
+ * Z_HANDOFF (map-side maxZoom clamp — scroll-as-zoom throttled), further
+ * scroll ticks accumulate as stage scroll S (px of wheel delta past the
+ * gate) instead of depth. Gates (cumulative px):
+ *   ring   0..250   — enclosing ring converges canvas-edges -> ring-edges
+ *   blend  250..500 — terrain blend holds full satellite
+ *   tilt   500..750 — iso tilt holds 45deg
+ *   reveal 750..1250 — twin overlay dissolves 0..1 (twin-ready gates >0)
+ * Ring/blend/tilt already arrive pre-gate in the native journey (11..12
+ * band) — their staged laws HOLD the end-state; the reveal is the live
+ * post-gate stage. Every value is a pure function of S, so scroll-up
+ * retraces it symmetrically. Pure + node-checkable; the map-side wheel
+ * accumulator owns S, Task 36 consumes the reveal band for the
+ * range-scrubbed twin intro. */
+export const HANDOFF_STAGE_PX = 250;
+export const HANDOFF_REVEAL_LEN_PX = 500;
+export const HANDOFF_STAGED_S_MAX = 3 * HANDOFF_STAGE_PX + HANDOFF_REVEAL_LEN_PX; // 1250
+export function handoffStagesForScroll(s) {
+  const n = Number.isFinite(+s) ? Math.max(0, +s) : 0;
+  const seg = (a, b) => smooth01((n - a) / (b - a));
+  return {
+    ring: seg(0, HANDOFF_STAGE_PX),
+    blend: seg(HANDOFF_STAGE_PX, 2 * HANDOFF_STAGE_PX),
+    tilt: seg(2 * HANDOFF_STAGE_PX, 3 * HANDOFF_STAGE_PX),
+    reveal: seg(3 * HANDOFF_STAGE_PX, HANDOFF_STAGED_S_MAX),
+  };
 }
 
 /** At (or below tolerance of) the min-zoom cap — mirrored-reverse home. */

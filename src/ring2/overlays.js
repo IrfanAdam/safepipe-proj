@@ -130,9 +130,14 @@ export function matOpacity(baseOpacity, t, pitchDeg, kind) {
 export const REDRAPE_DEBOUNCE_MS = 300;
 export const REDRAPE_SETTLE_MS = 500;
 export const REDRAPE_MAX_DEFERS = 20;
-export function shouldDeferRedrape({ nowMs, lastSlideAt, defers = 0 } = {}) {
+export function shouldDeferRedrape({ nowMs, lastSlideAt, defers = 0, flightIdle = true } = {}) {
   if (!Number.isFinite(nowMs) || !Number.isFinite(lastSlideAt)) return false;
   if ((defers ?? 0) >= REDRAPE_MAX_DEFERS) return false;
+  // Task-36 flight-idle gate: while the twin owns the camera (intro flight
+  // or scrub reverse) the dispose+recreate hitch waits for the settled
+  // twin. The MAX_DEFERS bound above still wins mid-flight, so a parked
+  // hold can never pin a stale drape forever.
+  if (flightIdle === false) return true;
   return nowMs - lastSlideAt < REDRAPE_SETTLE_MS;
 }
 
@@ -1123,6 +1128,20 @@ function edgeFade(x, z) {
   let debounce = 0;
   let redrapeDefers = 0;
   let dead = false;
+  /* Task-36 flight-idle feed: main.js passes isFlightIdle() (phase
+   * done/idle, no scrub owning the walk). Default true keeps standalone
+   * callers on the old settle-only behavior. Fail-open: a throwing feed
+   * reads idle (a missed defer is one jank frame; a stuck defer is a stale
+   * drape). */
+  function flightIdle() {
+    try {
+      const fn = opts?.isFlightIdle;
+      if (typeof fn !== 'function') return true;
+      return fn() !== false;
+    } catch {
+      return true;
+    }
+  }
   const unsub = onStatus((s) => {
     if (s.stage === 'live' || s.stage === 'srtm') {
       clearTimeout(debounce);
@@ -1131,7 +1150,7 @@ function edgeFade(x, z) {
         if (dead) return;
         debounce = setTimeout(() => {
           try {
-            if (!dead && shouldDeferRedrape({ nowMs: Date.now(), lastSlideAt, defers: redrapeDefers })) {
+            if (!dead && shouldDeferRedrape({ nowMs: Date.now(), lastSlideAt, defers: redrapeDefers, flightIdle: flightIdle() })) {
               redrapeDefers++;
               arm();
               return;

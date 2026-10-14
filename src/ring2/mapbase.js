@@ -12,7 +12,7 @@
  */
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { SANGACHAL, VEX, worldToGeo } from './site.js';
+import { SANGACHAL, VEX, RING_RADIUS_M, worldToGeo } from './site.js';
 import { MAP_MAX_PITCH_DEG, MAP_INPUT_HANDLERS, assertMapNonInteractive, SAT_IMAGERY_MAXZOOM, TERRAIN_DEM_MAXZOOM } from './sync.js';
 /* Re-exported for callers that already reach the map through mapbase. */
 export { MAP_INPUT_HANDLERS, assertMapNonInteractive };
@@ -72,7 +72,10 @@ function circleRing(rM, seg = 72) {
   return ring;
 }
 function maskGeoJSON() {
-  const R = SANGACHAL.radiusKm * 1000;
+  // Task-36 radius unification: the hard mask shares RING_RADIUS_M
+  // (site.js single source) with the twin-side overlay clip shader and rim
+  // vignette — one radius, no second source to drift.
+  const R = RING_RADIUS_M;
   // Outer shell = the whole world (mercator limits): zoomed-out oblique
   // views otherwise show photo past a fixed-degree box. The lens hole is
   // the only imagery window at any zoom or pitch.

@@ -1,27 +1,8 @@
-// safepipe changelog — per-plan revision list · [plan:2026-10-07_130000-safepipe-changelog.md#task-11]
+// safepipe changelog — evals (unified verify + revision) · [plan:2026-10-07_130000-safepipe-changelog.md#task-11]
 import { fmtDate, fmtTime, isDone } from '../changelog-parse.js';
 import { esc } from './esc.js';
-// Current plan sources (same raw glob as the pages composer): feedback
-// bullets are quoted verbatim from the live plan text — never invented.
-// A quoted line appears only for a section whose hash really changed
-// (added/edited vs the previous rev); everything else keeps Task-10 lines.
 const raws = import.meta.glob('../../../.hermes/plans/*.md', { query: '?raw', import: 'default', eager: true });
-// revs: history[file] oldest-first [{date, time?, sections:[{head, hash, state}]}].
-// Flat newest-first semantic feedback: each entry leads with its date (+ local
-// HH:MM when stamped; date-only for old revs) and one plain-language line per
-// changed section — task-count transitions, done markings, renames, edits,
-// additions, removals — derived only from real hash/state diffs vs the previous
-// rev's same-head entries. Feedback-type sections (feedback/review/pass
-// language) instead quote their recorded bullets verbatim (Task 11).
-// No status marks, no unchanged counts. Body lines are
-// flush-left, sharing the date line's indent.
-// Changed rule mirrors rail · edited (section hash differs from previous
-// rev's same-head hash; unseen head = added; vanished head = removed).
-// Phase attribution shared with commit `[plan:file#anchor]` trailers and the
-// `{#…}` tokens in plan files. Digits kept as written (`Phase 03` → `phase-03`)
-// so rev sections match trailer anchors exactly; an explicit `{#…}` token in
-// the head wins verbatim. Heads with no number (prose) yield null.
-export const revAnchor = (head) => {
+const revAnchor = (head) => {
   const t = String(head || '');
   const m = t.match(/\{#([A-Za-z]+-\d+)\}/);
   if (m) return m[1].toLowerCase();
@@ -32,7 +13,6 @@ const frac = (s) => {
   const m = String(s || '').match(/(\d+)\/(\d+)/);
   return m ? [+m[1], +m[2]] : null;
 };
-// Display head: drop anchor tails + done/cancelled glyphs (they become words).
 const clean = (h) => String(h || '')
   .replace(/\s*\{#[^}]*\}\s*$/, '')
   .replace(/[✓✗]/g, '')
@@ -40,9 +20,6 @@ const clean = (h) => String(h || '')
   .replace(/\s+/g, ' ')
   .trim();
 const wasDone = (head, st) => /✓/.test(String(head || '')) || isDone(st);
-// Task 11: feedback-type heads (review critique, not counters). A changed
-// feedback section renders its recorded bullets — quoted verbatim, values
-// kept — instead of a Task-10 transition line.
 const FB_HEAD = /feedback|review|\bpass\b|retro|critique|rework/i;
 const isFb = (h) => FB_HEAD.test(clean(h));
 const toks = (s) => (String(s || '').toLowerCase().match(/[a-z0-9]+/g) || []).filter((t) => t.length > 1);
@@ -52,8 +29,6 @@ const overlap = (a, b) => {
   for (const t of new Set(toks(a))) if (bs.has(t)) n++;
   return n;
 };
-// Feedback blocks per plan file: a ##/###/#### head with feedback language
-// owns the `- ` bullets under it (up to the next heading). Built once.
 const fbBlocksOf = (md) => {
   const blocks = [];
   let curBlk = null;
@@ -67,11 +42,7 @@ const fbBlocksOf = (md) => {
     if (curBlk) {
       const bm = ln.match(/^\s*-\s+(.*)$/);
       if (bm) {
-        let b = bm[1]
-          .replace(/^\[[ xX]\]\s*/, '')
-          .replace(/\*\*/g, '').replace(/`/g, '')
-          .replace(/<!--[\s\S]*?-->/g, ' ').replace(/\{#[^}]*\}/g, ' ')
-          .replace(/\s+/g, ' ').trim();
+        let b = bm[1].replace(/^\[[ xX]\]\s*/, '').replace(/\*\*/g, '').replace(/`/g, '').replace(/<!--[\s\S]*?-->/g, ' ').replace(/\{#[^}]*\}/g, ' ').replace(/\s+/g, ' ').trim();
         if (b && !/^\|/.test(b) && b.length > 1) {
           if (b.length > 320) b = b.slice(0, 317).replace(/\s+\S*$/, '') + '…';
           curBlk.bullets.push(b);
@@ -90,7 +61,6 @@ const planFiles = Object.entries(raws).map(([p, md]) => {
   }
   return { file: p.split('/').pop(), heads, fb: fbBlocksOf(md) };
 });
-// Which plan do these revs belong to? Most cleaned-head hits wins.
 const fileFor = (revs) => {
   const want = new Set();
   for (const r of revs || []) for (const s of r.sections || []) want.add(clean(s.head));
@@ -102,9 +72,6 @@ const fileFor = (revs) => {
   }
   return bestN ? best : null;
 };
-// Best feedback block for a history head: exact cleaned-head match, else
-// token overlap ≥ 2 (covers ## → ### restructures, e.g. "Phase 1 iteration
-// — feedback pass" vs "Feedback pass — Phase 1 iteration").
 const blockFor = (f, head) => {
   if (!f) return null;
   const c = clean(head);
@@ -120,38 +87,25 @@ const MAXFB = 10;
 const fbLines = (f, head) => {
   const b = blockFor(f, head);
   if (!b) return null;
-  const items = b.bullets.slice(0, MAXFB)
-    .map((t) => `<li class="ds-rev-sec" data-fb="1">${esc(t)}</li>`);
-  if (b.bullets.length > MAXFB)
-    items.push(`<li class="ds-rev-sec" data-fb="1">… ${b.bullets.length - MAXFB} more in the plan</li>`);
-  return `<li class="ds-rev-sec" data-fb="1">${esc(clean(head))}</li>` + items.join('');
+  const items = b.bullets.slice(0, MAXFB).map((t) => esc(t));
+  if (b.bullets.length > MAXFB) items.push(`… ${b.bullets.length - MAXFB} more in the plan`);
+  return { title: esc(clean(head)), items };
 };
 const lineFor = (head, oldSt, newSt, oldHead) => {
   const name = esc(clean(head));
   const of = frac(oldSt), nf = frac(newSt);
   const doneNow = wasDone(head, newSt) && !wasDone(oldHead ?? head, oldSt);
-  if (of && nf && (of[0] !== nf[0] || of[1] !== nf[1]))
-    return `${name} — tasks ${esc(oldSt)} → ${esc(newSt)}${doneNow ? ', marked done' : ''}`;
+  if (of && nf && (of[0] !== nf[0] || of[1] !== nf[1])) return `${name} — tasks ${esc(oldSt)} → ${esc(newSt)}${doneNow ? ', marked done' : ''}`;
   if (doneNow) return `${name} — marked done`;
   if (!oldSt && newSt) return `${name} — now tracking ${esc(newSt)} tasks`;
   if (oldSt && !newSt) return `${name} — tasks cleared (was ${esc(oldSt)})`;
   if (oldSt !== newSt) return `${name} — ${esc(oldSt || '–')} → ${esc(newSt || '–')}`;
   return `Edited ${name}`;
 };
-// Per-rev changed parts with phase attribution. Each part carries the anchors
-// of the section(s) it describes (rename lines carry both sides) so the caller
-// can scope the feed to the open phase. Rendering (flat, newest-first,
-// token-only `.ds-rev*` markup) is unchanged.
 const partsOf = (r, prev, fb) => {
   const parts = [];
   if (!prev) {
-    for (const s of r.sections || [])
-      parts.push({
-        anchors: [revAnchor(s.head)],
-        heads: [s.head],
-        html: fb(s.head) ||
-          `<li class="ds-rev-sec">${esc(clean(s.head))}${s.state ? ` — tasks ${esc(s.state)}` : ''}</li>`,
-      });
+    for (const s of r.sections || []) parts.push({ anchors: [revAnchor(s.head)], heads: [s.head], html: fb(s.head) || `${esc(clean(s.head))}${s.state ? ` — tasks ${esc(s.state)}` : ''}` });
     return parts;
   }
   const ph = {}, ps = {}, phead = {};
@@ -159,72 +113,158 @@ const partsOf = (r, prev, fb) => {
   const cur = r.sections || [];
   const removed = (prev.sections || []).filter((s) => !cur.some((c) => c.head === s.head));
   const added = cur.filter((s) => ph[s.head] === undefined);
-  // 1:1 swap reads as a rename (one head out, one head in, same step).
   if (removed.length === 1 && added.length === 1) {
-    parts.push({
-      anchors: [revAnchor(removed[0].head), revAnchor(added[0].head)],
-      heads: [removed[0].head, added[0].head],
-      html: `<li class="ds-rev-sec">Renamed ${esc(clean(removed[0].head))} → ${esc(clean(added[0].head))}</li>`,
-    });
+    parts.push({ anchors: [revAnchor(removed[0].head), revAnchor(added[0].head)], heads: [removed[0].head, added[0].head], html: `Renamed ${esc(clean(removed[0].head))} → ${esc(clean(added[0].head))}` });
     const rfb = fb(added[0].head);
-    if (rfb) parts.push({ anchors: [revAnchor(added[0].head)], heads: [added[0].head], html: rfb });
+    if (rfb) {
+      if (typeof rfb === 'object') parts.push({ anchors: [revAnchor(added[0].head)], heads: [added[0].head], html: rfb.items.map((x) => x), isFbBlock: true, fbTitle: rfb.title });
+      else parts.push({ anchors: [revAnchor(added[0].head)], heads: [added[0].head], html: rfb });
+    }
   } else {
-    for (const s of removed) parts.push({
-      anchors: [revAnchor(s.head)], heads: [s.head],
-      html: `<li class="ds-rev-sec">Removed ${esc(clean(s.head))}</li>`,
-    });
-    for (const s of added) parts.push({
-      anchors: [revAnchor(s.head)], heads: [s.head],
-      html: fb(s.head) || `<li class="ds-rev-sec">Added ${esc(clean(s.head))}${s.state ? ` — ${esc(s.state)} tasks` : ''}</li>`,
-    });
+    for (const s of removed) parts.push({ anchors: [revAnchor(s.head)], heads: [s.head], html: `Removed ${esc(clean(s.head))}` });
+    for (const s of added) {
+      const f = fb(s.head);
+      if (f && typeof f === 'object') parts.push({ anchors: [revAnchor(s.head)], heads: [s.head], html: f.items, isFbBlock: true, fbTitle: f.title });
+      else parts.push({ anchors: [revAnchor(s.head)], heads: [s.head], html: f || `Added ${esc(clean(s.head))}${s.state ? ` — ${esc(s.state)} tasks` : ''}` });
+    }
   }
   const renamed = removed.length === 1 && added.length === 1;
   const skip = renamed ? added[0].head : null;
   for (const s of cur) {
     if (s.head === skip || ph[s.head] === undefined || ph[s.head] === s.hash) continue;
-    parts.push({
-      anchors: [revAnchor(s.head)], heads: [s.head],
-      html: fb(s.head) || `<li class="ds-rev-sec">${lineFor(s.head, ps[s.head], s.state, phead[s.head])}</li>`,
-    });
+    const f = fb(s.head);
+    if (f && typeof f === 'object') parts.push({ anchors: [revAnchor(s.head)], heads: [s.head], html: f.items, isFbBlock: true, fbTitle: f.title });
+    else parts.push({ anchors: [revAnchor(s.head)], heads: [s.head], html: f || lineFor(s.head, ps[s.head], s.state, phead[s.head]) });
   }
-  if (!parts.length) return parts;
   return parts;
 };
-const OUTSIDE = `<li class="ds-rev-sec">Edited plan text outside tracked sections</li>`;
+const OUTSIDE = `Edited plan text outside tracked sections`;
+const fmtTimelineDate = (iso) => {
+  if (!iso) return '';
+  const d = fmtDate(iso);
+  return d ? d.replace(/^(\d{2}) ([A-Za-z]{3}) (\d{4})$/, (_, dd, mmm, yyyy) => `${Number(dd)} ${mmm}, ${yyyy}`) : iso;
+};
+const gateText = (note) => {
+  let t = String(note || '').trim();
+  t = t.replace(/^[·—–-]\s*rev\s*\d{4}-\d{2}-\d{2}\s*/i, '');
+  t = t.replace(/^["“]+|["”]+$/g, '').trim();
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
+};
 export function paintRevs(revs, scope){
-  if (!revs || !revs.length) return '';
-  const src = fileFor(revs);
+  if (!revs || !revs.length) {
+    const gates = scope && scope.gates ? scope.gates : null;
+    if (!gates || !gates.length) return '';
+  }
+  const src = fileFor(revs || []);
   const fb = (head) => (isFb(head) ? fbLines(src, head) : null);
-  // No scope (no phase panel context): whole-plan feed, as before.
-  // With scope: strict per-phase feed for the open phase's anchor.
   const open = scope && scope.head ? revAnchor(scope.head) : null;
-  const rows = [];
-  for (let i = revs.length - 1; i >= 0; i--) {
+  let phaseN = null;
+  if (scope && scope.head) {
+    const m = String(scope.head).match(/Phase\s+(\d+)/i);
+    if (m) phaseN = Number(m[1]);
+  } else if (scope && Number.isInteger(scope.phaseN)) phaseN = scope.phaseN;
+  // ── Collect gate eval entries for this phase (newest-first) ──
+  const gateEvals = [];
+  if (scope && scope.gates && Array.isArray(scope.gates)) {
+    // file order is oldest→newest; we want newest-first for pairing with revs
+    const ordered = [...scope.gates];
+    for (let i = ordered.length - 1; i >= 0; i--) {
+      const g = ordered[i];
+      if (phaseN !== null && g.n !== phaseN) continue;
+      if (!/·\s*rev\b/i.test(g.note)) continue;
+      const text = gateText(g.note);
+      if (!text) continue;
+      gateEvals.push({ date: g.date || '', time: '', text, isGate: true, order: gateEvals.length });
+    }
+  }
+  // ── Collect history-rev rows newest-first ──
+  const revRows = [];
+  for (let i = (revs || []).length - 1; i >= 0; i--) {
     const r = revs[i], prev = i ? revs[i - 1] : null;
-    const when = esc(r.time ? `${fmtDate(r.date || '')} · ${fmtTime(r.time)}` : fmtDate(r.date || ''));
     let all = partsOf(r, prev, fb);
     if (open) {
-      // Strict per-phase scope on clean data: only lines for the open phase.
-      // (History carries no moved-phase entries anymore — they were migrated
-      // to their new plan — so there is nothing stale to surface.)
       all = all.filter((p) => p.anchors.filter(Boolean).some((a) => a === open));
       if (!all.length) continue;
     } else if (!all.length) {
       all = [{ anchors: [null], heads: [], html: OUTSIDE }];
     }
-    const lines = all.map((p) => p.html).join('');
-    rows.push(
-      `<div class="ds-rev" data-rev="${i + 1}" data-rev-date="${esc(r.date || '')}">` +
-      `<div class="ds-rev-date">${when}</div>` +
-      `<ul class="ds-rev-secs">${lines}</ul></div>`,
-    );
+    const texts = [];
+    for (const p of all) {
+      if (p.isFbBlock) {
+        texts.push(p.fbTitle);
+        for (const it of p.html) texts.push(it);
+      } else if (Array.isArray(p.html)) {
+        for (const it of p.html) texts.push(it);
+      } else {
+        const t = String(p.html).replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&quot;/g, '"');
+        texts.push(t);
+      }
+    }
+    for (const t of texts) {
+      const cleanT = String(t).trim();
+      if (!cleanT) continue;
+      revRows.push({ date: r.date || '', time: r.time || '', text: cleanT, isGate: false });
+    }
   }
-  if (!rows.length) return '';
-  const n = open ? rows.length : revs.length;
+  // Early exit if nothing
+  if (!gateEvals.length && !revRows.length) return '';
+  // ── Group rows by date ──
+  // Build date → revRows for that date (already newest-first within date)
+  const revByDate = new Map();
+  for (const r of revRows) {
+    const d = r.date || '';
+    if (!revByDate.has(d)) revByDate.set(d, []);
+    revByDate.get(d).push(r);
+  }
+  // Group gate evals by date (newest-first preserved)
+  const gateByDate = new Map();
+  for (const g of gateEvals) {
+    const d = g.date || '';
+    if (!gateByDate.has(d)) gateByDate.set(d, []);
+    gateByDate.get(d).push(g);
+  }
+  // All unique dates newest-first
+  const allDates = [...new Set([...gateEvals.map(g=>g.date), ...revRows.map(r=>r.date)])].sort((a,b)=> b.localeCompare(a));
+  // For dates with no evals, still create a group with just revs (baseline)
+  // For dates with evals, thread: eval parent → its iteration revs (paired by order)
+  const n = gateEvals.length + revRows.length;
+  const timeline = [];
+  for (const date of allDates) {
+    const dLabel = fmtTimelineDate(date) || date || 'Undated';
+    const gates = gateByDate.get(date) || [];
+    const revsForDate = revByDate.get(date) || [];
+    let groupInner = '';
+    if (gates.length) {
+      for (let gi = 0; gi < gates.length; gi++) {
+        const g = gates[gi];
+        groupInner += `<div class="ds-timeline-item ds-timeline-item--eval"><span>${esc(g.text)}</span></div>`;
+        if (gi < revsForDate.length) {
+          const rv = revsForDate[gi];
+          const timeLabel = rv.time ? `${esc(rv.date)} ${esc(fmtTime(rv.time))}` : esc(rv.date || '');
+          groupInner += `<div class="ds-timeline-item ds-timeline-item--iter"><span>${esc(rv.text)}</span><small>${timeLabel}</small></div>`;
+        }
+      }
+      for (let ri = gates.length; ri < revsForDate.length; ri++) {
+        const rv = revsForDate[ri];
+        const timeLabel = rv.time ? `${esc(rv.date)} ${esc(fmtTime(rv.time))}` : esc(rv.date || '');
+        groupInner += `<div class="ds-timeline-item ds-timeline-item--iter"><span>${esc(rv.text)}</span><small>${timeLabel}</small></div>`;
+      }
+    } else {
+      for (const rv of revsForDate) {
+        const timeLabel = rv.time ? `${esc(rv.date)} ${esc(fmtTime(rv.time))}` : esc(rv.date || '');
+        groupInner += `<div class="ds-timeline-item"><span>${esc(rv.text)}</span><small>${timeLabel}</small></div>`;
+      }
+    }
+    timeline.push(`<details class="ds-timeline-group" open><summary class="ds-timeline-date">${esc(dLabel)}</summary><div class="ds-timeline-items">${groupInner}</div></details>`);
+  }
+  const latestLabel = fmtTimelineDate(allDates[0]) || allDates[0] || '';
   return [
-    `<hr class="ds-hr"><div class="ds-revs" data-revs="${n}">`,
-    `<div class="ds-revs-title">Revisions · ${n}</div>`,
-    rows.join(''),
-    `</div>`,
+    `<hr class="ds-hr"><details class="ds-evals ds-revs ds-panel" data-evals="${n}" data-revs="${n}" open>`,
+    `<summary class="ds-revs-title ds-panel-title">Evals · <span class="ds-panel-num">${n}</span> <span class="ds-panel-date">· ${esc(latestLabel)}</span></summary>`,
+    `<div class="ds-timeline">`,
+    timeline.join(''),
+    `</div></details>`,
   ].join('');
 }
+export const paintEvals = paintRevs;

@@ -50,17 +50,39 @@
 .ds-md table{width:100%;table-layout:fixed;border-collapse:collapse}
 .ds-md th,.ds-md td{overflow-wrap:anywhere;vertical-align:top}
 .ds-md pre{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:visible}
-/* per-plan revision list (Task 10): flat newest-first semantic feedback —
-   date-led entries (date · time when stamped), one plain-language line per
-   changed section, flush-left at the date line's indent; flows in the
-   drawer's own scroll, no nested box */
-.ds-revs-title{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin-bottom:var(--cl-4)}
+/* per-plan revision list → Evals (unified verify + revision): single cohesive
+   timeline panel. Shares the commit-timeline spine/language so verify
+   descriptions and revision diffs read as one evaluation log — no disparate
+   flat list vs timeline. Flows in drawer's own scroll, no nested box. */
+.ds-revs-title,.ds-evals-title,.ds-panel-title{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin-bottom:var(--cl-4)}
+.ds-panel-num{color:var(--color-accent)}
+.ds-panel-date{color:var(--color-ink-muted);font-weight:400;letter-spacing:var(--tracking-label)}
+.ds-panel[open] > .ds-panel-title{margin-bottom:var(--cl-4)}
+.ds-panel > .ds-panel-title{cursor:pointer;list-style:none}
+.ds-panel > .ds-panel-title::-webkit-details-marker{display:none}
+.ds-panel > .ds-panel-title::marker{content:""}
 .ds-rev{border-top:var(--border-hairline);padding:var(--cl-4) 0}
 .ds-rev-date{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
 .ds-rev-secs{list-style:none;margin:var(--cl-2) 0 0;padding:0}
 /* beat .ds-md ul (higher specificity, same file scope) — zero indentation */
 .ds-md .ds-rev-secs{padding-left:0;margin-left:0}
 .ds-rev-sec{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding:var(--cl-1) 0;overflow-wrap:anywhere}
+/* Evals timeline reuses commit-timeline spine/date/item rhythm — one cohesive panel */
+.ds-evals .ds-timeline{margin-top:var(--cl-4)}
+.ds-panel .ds-timeline{margin-top:var(--cl-4)}
+.ds-evals .ds-timeline-item span{font-size:var(--text-ds-body);color:var(--color-ink);overflow-wrap:anywhere}
+.ds-timeline-item--eval{position:relative}
+.ds-timeline-item--eval span{color:var(--color-ink)}
+.ds-timeline-item--eval::before{content:"";position:absolute;left:calc(-1 * var(--cl-12) - var(--cl-4));top:calc(var(--cl-8));width:var(--cl-7);height:var(--cl-7);background:var(--color-bg);border:var(--cl-1) solid var(--color-accent);border-radius:50%;box-sizing:border-box}
+.ds-timeline-item--iter{margin-left:var(--cl-12);padding-left:var(--cl-8);border-left:var(--border-hairline);position:relative}
+.ds-timeline-item--iter::before{content:"";position:absolute;left:calc(-1 * var(--cl-1) - var(--cl-3));top:calc(var(--cl-7));width:var(--cl-4);height:var(--cl-1);background:var(--color-border);}
+/* collapsible timeline groups: date header is the summary */
+.ds-timeline-group{margin:0}
+.ds-timeline-group > .ds-timeline-date{cursor:pointer;list-style:none}
+.ds-timeline-group > .ds-timeline-date::-webkit-details-marker{display:none}
+.ds-timeline-group > .ds-timeline-date::marker{content:""}
+.ds-timeline-date{color:var(--color-ink-muted)}
+.ds-timeline-items{margin:0}
 /* inline gate tag (Task 12): quiet mono micro verdict after DONE in the phase
    head — same treatment as DONE, token-only, no rail/seals/popovers. */
 .ds-drawer-head .ds-done{color:var(--color-accent)}
