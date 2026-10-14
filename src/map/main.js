@@ -272,11 +272,11 @@ let rangeEndsW = 0; // viewport width the static ruler ends were computed at
 let rangeDeepM = 0; // deepest-in end span, meters (right stop)
 let rangeWideM = 0; // widest-allowed end span, meters (left stop)
 let rangeHandM = 0; // handoff span, meters (amber tick)
-/* Static ruler ends: widest-allowed span (left, the maximum) and deepest-in
- * span (right), computed once at home latitude — never live, so the ruler
- * is a fixed scale the needle travels along. The wide end is the true
- * viewport span at floor zoom (it can exceed one Earth — the viewport can
- * be wider than the planet), never clamped, so it always tops the label. */
+/* Static ruler ends: widest-allowed span (left, the maximum — one Earth,
+ * 40,075.017 KM) and deepest-in span (right), computed once at home
+ * latitude — never live, so the ruler is a fixed scale the needle travels
+ * along. The wide end clamps to one Earth: the map shows a single world
+ * (no repeats), so the viewport can never honestly exceed it. */
 function computeRangeEnds() {
   let w = 800;
   try {
@@ -292,7 +292,7 @@ function computeRangeEnds() {
     const mppWide = metersPerPixel(MAP_FLOOR, SITE.lat);
     const mppHand = metersPerPixel(Z_HANDOFF, SITE.lat);
     if (mppDeep != null) { deepM = mppDeep * w; minTxt = formatGround(deepM); }
-    if (mppWide != null) { wideM = mppWide * w; maxTxt = formatGround(wideM); }
+    if (mppWide != null) { wideM = Math.min(mppWide * w, EARTH_CIRC_M); maxTxt = formatGround(wideM); }
     if (mppHand != null) rangeHandM = mppHand * w;
   } catch { /* ends best-effort */ }
   rangeEndsW = w;
@@ -2032,6 +2032,11 @@ async function boot() {
     scrollZoom: true,
     minZoom: MAP_FLOOR,
     maxZoom: Z_MAX,
+    // Single world: no side-by-side repeats, so the widest honest span is
+    // one Earth. Drag pans freely (the journey only recenters on settle
+    // when the spot is near, never mid-drag).
+    renderWorldCopies: false,
+    dragPan: true,
     // LANE A naked view: no default attribution pill / info (ⓘ) button.
     // A minimal micro credit is mounted instead (mountMicroCredit).
     attributionControl: false,

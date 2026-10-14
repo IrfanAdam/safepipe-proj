@@ -261,7 +261,7 @@ export function lockAroundPoint(hx, hy, cx, cy, zoomIn) {
  * report exactly which ground scale a satellite tile swap pops at
  * (integer zoom crossings are where Esri swaps captures). */
 export const EARTH_MPP = 156543.03392;
-export const EARTH_CIRC_M = 40075016; // equatorial circumference (span clamp)
+export const EARTH_CIRC_M = 40075017; // Earth's circumference, meters (ruler maximum)
 export function metersPerPixel(zoom, latDeg) {
   const z = +zoom;
   const lat = +latDeg;
