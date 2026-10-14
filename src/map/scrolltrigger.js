@@ -22,7 +22,7 @@
 export const Z_MIN = 6.4; // country home — enforced as map minZoom (the cap)
 export const Z_FADE0 = 7.2; // fade starts: vector->sat keys off zoom only
 export const Z_FADE1 = 10.2; // fade ends: full sat (works at ANY center)
-export const Z_CENTER = 9.0; // proximity centering arms past this zoom
+export const Z_CENTER = 8.0; // proximity centering + brackets arm past this zoom
 export const Z_TOP = 11.0; // top-down checkpoint (bearing/pitch -> 0)
 export const Z_HANDOFF = 12.0; // deeper zoom hands to the twin
 export const Z_MAX = 14.0; // map maxZoom cap
@@ -232,4 +232,62 @@ export function installScrollTrigger(cfg = {}) {
   };
   publish(state);
   return () => {};
+}
+
+/** Owner wheel preference: drag UP zooms OUT, drag DOWN zooms in (sign
+ * flip of the native delta). Pinch (ctrl+wheel) is never flipped — the
+ * caller gates on e.ctrlKey. Pure + node-checkable. */
+export function flipWheelDelta(deltaY) {
+  const n = +deltaY;
+  return Number.isFinite(n) ? -n : 0;
+}
+
+/* Journey-lock anchor (pure, node-checkable): the screen point the native
+ * zoom should circle while locked. Zooming IN anchors beyond the spot, so
+ * the spot drifts toward center coupled to the user's own scroll speed and
+ * eases in as it centers; zooming OUT anchors at canvas center, so framing
+ * holds while the view widens. hx/hy = spot px, cx/cy = canvas center px. */
+export const Z_LOCK_ARM = 6.5;
+export function lockAroundPoint(hx, hy, cx, cy, zoomIn) {
+  const nums = [+hx, +hy, +cx, +cy];
+  if (nums.some((n) => !Number.isFinite(n))) return null;
+  if (!zoomIn) return { x: +cx, y: +cy };
+  const K = 0.9;
+  return { x: +hx + (+hx - +cx) * K, y: +hy + (+hy - +cy) * K };
+}
+
+/* Viewport ground-scale telemetry (pure, node-checkable): web-mercator
+ * meters-per-pixel at a latitude, scaled by a CSS-px span. Lets the owner
+ * report exactly which ground scale a satellite tile swap pops at
+ * (integer zoom crossings are where Esri swaps captures). */
+export const EARTH_MPP = 156543.03392;
+export const EARTH_CIRC_M = 40075016; // equatorial circumference (span clamp)
+export function metersPerPixel(zoom, latDeg) {
+  const z = +zoom;
+  const lat = +latDeg;
+  if (!Number.isFinite(z) || !Number.isFinite(lat)) return null;
+  const mpp = (EARTH_MPP * Math.cos((lat * Math.PI) / 180)) / Math.pow(2, z);
+  return Number.isFinite(mpp) && mpp > 0 ? mpp : null;
+}
+export function formatGround(m) {
+  const v = +m;
+  if (!Number.isFinite(v) || v <= 0) return '—';
+  if (v >= 10000) return (v / 1000).toFixed(0) + ' KM';
+  if (v >= 1000) return (v / 1000).toFixed(1) + ' KM';
+  if (v >= 10) return v.toFixed(0) + ' M';
+  if (v >= 1) return v.toFixed(1) + ' M';
+  return (v * 100).toFixed(0) + ' CM';
+}
+/* Span needle position (pure, node-checkable): where the current ground
+ * span sits between the ruler end spans, in log space — zoom steps are
+ * exponential, so a linear map would park the needle in the wrong place
+ * against the end numbers. Clamped to [0,1]. */
+export function spanFrac(currentM, minM, maxM) {
+  const c = +currentM;
+  const lo = +minM;
+  const hi = +maxM;
+  if (!Number.isFinite(c) || !Number.isFinite(lo) || !Number.isFinite(hi)) return 0;
+  if (lo <= 0 || hi <= lo || c <= 0) return 0;
+  const cl = c < lo ? lo : c > hi ? hi : c;
+  return (Math.log(cl) - Math.log(lo)) / (Math.log(hi) - Math.log(lo));
 }

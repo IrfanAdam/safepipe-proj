@@ -42,6 +42,14 @@ export const SCALE_FOR_LEVEL = {
 export function scaleForLevel(level) {
   return SCALE_FOR_LEVEL[level] ?? SCALE_FOR_LEVEL.network;
 }
+/* Edge-to-edge span label from frustum width km. Pure + unit-tested. */
+export function formatSpanKm(km) {
+  const v = +km;
+  if (!Number.isFinite(v) || v <= 0) return null;
+  if (v >= 10) return `${Math.round(v)} KM`;
+  if (v >= 1) return `${Math.round(v * 10) / 10} KM`;
+  return `${Math.max(1, Math.round(v * 1000))} M`;
+}
 export function formatClockUTC(d = new Date()) {
   const iso = d.toISOString();
   return `${iso.slice(0, 10)} · ${iso.slice(11, 19)} UTC`;
@@ -301,6 +309,22 @@ export function buildHud(container, cbs = {}) {
   scaleBar.appendChild(el('div', 'ops-hud__scalebar-seg'));
   scalebar.appendChild(scaleLabel);
   scalebar.appendChild(scaleBar);
+  // Edge-to-edge span: the full left→right viewport width from the live
+  // frustum (twin state.spanKm), flanked by outward edge ticks so it reads
+  // as the whole-frame span, not the bar above. Hidden until the twin
+  // provides a finite span.
+  const scaleSpan = el('div', 'ops-hud__scalespan ops-hud__scalespan--hidden');
+  scaleSpan.setAttribute('data-testid', 'ops-hud-span');
+  const spanL = el('div', 'ops-hud__scalespan-edge ops-hud__scalespan-edge--l');
+  spanL.setAttribute('aria-hidden', 'true');
+  const spanLabel = el('div', 'ops-hud__scalespan-label', '');
+  spanLabel.setAttribute('data-testid', 'ops-hud-span-label');
+  const spanR = el('div', 'ops-hud__scalespan-edge ops-hud__scalespan-edge--r');
+  spanR.setAttribute('aria-hidden', 'true');
+  scaleSpan.appendChild(spanL);
+  scaleSpan.appendChild(spanLabel);
+  scaleSpan.appendChild(spanR);
+  scalebar.appendChild(scaleSpan);
   root.appendChild(scalebar);
 
   // Live clock: refresh on every update + 1 s tick; cleared on dispose.
@@ -551,6 +575,15 @@ export function buildHud(container, cbs = {}) {
     }
     scaleLabel.textContent = `≈ ${sc.label}`;
     scalebar.setAttribute('aria-label', `Approximate scale at ${level} view: ${sc.label} — 1:1 km, dynamic with zoom`);
+    // Edge-to-edge span: full-frame width when the twin passes it.
+    const spanTxt = formatSpanKm(state.spanKm);
+    if (spanTxt) {
+      spanLabel.textContent = `≈ ${spanTxt}`;
+      scaleSpan.classList.remove('ops-hud__scalespan--hidden');
+      scaleSpan.setAttribute('aria-label', `Viewport spans approximately ${spanTxt} edge to edge`);
+    } else {
+      scaleSpan.classList.add('ops-hud__scalespan--hidden');
+    }
     clock.textContent = formatClockUTC(new Date());
     // Live site: a ?site=<lat>,<lon> twin re-labels coords + sector rows.
     if (state.site !== undefined) {

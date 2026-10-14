@@ -188,6 +188,27 @@ describe('ops3d HUD orientation/scale furniture', () => {
     h.dispose();
   });
 
+  it('edge-to-edge span shows frustum width with ticks, hides without spanKm', () => {
+    assert.equal(hud.formatSpanKm(22.4), '22 KM');
+    assert.equal(hud.formatSpanKm(2.5), '2.5 KM');
+    assert.equal(hud.formatSpanKm(0.4), '400 M');
+    assert.equal(hud.formatSpanKm(undefined), null);
+    const container = new FakeEl('div');
+    const h = hud.buildHud(container, {});
+    const root = container.children[0];
+    const span = find(root, byTestId('ops-hud-span'));
+    const spanLabel = find(root, byTestId('ops-hud-span-label'));
+    assert.ok(span.classList.contains('ops-hud__scalespan--hidden'), 'span hidden with no spanKm');
+    h.update({ level: 'network', scaleKm: 9.5, spanKm: 22.4 });
+    assert.ok(!span.classList.contains('ops-hud__scalespan--hidden'), 'span shows with spanKm');
+    assert.equal(spanLabel.textContent, '≈ 22 KM');
+    h.update({ level: 'asset', scaleKm: 0.4, spanKm: 0.4 });
+    assert.equal(spanLabel.textContent, '≈ 400 M');
+    h.update({ level: 'network' }); // no spanKm hides again
+    assert.ok(span.classList.contains('ops-hud__scalespan--hidden'), 'span hides when spanKm drops');
+    h.dispose();
+  });
+
   it('single-popover manager: opening one closes the others, Esc closes', () => {
     const container = new FakeEl('div');
     const h = hud.buildHud(container, {});

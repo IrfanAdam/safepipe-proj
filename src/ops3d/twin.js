@@ -270,6 +270,7 @@ export function createTwin(container, opts = {}) {
     // every HUD push — including the throttled per-frame push in tick() —
     // so the ≈XX KM label + bar width track wheel zoom continuously.
     let scaleKm;
+    let spanKm; // full left→right frustum width (km) for the edge span row
     try {
       const tgt = rig.getTarget();
       const dist = rig.camera.position.distanceTo(tgt);
@@ -279,6 +280,7 @@ export function createTwin(container, opts = {}) {
       const w = h * aspect;
       scaleKm = (120 * w) / container.clientWidth; // km that a 120px bar spans
       if (!Number.isFinite(scaleKm) || scaleKm <= 0) scaleKm = undefined;
+      spanKm = Number.isFinite(w) && w > 0 ? w : undefined;
     } catch { scaleKm = undefined; }
     // Target-relative heading: orbit/pan moves the camera around the target,
     // so azimuth is measured from the target, not the world origin.
@@ -301,6 +303,7 @@ export function createTwin(container, opts = {}) {
       banner: crit ? { kind: crit.faults[0]?.type ?? 'CRITICAL', assetId: crit.assetId } : null,
       heading,
       scaleKm,
+      spanKm,
       xray: xrayOn,
     });
   }

@@ -819,6 +819,41 @@
   background: var(--ops-edge-wash);
 }
 
+/* Edge-to-edge span row: full-frame width under the bar, flanked by
+ * outward edge ticks marking the left/right frame edges it covers.
+ * Pure-CSS triangles (like the needle) — crisp at 2x, no raster. */
+.ops-hud__scalespan {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.75;
+}
+
+.ops-hud__scalespan--hidden {
+  display: none;
+}
+
+.ops-hud__scalespan-label {
+  font-size: var(--ops-fs-sm);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-hud__scalespan-edge {
+  width: 7px;
+  height: 10px;
+  background: var(--ops-edge-dim);
+}
+
+.ops-hud__scalespan-edge--l {
+  clip-path: polygon(100% 0, 100% 100%, 0 50%);
+}
+
+.ops-hud__scalespan-edge--r {
+  clip-path: polygon(0 0, 0 100%, 100% 50%);
+}
+
 /* Site coords + clock: dim rows inside the sector block, no new box. */
 .ops-hud__coords,
 .ops-hud__clock {

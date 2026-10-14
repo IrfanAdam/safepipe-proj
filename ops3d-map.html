@@ -29,8 +29,17 @@
     border-right: 0; border-top: 0; }
   #ring-clip .rc-br { right: calc(14px + var(--clip) * 34%); bottom: calc(14px + var(--clip) * 30%);
     border-left: 0; border-top: 0; }
+  /* Journey vignette: circular enclosure riding on the hotspot (--vx/--vy),
+   * fading in once the brackets converge. Transparent core, dark periphery;
+   * pointer-transparent; twin open/close share the same toggle. */
+  #map-vignette { position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    opacity: 0; transition: opacity 0.5s ease; --vx: 50%; --vy: 50%;
+    background: radial-gradient(circle 260px at var(--vx) var(--vy),
+      transparent 52%, var(--ops-vig, rgba(4, 6, 8, 0.48)) 100%); }
+  #map-vignette.on { opacity: 1; }
   @media (prefers-reduced-motion: reduce) {
     #ring-clip { transition: none; }
+    #map-vignette { transition: none; }
   }
   /* Handoff-3 Lane 1: no MAP/SAT toggle ribbon — satellite switching is
    * transition-only/automatic (outbound flight + recede). Micro attribution
@@ -174,6 +183,34 @@
     pointer-events: none; user-select: none; max-width: 60vw;
   }
   #map-credit a { color: inherit; text-decoration: none; }
+  /* Scale + zoom-range HUD: persistent bottom-center overlay (same
+   * always-there treatment as #map-fs). Mono label row + range bar row:
+   * widest-out span | track (needle = you, tick = twin handoff) | deepest span.
+   * Pointer-transparent; sits clear of credit (left) + fullscreen (right). */
+  #map-zoomrange {
+    position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+    z-index: 2; pointer-events: none; user-select: none;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 7px 12px;
+    background: var(--ops-panel, rgba(10, 14, 18, 0.88));
+    border: 1px solid var(--ops-line, rgba(207, 212, 214, 0.18));
+    font: 10px/1.4 ui-monospace, Menlo, monospace; letter-spacing: 0.1em;
+    color: var(--ops-ink, #cfd4d6); white-space: nowrap;
+  }
+  #map-zoomrange-row { display: flex; align-items: center; gap: 8px; }
+  #map-zoomrange-left, #map-zoomrange-right { opacity: 0.65; }
+  #map-zoomrange-track {
+    position: relative; width: 170px; height: 3px;
+    background: var(--ops-line, rgba(207, 212, 214, 0.28));
+  }
+  #map-zoomrange-needle {
+    position: absolute; top: -3px; width: 2px; height: 9px;
+    background: var(--ops-ink, #cfd4d6);
+  }
+  #map-zoomrange-hand {
+    position: absolute; top: -2px; width: 2px; height: 7px;
+    background: var(--ops-amber, #ffd9a0); opacity: 0.9;
+  }
   /* LANE A: never show the maplibre attrib pill / info button even if a
    * control slips in via a plugin path. */
   .maplibregl-ctrl-attrib, .maplibre-ctrl-attrib,

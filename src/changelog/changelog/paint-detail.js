@@ -136,6 +136,8 @@ import { paintRevs } from './paint-revs.js';
 // as plain text appended to the below-title status line — same checkmark
 // treatment as DONE, reusing .ds-status styling (no span, no new colors).
 // Locked or gateless phases contribute no gate part.
+// Rev count (Task 13, owner): when the gate has appended `· rev …` iterations
+// while OPEN, surface that count inline — e.g. `· GATE OPEN · 4 revs`.
 const gateSuffixOf = (gates, phaseN) => {
   if (!gates || !gates.length) return '';
   const gs = [...gates].sort((a, b) => a.n - b.n);
@@ -143,12 +145,19 @@ const gateSuffixOf = (gates, phaseN) => {
   if (idx < 0 && Number.isInteger(phaseN)) idx = Math.min(Math.max(phaseN, 0), gs.length - 1);
   if (idx < 0) return '';
   const g = gs[idx];
-  const firstOpen = gs.findIndex((x) => x.state === 'open' || x.state === 'failed');
-  const disp = (g.state === 'passed' || g.state === 'waiver') ? g.state
-    : (idx === firstOpen ? g.state : 'locked');
-  if (disp === 'passed' || disp === 'waiver') return ' ✓ GATE PASSED';
-  if (disp === 'failed') return ' · GATE FAILED';
-  if (disp === 'open') return ' · GATE OPEN';
+  const isRev = (x) => /·\s*rev\b/i.test(x.note);
+  const revs = gs.filter((x) => x.n === g.n && isRev(x)).length;
+  const revSuffix = revs ? ` · ${revs} rev${revs > 1 ? 's' : ''}` : '';
+  const baseCandidates = gs.filter((x) => x.n === g.n && !isRev(x));
+  const eff = baseCandidates.length ? baseCandidates[baseCandidates.length - 1] : g;
+  const bases = gs.filter((x) => !isRev(x));
+  const effPos = bases.indexOf(eff);
+  const firstOpenPos = bases.findIndex((x) => x.state === 'open' || x.state === 'failed');
+  const disp = (eff.state === 'passed' || eff.state === 'waiver') ? eff.state
+    : (effPos === firstOpenPos && effPos !== -1 ? eff.state : 'locked');
+  if (disp === 'passed' || disp === 'waiver') return ' ✓ GATE PASSED' + revSuffix;
+  if (disp === 'failed') return ' · GATE FAILED' + revSuffix;
+  if (disp === 'open') return ' · GATE OPEN' + revSuffix;
   return '';
 };
 export function paintDetail(root, ctx){
