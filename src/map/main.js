@@ -58,13 +58,13 @@ const ESRI_IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services/World
 const SAT_SOURCE_ID = 'esri-sat';
 const SAT_LAYER_ID = 'esri-sat';
 const SEL_KEY = 'ops3d-map-selected';
-// GATE 3: country view of Azerbaijan with the Sangachal blip.
+// GATE 3: first load is the FULL map (whole world, hotspot centered) —
+// the user zooms into the Sangachal blip from there. Home rests at
+// COUNTRY_ZOOM but the camera starts at the floor, so the whole journey
+// (flat travel -> sat fade -> handoff) streams over warming tiles instead
+// of cold-opening mid-journey. Journey math already clamps sub-home to 0.
 const COUNTRY_CENTER = [47.6, 40.15];
 const COUNTRY_ZOOM = 6.4;
-// Zoom-out headroom: home rests at COUNTRY_ZOOM but the floor sits at
-// whole-world level, so drag-up / pinch-out on first load pulls all the
-// way out instead of stopping at country scale. Journey math already
-// clamps sub-home to 0.
 const MAP_FLOOR = 1.0;
 
 const errors = [];
@@ -989,7 +989,7 @@ function resetScrubJourney() {
     updateRingClip(0, null);
   } catch { /* reset is best-effort */ }
   try {
-    window.__mapProbe.scrub = { progress: 0, zoom: +COUNTRY_ZOOM.toFixed(3), opacity: 0, centerDist: null };
+    window.__mapProbe.scrub = { progress: 0, zoom: +MAP_FLOOR.toFixed(3), opacity: 0, centerDist: null };
     window.__mapProbe.centerEase = 0;
     window.__mapProbe.autoCenter = false;
   } catch { /* probe cosmetic */ }
@@ -1517,7 +1517,7 @@ function doCloseTwin() {
       showVignette(false);
     } catch { /* cosmetic */ }
     try {
-      recedeToCountry();
+      recedeToHome();
     } catch { /* recede is best-effort */ }
   }, reduced ? 0 : RECEDE_DELAY_MS);
   try {
@@ -1637,10 +1637,10 @@ function isTwinCloseData(d) {
   }
 }
 /* LANE A recede (reverse): animate sat->flat fade + smooth zoom back out
- * to the country view — never an abrupt cut. setSatForced(false) already
- * ramps raster-opacity 1->0 over the cached sat frame; the easeTo runs
- * concurrently so flat returns while zooming out. Reduced-motion: instant. */
-function recedeToCountry() {
+ * to the first-load world frame — never an abrupt cut. setSatForced(false)
+ * already ramps raster-opacity 1->0 over the cached sat frame; the easeTo
+ * runs concurrently so flat returns while zooming out. Reduced-motion: instant. */
+function recedeToHome() {
   let reduced = false;
   try {
     reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1690,7 +1690,7 @@ function recedeToCountry() {
       if (reduced) {
         mapRef.easeTo({
           center: COUNTRY_CENTER,
-          zoom: COUNTRY_ZOOM,
+          zoom: MAP_FLOOR,
           bearing: 0,
           pitch: 0,
           duration: 0,
@@ -1699,7 +1699,7 @@ function recedeToCountry() {
       } else {
         mapRef.easeTo({
           center: COUNTRY_CENTER,
-          zoom: COUNTRY_ZOOM,
+          zoom: MAP_FLOOR,
           bearing: 0,
           pitch: 0,
           duration: 800, // GATE-3 REVISION tempo: quicker recede, same home
@@ -1896,7 +1896,7 @@ function syncFsProbe() {
   try {
     if (!document.fullscreenElement && twinFs) {
       twinFs = false;
-      if (!twinOpen) recedeToCountry();
+      if (!twinOpen) recedeToHome();
     }
   } catch { /* recede fallback is best-effort */ }
 }
@@ -2023,12 +2023,13 @@ async function boot() {
     container: 'map',
     style,
     center: COUNTRY_CENTER,
-    zoom: COUNTRY_ZOOM,
+    zoom: MAP_FLOOR, // first-load frame: full map, hotspot centered
     // GATE-12-A NATIVE-ZOOM: native zoom STAYS ON everywhere (wheel
     // scrollZoom + touch pinch). The journey RIDES on zoom/zoomend/move
     // events and never hijacks gestures — no preventDefault capture path.
-    // The floor sits below home so first-load zoom-out visibly widens;
-    // home stays the journey rest, the floor is only the clamp.
+    // First load sits AT the floor (full map); zoom-in travels the whole
+    // journey from flat over warming tiles. Home stays the journey rest
+    // below the fade start, the floor is the clamp.
     scrollZoom: true,
     minZoom: MAP_FLOOR,
     maxZoom: Z_MAX,
@@ -2210,7 +2211,7 @@ async function boot() {
         onUp: () => closeTwin(),
       });
     } catch { /* journey wiring is best-effort */ }
-    // GATE-9-A(1): country flat view is the held frame — cache it now.
+    // GATE-9-A(1): first-load world flat view is the held frame — cache it now.
     holdVectorWarm('boot');
     // Handoff-11-A DEFECT 3: seed the sat precache at the journey start so
     // the first scroll-down already travels over warm tiles.
