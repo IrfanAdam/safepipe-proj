@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_DWELL_FRAMES } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_DWELL_FRAMES } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -83,7 +83,7 @@ let lastConsoleStatus = '';
 const FOV_DEG = MAP_TRUE_FOV_DEG;
 // Bump on every user-visible Ring-2 change: proves from a screenshot alone
 // which build Safari actually ran (stale-build confusion ends here).
-const BUILD_ID = 'b66twintone';
+const BUILD_ID = 'b67twinentry';
 // Shared GL-context + tile telemetry registry (see ctxmon.js: one
 // real-Safari screenshot of the six tokens discriminates every hypothesis
 // in the defect-hunt report).
@@ -630,6 +630,9 @@ async function boot() {
     readyPosted: false, // {type:'safepipe-twin-ready'} sent once per handoff
     readyHits: 0, // consecutive agreed hold frames (settle gate before post)
     closePosted: false, // {recede:true} close sent (later closes re-post, never re-fly)
+    entryPose: null, // GATE-3 native-zoom: live camera pose captured BEFORE the entry pin (continuity proof)
+    entryFrames: -1, // twinFrames at entry (boot entry runs pre-first-paint, so no visible jump is possible)
+    refits: 0, // viewport-settle range refits applied during hold (each restarts the settle count)
     precache: null, // GATE-3 predictive precache: { kicked, warmT0, lastErr, lastT, vel, poseOk, scene, pose, warm }
   };
   /* Hold cap: the inbound waits in hold for the matched sat frame (map up +
@@ -731,6 +734,27 @@ async function boot() {
     handoff.readyPosted = false;
     handoff.readyHits = 0;
     handoff.closePosted = false;
+    handoff.refits = 0;
+    // GATE-3 native-zoom entry continuity: record the staged entry pose
+    // (probe: __ring2.entry()). Boot entry runs before the first frame
+    // paints (twinFrames is still -1 — see entryFrames), so staging the
+    // HANDED frame is jump-free by construction: the first painted pixel is
+    // already the handed view, and the hold pin below re-asserts the same
+    // pose every frame (painted hold steps measure 0 m).
+    // The pin target is always the handed frame (never a canned pose): the
+    // range came from frameRange(z) on the map's actual handed zoom and the
+    // center from its handed cx/cy. Leg handoffs stay continuous downstream
+    // (swoop starts from the live captured pose, push from the exact mid).
+    try {
+      handoff.entryPose = capturePose();
+    } catch {
+      handoff.entryPose = null;
+    }
+    try {
+      handoff.entryFrames = twinFrames;
+    } catch {
+      handoff.entryFrames = -1;
+    }
     handoff.precache = { kicked: true, warmT0: handoffNow(), lastErr: null, lastT: 0, vel: 0, poseOk: false, scene: false, pose: false, warm: false };
     // GATE-3 predictive precache (defect 6, twin side): promote the DEM fetch
     // the moment the inbound stages — the live drape + first warm frames land
@@ -857,9 +881,12 @@ async function boot() {
       const vp = viewportPxNow();
       let r = frameRange(handoff.frame.z, { viewportPx: vp, lat: handoff.frame.cy });
       if (!Number.isFinite(r) || r <= 0) return false;
-      // Handoff-5-close: clamp to the shared orbit rails (sync.js) — the
-      // ceiling fits the 10 km ring + margin in short viewports.
-      r = Math.min(TWIN_MAX_RANGE_M, Math.max(1500, r));
+      // Handoff-5-close: clamp to the shared orbit rails (sync.js, via the
+      // sector.js pure clampHandoffRange) — the ceiling fits the 10 km ring
+      // + margin in short viewports. Counts the refit: each one restarts the
+      // settle count below, so the post tracks the CURRENT pin.
+      r = clampHandoffRange(r);
+      if (!Number.isFinite(r) || r <= 0) return false;
       const old = handoff.start?.range;
       if (Number.isFinite(old) && Math.abs(old - r) < 1) return false;
       const s = pinTopDown(handoff.anchor.x, handoff.anchor.z, r, handoff.frame.bearing ?? 0);
@@ -868,6 +895,7 @@ async function boot() {
       const eye = poseAt(handoff.anchor.x, aty, handoff.anchor.z, r, HANDOFF_ISO_POLAR_DEG, handoff.azim);
       handoff.mid = { eye, target: { x: handoff.anchor.x, y: aty, z: handoff.anchor.z } };
       driveMix(HANDOFF_START_MIX);
+      handoff.refits = (handoff.refits | 0) + 1;
       return true;
     } catch {
       return false;
@@ -1006,22 +1034,52 @@ async function boot() {
    * buildReverseWalk), then the {recede:true} close posts. */
   function stepHandoff() {
     if (!handoff || handoff.phase === 'idle') return;
-    /* GATE-3 SCROLL-SCRUB dwell: twin mode (done) pinned at the zoom-out
-     * clamp auto-enters the staged scrub-reverse even with no further wheel
-     * (covers reaching max via drag/pinch/keyboard zoom). Wheel entry is
-     * handled in onTwinScrubWheel. Gated on a flown handoff (start set) so
-     * standalone free orbit never trips it; re-arms when range drops back. */
+    /* GATE-3 SCROLL-SCRUB dwell (handoff12-B: the cap is an EXIT trigger,
+     * never a parking spot): twin mode (done) pinned at the zoom-out clamp
+     * auto-enters the staged scrub-reverse even with no further wheel
+     * (covers reaching max via drag/pinch/keyboard zoom — pinch wheels stay
+     * native, so this is the pinch exit path). Wheel entry is handled in
+     * onTwinScrubWheel. A range strictly PAST the cap clamps back onto it
+     * and exits on the SAME frame (no parking past the rail, not even for
+     * the dwell). Gated on a flown handoff (start set) so standalone free
+     * orbit never trips it; re-arms when range drops back. */
     if (handoff.phase === 'done') {
       if (handoff.start && !handoff.closePosted && !handoff.walk) {
         let r = null;
         try {
           r = twin?.camera?.position?.distanceTo?.(twin?.controls?.target);
         } catch { r = null; }
+        if (Number.isFinite(r) && r > TWIN_MAX_RANGE_M * 1.001) {
+          // Past the cap (damping overshoot or an external push): pull back
+          // onto the rail along the current view ray, then exit NOW.
+          try {
+            const t = twin.controls.target;
+            const e = twin.camera.position;
+            const dx = e.x - t.x, dy = e.y - t.y, dz = e.z - t.z;
+            const L = Math.hypot(dx, dy, dz);
+            if (L > 0) {
+              const k = TWIN_MAX_RANGE_M / L;
+              e.set(t.x + dx * k, t.y + dy * k, t.z + dz * k);
+              twin.updateControls();
+            }
+          } catch { /* clamp is best-effort; the exit below still runs */ }
+          handoff.atMaxFrames = 0;
+          enterScrubReverse();
+          // No entering gesture owns this entry — an immediate inward wheel
+          // must recover free orbit at once, not park at progress 0.
+          try {
+            if (handoff.scrub) handoff.scrub.justEntered = false;
+          } catch { /* scrub flag is best-effort */ }
+          return;
+        }
         if (Number.isFinite(r) && isAtMaxZoom(r)) {
           handoff.atMaxFrames = (handoff.atMaxFrames | 0) + 1;
           if (handoff.atMaxFrames >= TWIN_SCRUB_DWELL_FRAMES) {
             handoff.atMaxFrames = 0;
             enterScrubReverse();
+            try {
+              if (handoff.scrub) handoff.scrub.justEntered = false;
+            } catch { /* scrub flag is best-effort */ }
             return;
           }
         } else {
@@ -1335,10 +1393,12 @@ async function boot() {
    * reverse and the wheel scrubs the whole way back, stage by stage,
    * symmetric with the way in (wheel-up = outward/reverse intent, the same
    * sign the map-side scroll trigger treats as close — see sector.js
-   * TWIN_SCRUB_WHEEL_PX convention). Entry has two paths: a decisive wheel
-   * AT the zoom clamp (onTwinScrubWheel), or dwelling pinned at the clamp
-   * in twin mode (stepHandoff dwell counter — covers drag/pinch/keyboard
-   * zoom-outs). A running timed reverse takes wheel-up over the same way
+   * TWIN_SCRUB_WHEEL_PX convention). Entry has two paths: a decisive
+   * OUTWARD wheel AT the zoom clamp (onTwinScrubWheel — inward wheels pass
+   * through to OrbitControls, which dollies back in natively), or dwelling
+   * pinned at the clamp in twin mode (stepHandoff dwell counter — covers
+   * drag/pinch/keyboard zoom-outs, since pinch wheels stay native). A
+   * running timed reverse takes outward non-pinch wheels over the same way
    * (takeover at the live progress, no pose jump). Scrubbing back to 0
    * hands free orbit back (symmetric exit); scrubbing to 1 pins top-down +
    * posts {recede:true} on the shared path. Never breaks boot/input. */
@@ -1461,19 +1521,27 @@ async function boot() {
   function onTwinScrubWheel(e) {
     try {
       if (!handoff.start || handoff.closePosted) return;
-      if (e?.ctrlKey || e?.metaKey) return; // pinch stays native
+      const pinch = !!(e?.ctrlKey || e?.metaKey);
       const dY = Number(e?.deltaY);
       if (!Number.isFinite(dY) || dY === 0) return;
       if (handoff.phase === 'done') {
-        // Free orbit: only a decisive wheel AT the zoom clamp crosses in.
-        // (OrbitControls clamps there, so a consumed gesture fights nothing.)
+        // Free orbit: only a decisive OUTWARD wheel AT the zoom clamp
+        // crosses in. (OrbitControls clamps there, so a consumed outward
+        // gesture fights nothing.) Inward wheels pass through to
+        // OrbitControls, which dollies back in natively — entering the
+        // staged reverse on an inward gesture would park controls-disabled
+        // at progress 0 for no reason. Pinch stays native here too (its
+        // exit path is the dwell counter — same frame budget, ~0.2 s).
+        if (pinch) return;
+        if (dY >= 0) return;
         const r = rangeNow();
         if (!Number.isFinite(r) || !isAtMaxZoom(r)) return;
         if (Math.abs(dY) < TWIN_SCRUB_ENTER_DELTA) return;
         if (!enterScrubReverse()) return;
         if (handoff.phase !== 'reverse' || !handoff.scrub?.active) return;
       } else if (handoff.phase === 'reverse' && !handoff.scrub?.active) {
-        // Timed reverse: outward wheels take over at the live progress.
+        // Timed reverse: outward non-pinch wheels take over at the live progress.
+        if (pinch) return;
         if (dY >= 0 || !handoff.walk) return;
         handoff.scrub = {
           active: true,
@@ -1493,7 +1561,9 @@ async function boot() {
         e.stopPropagation();
       } catch { /* consume is best-effort */ }
       sc.accum = (Number(sc.accum) || 0) + Math.abs(dY);
-      sc.progress = scrubProgressForWheel(sc.progress, dY);
+      // Pinch never counts toward journey progress (sector.js convention —
+      // pinch stays with OrbitControls); it still consumes while owned.
+      sc.progress = scrubProgressForWheel(sc.progress, dY, { pinch });
       const wasEnter = !!sc.justEntered;
       sc.justEntered = false;
       if (sc.progress >= 1) {
@@ -1634,6 +1704,49 @@ async function boot() {
         return false;
       }
     },
+    // GATE-3 native-zoom entry probe (handoff12-B): handed frame vs pinned
+    // hold vs live camera — continuity proof for off-nominal entries.
+    entry: () => {
+      let live = null;
+      try {
+        live = capturePose();
+      } catch { live = null; }
+      let holdErrM = null;
+      try {
+        holdErrM = handoff.start ? twinHoldPoseError(live, handoff.start)?.posM ?? null : null;
+      } catch { holdErrM = null; }
+      return {
+        frame: handoff.frame ? { ...handoff.frame } : null,
+        anchor: handoff.anchor ? { ...handoff.anchor } : null,
+        start: handoff.start ? { ...handoff.start } : null,
+        entryPose: handoff.entryPose
+          ? { eye: { ...handoff.entryPose.eye }, target: { ...handoff.entryPose.target } }
+          : null,
+        entryFrames: handoff.entryFrames,
+        refits: handoff.refits,
+        live,
+        holdErrM,
+        phase: handoff.phase,
+        ready: handoff.readyPosted,
+        out: (window.__ring2readyOut ?? []).length,
+      };
+    },
+    // Live flight sample: pose + mix + range for continuity/stage probing.
+    flight: () => {
+      let p = null;
+      try {
+        p = capturePose();
+      } catch { p = null; }
+      let range = null;
+      try {
+        range = twin?.camera?.position?.distanceTo?.(twin?.controls?.target) ?? null;
+      } catch { range = null; }
+      let mix = null;
+      try {
+        mix = mixCtl?.getMix?.() ?? null;
+      } catch { mix = null; }
+      return { phase: handoff.phase, eye: p?.eye ?? null, target: p?.target ?? null, mix, range };
+    },
     twinReadyMsg: TWIN_READY_MSG,
     tone: () => {
       let m = null;
@@ -1732,8 +1845,10 @@ async function boot() {
           startRange = frameRange(sectorQ.frame.z, { viewportPx: vp, lat: sectorQ.frame.cy });
         }
         if (!Number.isFinite(startRange) || startRange <= 0) startRange = 12000;
-        // Handoff-5-close: shared orbit rails — ceiling fits the ring + margin.
-        startRange = Math.min(TWIN_MAX_RANGE_M, Math.max(1500, startRange));
+        // Shared orbit rails (sync.js single source, via the sector.js pure
+        // clamp) — the handed zoom is accepted as-is inside the rails, never
+        // replaced by a canned pose; only the rail breach clamps.
+        startRange = clampHandoffRange(startRange) ?? 12000;
         const bearing = sectorQ.frame?.bearing ?? 0;
         const azim = -(((Number(bearing) || 0) * Math.PI) / 180);
         // Ring-frame iso: the swoop target — same ring center/range as the

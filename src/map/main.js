@@ -19,7 +19,20 @@ import { MapLibreOverlay } from 'deck.gl';
 import { PolygonLayer, ScatterplotLayer } from 'deck.gl';
 import { SITE, sectorsWithOverride, worstHealth, HEALTH_COLORS, HEALTH_RANK } from './feed.js';
 import { buildPinData } from './rings.js';
-import { installScrollTrigger } from './scrolltrigger.js';
+import {
+  installZoomJourney,
+  zoomToProgress,
+  satOpacityForZoom,
+  centerBlendForZoom,
+  shouldCenter,
+  isTopDown,
+  needsHandoff,
+  isHomeZoom,
+  Z_MIN,
+  Z_HANDOFF,
+  Z_TOP,
+  Z_MAX,
+} from './scrolltrigger.js';
 import {
   sectorH3Map,
   twinUrl,
@@ -125,6 +138,10 @@ window.__mapProbe = {
   // GATE-9-A scrub probe: journey progress driving zoom/center/fade.
   scrub: { progress: 0, zoom: null, opacity: 0, centerDist: null },
   centerEase: 0, autoCenter: false, satOpacity: 0,
+  // GATE-12-A native-zoom probe: zoom-keyed journey, proximity, ring clip.
+  proximity: null, ringClip: { k: 0, cursorNear: false, centerNear: false },
+  zoomJourney: { zMin: 6.4, zHand: 12, zTop: 11, zMax: 14, topDown: false, handoff: false, home: true },
+  isoBridge: false, deepHandoff: null,
   vectorWarm: false, vectorCache: null, vectorSnapshot: false, vectorHold: false,
   vectorReturnMs: null,
   // Handoff-11-A predictive precache: velocity-predicted next frame kept warm.
@@ -409,23 +426,27 @@ function warmSatTiles() {
   } catch { /* pre-ready */ }
 }
 
-/* GATE-9-A scroll-scrub journey (map side, 4 defects).
- * (2) One journey progress 0..1 accumulates wheel delta (owned by
- *     scrolltrigger.js); it drives zoom depth continuously — no jumps.
- * (4) Sat fade tracks that same progress (scrubbed opacity, duration-0
- *     paint so it never runs on its own rhythm once triggered).
- * (3) Past CENTER_START the center eases onto the Sangachal spot
- *     automatically before the handoff edge (progress 1) flies.
- * (1) The vector style is HELD warm: cached style JSON + retained sources
- *     + a flat hold veil covering the zoom-out tile refill, timed in
- *     vectorReturnMs. The sat source/layer is never removed. */
-const SCRUB_HOTSPOT_ZOOM = 11;
-const SCRUB_CENTER_START = 0.55;
+/* GATE-12-A NATIVE-ZOOM journey (map side). Native zoom OWNS zoom depth —
+ * the journey only READS it. Fade keys off zoom at the CURRENT center (no
+ * fly-to, no jump: identical anywhere). Center eases onto the spot ONLY
+ * under proximity (cursor near hotspot OR hotspot near canvas center past
+ * Z arm); the ring clip converges canvas-edges -> ring-edges with it.
+ * Past the top-down checkpoint deeper zoom bridges top->iso, then hands to
+ * the twin through the SAME flyToSectorThenTwin entries as the click path.
+ * Zoom-out retraces identical checkpoints; the min-zoom cap converts
+ * overshoot into the reverse journey (never a stuck park past the cap). */
 const SITE_LNGLAT = [SITE.lon, SITE.lat];
+const PROX_CURSOR_PX = 140; // cursor within this of the hotspot -> near
+const PROX_CENTER_PX = 90; // hotspot within this of canvas center -> near
+const CENTER_EASE_MS = 280; // throttle between proximity ease steps
+const CENTER_EPS_DEG = 2e-4; // skip the ease when already on the spot
 let scrubProgress = 0;
 let scrubFired = false;
 let cachedVectorStyle = null;
 let recedeStartT = 0;
+let lastCursor = null; // {x,y} client px, passive mousemove only
+let lastCenterEaseT = 0;
+let isoBridged = false;
 
 function clamp01(v) {
   const n = +v;
@@ -436,16 +457,77 @@ function smooth01(t) {
   const c = clamp01(t);
   return c * c * (3 - 2 * c);
 }
-function scrubCenterFor(p) {
-  if (p <= SCRUB_CENTER_START) return COUNTRY_CENTER.slice();
-  const k = smooth01((p - SCRUB_CENTER_START) / (1 - SCRUB_CENTER_START));
-  return [
-    COUNTRY_CENTER[0] + (SITE_LNGLAT[0] - COUNTRY_CENTER[0]) * k,
-    COUNTRY_CENTER[1] + (SITE_LNGLAT[1] - COUNTRY_CENTER[1]) * k,
-  ];
+/** Proximity read: hotspot screen px vs cursor + vs canvas center.
+ * Returns { sx, sy, distCursor, distCenter, cursorNear, centerNear,
+ * near } or null pre-ready. Passive read only — never moves the map. */
+function proximityInfo() {
+  try {
+    if (!mapRef || typeof mapRef.project !== 'function') return null;
+    const pt = mapRef.project(SITE_LNGLAT);
+    if (!pt || !Number.isFinite(+pt.x) || !Number.isFinite(+pt.y)) return null;
+    let cw = 0;
+    let ch = 0;
+    try {
+      const el = mapRef.getContainer();
+      cw = (el && el.clientWidth) || window.innerWidth || 800;
+      ch = (el && el.clientHeight) || window.innerHeight || 600;
+    } catch {
+      cw = 800;
+      ch = 600;
+    }
+    const dxC = pt.x - cw / 2;
+    const dyC = pt.y - ch / 2;
+    const distCenter = Math.sqrt(dxC * dxC + dyC * dyC);
+    let distCursor = null;
+    let cursorNear = false;
+    if (lastCursor && Number.isFinite(+lastCursor.x) && Number.isFinite(+lastCursor.y)) {
+      try {
+        const r = mapRef.getContainer().getBoundingClientRect();
+        const lx = lastCursor.x - (r ? r.left : 0);
+        const ly = lastCursor.y - (r ? r.top : 0);
+        const dx = pt.x - lx;
+        const dy = pt.y - ly;
+        distCursor = Math.sqrt(dx * dx + dy * dy);
+        cursorNear = distCursor <= PROX_CURSOR_PX;
+      } catch { /* cursor math is best-effort */ }
+    }
+    const centerNear = distCenter <= PROX_CENTER_PX;
+    return {
+      sx: +pt.x.toFixed(1), sy: +pt.y.toFixed(1),
+      distCursor: distCursor == null ? null : +distCursor.toFixed(1),
+      distCenter: +distCenter.toFixed(1),
+      cursorNear, centerNear, near: cursorNear || centerNear,
+    };
+  } catch {
+    return null;
+  }
 }
-function scrubZoomFor(p) {
-  return COUNTRY_ZOOM + (SCRUB_HOTSPOT_ZOOM - COUNTRY_ZOOM) * clamp01(p);
+
+/** Ring clip: corner brackets converge canvas-edges -> ring-edges with the
+ * center blend. k=0 rests at the canvas edges, k=1 hugs the hotspot ring. */
+function updateRingClip(k, prox) {
+  const v = clamp01(k);
+  try {
+    let clip = document.getElementById('ring-clip');
+    if (!clip) {
+      clip = document.createElement('div');
+      clip.id = 'ring-clip';
+      clip.setAttribute('aria-hidden', 'true');
+      clip.innerHTML = '<i class="rc-tl"></i><i class="rc-tr"></i><i class="rc-bl"></i><i class="rc-br"></i>';
+      const app = document.getElementById('app');
+      if (app) app.appendChild(clip);
+    }
+    clip.style.setProperty('--clip', v.toFixed(4));
+    clip.classList.toggle('on', v > 0.02);
+  } catch { /* cosmetic */ }
+  try {
+    window.__mapProbe.ringClip = {
+      k: +v.toFixed(4),
+      cursorNear: !!(prox && prox.cursorNear),
+      centerNear: !!(prox && prox.centerNear),
+    };
+  } catch { /* probe cosmetic */ }
+  return v;
 }
 /** Hold the vector style/tiles warm: cache the style JSON, keep every
  * source+layer mounted, and repaint so country tiles stay resident. */
@@ -513,50 +595,165 @@ function showVectorHold(on) {
     window.__mapProbe.vectorHold = !!on;
   } catch { /* probe cosmetic */ }
 }
-/** Apply one scrub step: zoom depth + auto-center + scrubbed fade, all from
- * the single journey progress. Uses jumpTo (no animation) so the wheel —
- * never an autonomous flight — owns the motion until the handoff edge. */
-function applyScrubProgress(p) {
-  const v = clamp01(p);
-  scrubProgress = v;
-  holdVectorWarm('scrub');
-  const zoom = scrubZoomFor(v);
-  const center = scrubCenterFor(v);
-  const k = v <= SCRUB_CENTER_START ? 0 : smooth01((v - SCRUB_CENTER_START) / (1 - SCRUB_CENTER_START));
+/** THE native-zoom driver: reads ONE zoom snapshot (the map owns zoom —
+ * this never sets zoom, never jumpTo's depth). Fade tracks zoom at the
+ * CURRENT center; center eases onto the spot only under proximity; deep
+ * zoom past the top-down checkpoint bridges top->iso then hands to the
+ * twin through flyToSectorThenTwin; zoom-out at/below the min cap lands
+ * the mirrored reverse home. */
+function onNativeZoomStep(snap, source) {
   try {
-    if (mapRef && typeof mapRef.jumpTo === 'function') {
-      mapRef.jumpTo({ center, zoom, bearing: 0, pitch: 0 });
-    } else if (mapRef) {
-      mapRef.easeTo({ center, zoom, bearing: 0, pitch: 0, duration: 0 });
+    if (!mapRef) return;
+    let z = snap && Number.isFinite(+snap.z) ? +snap.z : null;
+    try {
+      const live = mapRef.getZoom();
+      if (Number.isFinite(+live)) z = +live;
+    } catch { /* snapshot zoom is best-effort */ }
+    if (!Number.isFinite(z)) return;
+    // Min-zoom cap: MapLibre clamps via minZoom, but a fast wheel burst can
+    // report a hair under — convert overshoot into the reverse journey
+    // instead of parking past the cap (the reported stuck state).
+    if (z < COUNTRY_ZOOM) {
+      try {
+        if (typeof mapRef.jumpTo === 'function') mapRef.jumpTo({ zoom: COUNTRY_ZOOM });
+        else mapRef.easeTo({ zoom: COUNTRY_ZOOM, duration: 0 });
+      } catch { /* cap clamp is best-effort */ }
+      z = COUNTRY_ZOOM;
     }
+    const progress = zoomToProgress(z);
+    scrubProgress = progress;
+    holdVectorWarm(source === 'native-zoomend' ? 'zoomend' : 'native-zoom');
+    // (2) FADE WHERE YOU ARE — zoom-keyed opacity at whatever center the
+    // user sits on. Duration-0 paint so it never runs its own rhythm.
+    const opacity = setSatScrubbed(satOpacityForZoom(z));
+    trackAndPrecache(progress);
+    let dist = null;
+    try {
+      const c = mapRef.getCenter();
+      const dx = c.lng - SITE_LNGLAT[0];
+      const dy = c.lat - SITE_LNGLAT[1];
+      dist = +Math.sqrt(dx * dx + dy * dy).toFixed(5);
+    } catch { /* probe cosmetic */ }
+    const prox = proximityInfo();
+    const blend = centerBlendForZoom(z);
+    // Ring clip converges canvas-edges -> ring-edges only while near;
+    // far away it rests at the canvas edges (k=0) so zoom reads the same.
+    const clipK = prox && prox.near ? blend : 0;
+    updateRingClip(clipK, prox);
+    try {
+      window.__mapProbe.scrub = {
+        progress: +progress.toFixed(4),
+        zoom: +z.toFixed(3),
+        opacity: +opacity.toFixed(4),
+        centerDist: dist,
+      };
+      window.__mapProbe.mapZoom = +z.toFixed(2);
+      window.__mapProbe.proximity = prox;
+      try {
+        window.__mapProbe.zoomJourney = {
+          zMin: Z_MIN, zHand: Z_HANDOFF, zTop: Z_TOP, zMax: Z_MAX,
+          topDown: isTopDown(z), handoff: needsHandoff(z), home: isHomeZoom(z),
+        };
+      } catch { /* probe cosmetic */ }
+    } catch { /* probe cosmetic */ }
+    const busyNow = !!(transitId || pendingReveal || reverseWait || receding);
+    // (3) PROXIMITY CENTERING — past the arm zoom, ease center onto the
+    // spot + top-down ONLY when near. Throttled, epsilon-guarded, and it
+    // preserves the native zoom (never sets depth).
+    if (!twinOpen && !busyNow && shouldCenter(z) && prox && prox.near) {
+      let now = 0;
+      try {
+        now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      } catch {
+        now = Date.now();
+      }
+      const far = dist == null || dist > CENTER_EPS_DEG;
+      let tilt = false;
+      try {
+        const b = mapRef.getBearing();
+        const p = mapRef.getPitch();
+        tilt = Math.abs(b || 0) > 0.5 || Math.abs(p || 0) > 0.5;
+      } catch { /* bearing read is best-effort */ }
+      if ((far || tilt) && now - lastCenterEaseT >= CENTER_EASE_MS) {
+        lastCenterEaseT = now;
+        try {
+          mapRef.easeTo({ center: SITE_LNGLAT.slice(), bearing: 0, pitch: 0, duration: 250 });
+        } catch (err) {
+          errors.push('CENTER-EASE: ' + (err && err.message));
+        }
+      }
+      try {
+        window.__mapProbe.centerEase = +blend.toFixed(4);
+        window.__mapProbe.autoCenter = true;
+      } catch { /* probe cosmetic */ }
+    } else {
+      try {
+        window.__mapProbe.centerEase = +blend.toFixed(4);
+        window.__mapProbe.autoCenter = false;
+      } catch { /* probe cosmetic */ }
+    }
+    // (4) DEEPER ZOOM — past top-down, bridge top->iso on approach, then
+    // hand to the twin through the SAME click-path entries.
+    if (!twinOpen && !busyNow && isTopDown(z) && !needsHandoff(z) && prox && prox.near && !isoBridged) {
+      try {
+        const p = mapRef.getPitch();
+        if (Number.isFinite(+p) && +p < 20) {
+          isoBridged = true;
+          try {
+            mapRef.easeTo({ pitch: 45, bearing: 0, duration: 300 });
+          } catch { /* iso bridge is best-effort */ }
+          try {
+            window.__mapProbe.isoBridge = true;
+          } catch { /* probe cosmetic */ }
+        }
+      } catch { /* pitch read is best-effort */ }
+    }
+    if (!twinOpen && !busyNow && needsHandoff(z)) {
+      if (!scrubFired) {
+        scrubFired = true;
+        try {
+          window.__mapProbe.deepHandoff = { z: +z.toFixed(2) };
+        } catch { /* probe cosmetic */ }
+        flyToSectorThenTwin(siteSector);
+      }
+    } else if (z < Z_HANDOFF - 0.5 && scrubFired && !twinOpen) {
+      scrubFired = false; // re-arm: a fresh deep zoom may hand off again
+      isoBridged = false;
+    }
+    // (5) MIRRORED REVERSE — at/below the cap the checkpoints retrace:
+    // fade is already ~0 here; land the journey home and re-arm.
+    if (isHomeZoom(z)) {
+      if (scrubProgress > 0.001 || scrubFired || isoBridged) {
+        scrubFired = false;
+        isoBridged = false;
+      }
+      try {
+        if (window.__mapProbe.recede === 'out') window.__mapProbe.recede = 'home';
+      } catch { /* probe cosmetic */ }
+      if (progress <= 0.001) {
+        try {
+          window.__mapProbe.centerEase = 0;
+          window.__mapProbe.autoCenter = false;
+        } catch { /* probe cosmetic */ }
+      }
+    }
+    try {
+      if (typeof positionDomPins === 'function' && mapRef) positionDomPins(mapRef);
+    } catch { /* pins cosmetic */ }
   } catch (err) {
-    errors.push('SCRUB-MOVE: ' + (err && err.message));
+    errors.push('ZOOM-STEP: ' + (err && err.message));
   }
-  try {
-    if (typeof positionDomPins === 'function' && mapRef) positionDomPins(mapRef);
-  } catch { /* pins cosmetic */ }
-  const opacity = setSatScrubbed(v);
-  let dist = null;
-  try {
-    const dx = center[0] - SITE_LNGLAT[0];
-    const dy = center[1] - SITE_LNGLAT[1];
-    dist = +Math.sqrt(dx * dx + dy * dy).toFixed(5);
-  } catch { /* probe cosmetic */ }
-  try {
-    window.__mapProbe.scrub = { progress: +v.toFixed(4), zoom: +zoom.toFixed(3), opacity: +opacity.toFixed(4), centerDist: dist };
-    window.__mapProbe.centerEase = +k.toFixed(4);
-    window.__mapProbe.autoCenter = k > 0;
-    window.__mapProbe.mapZoom = +zoom.toFixed(2);
-  } catch { /* probe cosmetic */ }
-  return v;
 }
 /** Reset the journey after a close lands home (progress + edge re-arm). */
 function resetScrubJourney() {
   scrubProgress = 0;
   scrubFired = false;
+  isoBridged = false;
   try {
-    const app = document.getElementById('app');
-    if (app && typeof app.__scrollScrubReset === 'function') app.__scrollScrubReset();
+    window.__mapProbe.isoBridge = false;
+  } catch { /* probe cosmetic */ }
+  try {
+    updateRingClip(0, null);
   } catch { /* reset is best-effort */ }
   try {
     window.__mapProbe.scrub = { progress: 0, zoom: +COUNTRY_ZOOM.toFixed(3), opacity: 0, centerDist: null };
@@ -668,7 +865,20 @@ function trackAndPrecache(p) {
     if (Math.abs(pPred - lastPrefetchPred) >= PRECACHE_MIN_P_DELTA || now - lastPrefetchT >= PRECACHE_MIN_MS) {
       lastPrefetchPred = pPred;
       lastPrefetchT = now;
-      prefetchSatTiles(scrubCenterFor(pPred), scrubZoomFor(pPred));
+      // GATE-12-A: predict from the LIVE frame (native zoom owns center) —
+      // predicted zoom spans the journey range, center stays where the user
+      // is (nudged to the spot only under an armed proximity blend).
+      let predCenter = COUNTRY_CENTER;
+      let predZoom = COUNTRY_ZOOM;
+      try {
+        if (mapRef) {
+          const c = mapRef.getCenter();
+          const z = mapRef.getZoom();
+          if (c && Number.isFinite(+c.lng) && Number.isFinite(+c.lat)) predCenter = [c.lng, c.lat];
+          if (Number.isFinite(+z)) predZoom = +z + precVel * PRECACHE_LOOKAHEAD_S * (Z_HANDOFF - Z_MIN);
+        }
+      } catch { /* live frame read is best-effort */ }
+      prefetchSatTiles(predCenter, predZoom);
       if (Math.abs(precVel) > 0.5) holdVectorWarm('predict');
     }
   } catch { /* precache never breaks the map */ }
@@ -1472,11 +1682,14 @@ async function boot() {
     style,
     center: COUNTRY_CENTER,
     zoom: COUNTRY_ZOOM,
-    // Handoff-11-A (FM-1): the scrub OWNS the wheel — MapLibre native
-    // scrollZoom must never chase applyScrubProgress jumpTo (judder). Pinch
-    // likewise belongs to the unified journey driver (scrolltrigger.js
-    // touch handlers), not to the native touchZoomRotate handler.
-    scrollZoom: false,
+    // GATE-12-A NATIVE-ZOOM: native zoom STAYS ON everywhere (wheel
+    // scrollZoom + touch pinch). The journey RIDES on zoom/zoomend/move
+    // events and never hijacks gestures — no preventDefault capture path.
+    // The min-zoom cap converts zoom-out overshoot into the reverse
+    // journey instead of parking past the cap (the stuck state).
+    scrollZoom: true,
+    minZoom: COUNTRY_ZOOM,
+    maxZoom: Z_MAX,
     // LANE A naked view: no default attribution pill / info (ⓘ) button.
     // A minimal micro credit is mounted instead (mountMicroCredit).
     attributionControl: false,
@@ -1592,10 +1805,46 @@ async function boot() {
     positionDomPins(map);
     window.__mapProbe.ready = true;
     window.__mapProbe.satLayer = !!map.getLayer(SAT_LAYER_ID);
-    // Handoff-11-A (FM-1 belt-and-braces): native handlers stay off even if
-    // a control path re-enables them; pinch stays with the journey driver.
-    try { if (map.scrollZoom) map.scrollZoom.disable(); } catch { /* best-effort */ }
-    try { if (map.touchZoomRotate) map.touchZoomRotate.disable(); } catch { /* best-effort */ }
+    // GATE-12-A NATIVE-ZOOM: native handlers stay ON — the journey rides
+    // on zoom events (scrolltrigger.js installZoomJourney). Re-assert the
+    // enabled state + the min/max caps in case a control path changed them.
+    try { if (map.scrollZoom) map.scrollZoom.enable(); } catch { /* best-effort */ }
+    try { if (map.touchZoomRotate) map.touchZoomRotate.enable(); } catch { /* best-effort */ }
+    try { if (typeof map.setMinZoom === 'function') map.setMinZoom(COUNTRY_ZOOM); } catch { /* best-effort */ }
+    try { if (typeof map.setMaxZoom === 'function') map.setMaxZoom(Z_MAX); } catch { /* best-effort */ }
+    // Passive cursor read for proximity centering (never prevents default).
+    try {
+      const app = document.getElementById('app');
+      if (app && !app.__cursorTracked) {
+        app.__cursorTracked = true;
+        app.addEventListener('mousemove', (e) => {
+          try {
+            lastCursor = { x: e.clientX, y: e.clientY };
+          } catch { /* cursor read is best-effort */ }
+        }, { passive: true });
+      }
+    } catch { /* cursor tracking is best-effort */ }
+    // THE native-zoom wiring: zoom/zoomend/move drive fade + proximity
+    // center + deep handoff + mirrored reverse. No wheel capture anywhere.
+    try {
+      installZoomJourney({
+        map,
+        isOpen: () => twinOpen,
+        isBusy: () => !!transitId || !!pendingReveal || !!reverseWait || receding,
+        onProgress: (snap, source) => onNativeZoomStep(snap, source),
+        onDown: () => {
+          try {
+            if (!scrubFired && !twinOpen && !transitId) {
+              scrubFired = true;
+              flyToSectorThenTwin(siteSector);
+            }
+          } catch (err) {
+            errors.push('ZOOM-DOWN: ' + (err && err.message));
+          }
+        },
+        onUp: () => closeTwin(),
+      });
+    } catch { /* journey wiring is best-effort */ }
     // GATE-9-A(1): country flat view is the held frame — cache it now.
     holdVectorWarm('boot');
     // Handoff-11-A DEFECT 3: seed the sat precache at the journey start so
@@ -1609,62 +1858,11 @@ async function boot() {
     errors.push('MAP: ' + msg);
   });
 
-  /* GATE-9-A scroll SCRUB (replaces GATE-8-B threshold firing), Handoff-11-A
-   * unified gesture revision: wheel + trackpad-pinch (ctrl-wheel) + two-finger
-   * touch pinch accumulate into ONE journey progress driving zoom depth +
-   * auto-center + scrubbed sat fade (applyScrubProgress) + predictive
-   * precache (trackAndPrecache); the handoff flight fires only at the
-   * progress-1 edge, the reverse-first close only at progress-0 while open.
-   * Recede arms the swallow (isReceding) so mid-recede gestures hold the
-   * frame instead of hijacking it. No autonomous jumps; blip click fallback
-   * intact. Installed once on #app (overlay root lives inside #app;
-   * scrolltrigger.js exempts the live twin frame so twin canvas gestures
-   * are never hijacked). */
-  try {
-    installScrollTrigger({
-      el: document.getElementById('app'),
-      isOpen: () => twinOpen,
-      isBusy: () => !!transitId || !!pendingReveal || !!reverseWait || receding,
-      isReceding: () => receding,
-      onProgress: (p) => {
-        try {
-          if (!twinOpen) {
-            applyScrubProgress(p);
-            trackAndPrecache(p);
-          }
-          else {
-            // Open: wheel-up scrubs the fade back down before the edge
-            // close fires — the fade still tracks scroll, never itself.
-            try {
-              const v = p < 0 ? 0 : p > 1 ? 1 : p;
-              setSatScrubbed(v);
-              try {
-                window.__mapProbe.scrub = {
-                  progress: +v.toFixed(4),
-                  zoom: window.__mapProbe.mapZoom ?? null,
-                  opacity: +v.toFixed(4),
-                  centerDist: 0,
-                };
-              } catch { /* probe cosmetic */ }
-            } catch { /* open scrub is best-effort */ }
-          }
-        } catch (err) {
-          errors.push('SCRUB: ' + (err && err.message));
-        }
-      },
-      onDown: () => {
-        try {
-          if (!scrubFired) {
-            scrubFired = true;
-            flyToSectorThenTwin(siteSector);
-          }
-        } catch (err) {
-          errors.push('SCRUB-DOWN: ' + (err && err.message));
-        }
-      },
-      onUp: () => closeTwin(),
-    });
-  } catch { /* trigger install is best-effort */ }
+  /* GATE-12-A NATIVE-ZOOM: no wheel/touch capture anywhere. The journey is
+   * wired inside map.on('load') via installZoomJourney (zoom/zoomend/move
+   * events only). Blip click fallback intact; twin overlay gestures are
+   * never touched (Lane B owns twin-side entry/exit via the unchanged
+   * handoff query + ready/close message contract). */
 }
 
 boot();

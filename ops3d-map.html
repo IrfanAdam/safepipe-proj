@@ -9,9 +9,29 @@
   html, body { margin: 0; height: 100%; background: var(--ops-bg, #0b0c0c); }
   #app { position: fixed; inset: 0; overflow: hidden; }
   #map { position: absolute; inset: 0; background: var(--ops-bg, #0b0c0c);
-    /* Handoff-11-A: pinch belongs to the unified journey driver — never let
-     * the browser take the two-finger gesture (pinch-zoom/scroll) natively. */
+    /* GATE-12-A NATIVE-ZOOM: native zoom owns wheel + pinch — the journey
+     * rides on zoom events, never captures gestures. touch-action:none lets
+     * MapLibre receive the two-finger pinch natively. */
     touch-action: none; }
+  /* GATE-12-A: map-side ring clip — corner brackets converging from the
+   * canvas edges (--clip:0) to the hotspot ring edges (--clip:1) with the
+   * proximity center blend. Pointer-transparent; sits above pins. */
+  #ring-clip { position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    opacity: 0; transition: opacity 0.3s ease; --clip: 0; }
+  #ring-clip.on { opacity: 1; }
+  #ring-clip i { position: absolute; width: 26px; height: 26px;
+    border: 2px solid var(--ops-amber, #ffd9a0); opacity: 0.9; }
+  #ring-clip .rc-tl { left: calc(14px + var(--clip) * 34%); top: calc(14px + var(--clip) * 30%);
+    border-right: 0; border-bottom: 0; }
+  #ring-clip .rc-tr { right: calc(14px + var(--clip) * 34%); top: calc(14px + var(--clip) * 30%);
+    border-left: 0; border-bottom: 0; }
+  #ring-clip .rc-bl { left: calc(14px + var(--clip) * 34%); bottom: calc(14px + var(--clip) * 30%);
+    border-right: 0; border-top: 0; }
+  #ring-clip .rc-br { right: calc(14px + var(--clip) * 34%); bottom: calc(14px + var(--clip) * 30%);
+    border-left: 0; border-top: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    #ring-clip { transition: none; }
+  }
   /* Handoff-3 Lane 1: no MAP/SAT toggle ribbon — satellite switching is
    * transition-only/automatic (outbound flight + recede). Micro attribution
    * credit (see #map-credit) is the only flat-view chrome besides pins. */

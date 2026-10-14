@@ -1,349 +1,235 @@
-// src/map/scrolltrigger.js — GATE-3 GESTURE REVISION (handoff 11-A): ONE smooth
-// continuous journey driver for wheel + pinch.
-// Wheel, trackpad pinch (ctrl/meta-wheel) and two-finger touch pinch ALL funnel
-// into a SINGLE integrator (accum px -> progress 0..1) that drives zoom depth,
-// center ease and sat fade in main.js — no autonomous jumps, no dead zones.
-//   scroll DOWN / pinch OUT -> progress += (zoom in toward the hotspot)
-//   scroll UP   / pinch IN  -> progress -= (zoom back out)
-// Edge entries fire exactly once per crossing:
-//   progress >= 1 (closed) -> onDown()  (forward handoff flight)
-//   progress <= 0 (open)    -> onUp()    (reverse-first close)
-// Every consumed gesture calls onProgress(progress, px, source) so the map
-// scrubs continuously. Twin-frame gestures are exempt.
-// Pure DOM helper (node-checkable): no map imports, callbacks injected.
+// src/map/scrolltrigger.js — GATE-3 NATIVE-ZOOM ITERATION (handoff 12-A):
+// zoom-event interpreter. Native map zoom (wheel scrollZoom, pinch
+// touchZoom) STAYS ON and keeps working everywhere — the journey RIDES on
+// it, never hijacks it.
 //
-// Handoff-10 prescriptions honored (FM-1/2/4/5/7/8):
-//   FM-1 native scrollZoom fight: EVERY consumed wheel/pinch is
-//         preventDefault+stopPropagation'd (not only fired edges); main.js
-//         additionally constructs the map with scrollZoom:false and disables
-//         the touchZoomRotate handler so no native zoom can chase jumpTo.
-//   FM-2 recede hijack: isReceding() swallows gestures (frame held, no
-//         progress motion) for the whole recede leg; main.js also guards
-//         landHome idempotent so a jumpTo-sourced moveend can't strand home.
-//   FM-4 momentum drinking: sub-4px ticks are ATTENUATED (x0.5), never
-//         dropped (trackpad bursts stay monotonic); direction-flip micro
-//         deltas need a sustained sign (x0.3) so momentum tails can't pump
-//         uncommanded progress.
-//   FM-5 entry asymmetry: trackpad pinch arrives as ctrl-wheel and counts
-//         the same as a mouse wheel — one accumulated journey, no per-event
-//         threshold, so small-tick devices enter exactly like mice.
-//   FM-7 deltaMode: line/page wheels scale to px (x16 / x800) before shaping.
-//   FM-8 single integrator: accum IS the journey (0..JOURNEY_PX px); progress
-//         derives from it — no parallel raw-dy integration, no misleading
-//         diagnostics. Clamp is exactly the journey range: reversal is
-//         immediate, no overshoot dead zone at either edge.
-const JOURNEY_PX = 1000; // full journey in gesture px (wheel-px equivalent)
-const PROGRESS_PER_PX = 1 / JOURNEY_PX;
-const DOWN_EDGE = 1; // fire forward at full progress
-const UP_EDGE = 0; // fire reverse at empty progress
-const REARM_DOWN_BELOW = 0.85; // drop below this to re-arm the down edge
-const REARM_UP_ABOVE = 0.15; // rise above this to re-arm the up edge
-const WINDOW_MS = 1200; // idle gap decays gesture velocity only (progress persists)
-const SUBPX_PX = 4; // FM-4: below this a tick is momentum-suspect
-const SUBPX_ATTEN = 0.5; // ... attenuated, never dropped (bursts stay monotonic)
-const FLIP_PX = 8; // FM-4: below this a sign-flip needs a sustained run
-const FLIP_ATTEN = 0.3;
-const PINCH_GAIN = 2; // two-finger touch px -> journey px
-const WHEEL_PINCH_GAIN = 1; // ctrl/meta-wheel already arrives in px: same scale
-const LINE_PX = 16; // FM-7: deltaMode 1 (lines) -> px
-const PAGE_PX = 800; // FM-7: deltaMode 2 (pages) -> px
+// There are NO wheel/touch capture listeners here and NO preventDefault /
+// stopPropagation anywhere in this module (the handoff-9/11 wheel-hijack
+// scrub path is retired). This module only:
+//   (1) maps a live MapLibre zoom level to journey progress / sat fade /
+//       center blend with pure, node-checkable helpers, and
+//   (2) subscribes to the map's own 'zoom' / 'move' / 'zoomend' events and
+//       republishes them as journey snapshots for main.js.
+// Direction contract (unchanged): zoom IN deepens the journey, zoom OUT
+// retraces it. Edge entries fire exactly once per crossing:
+//   z >= Z_HANDOFF (closed) -> onDown()  (forward handoff flight)
+//   z <= Z_MIN (+eps, open) -> onUp()    (reverse-first close — map side
+//        only fires this when the map canvas itself is zoomed home; the
+//        twin overlay covers the canvas while open, so twin-side reverse
+//        stays owned by Lane B via the ready/close message contract).
+// Pure helpers are node-checkable: no map imports, callbacks injected.
 
-/** Publish the scroll probe snapshot (best-effort, never throws). */
+export const Z_MIN = 6.4; // country home — enforced as map minZoom (the cap)
+export const Z_FADE0 = 7.2; // fade starts: vector->sat keys off zoom only
+export const Z_FADE1 = 10.2; // fade ends: full sat (works at ANY center)
+export const Z_CENTER = 9.0; // proximity centering arms past this zoom
+export const Z_TOP = 11.0; // top-down checkpoint (bearing/pitch -> 0)
+export const Z_HANDOFF = 12.0; // deeper zoom hands to the twin
+export const Z_MAX = 14.0; // map maxZoom cap
+const HOME_EPS = 0.06; // zoomend-at-home tolerance for the reverse edge
+const REARM_DOWN_BELOW = Z_HANDOFF - 0.5; // drop below to re-arm onDown
+const REARM_UP_ABOVE = Z_MIN + 0.3; // rise above to re-arm onUp
+
+export function clamp01(v) {
+  const n = +v;
+  if (!Number.isFinite(n)) return 0;
+  return n < 0 ? 0 : n > 1 ? 1 : n;
+}
+
+export function smooth01(t) {
+  const c = clamp01(t);
+  return c * c * (3 - 2 * c);
+}
+
+/** Live zoom -> journey progress 0..1 (MIN..HANDOFF span). */
+export function zoomToProgress(z) {
+  const n = +z;
+  if (!Number.isFinite(n)) return 0;
+  return clamp01((n - Z_MIN) / (Z_HANDOFF - Z_MIN));
+}
+
+/** Live zoom -> vector->sat opacity. Keys off ZOOM ONLY — identical at any
+ * center (fade where you are: no fly-to, no jump). */
+export function satOpacityForZoom(z) {
+  const n = +z;
+  if (!Number.isFinite(n)) return 0;
+  return smooth01((n - Z_FADE0) / (Z_FADE1 - Z_FADE0));
+}
+
+/** Live zoom -> proximity-center blend 0..1 (CENTER..TOP span). */
+export function centerBlendForZoom(z) {
+  const n = +z;
+  if (!Number.isFinite(n)) return 0;
+  return smooth01((n - Z_CENTER) / (Z_TOP - Z_CENTER));
+}
+
+/** Centering arms past Z_CENTER (proximity-gated by main.js). */
+export function shouldCenter(z) {
+  return Number.isFinite(+z) && +z >= Z_CENTER;
+}
+
+/** Top-down checkpoint reached (bearing/pitch -> 0). */
+export function isTopDown(z) {
+  return Number.isFinite(+z) && +z >= Z_TOP;
+}
+
+/** Deep-zoom handoff threshold reached. */
+export function needsHandoff(z) {
+  return Number.isFinite(+z) && +z >= Z_HANDOFF;
+}
+
+/** At (or below tolerance of) the min-zoom cap — mirrored-reverse home. */
+export function isHomeZoom(z) {
+  return Number.isFinite(+z) && +z <= Z_MIN + HOME_EPS;
+}
+
+/** Publish the zoom-journey probe snapshot (best-effort, never throws). */
 function publish(state) {
   try {
     window.__mapProbe.scroll = { ...state };
+    window.__mapProbe.zoomJourney = window.__mapProbe.zoomJourney || null;
   } catch { /* probe cosmetic */ }
 }
 
-/** True when the wheel originated inside the live twin frame (canvas
- * gestures there belong to the twin — orbit/zoom — not to the scrub). */
-function fromTwinFrame(e) {
-  try {
-    const t = e && e.target;
-    if (t && typeof t.closest === 'function' && t.closest('#twin-frame')) return true;
-  } catch { /* best-effort */ }
-  return false;
-}
-
-function clampJourney(px) {
-  const n = +px;
-  if (!Number.isFinite(n)) return 0;
-  return n < 0 ? 0 : n > JOURNEY_PX ? JOURNEY_PX : n;
-}
-
 /**
- * Install the unified wheel+pinch scrub on el.
+ * Subscribe to the map's OWN zoom/move events and republish them as journey
+ * snapshots. Adds NO wheel/touch listeners, calls NO preventDefault — native
+ * zoom keeps working everywhere (including far from the hotspot).
+ *
  * @param {Object} cfg
- * @param {Element} cfg.el container (the #app root)
- * @param {() => boolean} cfg.isOpen true while the twin overlay is open
- * @param {() => boolean} cfg.isBusy true mid-flight/prewarm/reverse-wait/recede
- * @param {() => boolean} [cfg.isReceding] true during the recede leg (swallow all)
- * @param {(p: number, px: number, source: string) => void} [cfg.onProgress] scrub driver (every gesture)
- * @param {() => void} [cfg.onDown] forward entry at progress >= 1
- * @param {() => void} [cfg.onUp] reverse entry at progress <= 0 (when open)
+ * @param {Object} cfg.map live MapLibre map (needs getZoom/getCenter/on/off)
+ * @param {() => boolean} [cfg.isOpen] true while the twin overlay is open
+ * @param {() => boolean} [cfg.isBusy] true mid-flight/prewarm/reverse-wait/recede
+ * @param {(snap: Object, source: string) => void} [cfg.onProgress] every zoom step
+ * @param {() => void} [cfg.onDown] forward entry at z >= Z_HANDOFF
+ * @param {() => void} [cfg.onUp] reverse entry at z <= Z_MIN+eps (while open)
  * @returns {() => void} uninstall
  */
-export function installScrollTrigger({ el, isOpen, isBusy, isReceding, onProgress, onDown, onUp }) {
+export function installZoomJourney({ map, isOpen, isBusy, onProgress, onDown, onUp }) {
   const state = {
-    armed: true, accum: 0, progress: 0, depth: 0,
+    source: 'native-zoom', progress: 0, zoom: null, opacity: 0,
     downs: 0, ups: 0, last: null,
-    vel: 0, source: null, pinchIn: 0, pinchOut: 0, consumed: 0,
   };
-  if (!el || typeof el.addEventListener !== 'function') {
-    publish(state);
-    return () => {};
-  }
-  if (el.__scrollTriggerInstalled) return () => {};
-  el.__scrollTriggerInstalled = true;
-  // THE single integrator: journey px in [0, JOURNEY_PX]. progress derives.
-  let accum = 0;
-  let progress = 0;
-  let lastT = 0;
-  let vel = 0; // journey-px per ms (EMA) — feeds the map-side precache predictor
-  let lastSign = 0;
+  publish(state);
+  if (!map || typeof map.on !== 'function') return () => {};
+  if (map.__zoomJourneyInstalled) return () => {};
+  try {
+    map.__zoomJourneyInstalled = true;
+  } catch { /* flag is best-effort */ }
   let downArmed = true;
   let upArmed = true;
-  const sync = (last) => {
-    state.accum = Math.round(accum);
-    state.progress = +progress.toFixed(4);
-    state.depth = +progress.toFixed(4);
-    state.last = last;
-    state.vel = +vel.toFixed(4);
-    publish(state);
-  };
-  const consume = (e) => {
-    try {
-      e.preventDefault();
-      e.stopPropagation();
-      state.consumed += 1;
-    } catch { /* best-effort */ }
-  };
-  // Map-side reset (called after a close lands home): journey restarts at 0.
-  try {
-    el.__scrollScrubReset = () => {
-      try {
-        accum = 0;
-        progress = 0;
-        vel = 0;
-        lastSign = 0;
-        downArmed = true;
-        upArmed = true;
-        sync('reset');
-      } catch { /* reset is best-effort */ }
-    };
-    el.__scrollScrubSet = (p) => {
-      try {
-        const n = +p;
-        const c = Number.isFinite(n) ? (n < 0 ? 0 : n > 1 ? 1 : n) : 0;
-        accum = c * JOURNEY_PX;
-        progress = c;
-        downArmed = progress < REARM_DOWN_BELOW;
-        upArmed = progress > REARM_UP_ABOVE;
-        sync(state.last);
-      } catch { /* set is best-effort */ }
-    };
-  } catch { /* handle exposure is best-effort */ }
-  publish(state);
 
-  /** FM-4 momentum shaping: attenuate suspect ticks, never drop them. */
-  function shapeDy(dy) {
-    let s = dy;
-    const ad = Math.abs(s);
-    const sign = s > 0 ? 1 : -1;
-    if (ad < SUBPX_PX) s *= SUBPX_ATTEN;
-    if (lastSign !== 0 && sign !== lastSign && ad < FLIP_PX) s *= FLIP_ATTEN;
-    if (sign !== 0) lastSign = sign;
-    return s;
+  function snapshot() {
+    let z = null;
+    let center = null;
+    try {
+      z = map.getZoom();
+    } catch { z = null; }
+    try {
+      const c = map.getCenter();
+      center = c ? { lng: +c.lng, lat: +c.lat } : null;
+    } catch { center = null; }
+    const zn = Number.isFinite(+z) ? +z : Z_MIN;
+    return {
+      z: Number.isFinite(+z) ? +z : null,
+      center,
+      progress: zoomToProgress(zn),
+      opacity: satOpacityForZoom(zn),
+      blend: centerBlendForZoom(zn),
+      topDown: isTopDown(zn),
+      handoff: needsHandoff(zn),
+      home: isHomeZoom(zn),
+    };
   }
 
-  function trackVel(shapedPx, now) {
-    try {
-      const dt = Math.max(1, now - lastT);
-      const inst = shapedPx / dt;
-      vel = vel * 0.7 + inst * 0.3;
-      if (!Number.isFinite(vel)) vel = 0;
-    } catch { /* velocity is best-effort */ }
-  }
-
-  /** THE one driver: every gesture lands here. Returns what happened. */
-  function addDelta(px, source, e) {
-    try {
-      if (fromTwinFrame(e)) return 'twin-exempt';
-    } catch { /* guard is best-effort */ }
-    // FM-2: recede holds the frame — swallow, never move, never edge.
-    try {
-      if (isReceding && isReceding()) {
-        vel = 0;
-        state.source = source;
-        sync('recede-hold');
-        consume(e);
-        return 'recede-hold';
-      }
-    } catch { /* recede guard is best-effort */ }
-    // Re-arm edges once the journey leaves the bound zone.
-    if (progress < REARM_DOWN_BELOW) downArmed = true;
-    if (progress > REARM_UP_ABOVE) upArmed = true;
+  function step(source, edge) {
+    const snap = snapshot();
+    state.progress = +snap.progress.toFixed(4);
+    state.zoom = snap.z == null ? null : +snap.z.toFixed(3);
+    state.opacity = +snap.opacity.toFixed(4);
+    state.last = source;
+    const open = (() => { try { return !!(isOpen && isOpen()); } catch { return false; } })();
     let busy = false;
     try {
       busy = !!(isBusy && isBusy());
-    } catch { /* busy is best-effort */ }
-    const open = (() => { try { return !!(isOpen && isOpen()); } catch { return false; } })();
-    if (open && busy) {
-      // Mid-flight/prewarm/reverse: hold the frame, still publish + consume.
-      state.source = source;
-      sync(source);
-      consume(e);
-      return 'busy-hold';
-    }
-    accum = clampJourney(accum + px);
-    progress = accum * PROGRESS_PER_PX;
-    state.source = source;
-    // Scrub driver first: zoom depth + center + fade track this value.
+    } catch { /* best-effort */ }
+    if (snap.z != null && snap.z < REARM_DOWN_BELOW) downArmed = true;
+    if (snap.z != null && snap.z > REARM_UP_ABOVE) upArmed = true;
     try {
-      onProgress && onProgress(progress, px, source);
-    } catch { /* scrub driver reports its own errors */ }
-    // Edge entries: exactly once per crossing, never autonomous jumps.
-    // Epsilon: float accumulation (e.g. 10x0.1) can land at 0.9999999.
-    if (!open && progress >= DOWN_EDGE - 1e-6 && downArmed) {
+      onProgress && onProgress(snap, source || 'native-zoom');
+    } catch { /* driver reports its own errors */ }
+    // Edges: exactly once per crossing, never autonomous jumps. While busy
+    // (flight/prewarm/recede) the step still publishes + drives the fade —
+    // only the EDGE entry is deferred.
+    if (edge && !open && snap.handoff && downArmed && !busy) {
       downArmed = false;
-      if (busy) {
-        sync('down-ignored-busy');
-        consume(e);
-        return 'down-ignored-busy';
-      }
       state.downs += 1;
-      sync('down');
-      consume(e);
+      publish(state);
       try {
         onDown && onDown();
       } catch { /* entry reports its own errors */ }
-      return 'down';
+      return;
     }
-    if (open && progress <= UP_EDGE + 1e-6 && upArmed) {
+    if (edge && open && snap.home && upArmed) {
       upArmed = false;
       state.ups += 1;
-      sync('up');
-      consume(e);
+      publish(state);
       try {
         onUp && onUp();
       } catch { /* entry reports its own errors */ }
-      return 'up';
+      return;
     }
-    sync(source);
-    consume(e); // FM-1: every consumed gesture wins over native zoom
-    return 'scrub';
+    publish(state);
   }
 
-  function onWheel(e) {
-    try {
-      // DEFECT 1: pinch-zoom is NOT exempt anymore — ctrl/meta-wheel is the
-      // trackpad pinch-zoom gesture and drives the SAME journey as the wheel.
-      if (fromTwinFrame(e)) return;
-      let dy = +(e.deltaY || 0);
-      if (!Number.isFinite(dy) || dy === 0) return;
-      // FM-7: scale line/page deltas to px before shaping.
-      try {
-        const m = e.deltaMode || 0;
-        if (m === 1) dy *= LINE_PX;
-        else if (m === 2) dy *= PAGE_PX;
-      } catch { /* deltaMode read is best-effort */ }
-      const pinch = !!((e && e.ctrlKey) || (e && e.metaKey));
-      const now = Date.now();
-      if (now - lastT > WINDOW_MS) vel = 0; // idle: decay velocity, keep journey
-      const shaped = shapeDy(dy) * (pinch ? WHEEL_PINCH_GAIN : 1);
-      trackVel(shaped, now);
-      lastT = now;
-      addDelta(shaped, pinch ? 'pinch-wheel' : 'wheel', e);
-    } catch { /* scrub never breaks the map */ }
-  }
-
-  // DEFECT 1: two-finger touch pinch drives the same integrator. Pinch OUT
-  // (fingers spread) zooms the journey in; pinch IN recedes — mirroring the
-  // wheel direction contract. Single-finger pan is untouched (map dragPan).
-  let pinchDist = null;
-  function touchDist(t0, t1) {
-    try {
-      const dx = t0.clientX - t1.clientX;
-      const dy = t0.clientY - t1.clientY;
-      return Math.sqrt(dx * dx + dy * dy);
-    } catch {
-      return null;
-    }
-  }
-  function onTouchStart(e) {
-    try {
-      const t = (e && e.touches) || [];
-      pinchDist = t.length === 2 ? touchDist(t[0], t[1]) : null;
-    } catch { pinchDist = null; }
-  }
-  function onTouchMove(e) {
-    try {
-      const t = (e && e.touches) || [];
-      if (t.length !== 2) {
-        pinchDist = null;
-        return;
-      }
-      if (fromTwinFrame(e)) return;
-      const d = touchDist(t[0], t[1]);
-      if (!Number.isFinite(d) || d <= 0) return;
-      if (pinchDist == null || !Number.isFinite(pinchDist)) {
-        pinchDist = d;
-        return;
-      }
-      const dd = (d - pinchDist) * PINCH_GAIN;
-      pinchDist = d;
-      if (dd === 0) return;
-      if (dd > 0) state.pinchOut += 1;
-      else state.pinchIn += 1;
-      const now = Date.now();
-      if (now - lastT > WINDOW_MS) vel = 0;
-      trackVel(dd, now);
-      lastT = now;
-      addDelta(dd, 'pinch', e);
-    } catch { /* scrub never breaks the map */ }
-  }
-  function onTouchEnd(e) {
-    try {
-      const t = (e && e.touches) || [];
-      pinchDist = t.length === 2 ? touchDist(t[0], t[1]) : null;
-      if (t.length < 2) vel = vel * 0.5; // fingers lifted: momentum dies fast
-    } catch { pinchDist = null; }
-  }
+  const onZoom = () => step('native-zoom', false);
+  const onZoomEnd = () => step('native-zoomend', true);
+  const onMove = () => step('native-move', false);
   try {
-    // Capture + non-passive: every consumed gesture must win over MapLibre
-    // native handlers AND the browser pinch-zoom default.
-    el.addEventListener('wheel', onWheel, { passive: false, capture: true });
-  } catch {
-    el.addEventListener('wheel', onWheel);
-  }
+    map.on('zoom', onZoom);
+  } catch { /* subscribe best-effort */ }
   try {
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-  } catch {
-    el.addEventListener('touchstart', onTouchStart);
-  }
+    map.on('move', onMove);
+  } catch { /* subscribe best-effort */ }
   try {
-    el.addEventListener('touchmove', onTouchMove, { passive: false, capture: true });
-  } catch {
-    el.addEventListener('touchmove', onTouchMove);
-  }
+    map.on('zoomend', onZoomEnd);
+  } catch { /* subscribe best-effort */ }
+  // Publish the home frame immediately so the probe never idles empty.
   try {
-    el.addEventListener('touchend', onTouchEnd, { passive: true });
-    el.addEventListener('touchcancel', onTouchEnd, { passive: true });
-  } catch {
-    try { el.addEventListener('touchend', onTouchEnd); } catch { /* best-effort */ }
-  }
+    step('native-init', false);
+  } catch { /* best-effort */ }
   return () => {
     try {
-      el.removeEventListener('wheel', onWheel, { capture: true });
+      map.off('zoom', onZoom);
     } catch { /* teardown best-effort */ }
     try {
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove, { capture: true });
-      el.removeEventListener('touchend', onTouchEnd);
-      el.removeEventListener('touchcancel', onTouchEnd);
+      map.off('move', onMove);
     } catch { /* teardown best-effort */ }
     try {
-      el.__scrollTriggerInstalled = false;
+      map.off('zoomend', onZoomEnd);
+    } catch { /* teardown best-effort */ }
+    try {
+      map.__zoomJourneyInstalled = false;
     } catch { /* flag teardown best-effort */ }
   };
+}
+
+/**
+ * Retired hijack entry (handoff-9/11): kept as a named alias so older
+ * imports keep working, but it NEVER installs wheel/touch capture listeners
+ * and NEVER calls preventDefault. With a live map it delegates to
+ * installZoomJourney; with only an element it publishes an idle snapshot and
+ * returns a no-op uninstall.
+ */
+export function installScrollTrigger(cfg = {}) {
+  if (cfg && cfg.map) {
+    return installZoomJourney(cfg);
+  }
+  const state = {
+    source: 'native-zoom', progress: 0, zoom: null, opacity: 0,
+    downs: 0, ups: 0, last: 'retired-hijack',
+    retired: true,
+  };
+  publish(state);
+  return () => {};
 }

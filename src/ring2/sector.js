@@ -5,20 +5,19 @@
 import { latLngToCell } from 'h3-js';
 import { H3_RES, SECTORS, worstHealth, HEALTH_RANK } from '../map/feed.js';
 import { geoToWorld } from './site.js';
-import { rangeForZoom, MAP_TRUE_FOV_DEG, TWIN_MAX_RANGE_M } from './sync.js';
+import { rangeForZoom, MAP_TRUE_FOV_DEG, TWIN_MIN_RANGE_M, TWIN_MAX_RANGE_M } from './sync.js';
 
 export const SECTOR_PARAM = 'sector';
 export const EMBED_PARAM = 'embed';
 /* Twinlink handoff frame params (LANE 3): the map overlay opens the twin as
  * ?sector=<h3>&cx=<lng>&cy=<lat>&z=<zoom>[&bearing=<deg>] at vertical
- * top-down. The frame is the RING bounds (wider than the terminal) at
- * satellite; bearing defaults to 0 (map north-up). Forward flight is
- * three stages: hold top-down at the ring frame, ease to iso at the
- * attached angle (same ring center/range, mix stays 0), then a tiny
- * push-in to the terminal while the slider drives satellite->twin
- * (0->100) — the push-in and the slider move together. Reverse mirrors
- * exactly: pull back to the ring frame + slider->0 + pitch->0, then post
- * the close with {recede:true}. */
+ * top-down. GATE-3 NATIVE-ZOOM (handoff12): the map drives the journey off
+ * its NATIVE zoom and hands the twin its ACTUAL current view at the
+ * deep-zoom checkpoint (same contract as the click path) — cx/cy/z may sit
+ * anywhere in the legal range, never at a fixed hold pose. The twin accepts
+ * the handed frame as the hold footprint and eases from it (hold top-down
+ * at the handed range, swoop to iso at the same center/range, push in to
+ * the terminal); it never snaps the camera to a canned pose on entry. */
 export const CX_PARAM = 'cx';
 export const CY_PARAM = 'cy';
 export const ZOOM_PARAM = 'z';
@@ -37,17 +36,18 @@ export const TWIN_READY_MSG = 'safepipe-twin-ready';
  * Lane-1 owned — this file only names the wire format. */
 export const TWIN_FULLSCREEN_MSG = 'safepipe-twin-fullscreen';
 
-/* Handoff flight timing (ms) — GATE-3 REVISION tempo: the full transition
- * must read as ONE continuous gesture, so holds are short and legs overlap
- * end-to-end with zero end-acceleration easing (see easeInOutSmoother):
- * hold a beat top-down at the ring frame, ease to iso at the attached angle
- * (ring center/range, slider stays 0), then push in to the terminal with the
+/* Handoff flight timing (ms) — GATE-3 NATIVE-ZOOM tempo (handoff12-B): the
+ * full transition must read as ONE slow continuous gesture, so holds are
+ * long enough to register top-down and legs overlap end-to-end with zero
+ * end-acceleration easing (see easeInOutSmoother): hold a beat top-down at
+ * the handed ring frame, slow-ease to iso at the attached angle (ring
+ * center/range, slider stays 0), then slow-push in to the terminal with the
  * slider driving 0->100. Reverse mirrors exactly: pull back (push reversed)
  * + pitch back (swoop reversed) with the slider ->0, then the {recede:true}
- * close posts. Forward total 3850ms; reverse 3300ms. */
-export const HANDOFF_HOLD_MS = 550;
-export const HANDOFF_SWOOP_MS = 1700;
-export const HANDOFF_PUSH_MS = 1600;
+ * close posts. Forward total 5900ms; reverse 5000ms. */
+export const HANDOFF_HOLD_MS = 900;
+export const HANDOFF_SWOOP_MS = 2600;
+export const HANDOFF_PUSH_MS = 2400;
 /* Reverse is the exact two-segment mirror: pull (PUSH_MS) then pitch-back
  * (SWOOP_MS). Single source of truth for the total so the flight and any
  * probe margin agree. */
@@ -124,6 +124,20 @@ export function frameRange(z, { viewportPx = 600, fovDeg = MAP_TRUE_FOV_DEG, lat
     // site.js is the lat source of truth; dynamic import avoided — caller
     // passes cy, fallback is the Sangachal parallel in sync.js default.
     return rangeForZoom(z, Number.isFinite(lat) ? lat : undefined, { viewportPx: vp, fovDeg });
+  } catch {
+    return null;
+  }
+}
+
+/** Pure: clamp a handoff range into the shared orbit rails
+ * ([TWIN_MIN_RANGE_M, TWIN_MAX_RANGE_M], sync.js single source of truth).
+ * Non-finite/non-positive input returns null (caller falls back, never a
+ * canned pose). Node-checkable. */
+export function clampHandoffRange(r) {
+  try {
+    const v = Number(r);
+    if (!Number.isFinite(v) || !(v > 0)) return null;
+    return Math.min(TWIN_MAX_RANGE_M, Math.max(TWIN_MIN_RANGE_M, v));
   } catch {
     return null;
   }
@@ -242,8 +256,10 @@ export const TWIN_SCRUB_WHEEL_PX = 600;
 export const TWIN_SCRUB_ENTER_DELTA = 40;
 /* Dwell fallback: consecutive done-phase frames pinned at max that auto-enter
  * scrub-reverse even with no further wheel (covers reaching max via
- * drag/pinch/keyboard zoom). ~0.4 s at 60fps. */
-export const TWIN_SCRUB_DWELL_FRAMES = 24;
+ * drag/pinch/keyboard zoom — pinch wheels stay native, so this is the pinch
+ * exit path). ~0.2 s at 60fps: the cap is an EXIT trigger, never a parking
+ * spot (a strictly past-cap range exits on the same frame — see main.js). */
+export const TWIN_SCRUB_DWELL_FRAMES = 12;
 /* Range within this fraction of the max clamp counts as at-max (damping
  * hover just under the rail still reads as the limit). */
 export const TWIN_MAXZOOM_TOL_FRAC = 0.01;
