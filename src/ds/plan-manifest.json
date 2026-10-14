@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-14T12:23:49.041Z",
+  "generated": "2026-10-14T13:04:03.724Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -16,6 +16,15 @@
     "2026-10-13_233337-ops3d-twin-work.md"
   ],
   "commits": [
+    {
+      "sha": "191d0fa",
+      "full": "191d0fad385af85f2ba9bd0691446fa7520566bf",
+      "date": "2026-10-14",
+      "time": "17:55",
+      "subject": "fix(journey): enclosure closes from screen corners, never a peephole [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "f2d514e",
       "full": "f2d514e01a7eb10983ae314096835d9335b1316d",
@@ -3285,7 +3294,6 @@
     }
   ],
   "wip": [
-    "src/map/main.js",
-    "src/map/scrolltrigger.js"
+    "src/map/main.js"
   ]
 }

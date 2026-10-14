@@ -623,6 +623,7 @@ let recedeStartT = 0;
 let lastCursor = null; // {x,y} client px, passive mousemove only
 let lastCenterEaseT = 0;
 let isoScrubOwned = false;
+let isoRestoreDue = false; // latched on iso engage; cleared only when a settle glides pitch home — the strand guarantor
 const ISO_SCRUB_SLACK_DEG = 2; // engage only when pitch is at/below target+slack: never yanks a user oblique
 const ISO_SCRUB_EPS_DEG = 0.3; // skip transform writes inside this of target
 const ISO_SCRUB_RELEASE = 0.3; // zoom below Z_TOP-this releases ownership
@@ -902,6 +903,7 @@ function onNativeZoomStep(snap, source) {
         window.__mapProbe.zoomJourney = {
           zMin: Z_MIN, zHand: Z_HANDOFF, zTop: Z_TOP, zMax: Z_MAX,
           topDown: isTopDown(z), handoff: needsHandoff(z), home: isHomeZoom(z),
+          due: isoRestoreDue, src: source,
         };
       } catch { /* probe cosmetic */ }
     } catch { /* probe cosmetic */ }
@@ -958,6 +960,30 @@ function onNativeZoomStep(snap, source) {
         window.__mapProbe.autoCenter = false;
       } catch { /* probe cosmetic */ }
     }
+    // (3b) SETTLE RECONCILE — the strand guarantor. Per-step iso writes can
+    // be clobbered mid-glide (the native zoom animation re-applies the
+    // gesture-start pitch per frame), so a fast flick-out may land below
+    // the band with the tilt still on. If the journey ever owned the tilt
+    // (isoRestoreDue) and the gesture settles below the band, glide pitch
+    // home on the existing settle tempo. Center is never touched here, and
+    // a camera the journey never tilted (due false) is never yanked.
+    if (!twinOpen && !busyNow && source === 'native-zoomend' && isoRestoreDue && !shouldCenter(z)) {
+      let pSet = null;
+      try {
+        pSet = +mapRef.getPitch();
+      } catch { pSet = null; }
+      if (Number.isFinite(pSet)) {
+        if (Math.abs(pSet) > 0.5) {
+          try {
+            mapRef.easeTo({ pitch: 0, duration: 250 });
+          } catch (err) {
+            errors.push('SETTLE-RECONCILE: ' + (err && err.message));
+          }
+        } else {
+          isoRestoreDue = false;
+        }
+      }
+    }
     // (4) ISO SCRUB — past the top-down checkpoint the tilt rides the zoom
     // itself (Z_TOP..Z_HANDOFF -> pitch 0..45), written straight into the
     // transform so the running scroll glide is never stopped: no latch, no
@@ -965,21 +991,37 @@ function onNativeZoomStep(snap, source) {
     // scrub engages only while near and only when the live pitch sits
     // at/below target (+slack), so a user-set oblique is never yanked; the
     // settle landing above still zeroes bearing and holds this same target.
+    // Once owned, the scrub keeps driving until pitch is restored even if
+    // proximity drops (pan-away-then-zoom-out), and the release step itself
+    // writes the target — a fast flick-out that jumps clean over the band
+    // still zeroes the tilt in the landing step instead of stranding it.
     // Twin paths own the camera while open. Task-37: the gesture recede
     // does NOT block this — pitch 45->0 IS the mirrored checkpoint on the
     // way out, ridden by the same law.
-    if (!twinOpen && !busyNoRecede && prox && prox.near) {
+    if (!twinOpen && !busyNoRecede && prox && (prox.near || isoScrubOwned)) {
       const pTarget = pitchTargetForZoom(z);
       let pCur = null;
       try {
         pCur = +mapRef.getPitch();
       } catch { pCur = null; }
       if (Number.isFinite(pCur)) {
+        let releaseNow = false;
         if (!isoScrubOwned) {
-          if (z >= Z_TOP && pCur <= pTarget + ISO_SCRUB_SLACK_DEG) isoScrubOwned = true;
-        } else if (z < Z_TOP - ISO_SCRUB_RELEASE) isoScrubOwned = false;
-        if (isoScrubOwned && Math.abs(pCur - pTarget) > ISO_SCRUB_EPS_DEG) {
+          if (prox.near && z >= Z_TOP && pCur <= pTarget + ISO_SCRUB_SLACK_DEG) {
+            isoScrubOwned = true;
+            isoRestoreDue = true;
+          }
+        } else if (z < Z_TOP - ISO_SCRUB_RELEASE) {
+          isoScrubOwned = false;
+          releaseNow = true;
+        }
+        if ((isoScrubOwned || releaseNow) && Math.abs(pCur - pTarget) > ISO_SCRUB_EPS_DEG) {
           try {
+            // Mid-glide this write may be clobbered by the native zoom
+            // animation (it re-applies the gesture-start pitch per frame) —
+            // never stop the glide for it (stair-steps zoom). The settle
+            // reconcile below is the guarantor: isoRestoreDue stays latched
+            // until a zoomend glides pitch home.
             if (mapRef.transform && typeof mapRef.transform.setPitch === 'function') {
               mapRef.transform.setPitch(pTarget);
               if (typeof mapRef.triggerRepaint === 'function') mapRef.triggerRepaint();
@@ -990,6 +1032,7 @@ function onNativeZoomStep(snap, source) {
         }
         try {
           window.__mapProbe.isoBridge = isoScrubOwned;
+          window.__mapProbe.pitch = pCur == null ? null : +(+pCur).toFixed(2);
         } catch { /* probe cosmetic */ }
       }
     } else if (isoScrubOwned) {
@@ -1038,6 +1081,7 @@ function onNativeZoomStep(snap, source) {
       if (scrubProgress > 0.001 || scrubFired || isoScrubOwned) {
         scrubFired = false;
         isoScrubOwned = false;
+        isoRestoreDue = false;
       }
       try {
         if (window.__mapProbe.recede === 'out') window.__mapProbe.recede = 'home';
@@ -1061,6 +1105,7 @@ function resetScrubJourney() {
   scrubProgress = 0;
   scrubFired = false;
   isoScrubOwned = false;
+  isoRestoreDue = false;
   // Task-35: never leave the ceiling clamped or staged flags set behind a
   // close (Esc during a staged hold funnels here via recede -> landHome).
   try {

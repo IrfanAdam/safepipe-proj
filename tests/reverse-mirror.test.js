@@ -212,7 +212,7 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
   assert.ok(!main.includes(', 2500);'), '2500ms fallback timer is gone');
   assert.ok(main.includes('lastPostedStagedS = null; // symmetric unwind'), 'staged exit unwinds the S stream');
   assert.ok(main.includes('if (receding && needsHandoff(z))'), 'scrolling back in disarms the recede');
-  assert.ok(main.includes('!busyNoRecede && prox && prox.near'), 'iso retrace rides the gesture home');
+  assert.ok(main.includes('!busyNoRecede && prox && (prox.near || isoScrubOwned)'), 'iso retrace rides the gesture home, owned tilt restores even after pan-away');
 });
 
 test('map vignette: radius from projected R, brackets retired as enclosure signal', () => {
@@ -232,6 +232,12 @@ test('forward path untouched: staged laws, intro legs, iso ownership, FOV', () =
   assert.ok(map.includes('setMaxZoom(Z_HANDOFF)'), 'scroll-as-zoom still clamps at the gate');
   assert.ok(map.includes('setSatScrubbed(satOpacityForZoom'), 'forward sat still rides the scrub law');
   assert.ok(map.includes('mapRef.transform.setPitch(pTarget)'), 'iso scrub still owns the transform');
+  assert.ok(map.includes('releaseNow = true'), 'release step zeroes the tilt in the landing step');
+  assert.ok(map.includes('(isoScrubOwned || releaseNow)'), 'fast flick-out over the band cannot strand pitch');
+  assert.ok(map.includes('prox.near || isoScrubOwned'), 'owned scrub restores pitch even after pan-away');
+  assert.ok(map.includes('isoRestoreDue = true'), 'engage latches the restore due flag');
+  assert.ok(map.includes("source === 'native-zoomend' && isoRestoreDue && !shouldCenter(z)"), 'below-band settle glides journey tilt home');
+  assert.ok(map.includes('mapRef.easeTo({ pitch: 0, duration: 250 })'), 'reconcile glides pitch home on settle tempo');
   assert.ok(map.includes('prewarmThenReveal(id, liveFrame(), { ...opts, staged: true })'), 'near-gate arrival still stages');
   const twin = srcOf('../src/ring2/main.js');
   assert.ok(twin.includes('poseForScrubProgress(fwd.legs, fwd.progress)'), 'forward pose still reads the scrub law');
