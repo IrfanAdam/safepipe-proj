@@ -230,33 +230,36 @@ export function paintRevs(revs, scope){
   // For dates with evals, thread: eval parent → its iteration revs (paired by order)
   const n = gateEvals.length + revRows.length;
   const timeline = [];
-  for (const date of allDates) {
-    const dLabel = fmtTimelineDate(date) || date || 'Undated';
+  let globalIdx = 1;
+  for (let di = 0; di < allDates.length; di++) {
+    const date = allDates[di];
+    const dLabelDate = fmtTimelineDate(date) || date || 'Undated';
+    const dayLabel = `<span class="ds-caret">››</span><span class="ds-day-num">Day ${di + 1}</span> · ${esc(dLabelDate)}`;
     const gates = gateByDate.get(date) || [];
     const revsForDate = revByDate.get(date) || [];
     let groupInner = '';
     if (gates.length) {
       for (let gi = 0; gi < gates.length; gi++) {
         const g = gates[gi];
-        groupInner += `<div class="ds-timeline-item ds-timeline-item--eval"><span>${esc(g.text)}</span></div>`;
+        groupInner += `<div class="ds-timeline-item ds-timeline-item--eval"><span class="ds-item-index">${globalIdx++}</span><span>${esc(g.text)}</span></div>`;
         if (gi < revsForDate.length) {
           const rv = revsForDate[gi];
           const timeLabel = rv.time ? `${esc(rv.date)} ${esc(fmtTime(rv.time))}` : esc(rv.date || '');
-          groupInner += `<div class="ds-timeline-item ds-timeline-item--iter"><span>${esc(rv.text)}</span><small>${timeLabel}</small></div>`;
+          groupInner += `<div class="ds-timeline-item ds-timeline-item--iter"><span class="ds-item-index">${globalIdx++}</span><span>${esc(rv.text)}</span><small>${timeLabel}</small></div>`;
         }
       }
       for (let ri = gates.length; ri < revsForDate.length; ri++) {
         const rv = revsForDate[ri];
         const timeLabel = rv.time ? `${esc(rv.date)} ${esc(fmtTime(rv.time))}` : esc(rv.date || '');
-        groupInner += `<div class="ds-timeline-item ds-timeline-item--iter"><span>${esc(rv.text)}</span><small>${timeLabel}</small></div>`;
+        groupInner += `<div class="ds-timeline-item ds-timeline-item--iter"><span class="ds-item-index">${globalIdx++}</span><span>${esc(rv.text)}</span><small>${timeLabel}</small></div>`;
       }
     } else {
       for (const rv of revsForDate) {
         const timeLabel = rv.time ? `${esc(rv.date)} ${esc(fmtTime(rv.time))}` : esc(rv.date || '');
-        groupInner += `<div class="ds-timeline-item"><span>${esc(rv.text)}</span><small>${timeLabel}</small></div>`;
+        groupInner += `<div class="ds-timeline-item"><span class="ds-item-index">${globalIdx++}</span><span>${esc(rv.text)}</span><small>${timeLabel}</small></div>`;
       }
     }
-    timeline.push(`<details class="ds-timeline-group" open><summary class="ds-timeline-date">${esc(dLabel)}</summary><div class="ds-timeline-items">${groupInner}</div></details>`);
+    timeline.push(`<details class="ds-timeline-group" open><summary class="ds-timeline-date">${dayLabel}</summary><div class="ds-timeline-items">${groupInner}</div></details>`);
   }
   const latestLabel = fmtTimelineDate(allDates[0]) || allDates[0] || '';
   return [

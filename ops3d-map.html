@@ -146,12 +146,15 @@
   #twin-overlay:fullscreen { background: var(--ops-bg, #0b0c0c); }
   #twin-overlay:fullscreen .twin-overlay__bar { display: flex; }
   #twin-overlay::backdrop { background: #0b0c0c; }
-  /* T2 handoff: black periphery vignette staging the twin open. Token-only
-   * where possible (outer wash falls back to --ops-bg); pointer-transparent
+  /* T2 handoff: hotspot-centered circular enclosure staging the twin open.
+   * Radius rides --vr (projected RING_RADIUS_M at the live zoom, set by the
+   * journey driver; 260px fallback) so the enclosing coincides with the
+   * twin clip circle (685px across at handoff z=12). Token-only where
+   * possible (outer wash falls back to --ops-bg); pointer-transparent
    * so blip hit-testing is unchanged. Sits above pins, below twin. */
   #map-vignette {
     position: absolute; inset: 0; z-index: 3; pointer-events: none;
-    background: radial-gradient(ellipse at center,
+    background: radial-gradient(circle var(--vr, 260px) at var(--vx, 50%) var(--vy, 50%),
       transparent 52%, rgba(0, 0, 0, 0.28) 78%, var(--ops-bg, #0b0c0c) 100%);
     opacity: 0; transition: opacity 0.45s ease; /* GATE-3 REVISION tempo */
   }

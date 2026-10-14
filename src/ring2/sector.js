@@ -262,12 +262,17 @@ export const TWIN_SCRUB_WHEEL_PX = 600;
 /* A decisive wheel AT the zoom clamp crosses into scrub-reverse (trackpad
  * dust below this is ignored so resting fingers at max don't trip it). */
 export const TWIN_SCRUB_ENTER_DELTA = 40;
-/* Dwell fallback: consecutive done-phase frames pinned at max that auto-enter
- * scrub-reverse even with no further wheel (covers reaching max via
- * drag/pinch/keyboard zoom — pinch wheels stay native, so this is the pinch
- * exit path). ~0.2 s at 60fps: the cap is an EXIT trigger, never a parking
- * spot (a strictly past-cap range exits on the same frame — see main.js). */
-export const TWIN_SCRUB_DWELL_FRAMES = 12;
+/* Dwell fallback is RETIRED (Task 37): the zoom-clamp rest was a
+ * frame-counter entry (~0.2 s parked at max auto-enters scrub-reverse with
+ * no gesture). Entry is gesture-owned now — a decisive outward wheel AT the
+ * clamp (TWIN_SCRUB_ENTER_DELTA, single shot) or ACCUMULATED outward
+ * wheel/pinch delta at the clamp (TWIN_SCRUB_PINCH_ENTER_PX, covering
+ * pinch-outs and trackpad dust that never trip the single shot — pinch
+ * itself stays native, its delta only feeds the entry accumulator) — or an
+ * explicit close (Esc / parent-X / close message drives the scrub to 1).
+ * A range strictly PAST the cap still clamps back + exits on the same
+ * frame (a rail guard, never a parking spot). */
+export const TWIN_SCRUB_PINCH_ENTER_PX = 240;
 /* Range within this fraction of the max clamp counts as at-max (damping
  * hover just under the rail still reads as the limit). */
 export const TWIN_MAXZOOM_TOL_FRAC = 0.01;
@@ -304,6 +309,28 @@ export function scrubProgressForWheel(progress, deltaY, { pinch = false, totalPx
     return clamp01(p + -d / total);
   } catch {
     return clamp01(progress);
+  }
+}
+
+/** Pure: fold one outward-delta event into the scrub-reverse ENTRY
+ * accumulator (Task 37, dwell-counter replacement). Outward intent is
+ * wheel-up (dY<0) — the same sign scrubProgressForWheel advances on — so
+ * pinch-outs (which stay native and never touch progress) and sub-threshold
+ * trackpad dust still count toward crossing in; inward deltas drain. Returns
+ * { accum, enter }: enter when the accumulator reaches the threshold.
+ * Non-finite input parks (never throws, never enters). */
+export function scrubEntryForDelta(accum, deltaY, { enterPx = TWIN_SCRUB_PINCH_ENTER_PX } = {}) {
+  try {
+    let a = Number(accum);
+    if (!Number.isFinite(a) || a < 0) a = 0;
+    const d = Number(deltaY);
+    if (!Number.isFinite(d) || d === 0) return { accum: a, enter: false };
+    let th = Number(enterPx);
+    if (!Number.isFinite(th) || !(th > 0)) th = TWIN_SCRUB_PINCH_ENTER_PX;
+    a = Math.max(0, a + -d);
+    return { accum: a, enter: a >= th };
+  } catch {
+    return { accum: 0, enter: false };
   }
 }
 

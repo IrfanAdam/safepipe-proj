@@ -29,7 +29,9 @@ import {
   needsHandoff,
   handoffScrubForZoom,
   handoffStagesForScroll,
-  HANDOFF_STAGED_S_MAX,
+  accumStagedS,
+  vignetteRadiusPxForZoom,
+  MAP_VIGNETTE_RING_M,
   isHomeZoom,
   flipWheelDelta,
   lockAroundPoint,
@@ -53,6 +55,7 @@ import {
   worstAssetId,
   TWIN_CLOSE_MSG,
   TWIN_READY_MSG,
+  buildTwinStagedMessage,
   parseTwinFsMessage,
   parseTwinReadyMessage,
 } from './twinlink.js';
@@ -123,14 +126,16 @@ let mapRef = null;
 let setSatRef = null;
 let transitId = null;
 let twinFs = false;
-// Handoff-11-A (FM-2): recede leg flag. Set on recede start, cleared ONLY by
-// landHome (idempotent, token-guarded): while set, the gesture trigger
-// swallows wheels/pinches (frame held) so a mid-recede jumpTo can never
-// cancel the recede easeTo and fire landHome early with a POSITION-OFF rest.
+// Handoff-11-A (FM-2): recede leg flag. Set on recede start, cleared by
+// landHome (idempotent, token-guarded) or by a fresh handoff (which disarms
+// the armed gesture leg and owns the camera again). While set, journey
+// edge entries defer (flight/prewarm/recede busy) — gestures themselves are
+// never swallowed: native zoom stays live so the fingers own the way home.
 let receding = false;
+let recedeLandHome = null; // Task-37 gesture recede: arrival closure armed by recedeToHome, fired by the zoom-step home check
 let recedeDone = false;
 // Handoff-5-close: single close chain. CLOSE_FADE_MS mirrors the forward
-// reveal; RECEDE_DELAY_MS starts sat->flat + zoom-out after the fade.
+// reveal; RECEDE_DELAY_MS starts the gesture-owned recede arm after the fade.
 // GATE-3 REVISION tempo: 450ms fades overlap the recede for one gesture.
 // closeSeq invalidates a pending hide/recede when a fresh open lands first.
 const CLOSE_FADE_MS = 450;
@@ -610,6 +615,9 @@ let scrubFired = false;
 let stagedActive = false;
 let stagedS = 0;
 let stagedCommitted = false;
+// Task-37 staged-S producer: last S value posted to the twin frame
+// (postTwinStagedS throttles to value-change; null = nothing posted yet).
+let lastPostedStagedS = null;
 let cachedVectorStyle = null;
 let recedeStartT = 0;
 let lastCursor = null; // {x,y} client px, passive mousemove only
@@ -831,18 +839,29 @@ function onNativeZoomStep(snap, source) {
     // far away it rests at the canvas edges (k=0) so zoom reads the same.
     const clipK = prox && prox.near ? blend : 0;
     updateRingClip(clipK, prox);
-    // Journey enclosure: the vignette circle rides on the hotspot and starts
-    // closing once the brackets have meaningfully converged (blend >= .5)
-    // while near; zoom-out retraces it. Twin paths own it while open.
+    // Journey enclosure: the vignette circle rides on the hotspot with the
+    // PROJECTED ring radius (RING_RADIUS_M / metersPerPixel(z) — the same
+    // ground circle the twin clip cuts, 685px across at handoff z=12), so
+    // the enclosing coincides with the twin clip exactly. The corner
+    // brackets stay as dressing only — they no longer gate the enclosure.
+    // Zoom-out retraces the radius symmetrically (pure function of z).
+    // Twin paths own it while open.
     if (!twinOpen && prox) {
       try {
         const v = document.getElementById('map-vignette');
         if (v) {
           v.style.setProperty('--vx', prox.sx.toFixed(1) + 'px');
           v.style.setProperty('--vy', prox.sy.toFixed(1) + 'px');
+          const vr = vignetteRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M);
+          if (Number.isFinite(vr)) {
+            v.style.setProperty('--vr', vr.toFixed(1) + 'px');
+            try {
+              window.__mapProbe.vignetteR = +vr.toFixed(1);
+            } catch { /* probe cosmetic */ }
+          }
         }
       } catch { /* cosmetic */ }
-      showVignette(prox.near && blend >= 0.5);
+      showVignette(prox.near);
     }
     // Deep warm for the dissolve: while the spot is tracked in sat range,
     // keep the level AFTER next warm around it — the arriving level streams
@@ -874,7 +893,17 @@ function onNativeZoomStep(snap, source) {
         };
       } catch { /* probe cosmetic */ }
     } catch { /* probe cosmetic */ }
+    // Task-37: scrolling back up to the gate cancels an armed gesture
+    // recede — the journey owns forward again (staging may re-fire below).
+    if (receding && needsHandoff(z)) {
+      receding = false;
+      recedeLandHome = null;
+      try {
+        window.__mapProbe.recede = null;
+      } catch { /* probe cosmetic */ }
+    }
     const busyNow = !!(transitId || pendingReveal || reverseWait || receding);
+    const busyNoRecede = !!(transitId || pendingReveal || reverseWait);
     // (3) PROXIMITY CENTERING — past the arm zoom, ease center onto the
     // spot + top-down ONLY when near, and ONLY on gesture settle
     // (native-zoomend). NOTHING may touch the camera mid-gesture: even an
@@ -924,8 +953,10 @@ function onNativeZoomStep(snap, source) {
     // scrub engages only while near and only when the live pitch sits
     // at/below target (+slack), so a user-set oblique is never yanked; the
     // settle landing above still zeroes bearing and holds this same target.
-    // Twin paths own the camera while open.
-    if (!twinOpen && !busyNow && prox && prox.near) {
+    // Twin paths own the camera while open. Task-37: the gesture recede
+    // does NOT block this — pitch 45->0 IS the mirrored checkpoint on the
+    // way out, ridden by the same law.
+    if (!twinOpen && !busyNoRecede && prox && prox.near) {
       const pTarget = pitchTargetForZoom(z);
       let pCur = null;
       try {
@@ -983,8 +1014,15 @@ function onNativeZoomStep(snap, source) {
       } catch { /* unwind is best-effort */ }
     }
     // (5) MIRRORED REVERSE — at/below the cap the checkpoints retrace:
-    // fade is already ~0 here; land the journey home and re-arm.
+    // fade is already ~0 here; land the journey home and re-arm. A
+    // gesture-owned recede armed by recedeToHome lands here (the fingers
+    // drove z home; sat already retraced via the scrub law).
     if (isHomeZoom(z)) {
+      if (receding && recedeLandHome) {
+        try {
+          recedeLandHome();
+        } catch { /* landing is best-effort */ }
+      }
       if (scrubProgress > 0.001 || scrubFired || isoScrubOwned) {
         scrubFired = false;
         isoScrubOwned = false;
@@ -1231,6 +1269,14 @@ function flyToSectorThenTwin(id, opts = {}) {
   const deep = Number.isFinite(liveZ) && needsHandoff(liveZ);
   transitId = id;
   window.__mapProbe.transit = id;
+  // Task-37: a fresh handoff disarms an armed gesture recede (the camera is
+  // owned forward again — the stale arrival closure must never land home
+  // mid-journey) and drops the hold veil if one lingered.
+  receding = false;
+  recedeLandHome = null;
+  try {
+    showVectorHold(false);
+  } catch { /* veil teardown is best-effort */ }
   try {
     if (!deep) {
       // Click/fallback entry below handoff: place the staged frame
@@ -1284,6 +1330,7 @@ function flyToSectorThenTwin(id, opts = {}) {
       stagedActive = true;
       stagedS = 0;
       stagedCommitted = false;
+      lastPostedStagedS = null; // Task-37: the S producer re-arms (S=0 posts on first drive)
       try {
         window.__mapProbe.staged = { active: true, s: 0, committed: false };
       } catch { /* probe cosmetic */ }
@@ -1306,12 +1353,45 @@ function restoreMaxZoom() {
   } catch { /* unclamp is best-effort */ }
 }
 
+/** Task-37 staged-S producer (map -> twin): posts { type, s } to the live
+ * twin frame as S accumulates past the gate, so the twin intro scrub tracks
+ * the fingers instead of its autoplay clock. Throttled to value-change
+ * (lastPostedStagedS); mirrors the postTwinReverseRequest pattern
+ * (contentWindow + '*' — same-origin iframe). The twin consumes it through
+ * its existing staged listener; with no twin/no frame this is a silent
+ * no-op and autoplay still owns the intro. Never throws. */
+function postTwinStagedS() {
+  try {
+    if (!stagedActive || stagedCommitted) return false;
+    const s = Math.max(0, +stagedS || 0);
+    if (lastPostedStagedS !== null && s === lastPostedStagedS) return false;
+    const fr = overlayEls && overlayEls.frame;
+    if (!fr || fr.getAttribute('data-url') === 'about:blank') return false;
+    const win = fr.contentWindow;
+    if (!win) return false;
+    win.postMessage(buildTwinStagedMessage(s), '*');
+    lastPostedStagedS = s;
+    try {
+      window.__mapProbe.stagedPost = +s.toFixed(1);
+    } catch { /* probe cosmetic */ }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Drive the staged overlay dissolve from accumulated scroll S. Twin-ready
  * GRANTS (>0 only once Lane B posts it); the S law owns the progress, so a
  * fast twin still dissolves on the fingers, never its own rhythm. At full
  * reveal the hold commits (finalizeStagedReveal). Pure-law in, DOM out. */
 function driveStagedOverlay() {
   if (!stagedActive || stagedCommitted) return;
+  // Task-37: feed S to the twin on every drive (value-change throttled
+  // inside) — including the unready hold, where it seeds the release
+  // progress without moving the pin.
+  try {
+    postTwinStagedS();
+  } catch { /* producer never breaks the drive */ }
   const st = handoffStagesForScroll(stagedS);
   let root = null;
   try {
@@ -1361,6 +1441,7 @@ function finalizeStagedReveal(root) {
   if (stagedCommitted) return;
   stagedCommitted = true;
   stagedActive = false;
+  lastPostedStagedS = null; // commit ends the S stream (producer guards on flags anyway)
   try {
     if (root) root.style.opacity = '';
   } catch { /* cosmetic */ }
@@ -1382,6 +1463,7 @@ function exitStaged() {
   stagedActive = false;
   stagedS = 0;
   stagedCommitted = false;
+  lastPostedStagedS = null; // symmetric unwind: the S stream ends with the hold
   restoreMaxZoom();
   try {
     window.__mapProbe.staged = { active: false, s: 0, committed: false };
@@ -1559,6 +1641,12 @@ function openTwin(id, opts = {}) {
   const s = sectors.find((x) => x.id === id);
   if (!s) return false;
   selectSector(id);
+  // Task-37: direct opens disarm an armed gesture recede, like the staged path.
+  receding = false;
+  recedeLandHome = null;
+  try {
+    showVectorHold(false);
+  } catch { /* veil teardown is best-effort */ }
   const h3 = h3map[id];
   // Handoff-5-close: a fresh open cancels any pending close hide/recede.
   closeSeq++;
@@ -1795,24 +1883,28 @@ function isTwinCloseData(d) {
     return false;
   }
 }
-/* LANE A recede (reverse): animate sat->flat fade + smooth zoom back out
- * to the first-load world frame — never an abrupt cut. setSatForced(false)
- * already ramps raster-opacity 1->0 over the cached sat frame; the easeTo
- * runs concurrently so flat returns while zooming out. Reduced-motion: instant. */
+/* LANE A recede (reverse): Task-37 gesture-owned reverse scrub back to the
+ * first-load world frame — never an abrupt cut, never a programmatic
+ * flight. Native wheel/pinch zoom (wheel deltas) owns z back to MAP_FLOOR;
+ * sat follows the scrub law per zoom step (setSatScrubbed(satOpacityForZoom(z))
+ * in onNativeZoomStep, so the checkpoints retrace exactly); arrival at home
+ * lands via the armed recedeLandHome closure. No easeTo, no gesture
+ * swallow, no moveend fallback timer — the map stays live throughout, and a
+ * fresh handoff mid-recede simply disarms it. Reduced-motion: instant cut.
+ * The vector style/sources are never reloaded (held warm), so the way back
+ * is instant; no hold veil is raised — the user watches the retrace. */
 function recedeToHome() {
   let reduced = false;
   try {
     reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   } catch { /* cosmetic */ }
-  // GATE-9-A(1): veil up + clock starts — the flat return is timed in
-  // vectorReturnMs and the veil covers the vector tile refill (no jank).
-  // The vector style/sources are never reloaded: the zoom runs over the
-  // HELD style (cached in holdVectorWarm), so the way back is instant.
+  // GATE-9-A(1): the vector style/sources are never reloaded — the zoom
+  // runs over the HELD style (cached in holdVectorWarm), so the way back
+  // is instant. No veil: the user watches the checkpoints retrace.
   holdVectorWarm('recede');
-  showVectorHold(true);
-  // Handoff-11-A (FM-2): arm the recede leg — gestures are swallowed until
-  // landHome, and landHome is idempotent so a jumpTo-sourced moveend can
-  // never strand a POSITION-OFF rest behind a 'home' probe.
+  // Task-37: arm the gesture-owned leg — the fingers own z home, the
+  // zoom-step home check fires landHome. LandHome is idempotent so a
+  // duplicate arrival can never strand a POSITION-OFF rest behind 'home'.
   receding = true;
   recedeDone = false;
   try {
@@ -1824,6 +1916,7 @@ function recedeToHome() {
     if (recedeDone) return; // idempotent: first arrival wins (FM-2 token)
     recedeDone = true;
     receding = false;
+    recedeLandHome = null;
     try {
       let ms = null;
       try {
@@ -1841,12 +1934,13 @@ function recedeToHome() {
       resetScrubJourney();
     } catch { /* reset is best-effort */ }
   };
-  setSatForced(false);
+  recedeLandHome = landHome;
   // Handoff-5-close: probe the recede leg (sat->flat + zoom-out).
   window.__mapProbe.recede = 'out';
   try {
-    if (mapRef) {
-      if (reduced) {
+    if (reduced) {
+      // Reduced-motion: instant cut home, no gesture needed.
+      if (mapRef) {
         mapRef.easeTo({
           center: COUNTRY_CENTER,
           zoom: MAP_FLOOR,
@@ -1854,25 +1948,24 @@ function recedeToHome() {
           pitch: 0,
           duration: 0,
         });
-        landHome();
-      } else {
-        mapRef.easeTo({
-          center: COUNTRY_CENTER,
-          zoom: MAP_FLOOR,
-          bearing: 0,
-          pitch: 0,
-          duration: 800, // GATE-3 REVISION tempo: quicker recede, same home
-        });
-        try {
-          mapRef.once('moveend', landHome);
-        } catch { /* probe listener is best-effort */ }
-        // Fallback: never strand the veil/journey if moveend is missed.
-        setTimeout(() => {
-          try {
-            if (window.__mapProbe.recede === 'out') landHome();
-          } catch { /* fallback is best-effort */ }
-        }, 2500);
       }
+      landHome();
+      return;
+    }
+    if (mapRef) {
+      // Gesture path: NO programmatic flight — assert the scrubbed sat for
+      // the current z so the frame is honest while awaiting the fingers;
+      // every native zoom step repaints after it (sat via setSatScrubbed).
+      try {
+        const lz = +mapRef.getZoom();
+        if (Number.isFinite(lz)) setSatScrubbed(satOpacityForZoom(lz));
+      } catch { /* sat assert is best-effort */ }
+      // Already home (or under it): land now instead of waiting on a
+      // gesture that has nowhere to go.
+      try {
+        const lz = +mapRef.getZoom();
+        if (Number.isFinite(lz) && isHomeZoom(lz)) landHome();
+      } catch { /* arrival check is best-effort */ }
     }
   } catch (err) {
     errors.push('RECEDE: ' + (err && err.message));
@@ -2193,6 +2286,8 @@ function installWheelFlip(rootEl, laneEl, ctx) {
  * gate native zoom is untouched, above it the maxZoom clamp holds depth, so
  * there is nothing to block. Symmetric: scroll-up drains S; the zoomend
  * exit (below gate) and twin-ready + S-commit (forward) are the only exits.
+ * Every accumulation also drives the overlay AND posts S to the twin frame
+ * (driveStagedOverlay -> postTwinStagedS, value-change throttled).
  * A close tearing down the prewarm mid-hold unwinds via exitStaged. */
 function installStagedAccum(laneEl) {
   if (!laneEl || laneEl.__stagedAccumInstalled) return;
@@ -2209,8 +2304,8 @@ function installStagedAccum(laneEl) {
       }
       const dy = +e.deltaY;
       if (!Number.isFinite(dy) || dy === 0) return;
-      stagedS = Math.min(HANDOFF_STAGED_S_MAX, Math.max(0, stagedS - dy));
-      driveStagedOverlay();
+      stagedS = accumStagedS(stagedS, dy); // symmetric: scroll-up retraces the same law
+      driveStagedOverlay(); // repaints the overlay AND posts S to the twin (throttled)
     } catch { /* accumulator never breaks the map */ }
   }, { passive: true });
 }

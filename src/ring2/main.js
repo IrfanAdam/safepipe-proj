@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_DWELL_FRAMES, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -642,7 +642,7 @@ async function boot() {
     fwd: null, // Task-36 intro scrub: { legs:[swoop,push], progress:0..1, t0, staged } or null (pose = pure fn of progress)
     fwdStagedS: null, // last parent-posted staged scroll S (px); null = no staged driver, autoplay advances the scalar
     capExpired: false, // hold parked past HOLD+CAP with no ready post (shelved-cap observability for the probe)
-    atMaxFrames: 0, // dwell counter: consecutive done-phase frames pinned at the zoom clamp
+    entryAccum: 0, // Task-37 gesture entry: accumulated outward wheel/pinch delta (px) at the zoom clamp toward scrub-reverse
     frame: null, // handed-off { cx, cy, z, bearing } (range refit source)
     anchor: null, // ring-frame center { x, z } (range refit source)
     azim: 0, // attached-angle azimuth rad (range refit source)
@@ -752,7 +752,7 @@ async function boot() {
     handoff.revMode = null;
     handoff.walk = null;
     handoff.scrub = null;
-    handoff.atMaxFrames = 0;
+    handoff.entryAccum = 0;
     handoff.readyPosted = false;
     handoff.readyHits = 0;
     handoff.closePosted = false;
@@ -1057,15 +1057,14 @@ async function boot() {
    * buildReverseWalk), then the {recede:true} close posts. */
   function stepHandoff() {
     if (!handoff || handoff.phase === 'idle') return;
-    /* GATE-3 SCROLL-SCRUB dwell (handoff12-B: the cap is an EXIT trigger,
-     * never a parking spot): twin mode (done) pinned at the zoom-out clamp
-     * auto-enters the staged scrub-reverse even with no further wheel
-     * (covers reaching max via drag/pinch/keyboard zoom — pinch wheels stay
-     * native, so this is the pinch exit path). Wheel entry is handled in
-     * onTwinScrubWheel. A range strictly PAST the cap clamps back onto it
-     * and exits on the SAME frame (no parking past the rail, not even for
-     * the dwell). Gated on a flown handoff (start set) so standalone free
-     * orbit never trips it; re-arms when range drops back. */
+    /* GATE-3 SCROLL-SCRUB clamp rail (handoff12-B: the cap is an EXIT
+     * trigger, never a parking spot): a range strictly PAST the cap clamps
+     * back onto it and exits on the SAME frame (no parking past the rail,
+     * not even for a frame). Resting AT the clamp never auto-enters — entry
+     * is gesture-owned (decisive/accumulated outward wheel/pinch delta in
+     * onTwinScrubWheel) or explicit (Esc / parent-X / close message).
+     * Gated on a flown handoff (start set) so standalone free orbit never
+     * trips it; re-arms when range drops back. */
     if (handoff.phase === 'done') {
       if (handoff.start && !handoff.closePosted && !handoff.walk) {
         let r = null;
@@ -1086,7 +1085,7 @@ async function boot() {
               twin.updateControls();
             }
           } catch { /* clamp is best-effort; the exit below still runs */ }
-          handoff.atMaxFrames = 0;
+          handoff.entryAccum = 0;
           enterScrubReverse();
           // No entering gesture owns this entry — an immediate inward wheel
           // must recover free orbit at once, not park at progress 0.
@@ -1095,21 +1094,9 @@ async function boot() {
           } catch { /* scrub flag is best-effort */ }
           return;
         }
-        if (Number.isFinite(r) && isAtMaxZoom(r)) {
-          handoff.atMaxFrames = (handoff.atMaxFrames | 0) + 1;
-          if (handoff.atMaxFrames >= TWIN_SCRUB_DWELL_FRAMES) {
-            handoff.atMaxFrames = 0;
-            enterScrubReverse();
-            try {
-              if (handoff.scrub) handoff.scrub.justEntered = false;
-            } catch { /* scrub flag is best-effort */ }
-            return;
-          }
-        } else {
-          handoff.atMaxFrames = 0;
-        }
+        if (!Number.isFinite(r) || !isAtMaxZoom(r)) handoff.entryAccum = 0;
       } else {
-        handoff.atMaxFrames = 0;
+        handoff.entryAccum = 0;
       }
       return;
     }
@@ -1366,16 +1353,16 @@ async function boot() {
    * X (parent chrome) + browser-back are parent-owned — the parent tears the
    * iframe down directly; Esc, the sister HUD lane, and parent close
    * messages call this. Safe standalone (no frame): notifies now.
-   * Idempotent: a close after the post re-posts without re-flying. */
+   * Idempotent: a close after the post re-posts without re-flying.
+   * Task 37: the reverse is ALWAYS scrub-owned — the walk is built from the
+   * live pose, handed to handoff.scrub at the live progress, and an explicit
+   * close drives that scrub to 1 through paintScrubPose (completeScrubReverse).
+   * No wall clock ever restarts here; the wheel stays the analog path. */
   function requestTwinClose() {
     try {
-      /* GATE-3 SCROLL-SCRUB: a scrub-owned reverse converts to the timed
-       * engine (same legs, clock restarted from the live scrubbed pose) so
-       * Esc / parent-X / close-messages always rescue a wheel-stalled
-       * journey — never a dead end, never a pose jump. */
       if (handoff.phase === 'reverse') {
-        if (handoff.scrub?.active) scrubToTimed();
-        return true; // already running
+        if (handoff.scrub?.active) completeScrubReverse();
+        return true; // already running: drive it home, never re-fly
       }
       if (!handoff.start) {
         postTwinClose(); // standalone: no frame to reverse to
@@ -1409,14 +1396,19 @@ async function boot() {
         postTwinClose();
         return false;
       }
+      // Hand the live-posed walk to the scrub at the live progress (0: the
+      // walk starts where the camera is) and drive it home now — the same
+      // legs, same smootherstep, same slider law as the wheel path, so Esc
+      // and the wheel agree pose-for-pose.
       handoff.from = cur;
       handoff.walk = { legs: walk.legs, i: 0, legT0: handoffNow() };
-      handoff.scrub = null;
-      handoff.atMaxFrames = 0;
+      handoff.scrub = { active: true, progress: 0, accum: 0, justEntered: false };
+      handoff.entryAccum = 0;
       handoff.phase = 'reverse';
       try {
         twin.controls.enabled = false;
       } catch { /* flight still drives the camera */ }
+      completeScrubReverse();
       return true;
     } catch {
       try {
@@ -1432,10 +1424,10 @@ async function boot() {
    * sign the map-side scroll trigger treats as close — see sector.js
    * TWIN_SCRUB_WHEEL_PX convention). Entry has two paths: a decisive
    * OUTWARD wheel AT the zoom clamp (onTwinScrubWheel — inward wheels pass
-   * through to OrbitControls, which dollies back in natively), or dwelling
-   * pinned at the clamp in twin mode (stepHandoff dwell counter — covers
-   * drag/pinch/keyboard zoom-outs, since pinch wheels stay native). A
-   * running timed reverse takes outward non-pinch wheels over the same way
+   * through to OrbitControls, which dollies back in natively), or
+   * ACCUMULATED outward wheel/pinch delta at the clamp (same handler —
+   * covers pinch-outs and trackpad dust, since pinch wheels stay native).
+   * An unowned reverse takes outward non-pinch wheels over the same way
    * (takeover at the live progress, no pose jump). Scrubbing back to 0
    * hands free orbit back (symmetric exit); scrubbing to 1 pins top-down +
    * posts {recede:true} on the shared path. Never breaks boot/input. */
@@ -1478,7 +1470,7 @@ async function boot() {
       handoff.from = cur;
       handoff.walk = { legs: walk.legs, i: 0, legT0: handoffNow() };
       handoff.scrub = { active: true, progress: 0, accum: 0, justEntered: true };
-      handoff.atMaxFrames = 0;
+      handoff.entryAccum = 0;
       handoff.phase = 'reverse';
       try {
         twin.controls.enabled = false;
@@ -1488,32 +1480,21 @@ async function boot() {
       return false;
     }
   }
-  /* Convert a scrub-owned reverse to the timed engine from the live
-   * scrubbed pose (Esc / parent-X rescue). Same legs; first leg restarts
-   * from the current camera so there is no jump. */
-  function scrubToTimed() {
+  /* Explicit-close completion (Task 37 — Esc / parent-X / close message):
+   * drives the scrub-owned reverse to progress 1 through paintScrubPose,
+   * then the shared pin + {recede:true} post. Same legs, same smootherstep,
+   * same slider law as the wheel path — never a wall clock, never a pose
+   * jump. False when no scrub owns the reverse. */
+  function completeScrubReverse() {
     try {
-      const walk = handoff.walk;
-      if (!walk || !Array.isArray(walk.legs) || !walk.legs.length) {
-        handoff.scrub = null;
-        return false;
-      }
-      const cur = capturePose();
-      if (cur?.eye && cur?.target) {
-        walk.legs[0] = {
-          ...walk.legs[0],
-          from: { eye: { ...cur.eye }, target: { ...cur.target } },
-          fromMix: Number.isFinite(cur.mix) ? cur.mix : HANDOFF_START_MIX,
-        };
-      }
-      walk.i = 0;
-      walk.legT0 = handoffNow();
-      handoff.scrub = null;
+      const sc = handoff.scrub;
+      if (!sc?.active) return false;
+      sc.progress = 1;
+      sc.justEntered = false;
+      paintScrubPose();
+      finishScrubReverse();
       return true;
     } catch {
-      try {
-        handoff.scrub = null;
-      } catch { /* rescue is best-effort */ }
       return false;
     }
   }
@@ -1618,25 +1599,45 @@ async function boot() {
       const pinch = !!(e?.ctrlKey || e?.metaKey);
       const dY = Number(e?.deltaY);
       if (!Number.isFinite(dY) || dY === 0) return;
-      if (pinch) return;
-      if (!handoff.start || handoff.closePosted) { twinFlipToOrbit(e); return; }
+      // Pinch is NOT dropped here: it stays native for zoom (never counts
+      // toward scrub progress), but its outward delta feeds the done-phase
+      // entry accumulator below — the dwell-counter's pinch exit, gestured.
+      if (!handoff.start || handoff.closePosted) { if (!pinch) twinFlipToOrbit(e); return; }
+      // Native pinch-zoom everywhere except the done-phase clamp entry:
+      // flipping a pinch clone would convert it into a plain dolly.
+      if (pinch && handoff.phase !== 'done') return;
       if (handoff.phase === 'done') {
-        // Free orbit: only a decisive OUTWARD wheel AT the zoom clamp
-        // crosses in. (OrbitControls clamps there, so a consumed outward
-        // gesture fights nothing.) Inward wheels pass through to
-        // OrbitControls, which dollies back in natively — entering the
-        // staged reverse on an inward gesture would park controls-disabled
-        // at progress 0 for no reason. Pinch stays native here too (its
-        // exit path is the dwell counter — same frame budget, ~0.2 s).
-        if (pinch) return;
-        if (dY >= 0) { twinFlipToOrbit(e); return; }
+        // Free orbit: outward intent AT the zoom clamp crosses into the
+        // staged reverse. Inward wheels pass through to OrbitControls, which
+        // dollies back in natively — entering on an inward gesture would
+        // park controls-disabled at progress 0 for no reason. A decisive
+        // outward wheel enters on the single shot; sub-threshold outward
+        // wheels AND pinch-outs (pinch stays native — its delta only feeds
+        // entry) accumulate toward the same entry via scrubEntryForDelta, so
+        // pinch/keyboard arrivals cross in on gesture, never on a timer.
+        if (dY >= 0) { handoff.entryAccum = 0; if (!pinch) twinFlipToOrbit(e); return; }
         const r = rangeNow();
-        if (!Number.isFinite(r) || !isAtMaxZoom(r)) { twinFlipToOrbit(e); return; }
-        if (Math.abs(dY) < TWIN_SCRUB_ENTER_DELTA) { twinFlipToOrbit(e); return; }
+        if (!Number.isFinite(r) || !isAtMaxZoom(r)) { handoff.entryAccum = 0; if (!pinch) twinFlipToOrbit(e); return; }
+        const decisive = !pinch && Math.abs(dY) >= TWIN_SCRUB_ENTER_DELTA;
+        if (!decisive) {
+          const upd = scrubEntryForDelta(handoff.entryAccum ?? 0, dY, { enterPx: TWIN_SCRUB_PINCH_ENTER_PX });
+          handoff.entryAccum = upd.accum;
+          if (!upd.enter) {
+            // Below the entry budget the gesture still belongs to orbit
+            // (a no-op against the clamp) — never swallowed.
+            if (!pinch) twinFlipToOrbit(e);
+            return;
+          }
+          handoff.entryAccum = 0;
+        } else {
+          handoff.entryAccum = 0;
+        }
         if (!enterScrubReverse()) { twinFlipToOrbit(e); return; }
         if (handoff.phase !== 'reverse' || !handoff.scrub?.active) { twinFlipToOrbit(e); return; }
+        if (pinch) return; // entered on pinch: pose stays native, wheel owns it from here
       } else if (handoff.phase === 'reverse' && !handoff.scrub?.active) {
-        // Timed reverse: outward non-pinch wheels take over at the live progress.
+        // Unowned reverse (defensive — closes always hand a scrub now):
+        // outward non-pinch wheels take over at the live progress.
         if (pinch) return;
         if (dY >= 0 || !handoff.walk) return;
         handoff.scrub = {
@@ -1650,6 +1651,7 @@ async function boot() {
       }
       const sc = handoff.scrub;
       if (!sc?.active) { twinFlipToOrbit(e); return; }
+      if (pinch) return; // pinch stays native even while owned (progress law ignores it; never swallow it)
       try {
         e.preventDefault();
       } catch { /* consume is best-effort */ }
@@ -1681,7 +1683,7 @@ async function boot() {
   }
   try {
     twinDiv?.addEventListener?.('wheel', onTwinScrubWheel, { passive: false, capture: true });
-  } catch { /* scrub entry is best-effort; dwell still triggers */ }
+  } catch { /* scrub entry is best-effort */ }
 
   /* Delegated fullscreen state (twin-side). Embedded (?embed=1): the HUD
    * FULLSCREEN button posts { type:'safepipe-twin-fullscreen', on } to the
@@ -1787,6 +1789,7 @@ async function boot() {
         active: !!handoff.scrub?.active,
         progress: handoff.scrub?.progress ?? null,
         accum: handoff.scrub?.accum ?? null,
+        entryAccum: handoff.entryAccum ?? null,
         legs: handoff.walk ? handoff.walk.legs.map((l) => l.name) : null,
         range,
         atMax: Number.isFinite(range) ? isAtMaxZoom(range) : null,

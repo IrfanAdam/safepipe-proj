@@ -6,14 +6,12 @@ const GH = 'https://github.com/IrfanAdam/safepipe-proj/commit/';
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/\"/g, '&quot;').replace(/</g, '&lt;');
 export const commits = manifest.commits || [];
 export const wip = manifest.wip || [];
-const badgeItem = (c) => `<div class="ds-timeline-item"><a href="${GH}${c.full}">${c.sha}</a> <span>${esc(c.subject)}</span><small>${esc(c.time ? `${c.date} ${fmtTime(c.time)}` : c.date)}</small></div>`;
+const badgeItem = (c, idx) => `<div class="ds-timeline-item"><span class="ds-item-index">${idx}</span><a href="${GH}${c.full}">${c.sha}</a> <span>${esc(c.subject)}</span><small>${esc(c.time ? `${c.date} ${fmtTime(c.time)}` : c.date)}</small></div>`;
 export const hits = (file, text, first) => commits
   .filter((c) => c.plan === file && (c.anchor ? anchorHit(text, c.anchor) : first));
 export const badges = (list) => {
   if (!list.length) return '';
   const n = list.length;
-  // group by date preserving order (list already newest-first or chron order from manifest)
-  // commits in manifest are newest-first? sort by date/time descending for grouping consistency
   const sorted = [...list].sort((a,b)=> (b.date + (b.time||'')).localeCompare(a.date + (a.time||'')));
   const groups = new Map();
   for (const c of sorted) {
@@ -24,10 +22,13 @@ export const badges = (list) => {
   const dates = [...groups.keys()].sort((a,b)=> b.localeCompare(a));
   const latestLabel = fmtTimelineDate(dates[0]) || dates[0] || '';
   let inner = '';
-  for (const d of dates) {
-    const label = fmtTimelineDate(d) || d || 'Undated';
-    const items = groups.get(d).map(badgeItem).join('');
-    inner += `<details class="ds-timeline-group" open><summary class="ds-timeline-date">${esc(label)}</summary><div class="ds-timeline-items">${items}</div></details>`;
+  let globalIdx = 1;
+  for (let i = 0; i < dates.length; i++) {
+    const d = dates[i];
+    const labelDate = fmtTimelineDate(d) || d || 'Undated';
+    const dayLabel = `<span class="ds-caret">››</span><span class="ds-day-num">Day ${i + 1}</span> · ${esc(labelDate)}`;
+    const items = groups.get(d).map((c)=> badgeItem(c, globalIdx++)).join('');
+    inner += `<details class="ds-timeline-group" open><summary class="ds-timeline-date">${dayLabel}</summary><div class="ds-timeline-items">${items}</div></details>`;
   }
   return `<hr class="ds-hr"><details class="ds-commits-panel ds-panel" data-commits="${n}" open><summary class="ds-revs-title ds-panel-title">Commits · <span class="ds-panel-num">${n}</span> <span class="ds-panel-date">· ${esc(latestLabel)}</span></summary><div class="ds-timeline">${inner}</div></details>`;
 };
@@ -36,6 +37,6 @@ export const unlinked = (texts) => {
   if (!xs.length) return '<h2>Unlinked changes</h2><p>All tracked — every commit cites its plan.</p>';
   return ['<h2>Unlinked changes</h2><p>These cite no plan — link next time via ',
     '<code>[plan:&lt;file&gt;#&lt;anchor&gt;]</code>.</p>'].join('')
-    + (xs.length ? ((()=>{ let h='<div class=\"ds-timeline\">'; let l=null; for(const c of xs){ if(c.date!==l){ h+=`<div class=\"ds-timeline-date\">${esc(fmtTimelineDate(c.date))}</div>`; l=c.date; } h+=badgeItem(c); } return h+'</div>'; })()) : '')
+    + (xs.length ? ((()=>{ let h='<div class=\"ds-timeline\">'; let l=null; for(const c of xs){ if(c.date!==l){ h+=`<div class=\"ds-timeline-date\">${esc(fmtTimelineDate(c.date))}</div>`; l=c.date; } h+=badgeItem(c, '·'); } return h+'</div>'; })()) : '')
     + (wip.length ? `<p>Uncommitted:</p><ul>${wip.map((w) => `<li><code>${esc(w)}</code></li>`).join('')}</ul>` : '');
 };

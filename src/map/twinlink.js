@@ -15,6 +15,18 @@ export const TWIN_FS_MSG = 'safepipe-twin-fullscreen';
 // { type: TWIN_READY_MSG } when its top-down satellite frame matches the
 // staged map end-frame and is ready to be revealed. Pure.
 export const TWIN_READY_MSG = 'safepipe-twin-ready';
+// Task-36/37 staged-scroll contract (parent -> twin): the map posts
+// { type: TWIN_STAGED_MSG, s } as stage scroll S (px past the z=12 gate)
+// accumulates. Mirrors src/ring2/sector.js (which owns the twin-side copy
+// + the S->progress law); the node suite pins them equal so a Lane A move
+// breaks loudly, never silently. Pure.
+export const TWIN_STAGED_MSG = 'safepipe-twin-staged';
+
+/** Build the staged-scroll post payload. S parks at >= 0. Pure. */
+export function buildTwinStagedMessage(s) {
+  const v = Number(s);
+  return { type: TWIN_STAGED_MSG, s: Number.isFinite(v) ? Math.max(0, v) : 0 };
+}
 
 /** Parse a twin ready message. { ready:true } when matched, else null. */
 export function parseTwinReadyMessage(d) {

@@ -132,6 +132,32 @@ export function handoffStagesForScroll(s) {
   };
 }
 
+/** Symmetric stage-scroll accumulator: forward intent is -deltaY in both
+ * conventions (the wheel lane carries flipped clones — plain wheel forward
+ * = dy<0 — and native pinch, forward = dy<0), so S grows on scroll-down
+ * and drains on scroll-up through the SAME law. Clamped [0, S_MAX]. */
+export function accumStagedS(s, deltaY) {
+  const cur = Number.isFinite(+s) ? Math.max(0, +s) : 0;
+  const dy = +deltaY;
+  if (!Number.isFinite(dy) || dy === 0) return Math.min(HANDOFF_STAGED_S_MAX, cur);
+  return Math.min(HANDOFF_STAGED_S_MAX, Math.max(0, cur - dy));
+}
+
+/* Journey-enclosure radius (Task 37, map side): the ground ring the twin
+ * clip cuts at (RING_RADIUS_M, owned by src/ring2/site.js — mirrored here
+ * so this module stays import-free; the node suite pins them equal).
+ * Projected to CSS px at the live zoom/lat: R / metersPerPixel. The
+ * #map-vignette circle rides this radius, so the map-side enclosing
+ * coincides with the twin clip circle exactly (685px diameter at handoff
+ * z=12) — symmetric on zoom-out, since it is a pure function of z. */
+export const MAP_VIGNETTE_RING_M = 10000;
+export function vignetteRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M) {
+  const R = +ringM;
+  if (!Number.isFinite(R) || !(R > 0)) return null;
+  const mpp = metersPerPixel(zoom, latDeg);
+  if (!Number.isFinite(mpp) || !(mpp > 0)) return null;
+  return R / mpp;
+}
 /** At (or below tolerance of) the min-zoom cap — mirrored-reverse home. */
 export function isHomeZoom(z) {
   return Number.isFinite(+z) && +z <= Z_MIN + HOME_EPS;
