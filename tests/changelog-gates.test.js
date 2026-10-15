@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { split, anchorHit, gateNOf } from '../src/changelog/changelog-parse.js';
+import { split, anchorHit, anchorHitCI, anchorOf, gateNOf } from '../src/changelog/changelog-parse.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const plansDir = join(root, '.hermes', 'plans');
@@ -65,5 +65,18 @@ describe('corpus gate ownership', () => {
     const orphans = manifest.commits.filter((c) => c.plan === file && !seen.has(c.sha));
     assert.ok(orphans.length > 0, 'expected orphan follow-up commits');
     assert.ok(orphans.every((c) => c.anchor === 'follow-up'));
+  });
+  it('unlinked triage matches anchors case-insensitively (Follow-up heading)', () => {
+    const file = '2026-10-15_120000-safepipe-changelog-timeline.md';
+    const raw = readFileSync(join(plansDir, file), 'utf8');
+    assert.equal(anchorHit(raw, 'follow-up'), false);
+    assert.equal(anchorHitCI(raw, 'follow-up'), true);
+    assert.equal(anchorHitCI('see {#task-10}', 'task-1'), false);
+    assert.equal(anchorHitCI('see {#task-1}', 'task-1'), true);
+    // Mirror pages-changelog texts[]: raw plus one {#anchor} per section.
+    let text = raw;
+    for (const s of split(raw)) { const a = anchorOf(s.head); if (a) text += `\n{#${a}}`; }
+    const flagged = manifest.commits.filter((c) => c.plan === file && c.anchor && !anchorHitCI(text, c.anchor));
+    assert.equal(flagged.length, 0, `wrongly unlinked: ${flagged.map((c) => c.sha).join(',')}`);
   });
 });
