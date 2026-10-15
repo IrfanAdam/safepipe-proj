@@ -1,5 +1,6 @@
 // safepipe changelog — parse helpers · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
-// Exports: chunks, goal, norm, split, state, isDone, buildState, parseMeta, anchorOf, anchorHit
+// Exports: chunks, goal, norm, split, state, isDone, buildState, parseMeta, anchorOf, anchorHit,
+//   parseDue, dueOf (+ phash, parseGates)
 // Re-exports MONTHS, fmtDate, fmtTime, pDay, isoDay via changelog-format.js
 // Safepipe adapter: plans use `## Task N` / `## Step N` (or bare `### Task N`)
 // instead of `## Phase N`; commit anchors are bare `task-N`.
@@ -171,3 +172,40 @@ export const parseGates = (md) => {
 };
 
 export { MONTHS, fmtDate, fmtTime, pDay, isoDay } from './changelog-format.js';
+
+// Due dates (timeline scheduling · [plan:2026-10-15_120000-safepipe-changelog-timeline.md#task-1]).
+// Convention: `*Due: YYYY-MM-DD*` alone on its own line, directly under a
+// `## Phase|Task|Step` head or a `### Task` head — whichever section level
+// holds the work inside that plan (nearest level wins: split() returns `##`
+// sections when present, else `###` sections, so each dueOf() call already
+// sees the winning level). norm() is untouched — a Due line never
+// synthesizes checkboxes.
+const DUE_LINE = /^\s*\*Due:\s*(\d{4})-(\d{2})-(\d{2})\*\s*$/;
+const DUE_DIM = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+// First Due-shaped line wins (idempotent under duplicate lines). Invalid —
+// malformed, month>12, day>31, year>2099, or no such calendar day — → null,
+// never throws.
+export const parseDue = (body) => {
+  try {
+    for (const ln of String(body || '').split('\n')) {
+      const m = ln.match(DUE_LINE);
+      if (!m) continue;
+      const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+      if (y < 1 || y > 2099 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+      const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+      if (d > (mo === 2 && leap ? 29 : DUE_DIM[mo - 1])) return null;
+      return `${m[1]}-${m[2]}-${m[3]}`;
+    }
+  } catch { return null; }
+  return null;
+};
+
+// dueOf(section): Due honored ONLY for incomplete sections — a head carrying
+// ✓/✗ or a body whose checkboxes are all done yields null (done/cancelled
+// work never grows a ghost). section = split() output {head, body}.
+export const dueOf = (section) => {
+  if (!section) return null;
+  if (/[✓✗]/.test(String(section.head || ''))) return null;
+  if (isDone(state(section.body || ''))) return null;
+  return parseDue(section.body);
+};
