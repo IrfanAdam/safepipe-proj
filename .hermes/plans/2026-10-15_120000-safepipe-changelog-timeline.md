@@ -77,7 +77,7 @@
 
 **Verify:** every plan with commits shows ≥1 bar; ghost absent until a Due is set (Task 3 proves presence); streak summary counts equal manual bout filter; sporadic summary lists exactly its day; list→timeline→plan→close lands on timeline; `?view=timeline` cold-load works.
 
-- REF GATE 2 (visual): chromium + webkit screenshots of (a) button next to graph, (b) open timeline with bars, (c) hover tooltip, (d) bout popover + bout summary, (e) plan opened from track; zero page errors; `npm run build` green.
+- REF GATE 2 (visual): chromium + webkit screenshots of (a) button next to graph, (b) open timeline with bars, (c) hover tooltip, (d) bout popover + bout summary, (e) plan opened from track; zero page errors; `npm run build` green ✓ PASSED.
 
 ### Task 2 ✓ done ea83227
 
@@ -105,7 +105,7 @@
 
 **Verify:** set Due on open task → file diff shows exactly one Due line; done task offers no control; set Due +7d → ghost bar + calendar future dot appear; overdue Due → top cluster + overdue treatment; `npm run build` + second `plan-track` run diff-clean; preflight `--check` passes.
 
-- REF GATE 3: end-to-end set→ghost→clear captured in screenshots; Due commits carry trailers; tracker 0 wip after regen.
+- REF GATE 3: end-to-end set→ghost→clear captured in screenshots; Due commits carry trailers; tracker 0 wip after regen ✓ PASSED.
 
 ### Task 3 ✓ done 1e89d6c
 
@@ -130,7 +130,7 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 
 **Verify:** SKILL.md diff shows version bump + new sections; full skill Verification checklist (old + new timeline items) ticked; `npm run build` green; 0 wip.
 
-- REF GATE 4 (ship): build green, 0 wip, screenshots attached, skill v0.4.0 committed, this plan closed.
+- REF GATE 4 (ship): build green, 0 wip, screenshots attached, skill v0.4.0 committed, this plan closed ✓ PASSED.
 
 ### Task 4 ✓ done c5e9946
 
