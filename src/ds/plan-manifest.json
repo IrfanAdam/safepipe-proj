@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-15T14:59:53.842Z",
+  "generated": "2026-10-15T15:06:43.808Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "5265a58",
+      "full": "5265a586a3d11851f8b723d7fefdcc8bb20955f2",
+      "date": "2026-10-15",
+      "time": "20:36",
+      "subject": "feat(changelog): timeline readability — axis fix, wider days, month padding, larger bars, structured popover [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "fa74e88",
       "full": "fa74e88820395aaa9ac55c61366e9f83aa281778",
@@ -3456,9 +3465,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/changelog/changelog-events.js",
-    "src/changelog/changelog-timeline.css",
-    "src/changelog/changelog/timeline-paint.js"
-  ]
+  "wip": []
 }
