@@ -201,7 +201,11 @@ export function paintTimeline(root, ctx) {
       const cls = b.kind === 'streak' ? 'ds-tl-streak' : 'ds-tl-bout';
       const cur = (selRow === r && selIdx === i) ? ' aria-current="true"' : '';
       const nm = i === li ? `<span class="ds-tl-barname">${esc(r.plan.title)}</span>` : '';
-      return `<button class="${cls} lv${lv}" style="${barGeom(grid.start, b.start, b.end)}"` +
+      // Done coverage: the muted-accent share of the bar = phases done among
+      // the phases this bout touches (data-ph carries the same ratio) — a
+      // 3/5 bout covers 60% of its width from the left.
+      const cov = bs && bs.phases > 0 ? Math.round((bs.phasesDone / bs.phases) * 100) : 0;
+      return `<button class="${cls} lv${lv}" style="${barGeom(grid.start, b.start, b.end)};--tl-done:${cov}%"` +
         ` data-tl-bout="${esc(r.plan.file)}:${i}" data-tip="${esc(r.tip)}"` +
         ` data-pop="${esc(boutPopLines(bs))}"${bs && bs.complete ? ' data-popdone="1"' : ''}${cur}` +
         ` data-due="${bs && bs.due ? bs.due : ''}" data-duetxt="${bs && bs.due ? esc(fmtDate(bs.due)) : ''}"` +

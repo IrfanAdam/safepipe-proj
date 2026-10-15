@@ -183,6 +183,8 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 20. Title inset + softer done bars: the timeline head title now carries the `cl-16` left inset (matching the ✕'s `cl-16` from the right; the grid below stays flush); fully-done bars muted further, 60% → 45% accent × `neutral-5` (≈ `#b3a7ef`). All 13 bars verified down to two fills — done `#b3a7ef` / neutral `#eaeaea`.
 21. Past lockout: picker days before today render muted + `disabled` (click is a no-op) — schedules only run today-forward. Existing overdue Dues keep their flag, they just can't be (re-)picked.
 
+22. Coverage + quieter accent: every bar now paints its done share from the left — `--tl-done` inline per bar (phasesDone/phases among the bout's phases; e.g. 4/5 → 80%, 1/2 → 50%, fully done → 100%) as a hard-stop gradient from the muted accent (45% → 35% accent × `neutral-5` ≈ `#bdb4eb`) to the neutral (`#eaeaea`); `[data-popdone]` fill rules retired (the gradient covers 100%).
+
 - REF GATE (polish): chromium + webkit — white 7×7 tile in grid; 13 rows named on bars, no sidebar; popover 5 lines; bar→drawer-only→✕→timeline; zero page errors; build green.
 
 ### Follow-up ✓ done ead03a5
