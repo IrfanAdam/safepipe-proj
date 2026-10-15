@@ -181,6 +181,8 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 
 19. Timeline surface batch: drawer panel now resets margin+padding so the in-drawer commit-list `.ds-timeline` rule (changelog-drawer.css) can no longer leak `padding-left:12px` onto the aside — head/axis/rows sit flush with the drawer's left edge; head-date scrub input removed (markup, CSS, `change` wiring); done bars drop the full accent for a muted accent (`color-mix` accent 60% × `neutral-5` ≈ #a494f3) and neutral bars darken one quiet step (`neutral-3` → 50% `neutral-5` mix ≈ #eaeaea); dead `lv*` bar rules deleted.
 
+20. Title inset + softer done bars: the timeline head title now carries the `cl-16` left inset (matching the ✕'s `cl-16` from the right; the grid below stays flush); fully-done bars muted further, 60% → 45% accent × `neutral-5` (≈ `#b3a7ef`). All 13 bars verified down to two fills — done `#b3a7ef` / neutral `#eaeaea`.
+
 - REF GATE (polish): chromium + webkit — white 7×7 tile in grid; 13 rows named on bars, no sidebar; popover 5 lines; bar→drawer-only→✕→timeline; zero page errors; build green.
 
 ### Follow-up ✓ done ead03a5

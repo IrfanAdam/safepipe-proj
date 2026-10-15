@@ -23,13 +23,14 @@
 aside.ds-timeline{position:fixed;top:0;right:0;bottom:0;margin:0;padding:0;width:min(86vw,var(--size-ds-drawer));box-sizing:border-box;background:var(--color-bg);border-left:var(--border-hairline);z-index:var(--z-ds-drawer);box-shadow:var(--shadow-viewer);display:flex;flex-direction:column;overflow:hidden}
 aside.ds-timeline[hidden]{display:none}
 aside.ds-timeline:not([hidden]){animation:ds-drawer-in var(--dur-glide) var(--ease-signature)}
-.ds-tl-head{display:flex;gap:var(--cl-8);align-items:flex-start;padding:var(--cl-16) var(--cl-16) var(--cl-8) 0 !important}
-/* Owner call (2026-10-16): the head-date scrub input is gone — the title
-   alone sits flush left in the head. */
+.ds-tl-head{display:flex;gap:var(--cl-8);align-items:flex-start;padding:var(--cl-16) var(--cl-16) var(--cl-8) var(--cl-16) !important}
+/* Owner call (2026-10-16): head-date scrub input gone; the title carries
+   the cl-16 left inset to mirror the ✕'s cl-16 from the right — the grid
+   below stays flush left. */
 .ds-tl-head b{font-family:var(--font-display);font-size:var(--sp-text-lg);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ds-tl-head small{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);align-self:center}
 .ds-tl-head button{font-family:var(--font-mono);font-size:var(--text-micro);background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);padding:var(--cl-4) var(--cl-8);cursor:pointer}
-.ds-tl-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding-bottom:var(--cl-16);padding-left:0 !important;margin-left:0 !important}
+.ds-tl-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding-bottom:var(--cl-16);padding-left:var(--cl-16) !important;margin-left:0 !important}
 .ds-tl-axis{display:flex;position:sticky;top:0;background:var(--color-bg);z-index:2;border-bottom:var(--border-hairline);padding:var(--cl-8) 0 var(--cl-4) !important;margin-left:0 !important}
 .ds-tl-ticks{position:relative;flex:none;height:var(--cl-20)}
 .ds-tl-tick{position:absolute;top:0;height:var(--cl-20);line-height:var(--cl-16);border-left:var(--border-hairline);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding-left:var(--cl-2);white-space:nowrap;overflow:visible}
@@ -44,9 +45,9 @@ aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
    fully-done bars wear a muted accent — never the full dark violet.
    Density lv* no longer shades (all levels share the one neutral). */
 .ds-tl-bout{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-20);border:none;border-radius:var(--radius-xs);background:color-mix(in srgb, var(--sp-neutral-5) 50%, var(--sp-neutral-3));cursor:pointer;padding:0;box-sizing:border-box}
-.ds-tl-bout[data-popdone="1"]{background:color-mix(in srgb, var(--color-accent) 60%, var(--sp-neutral-5));border-color:color-mix(in srgb, var(--color-accent) 60%, var(--sp-neutral-5))}
+.ds-tl-bout[data-popdone="1"]{background:color-mix(in srgb, var(--color-accent) 45%, var(--sp-neutral-5));border-color:color-mix(in srgb, var(--color-accent) 45%, var(--sp-neutral-5))}
 .ds-tl-streak{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-26);border:none;border-radius:var(--radius-xs);background:color-mix(in srgb, var(--sp-neutral-5) 50%, var(--sp-neutral-3));cursor:pointer;padding:0;box-sizing:border-box}
-.ds-tl-streak[data-popdone="1"]{background:color-mix(in srgb, var(--color-accent) 60%, var(--sp-neutral-5));border-color:color-mix(in srgb, var(--color-accent) 60%, var(--sp-neutral-5))}
+.ds-tl-streak[data-popdone="1"]{background:color-mix(in srgb, var(--color-accent) 45%, var(--sp-neutral-5));border-color:color-mix(in srgb, var(--color-accent) 45%, var(--sp-neutral-5))}
 .ds-tl-bout:hover,.ds-tl-streak:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-tl-bout[aria-current="true"],.ds-tl-streak[aria-current="true"]{outline:var(--cl-2) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-tl-ghost{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-8);border:var(--cl-1) dashed var(--color-ink-muted);border-radius:var(--radius-xs);background:transparent;cursor:pointer;padding:0}
