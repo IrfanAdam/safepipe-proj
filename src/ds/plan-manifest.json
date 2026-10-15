@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-15T10:04:41.743Z",
+  "generated": "2026-10-15T10:10:05.082Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -16,6 +16,15 @@
     "2026-10-13_233337-ops3d-twin-work.md"
   ],
   "commits": [
+    {
+      "sha": "092f9bf",
+      "full": "092f9bff6f8d66e170349a1c8225bec64f643b11",
+      "date": "2026-10-15",
+      "time": "15:40",
+      "subject": "fix(changelog): retro re-point split-phase + skill sync commits, triage-zero [plan:2026-10-07_130000-safepipe-changelog.md#task-5]",
+      "plan": "2026-10-07_130000-safepipe-changelog.md",
+      "anchor": "task-5"
+    },
     {
       "sha": "6f3e285",
       "full": "6f3e2853792e8f0b5d1c6f5e4fafd36509a95b12",
@@ -3329,7 +3338,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/ds/plan-retro.json"
-  ]
+  "wip": []
 }
