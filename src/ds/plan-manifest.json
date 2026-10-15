@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-15T19:14:57.539Z",
+  "generated": "2026-10-15T19:15:08.922Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "fad8522",
+      "full": "fad8522b3a1d5f03163cefb8ab53d7d3eefb26a1",
+      "date": "2026-10-16",
+      "time": "00:45",
+      "subject": "feat(changelog): scope fractions with done-count accent in popover [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "3802720",
       "full": "3802720ad08ca703bae5f5df233220f1af5e48d0",
@@ -3530,11 +3539,7 @@
   ],
   "wip": [
     "src/changelog/changelog-cal.css",
-    "src/changelog/changelog-events.js",
-    "src/changelog/changelog-timeline.css",
-    "src/changelog/changelog-timeline.js",
     "src/changelog/changelog/graph.js",
-    "src/changelog/changelog/timeline-paint.js",
     "src/changelog/pages-changelog.js"
   ]
 }
