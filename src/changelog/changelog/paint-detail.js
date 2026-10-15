@@ -214,7 +214,7 @@ export function paintDetail(root, ctx){
     }
   }
   // Due control (Task 3, scheduling): incomplete sections only. Complete /
-  // cancelled sections render no control — just the shipped tip.
+  // cancelled sections render no Due line at all — never a Due n/a.
   const secShipped = /[✓✗]/.test(String(sprint.head || '')) || isDone(state(sprint.body));
   const secDue = secShipped ? null : dueOf({ head: sprint.head, body: sprint.body });
   const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -222,7 +222,7 @@ export function paintDetail(root, ctx){
   const secAnchor = (String(sprint.body || '').match(/\{#([A-Za-z]+-\d+)\}/) || [])[1]
     || anchorOf(sprint.head) || '';
   const dueHTML = secShipped
-    ? `<p class="ds-due ds-is-na" data-tip="shipped — Due n/a"><span>Due</span> n/a</p>`
+    ? ''
     : [
       `<div class="ds-due" data-due-row>`,
       `<label>Due <input type="date" data-due-input value="${secDue || ''}"`,

@@ -102,4 +102,3 @@
 .ds-due button[disabled]{opacity:0.45;cursor:default}
 .ds-due-overdue{color:var(--color-accent);font-weight:700;text-transform:uppercase;letter-spacing:var(--tracking-label)}
 .ds-due small{flex-basis:100%;line-height:var(--leading-mono);overflow-wrap:anywhere}
-.ds-due.ds-is-na{margin-bottom:var(--cl-12)}

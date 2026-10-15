@@ -52,7 +52,7 @@ export function graph({ plans, day }) {
       const k = isoDay(d),
         todayCls = k === isoDay(today) ? ' is-today' : '';
       if (d > today) {
-        if (dues.has(k)) return `<span class="ds-day is-future is-due" data-tip="${fmtDate(k)} · Due"></span>`;
+        if (dues.has(k)) return `<span class="ds-day is-future is-due" data-due-day="${k}" data-tip="${fmtDate(k)} · Due"></span>`;
         return `<span class="ds-day is-future" data-tip="${fmtDate(k)} · upcoming"></span>`;
       }
       const n = dc[k] || 0;

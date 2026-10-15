@@ -5,16 +5,17 @@
 .ds-dows{display:flex;flex-direction:column;gap:var(--cl-4);width:var(--cl-26);flex:none}
 .ds-dows span{height:var(--cl-16);display:flex;align-items:center;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
 .ds-week{display:flex;flex-direction:column;gap:var(--cl-4)}
-.ds-month{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);min-height:1.2em;margin-bottom:var(--cl-2);white-space:nowrap;overflow:visible;flex:none}
-.ds-day{width:var(--cl-16);height:var(--cl-16);border:var(--border-hairline);background:color-mix(in srgb, var(--color-ink) 7%, transparent);padding:0;border-radius:var(--radius-xs)}
+.ds-month{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);min-height:1.2em;margin-bottom:var(--cl-2);white-space:nowrap;overflow:visible;flex:none;text-transform:uppercase}
+.ds-day{width:var(--cl-16);height:var(--cl-16);border:var(--border-hairline);background:var(--color-surface);padding:0;border-radius:var(--radius-xs)}
 button.ds-day{cursor:pointer;background:var(--color-accent);border-color:transparent}
 button.ds-day.lv1{background:color-mix(in srgb, var(--color-accent) 30%, transparent)}
 button.ds-day.lv2{background:color-mix(in srgb, var(--color-accent) 50%, transparent)}
 button.ds-day.lv3{background:color-mix(in srgb, var(--color-accent) 75%, transparent)}
 button.ds-day.lv4{background:var(--color-accent)}
 .ds-day.on{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
-button.ds-day:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
-.ds-day.is-today{position:relative;border-color:var(--color-ink)}
+button.ds-day:hover{outline:var(--cl-1) solid var(--color-accent);outline-offset:var(--cl-1)}
+button.ds-day:focus-visible{outline:var(--cl-1) solid var(--color-accent);outline-offset:var(--cl-1)}
+.ds-day.is-today{position:relative;border-color:var(--color-accent)}
 .ds-day.is-future{opacity:.6}
 /* scheduling ghost-dot (timeline Task 3): future Due marker — full-opacity
    accent outline on the dimmed future cell, no new colors. */

@@ -93,7 +93,9 @@ export function sortTimelineRows(rows, sort) {
 }
 
 // Bout popover lines: title / 'P phases · d/t tasks' / 'C commits · R revs' /
-// range + Due. boutPopText stays the one-line form for the summary sumline.
+// range. Due is NOT a text line — it renders structurally right under the
+// tasks line (underlined deadline link, or muted done date), never a Due n/a.
+// boutPopText stays the one-line form for the summary sumline.
 export function boutPopLines(sum) {
   if (!sum) return '';
   const lines = [sum.title];
@@ -104,8 +106,7 @@ export function boutPopLines(sum) {
   if (scope) lines.push(scope);
   lines.push(`${sum.commits} commit${sum.commits === 1 ? '' : 's'} · ${sum.revs} rev${sum.revs === 1 ? '' : 's'}`);
   if (sum.range) lines.push(sum.range);
-  if (sum.due) lines.push(`Due ${sum.due}${sum.overdue ? ' (overdue)' : ''}`);
-  return lines.filter(Boolean).join('\n');
+  return lines.join('\n');
 }
 // Bout popover snippet: "{title} · {d/t} tasks · {C} commits · {R} revs · {range}" + Due.
 export function boutPopText(sum) {
@@ -178,9 +179,11 @@ export function paintTimeline(root, ctx) {
   // on month bands: any month-boundary shade change reads as a gap, so no
   // band elements are emitted at all. Months differ only by the `Oct` tick.
   const laneW = `width:calc(var(--cl-tl-day) * ${grid.days})`;
-  const todayOff = Math.round((pISO(today) - pISO(grid.start)) / DAY);
+  const nowMs = Date.now();
+  const todayFracOff = (nowMs - pISO(grid.start).getTime()) / DAY;
+  const todayOff = Math.floor(todayFracOff);
   const todayLine = (todayOff >= 0 && todayOff < grid.days)
-    ? `<span class="ds-tl-todaycol" style="left:calc(var(--cl-tl-day) * ${todayOff})"></span><span class="ds-tl-today" style="left:calc(var(--cl-tl-day) * ${todayOff})"></span>` : '';
+    ? `<span class="ds-tl-todaycol" style="left:calc(var(--cl-tl-day) * ${todayOff})"></span><span class="ds-tl-today" style="left:calc(var(--cl-tl-day) * ${todayFracOff.toFixed(4)})"></span>` : '';
   const body = rows.length ? rows.map((r) => {
     // Owner call: the plan name rides its longest bar, not a sidebar label.
     let li = -1, best = -1;
@@ -199,6 +202,8 @@ export function paintTimeline(root, ctx) {
       return `<button class="${cls} lv${lv}" style="${barGeom(grid.start, b.start, b.end)}"` +
         ` data-tl-bout="${esc(r.plan.file)}:${i}" data-tip="${esc(r.tip)}"` +
         ` data-pop="${esc(boutPopLines(bs))}"${bs && bs.complete ? ' data-popdone="1"' : ''}${cur}` +
+        ` data-due="${bs && bs.due ? bs.due : ''}" data-duetxt="${bs && bs.due ? esc(fmtDate(bs.due)) : ''}"` +
+        ` data-donetxt="${bs && bs.done ? esc(fmtDate(bs.done)) : ''}"` +
         ` aria-label="${esc(`${r.plan.title}, ${b.kind} ${b.start} to ${b.end}`)}">${nm}</button>`;
     }).join('');
     let g = '';
@@ -233,10 +238,10 @@ export function paintTimeline(root, ctx) {
       try {
         const sc = panel.querySelector('.ds-tl-scroll');
         const lane = panel.querySelector('.ds-tl-lane');
-        if (!sc || !lane || todayOff < 0 || todayOff >= grid.days) return;
+        if (!sc || !lane || todayFracOff < 0 || todayFracOff >= grid.days) return;
         const dayPx = lane.getBoundingClientRect().width / grid.days;
         if (!dayPx) return;
-        const x = todayOff * dayPx;
+        const x = todayFracOff * dayPx;
         if (x < sc.scrollLeft || x > sc.scrollLeft + sc.clientWidth) {
           sc.scrollLeft = Math.max(0, x - sc.clientWidth * 0.3);
         }

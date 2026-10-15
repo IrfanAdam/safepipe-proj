@@ -60,26 +60,36 @@ export function duePreviewEdit(body, head, due) {
 export function bindChangelogEvents(root, st, helpers) {
   const { cur, doPaint } = helpers;
   const tlPop = () => root.querySelector('[data-tl-pop]');
-  const hidePop = () => { const p = tlPop(); if (p) p.hidden = true; };
+  let popFor = null;
+  const hidePop = () => { popFor = null; const p = tlPop(); if (p) p.hidden = true; };
   const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const showPop = (el, x, y) => {
     const p = tlPop();
     if (!p || !el || !el.dataset.pop) { hidePop(); return; }
     // Structured popover: title + 2-line-clamped description (from the
     // bout's data-tip) + phases/tasks line (accent when the bout is fully
-    // done) + smaller muted stats/date subtext.
+    // done) + schedule-deadline link right under it (or a muted done date
+    // when no Due applies — never a Due n/a) + smaller muted stats/date
+    // subtext.
     const lines = String(el.dataset.pop).split('\n').filter(Boolean);
     const title = lines[0] || '';
     const tasks = lines[1] || '';
     const sub = lines.slice(2).join('\n');
     const desc = (el.dataset.tip || '').trim();
     const done = !!el.dataset.popdone;
+    const due = (el.dataset.due || '').trim();
+    const dueRow = due
+      ? `<button class="ds-tl-pop__due" data-tl-due="${escHtml(due)}">Schedule deadline · ${escHtml((el.dataset.duetxt || '').trim() || due)}</button>`
+      : ((el.dataset.donetxt || '').trim()
+        ? `<span class="ds-tl-pop__done">Done ${escHtml((el.dataset.donetxt || '').trim())}</span>` : '');
     p.innerHTML =
       `<b class="ds-tl-pop__title">${escHtml(title)}</b>` +
       (desc && desc !== title ? `<span class="ds-tl-pop__desc">${escHtml(desc)}</span>` : '') +
       (tasks ? `<span class="ds-tl-pop__tasks${done ? ' is-done' : ''}">${escHtml(tasks)}</span>` : '') +
+      dueRow +
       (sub ? `<span class="ds-tl-pop__sub">${escHtml(sub)}</span>` : '');
     p.hidden = false;
+    popFor = el;
     const pad = 14;
     const r = p.getBoundingClientRect();
     let px = (x ?? 0) + pad, py = (y ?? 0) + pad;
@@ -165,6 +175,19 @@ export function bindChangelogEvents(root, st, helpers) {
       hidePop(); doPaint(root); return;
     }
     if (e.target.closest('[data-tl-close]')) { closeTimeline(); return; }
+    // Schedule-deadline link: leave the timeline and reveal the Due cell on
+    // the calendar. Never sets the day filter (a future Due would empty the
+    // list) — just scrolls the marked cell into view.
+    const ddl = e.target.closest('[data-tl-due]');
+    if (ddl && ddl.dataset.tlDue) {
+      const iso = ddl.dataset.tlDue;
+      hidePop(); closeTimeline();
+      requestAnimationFrame(() => {
+        const cell = root.querySelector(`[data-due-day="${iso}"]`);
+        if (cell && cell.scrollIntoView) cell.scrollIntoView({ block: 'nearest', inline: 'center' });
+      });
+      return;
+    }
     const bb = e.target.closest('[data-tl-bout]');
     if (bb) {
       const [f, i] = (bb.dataset.tlBout || '').split(':');
@@ -209,7 +232,7 @@ export function bindChangelogEvents(root, st, helpers) {
   const onKey = (e) => {
     if (e.key !== 'Escape') return;
     const p = tlPop();
-    if (p && !p.hidden) { p.hidden = true; return; }
+    if (p && !p.hidden) { hidePop(); return; }
     if (st.open) {
       st.open = false;
       if (st.view !== 'timeline' && st.returnView !== 'timeline') st.stage = 'list';
@@ -220,10 +243,13 @@ export function bindChangelogEvents(root, st, helpers) {
   const move = (e) => {
     const bout = e.target.closest ? e.target.closest('[data-tl-bout]') : null;
     if (bout && st.view === 'timeline') {
+      if (bout === popFor) return; // same bar: stay put so the deadline link is clickable
       const tip = root.querySelector('.ds-cursor-tip');
       if (tip) tip.hidden = true;
       showPop(bout, e.clientX, e.clientY); return;
     }
+    // Moving onto the popover itself (reaching the deadline link) keeps it open.
+    if (e.target.closest('[data-tl-pop]')) return;
     const el = e.target.closest('[data-tip]'), tip = root.querySelector('.ds-cursor-tip');
     hidePop();
     if (!tip) return;

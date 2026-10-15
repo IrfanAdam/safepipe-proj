@@ -150,15 +150,17 @@ export const boutSummary = (plan = {}, bout = {}, todayISO) => {
   let evals = parseGates(plan.raw || '').filter((g) => REV_NOTE.test(g.note || '') && g.date && inBout.has(g.date)).length;
   for (const s of sections) evals += fbBlocksIn(s.body || '');
   const status = buildState(sections);
+  const dates = [...inBout].filter((d) => ISO.test(d)).sort();
   return {
     title: titleOf(plan),
     status,
     phases: sections.length,
     complete: isDone(status),
+    done: dates.length ? dates[dates.length - 1] : null,
     commits: ((plan && plan.commits) || []).filter(has).length,
     revs: revsOf(plan).filter(has).length,
     evals,
-    range: rangeOf([...inBout].filter((d) => ISO.test(d)).sort()),
+    range: rangeOf(dates),
     due,
     overdue: !!due && due < today,
   };

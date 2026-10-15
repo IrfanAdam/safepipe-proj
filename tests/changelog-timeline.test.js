@@ -185,6 +185,8 @@ describe('summaries', () => {
     assert.equal(s.revs, 0);
     assert.equal(s.status, state(p.sprints[0].body));
     assert.equal(s.range, '2026-10-21');
+    assert.equal(s.done, '2026-10-21');
+    assert.equal(s.complete, isDone(s.status));
     assert.equal(s.title, planSummary(p, TODAY).title);
   });
 });
