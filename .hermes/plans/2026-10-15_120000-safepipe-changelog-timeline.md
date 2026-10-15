@@ -167,6 +167,7 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 5. Timeline entry is a large WHITE 7×7-cell tile inside the days grid after the last week (surface bg, hairline, `radius-md`); count + pressed state still sync from `doPaint` (text wraps centered). Note: `--cl-24` does not exist in the token scale (22→26) — sizes use `--cl-16/--cl-26`.
 6. Bout popover: one stat per line incl. date range (`boutPopLines`; `boutPopText` stays the sumline form; `.ds-tl-pop` gains `pre-line`).
 7. No in-timeline bout panel at all — the plan panel suffices: `summaryHTML` renders only the one-line overall sumline (bout state drives bar highlight + deep link only); dead `badges`/`paintRevs`/`parseGates` imports + `.ds-tl-items`/`.ds-tl-back` CSS removed. Bar→drawer→✕ lands straight back on the timeline.
+8. Subagent batch (deleg_2b30f44e, 2 lanes): black scrim under the timeline + scrim-click closes it (pages-changelog/events); summary + What's-next/overdue row deleted — head straight to rows; day column ×1.6, streak 20px/bout 16px, 1-day bars min 2 cols; square bar corners (`radius-none`); label chip from bar edge, 20ch spill; daily `5 6 …` ticks + per-month bands; white popover with `C commits · R revs` one line; parent fix: chip wash covered the full bar (killed the darker left nub).
 
 - REF GATE (polish): chromium + webkit — white 7×7 tile in grid; 13 rows named on bars, no sidebar; popover 5 lines; bar→drawer-only→✕→timeline; zero page errors; build green.
 

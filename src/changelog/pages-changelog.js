@@ -98,6 +98,8 @@ function doPaint(root) {
     sel: st.sel, open: st.open, stage: st.stage, counts, plans, texts,
     rev: plan ? revOf(plan.file) : null, revOf, edited: plan ? (s) => sectionEdited(plan.file, s) : () => false,
     revs: plan ? (history[plan.file] || []) : [] });
+  const scrim = root.querySelector('[data-scrim]');
+  if (scrim) scrim.hidden = !(st.open || st.view === 'timeline');
   const btn = root.querySelector('[data-view="timeline"]');
   if (btn) {
     const n = list.length, on = st.view === 'timeline';

@@ -150,9 +150,6 @@ export function bindChangelogEvents(root, st, helpers) {
       hidePop(); doPaint(root); return;
     }
     if (e.target.closest('[data-tl-close]')) { closeTimeline(); return; }
-    if (e.target.closest('[data-tl-overall]')) { st.tlSel = null; doPaint(root); return; }
-    const tsort = e.target.closest('[data-tl-sort]');
-    if (tsort) { st.tlSort = st.tlSort === 'next' ? '' : 'next'; doPaint(root); return; }
     const bb = e.target.closest('[data-tl-bout]');
     if (bb) {
       const [f, i] = (bb.dataset.tlBout || '').split(':');
@@ -164,6 +161,7 @@ export function bindChangelogEvents(root, st, helpers) {
     if (tl) { openTlPlan(tl.dataset.tlOpen, null, false); return; }
     if (e.target.closest('[data-close]')
       || e.target.closest('[data-scrim]')) {
+      if (e.target.closest('[data-scrim]') && !st.open && st.view === 'timeline') { closeTimeline(); return; }
       st.open = false;
       if (st.view !== 'timeline' && st.returnView !== 'timeline') st.stage = 'list';
       st.returnView = null; hidePop(); doPaint(root); return;

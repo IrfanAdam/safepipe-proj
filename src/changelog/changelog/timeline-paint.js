@@ -3,7 +3,7 @@
 // View layer only: streak/sporadic/ghost tracks + overall summary over the
 // frozen lane-A model (../changelog-timeline.js). Bout popovers reuse
 // boutSummary — no reimplemented grouping.
-import { activeDatesOf, boutsOf, ghostOf, planSummary, boutSummary, planTip, MERGE_GAP } from '../changelog-timeline.js';
+import { activeDatesOf, boutsOf, ghostOf, boutSummary, planTip, MERGE_GAP } from '../changelog-timeline.js';
 import { hits, commits } from '../changelog-links.js';
 import { state, isDone, buildState, dueOf, fmtDate, isoDay } from '../changelog-parse.js';
 import { clip, oneLine } from '../changelog-titles.js';
@@ -76,14 +76,13 @@ export function sortTimelineRows(rows, sort) {
   }).map(([r]) => r);
 }
 
-// Bout popover lines: one stat per line (title / tasks / commits / revs /
-// range + Due). boutPopText stays the one-line form for the summary sumline.
+// Bout popover lines: title / tasks / 'C commits · R revs' / range + Due.
+// boutPopText stays the one-line form for the summary sumline.
 export function boutPopLines(sum) {
   if (!sum) return '';
   const lines = [sum.title];
   if (sum.status) lines.push(`${sum.status} tasks`);
-  lines.push(`${sum.commits} commit${sum.commits === 1 ? '' : 's'}`);
-  lines.push(`${sum.revs} rev${sum.revs === 1 ? '' : 's'}`);
+  lines.push(`${sum.commits} commit${sum.commits === 1 ? '' : 's'} · ${sum.revs} rev${sum.revs === 1 ? '' : 's'}`);
   if (sum.range) lines.push(sum.range);
   if (sum.due) lines.push(`Due ${sum.due}${sum.overdue ? ' (overdue)' : ''}`);
   return lines.filter(Boolean).join('\n');
@@ -100,22 +99,10 @@ export function boutPopText(sum) {
 
 const barGeom = (startISO, s, e) => {
   const off = Math.max(Math.round((pISO(s) - pISO(startISO)) / DAY), 0);
-  const span = Math.max(Math.round((pISO(e) - pISO(s)) / DAY) + 1, 1);
+  // Min-width of 2 day-columns so one-day/sporadic bars read as bars.
+  const span = Math.max(Math.round((pISO(e) - pISO(s)) / DAY) + 1, 2);
   return `left:calc(var(--cl-tl-day) * ${off});width:calc(var(--cl-tl-day) * ${span})`;
 };
-
-function summaryHTML(plan, sum) {
-  // Owner call: no in-timeline bout panel at all — the plan panel suffices.
-  // The summary is always the one-line overall sumline; a bar click opens
-  // the drawer and its close lands straight back on the timeline.
-  if (!plan || !sum) return '';
-  return [
-    `<div class="ds-tl-summary" data-tl-summary>`,
-    `<b>${esc(sum.title || plan.title)}</b>`,
-    `<p class="ds-tl-sumline">${esc(boutPopText(sum))}</p>`,
-    `</div>`,
-  ].join('');
-}
 
 export function paintTimeline(root, ctx) {
   const { list, st } = ctx;
@@ -134,15 +121,14 @@ export function paintTimeline(root, ctx) {
   const max = Math.max(1, ...Object.values(dc));
   let rows = (list || []).map((plan) => {
     const ep = enrich(plan);
-    let dates = [], bouts = [], ghost = null, sum = null, tip = '';
+    let dates = [], bouts = [], ghost = null, tip = '';
     try {
       dates = activeDatesOf(ep) || [];
       bouts = boutsOf(dates, MERGE_GAP) || [];
       ghost = ghostOf(ep, today);
-      sum = planSummary(ep, today);
       tip = planTip(ep, 100) || clip(oneLine(ep.title), 100);
-    } catch { dates = []; bouts = []; ghost = null; sum = null; tip = ''; }
-    return { plan: ep, dates, bouts, ghost, sum,
+    } catch { dates = []; bouts = []; ghost = null; tip = ''; }
+    return { plan: ep, dates, bouts, ghost,
       frac: buildState(ep.sprints || []), tip };
   });
   const grid = timelineGrid(rows, today);
@@ -157,12 +143,32 @@ export function paintTimeline(root, ctx) {
     else st.tlSel = null;
   }
   const selIdx = selRow && selBout ? selRow.bouts.indexOf(selBout) : -1;
-  const overdueN = rows.filter((r) => r.ghost && r.ghost.overdue).length;
-  // Axis: weekly ticks.
+  // Axis: daily ticks — bare day numbers, month-start tick shows '1 Oct'.
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayNum = (iso) => String(Number(iso.slice(8, 10)));
+  const monName = (iso) => MON[Number(iso.slice(5, 7)) - 1] || '';
   let ticks = '';
-  for (let d = grid.start; cmpDay(d, grid.end) <= 0; d = addDays(d, 7)) {
+  for (let d = grid.start; cmpDay(d, grid.end) <= 0; d = addDays(d, 1)) {
     const off = Math.round((pISO(d) - pISO(grid.start)) / DAY);
-    ticks += `<span class="ds-tl-tick" style="left:calc(var(--cl-tl-day) * ${off})">${esc(fmtDate(d))}</span>`;
+    const isMonth = d.slice(8) === '01';
+    const label = isMonth ? `${dayNum(d)} ${monName(d)}` : dayNum(d);
+    ticks += `<span class="ds-tl-tick${isMonth ? ' is-month' : ''}" style="left:calc(var(--cl-tl-day) * ${off})">${esc(label)}</span>`;
+  }
+  // Per-month background bands: literal ds-tl-band / ds-tl-band alt classes,
+  // alternating behind the bars.
+  let bands = '';
+  {
+    let cur = grid.start, mi = 0;
+    while (cmpDay(cur, grid.end) <= 0) {
+      const [y, mo] = cur.split('-').map(Number);
+      const mEnd = isoOf(new Date(y, mo, 0));
+      const segEnd = cmpDay(mEnd, grid.end) < 0 ? mEnd : grid.end;
+      const off = Math.round((pISO(cur) - pISO(grid.start)) / DAY);
+      const span = Math.max(Math.round((pISO(segEnd) - pISO(cur)) / DAY) + 1, 1);
+      bands += `<div class="ds-tl-band${mi % 2 ? ' alt' : ''}" style="left:calc(var(--cl-tl-day) * ${off});width:calc(var(--cl-tl-day) * ${span})" aria-hidden="true"></div>`;
+      cur = addDays(segEnd, 1);
+      mi += 1;
+    }
   }
   const laneW = `width:calc(var(--cl-tl-day) * ${grid.days})`;
   const todayOff = Math.round((pISO(today) - pISO(grid.start)) / DAY);
@@ -199,17 +205,12 @@ export function paintTimeline(root, ctx) {
     const laneOpen = (!bars && !g)
       ? `<button class="ds-tl-lane-name" data-tl-open="${esc(r.plan.file)}" data-tip="${esc(r.tip)}" aria-label="Open ${esc(r.plan.title)}">${esc(r.plan.title)}</button>` : '';
     return `<div class="ds-tl-row" data-tl-row="${esc(r.plan.file)}">` +
-      `<div class="ds-tl-lane" style="${laneW}">${bars}${g}${todayLine}${laneOpen}</div></div>`;
+      `<div class="ds-tl-lane" style="${laneW}">${bands}${bars}${g}${todayLine}${laneOpen}</div></div>`;
   }).join('') : `<p class="ds-tl-empty">Nothing matches the current filters yet.</p>`;
   const rangeTxt = rows.length ? `${fmtDate(grid.start)} → ${fmtDate(grid.end)}` : '';
   panel.innerHTML = [
     `<div class="ds-tl-head"><b>Timeline</b><small>${esc(rangeTxt)}</small>`,
     `<button data-tl-close aria-label="Close timeline">✕</button></div>`,
-    selRow && selRow.sum ? summaryHTML(selRow.plan, selRow.sum) : '',
-    `<div class="ds-tl-tools" role="group" aria-label="Timeline tools">`,
-    `<button data-tl-sort aria-pressed="${st.tlSort === 'next'}" aria-label="Sort nearest due first">What's next</button>`,
-    overdueN ? `<span class="ds-tl-overdue">${overdueN} overdue</span>` : '',
-    `</div>`,
     `<div class="ds-tl-scroll"><div class="ds-tl-axis">` +
     `<div class="ds-tl-ticks" style="${laneW}">${ticks}</div></div>${body}</div>`,
   ].join('');
