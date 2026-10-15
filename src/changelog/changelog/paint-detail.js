@@ -130,9 +130,9 @@ const marked = {
     return html;
   }
 };
-import { hits, badges, unlinked } from '../changelog-links.js';
+import { hits, badges, unlinked, commits as planCommits } from '../changelog-links.js';
 import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../changelog-titles.js';
-import { isDone, state, parseGates, dueOf, fmtDate } from '../changelog-parse.js';
+import { isDone, state, parseGates, dueOf, fmtDate, gateNOf } from '../changelog-parse.js';
 import { esc } from './esc.js';
 import { paintRevs } from './paint-revs.js';
 // Gate verdict (Task 12, owner refinement): the phase's own REF GATE verdict
@@ -195,8 +195,10 @@ export function paintDetail(root, ctx){
     `</div>`,
   ].join('');
   const hs = hits(plan.file, sprint.body, plan.sprints.indexOf(sprint) === 0);
-  const pm = (sprint.head || '').match(/Phase\s+(\d+)/i);
-  const phaseN = pm ? Number(pm[1]) : si;
+  // Gate ownership is by section number (`Task 3` → gate 3), never by
+  // position — positional index misattributes verdicts on Task-headed
+  // plans (gateNOf · [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]).
+  const phaseN = gateNOf(sprint.head, si);
   const gates = parseGates(plan.raw || '');
   // Evals now owns the REF GATE feedback — strip the raw gate thread from the
   // phase body so Verify doesn't duplicate the same verbatim thread. Collapse
@@ -246,7 +248,15 @@ export function paintDetail(root, ctx){
         phaseDone: isDone(state(sprint.body)),
         gateSuffix: gateSuffixOf(gates, phaseN),
       };
-      const revsHTML = paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN }) + (hs.length ? badges(hs) : '');
+      const revsHTML = paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN }) + (hs.length ? badges(hs) : '') + (() => {
+        // Plan-linked commits whose anchor hits NO section (e.g. `#follow-up`
+        // polish batches) are invisible in every section's badges — surface
+        // them once per section so post-done work stays tracked.
+        const seen = new Set(hs);
+        plan.sprints.forEach((s, i) => { for (const c of hits(plan.file, s.body, i === 0)) seen.add(c); });
+        const orphans = planCommits.filter((c) => c.plan === plan.file && !seen.has(c));
+        return orphans.length ? badges(orphans, 'Further commits') : '';
+      })();
       const hm = String(bodySansGates || '').match(/^(#{1,4}\s+[^\n]+)\n([\s\S]*)$/);
       if (!hm) return [dueHTML, `<div class="ds-md">`, marked.parse(bodySansGates, markOpts) + revsHTML, `</div>`].join('');
       return [`<div class="ds-md">`, marked.parse(hm[1], markOpts) + dueHTML + marked.parse(hm[2], markOpts) + revsHTML, `</div>`].join('');

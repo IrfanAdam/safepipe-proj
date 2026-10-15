@@ -1,6 +1,6 @@
 // safepipe changelog — parse helpers · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
 // Exports: chunks, goal, norm, split, state, isDone, buildState, parseMeta, anchorOf, anchorHit,
-//   parseDue, dueOf (+ phash, parseGates)
+//   parseDue, dueOf (+ phash, parseGates, gateNOf)
 // Re-exports MONTHS, fmtDate, fmtTime, pDay, isoDay via changelog-format.js
 // Safepipe adapter: plans use `## Task N` / `## Step N` (or bare `### Task N`)
 // instead of `## Phase N`; commit anchors are bare `task-N`.
@@ -72,6 +72,16 @@ const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // Digit-boundary match: `task-1` hits `{#task-1}` but never `{#task-10}`.
 export const anchorHit = (text, anchor) =>
   new RegExp(`(?<![\\w-])${escRe(String(anchor))}(?![\\d])`).test(String(text || ''));
+
+// Section number for gate ownership (`Task 3` → 3, `Phase 03` → 3,
+// `Step 0` → 0). Falls back when the head carries no number — callers
+// pass their positional index. Same head-number rule as anchorOf: a
+// section is judged by its OWN gate, never the gate at its position
+// (positional index misattributes verdicts on Task-headed plans).
+export const gateNOf = (head, fb) => {
+  const m = String(head || '').match(/^(Phase|Task|Step)\s+(\d+)/i);
+  return m ? Number(m[2]) : fb;
+};
 
 const SECTION = /^(Phase|Task|Step)\b/;
 

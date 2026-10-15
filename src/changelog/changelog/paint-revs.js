@@ -1,5 +1,5 @@
 // safepipe changelog — evals (unified verify + revision) · [plan:2026-10-07_130000-safepipe-changelog.md#task-11]
-import { fmtDate, fmtTime, isDone } from '../changelog-parse.js';
+import { fmtDate, fmtTime, isDone, gateNOf } from '../changelog-parse.js';
 import { esc } from './esc.js';
 const raws = import.meta.glob('../../../.hermes/plans/*.md', { query: '?raw', import: 'default', eager: true });
 const revAnchor = (head) => {
@@ -159,10 +159,11 @@ export function paintRevs(revs, scope){
   const src = fileFor(revs || []);
   const fb = (head) => (isFb(head) ? fbLines(src, head) : null);
   const open = scope && scope.head ? revAnchor(scope.head) : null;
+  // Gate ownership follows the section number (Task 3 → gate 3), same
+  // rule as the drawer status line — never the positional index.
   let phaseN = null;
   if (scope && scope.head) {
-    const m = String(scope.head).match(/Phase\s+(\d+)/i);
-    if (m) phaseN = Number(m[1]);
+    phaseN = gateNOf(scope.head, Number.isInteger(scope.phaseN) ? scope.phaseN : null);
   } else if (scope && Number.isInteger(scope.phaseN)) phaseN = scope.phaseN;
   // ── Collect gate eval entries for this phase (newest-first) ──
   const gateEvals = [];
@@ -262,11 +263,11 @@ export function paintRevs(revs, scope){
     timeline.push(`<details class="ds-timeline-group" open><summary class="ds-timeline-date">${dayLabel}</summary><div class="ds-timeline-items">${groupInner}</div></details>`);
   }
   return [
-    `<hr class="ds-hr"><details class="ds-evals ds-revs ds-panel" data-evals="${n}" data-revs="${n}" open>`,
-    `<summary class="ds-revs-title ds-panel-title">Evals · <span class="ds-panel-num">${n}</span></summary>`,
+    `<hr class="ds-hr"><div class="ds-evals ds-revs ds-panel" data-evals="${n}" data-revs="${n}">`,
+    `<div class="ds-revs-title ds-panel-title">Evals · <span class="ds-panel-num">${n}</span></div>`,
     `<div class="ds-timeline">`,
     timeline.join(''),
-    `</div></details>`,
+    `</div></div>`,
   ].join('');
 }
 export const paintEvals = paintRevs;

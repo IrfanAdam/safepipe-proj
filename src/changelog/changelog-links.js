@@ -9,7 +9,7 @@ export const wip = manifest.wip || [];
 const badgeItem = (c) => `<div class="ds-timeline-item"><a href="${GH}${c.full}">${c.sha}</a> <span>${esc(c.subject)}</span><small>${esc(c.time ? `${c.date} ${fmtTime(c.time)}` : c.date)}</small></div>`;
 export const hits = (file, text, first) => commits
   .filter((c) => c.plan === file && (c.anchor ? anchorHit(text, c.anchor) : first));
-export const badges = (list) => {
+export const badges = (list, title = 'Commits') => {
   if (!list.length) return '';
   const n = list.length;
   const sorted = [...list].sort((a,b)=> (b.date + (b.time||'')).localeCompare(a.date + (a.time||'')));
@@ -29,7 +29,7 @@ export const badges = (list) => {
     const items = groups.get(d).map((c)=> badgeItem(c)).join('');
     inner += `<details class="ds-timeline-group" open><summary class="ds-timeline-date">${dayLabel}</summary><div class="ds-timeline-items">${items}</div></details>`;
   }
-  return `<hr class="ds-hr"><details class="ds-commits-panel ds-panel" data-commits="${n}" open><summary class="ds-revs-title ds-panel-title">Commits · <span class="ds-panel-num">${n}</span></summary><div class="ds-timeline">${inner}</div></details>`;
+  return `<hr class="ds-hr"><div class="ds-commits-panel ds-panel" data-commits="${n}"><div class="ds-revs-title ds-panel-title">${esc(title)} · <span class="ds-panel-num">${n}</span></div><div class="ds-timeline">${inner}</div></div>`;
 };
 export const unlinked = (texts) => {
   const xs = commits.filter((c) => !c.plan || !texts[c.plan] || (c.anchor && !anchorHit(texts[c.plan], c.anchor)));
