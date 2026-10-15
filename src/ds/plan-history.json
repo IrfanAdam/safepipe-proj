@@ -4357,6 +4357,34 @@
      "state": "1/1"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-15",
+   "time": "01:26",
+   "hash": "8386b5ce",
+   "sections": [
+    {
+     "head": "Task 1: Due contract + timeline model (pure, tested)",
+     "hash": "bf2ecc1c",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Timeline view — button, side panel, tracks, summaries, nav",
+     "hash": "401b65a5",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Scheduling — date setter, ghost reflection, upcoming view",
+     "hash": "6385c37a",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Skill sync + ship",
+     "hash": "1d4c1a1e",
+     "state": "1/1"
+    }
+   ]
   }
  ]
 }
