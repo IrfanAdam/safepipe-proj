@@ -92,18 +92,14 @@ export function sortTimelineRows(rows, sort) {
   }).map(([r]) => r);
 }
 
-// Bout popover lines: title / 'P phases · d/t tasks' / 'C commits · R revs' /
-// range. Due is NOT a text line — it renders structurally right under the
-// tasks line (underlined deadline link, or muted done date), never a Due n/a.
+// Bout popover lines: title / 'C commits · R revs' / range. The scope line
+// ('2/4 phases · 4/4 tasks') is NOT text — it renders structurally right
+// under the title with done-counts accented (data-ph/data-tk). Due is NOT a
+// text line either — underlined deadline link, or muted done date, never n/a.
 // boutPopText stays the one-line form for the summary sumline.
 export function boutPopLines(sum) {
   if (!sum) return '';
   const lines = [sum.title];
-  const scope = [
-    sum.phases ? `${sum.phases} phase${sum.phases === 1 ? '' : 's'}` : '',
-    sum.status ? `${sum.status} tasks` : '',
-  ].filter(Boolean).join(' · ');
-  if (scope) lines.push(scope);
   lines.push(`${sum.commits} commit${sum.commits === 1 ? '' : 's'} · ${sum.revs} rev${sum.revs === 1 ? '' : 's'}`);
   if (sum.range) lines.push(sum.range);
   return lines.join('\n');
@@ -136,7 +132,8 @@ export function paintTimeline(root, ctx) {
   // close (✕/scrim/Esc, same drawer path) lands back on the timeline.
   if (st.open && st.returnView === 'timeline') { panel.hidden = true; if (pop) pop.hidden = true; return; }
   panel.hidden = false;
-  const today = todayISO();
+  const todayRaw = (st.tlDate && /^\d{4}-\d{2}-\d{2}$/.test(st.tlDate)) ? st.tlDate : todayISO();
+  const today = todayRaw;
   const dc = {};
   commits.forEach((c) => { if (c.date) dc[c.date] = (dc[c.date] || 0) + 1; });
   const max = Math.max(1, ...Object.values(dc));
@@ -179,8 +176,13 @@ export function paintTimeline(root, ctx) {
   // on month bands: any month-boundary shade change reads as a gap, so no
   // band elements are emitted at all. Months differ only by the `Oct` tick.
   const laneW = `width:calc(var(--cl-tl-day) * ${grid.days})`;
-  const nowMs = Date.now();
-  const todayFracOff = (nowMs - pISO(grid.start).getTime()) / DAY;
+  const realNow = new Date();
+  const realTodayMid = pISO(todayISO());
+  const timeFrac = Math.max(0, Math.min(0.9999, (realNow - realTodayMid) / DAY));
+  const effectiveNowMs = (st.tlDate && /^\d{4}-\d{2}-\d{2}$/.test(st.tlDate))
+    ? pISO(st.tlDate).getTime() + timeFrac * DAY
+    : Date.now();
+  const todayFracOff = (effectiveNowMs - pISO(grid.start).getTime()) / DAY;
   const todayOff = Math.floor(todayFracOff);
   const todayLine = (todayOff >= 0 && todayOff < grid.days)
     ? `<span class="ds-tl-todaycol" style="left:calc(var(--cl-tl-day) * ${todayOff})"></span><span class="ds-tl-today" style="left:calc(var(--cl-tl-day) * ${todayFracOff.toFixed(4)})"></span>` : '';
@@ -204,6 +206,7 @@ export function paintTimeline(root, ctx) {
         ` data-pop="${esc(boutPopLines(bs))}"${bs && bs.complete ? ' data-popdone="1"' : ''}${cur}` +
         ` data-due="${bs && bs.due ? bs.due : ''}" data-duetxt="${bs && bs.due ? esc(fmtDate(bs.due)) : ''}"` +
         ` data-donetxt="${bs && bs.done ? esc(fmtDate(bs.done)) : ''}"` +
+        ` data-ph="${bs ? `${bs.phasesDone}/${bs.phases}` : ''}" data-tk="${bs && bs.status ? bs.status : ''}"` +
         ` aria-label="${esc(`${r.plan.title}, ${b.kind} ${b.start} to ${b.end}`)}">${nm}</button>`;
     }).join('');
     let g = '';
@@ -223,8 +226,9 @@ export function paintTimeline(root, ctx) {
       `<div class="ds-tl-lane" style="${laneW}">${bars}${g}${todayLine}${laneOpen}</div></div>`;
   }).join('') : `<p class="ds-tl-empty">Nothing matches the current filters yet.</p>`;
   const rangeTxt = rows.length ? `${fmtDate(grid.start)} → ${fmtDate(grid.end)}` : '';
+  const tlDateVal = (st.tlDate && /^\d{4}-\d{2}-\d{2}$/.test(st.tlDate)) ? st.tlDate : todayRaw;
   panel.innerHTML = [
-    `<div class="ds-tl-head"><b>Timeline</b><small>${esc(rangeTxt)}</small>`,
+    `<div class="ds-tl-head"><div class="ds-tl-titlewrap"><b>Timeline</b><input type="date" data-tl-date value="${esc(tlDateVal)}" aria-label="Set timeline date"></div><small>${esc(rangeTxt)}</small>`,
     `<button data-tl-close aria-label="Close timeline">✕</button></div>`,
     `<div class="ds-tl-scroll"><div class="ds-tl-axis">` +
     `<div class="ds-tl-ticks" style="${laneW}">${ticks}</div></div>${body}</div>`,

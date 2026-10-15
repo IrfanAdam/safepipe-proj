@@ -66,17 +66,21 @@ export function bindChangelogEvents(root, st, helpers) {
   const showPop = (el, x, y) => {
     const p = tlPop();
     if (!p || !el || !el.dataset.pop) { hidePop(); return; }
-    // Structured popover: title + 2-line-clamped description (from the
-    // bout's data-tip) + phases/tasks line (accent when the bout is fully
-    // done) + schedule-deadline link right under it (or a muted done date
-    // when no Due applies — never a Due n/a) + smaller muted stats/date
-    // subtext.
+    // Structured popover: title + scope line with done-counts accented
+    // ('2/4 phases · 4/4 tasks') + 2-line-clamped description (from the
+    // bout's data-tip) + schedule-deadline link right under it (or a muted
+    // done date when no Due applies — never a Due n/a) + smaller muted
+    // stats/date subtext.
     const lines = String(el.dataset.pop).split('\n').filter(Boolean);
     const title = lines[0] || '';
-    const tasks = lines[1] || '';
-    const sub = lines.slice(2).join('\n');
+    const sub = lines.slice(1).join('\n');
     const desc = (el.dataset.tip || '').trim();
-    const done = !!el.dataset.popdone;
+    const ph = String(el.dataset.ph || '').split('/');
+    const tk = String(el.dataset.tk || '').split('/');
+    const phOk = ph.length === 2 && ph[0] !== '' && ph[1] !== '';
+    const tkOk = tk.length === 2 && tk[0] !== '' && tk[1] !== '';
+    const scope = (phOk || tkOk)
+      ? `<span class="ds-tl-pop__tasks">${phOk ? `<b>${escHtml(ph[0])}</b>/${escHtml(ph[1])} phase${ph[1] === '1' ? '' : 's'}` : ''}${phOk && tkOk ? ' · ' : ''}${tkOk ? `<b>${escHtml(tk[0])}</b>/${escHtml(tk[1])} tasks` : ''}</span>` : '';
     const due = (el.dataset.due || '').trim();
     const dueRow = due
       ? `<button class="ds-tl-pop__due" data-tl-due="${escHtml(due)}">Schedule deadline · ${escHtml((el.dataset.duetxt || '').trim() || due)}</button>`
@@ -85,7 +89,7 @@ export function bindChangelogEvents(root, st, helpers) {
     p.innerHTML =
       `<b class="ds-tl-pop__title">${escHtml(title)}</b>` +
       (desc && desc !== title ? `<span class="ds-tl-pop__desc">${escHtml(desc)}</span>` : '') +
-      (tasks ? `<span class="ds-tl-pop__tasks${done ? ' is-done' : ''}">${escHtml(tasks)}</span>` : '') +
+      scope +
       dueRow +
       (sub ? `<span class="ds-tl-pop__sub">${escHtml(sub)}</span>` : '');
     p.hidden = false;
@@ -147,6 +151,12 @@ export function bindChangelogEvents(root, st, helpers) {
     doPaint(root);
   };
   const onChange = (e) => {
+    const tld = e.target.closest ? e.target.closest('[data-tl-date]') : null;
+    if (tld) {
+      const v = (tld.value || '').trim();
+      if (!v || /^\d{4}-\d{2}-\d{2}$/.test(v)) { st.tlDate = v; doPaint(root); }
+      return;
+    }
     const di = e.target.closest ? e.target.closest('[data-due-input]') : null;
     if (!di || di.disabled) return;
     applyDue((di.value || '').trim() || null);

@@ -155,6 +155,7 @@ export const boutSummary = (plan = {}, bout = {}, todayISO) => {
     title: titleOf(plan),
     status,
     phases: sections.length,
+    phasesDone: sections.filter((s) => isDone(buildState([s]))).length,
     complete: isDone(status),
     done: dates.length ? dates[dates.length - 1] : null,
     commits: ((plan && plan.commits) || []).filter(has).length,

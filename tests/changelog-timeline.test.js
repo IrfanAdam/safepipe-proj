@@ -187,6 +187,7 @@ describe('summaries', () => {
     assert.equal(s.range, '2026-10-21');
     assert.equal(s.done, '2026-10-21');
     assert.equal(s.complete, isDone(s.status));
+    assert.ok(Number.isInteger(s.phasesDone) && s.phasesDone <= s.phases);
     assert.equal(s.title, planSummary(p, TODAY).title);
   });
 });
