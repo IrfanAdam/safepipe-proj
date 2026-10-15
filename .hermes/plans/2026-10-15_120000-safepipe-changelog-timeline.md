@@ -130,6 +130,8 @@
 
 - REF GATE 4 (ship): build green, 0 wip, screenshots attached, skill v0.4.0 committed, this plan closed.
 
+### Task 4 ✓ done c5e9946
+
 ---
 
 ## File map (no other files touched)
