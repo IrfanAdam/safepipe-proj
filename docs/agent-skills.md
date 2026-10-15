@@ -11,7 +11,7 @@ in each folder is self-contained — read it, follow it.
 | `map-twin-crossfade` | MapLibre satellite ↔ 3D twin crossfade + headless verify | ops3d terrain phases |
 | `crisp-webgl` | Sharp Three.js rendering (no-zoom-blur) | ops3d scene work |
 | `interactive-3d-views` | Orbit sweeps, registration probes for twin alignment | twin geometry phases |
-| `changelog-kit` | Changelog lanes + plan shapes for `changelog.html` | changelog updates |
+| `changelog-kit` | Changelog lanes + plan shapes for `changelog.html`, incl. timeline tracks + scheduling (v0.4.0) | changelog updates |
 
 ## Without Hermes
 

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-15T11:51:01.253Z",
+  "generated": "2026-10-15T12:35:18.515Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,33 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "1e89d6c",
+      "full": "1e89d6c4991c226554c207621f8192548f9cad5c",
+      "date": "2026-10-15",
+      "time": "18:05",
+      "subject": "feat(changelog): scheduling due controls, ghost reflection, whats-next, dot styles [plan:2026-10-15_120000-safepipe-changelog-timeline.md#task-3]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "task-3"
+    },
+    {
+      "sha": "ea83227",
+      "full": "ea83227fdc7040d5fbdc99075f98c83144024e52",
+      "date": "2026-10-15",
+      "time": "17:22",
+      "subject": "feat(changelog): timeline view with tracks, popovers, summaries, nav [plan:2026-10-15_120000-safepipe-changelog-timeline.md#task-2]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "task-2"
+    },
+    {
+      "sha": "a755d5e",
+      "full": "a755d5e9e62ece4c35f4c3c493a4a4d0bc19ce97",
+      "date": "2026-10-15",
+      "time": "17:22",
+      "subject": "feat(changelog): due contract + pure timeline model with tests [plan:2026-10-15_120000-safepipe-changelog-timeline.md#task-1]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "task-1"
+    },
     {
       "sha": "5aa587e",
       "full": "5aa587eb06bd61cc0debefadb45ee1ed6085eaca",
@@ -3349,12 +3376,7 @@
     }
   ],
   "wip": [
-    "changelog.html",
-    "src/changelog/changelog-events.js",
-    "src/changelog/changelog-parse.js",
-    "src/changelog/pages-changelog.js",
-    "src/changelog/changelog-timeline.css",
-    "src/changelog/changelog-timeline.js",
-    "src/changelog/changelog/timeline-paint.js"
+    ".agents/skills/changelog-kit/SKILL.md",
+    "docs/agent-skills.md"
   ]
 }
