@@ -2,6 +2,40 @@
 // Exports: bindChangelogEvents — click/key/hover wiring over shared state st
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
+// Due scheduling (task 3): pure file-text edit — insert/replace/clear the
+// single `*Due: YYYY-MM-DD*` line under the owning head, idempotently (first
+// Due-shaped line wins, extras removed, never duplicated). Head not found →
+// text unchanged. Exported for node probes; the browser handler applies the
+// same edit to the live section body so the ghost preview recomputes live.
+const DUE_SHAPE = /^\s*\*Due:\s*[^*\n]*\*\s*$/;
+const escRe = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export function dueEditText(raw, head, due) {
+  const lines = String(raw || '').split('\n');
+  const want = String(head || '').trim();
+  const hi = lines.findIndex((ln) => new RegExp(`^#{2,3}\\s+${escRe(want)}\\s*$`).test(ln));
+  if (hi < 0) return String(raw || '');
+  const lvl = (lines[hi].match(/^#+/) || ['##'])[0].length;
+  let end = lines.length;
+  for (let i = hi + 1; i < lines.length; i++) {
+    const m = lines[i].match(/^(#{1,3})\s/);
+    if (m && m[1].length <= lvl) { end = i; break; }
+  }
+  const shaped = [];
+  for (let i = hi + 1; i < end; i++) if (DUE_SHAPE.test(lines[i])) shaped.push(i);
+  const out = lines.slice();
+  if (!due) {
+    for (let k = shaped.length - 1; k >= 0; k--) out.splice(shaped[k], 1);
+    return out.join('\n');
+  }
+  const line = `*Due: ${due}*`;
+  if (shaped.length) {
+    out[shaped[0]] = line;
+    for (let k = shaped.length - 1; k >= 1; k--) out.splice(shaped[k], 1);
+    return out.join('\n');
+  }
+  out.splice(hi + 1, 0, line);
+  return out.join('\n');
+}
 export function bindChangelogEvents(root, st, helpers) {
   const { cur, doPaint } = helpers;
   const tlPop = () => root.querySelector('[data-tl-pop]');
@@ -46,8 +80,36 @@ export function bindChangelogEvents(root, st, helpers) {
     }
     apply(0);
   };
+  // Due set/clear against the open section: same edit the file commit
+  // carries, applied to the live section body so ghostOf recomputes on the
+  // next doPaint with no build. Done/cancelled sections render no control,
+  // so reaching here with one is a no-op guard. st.duePending records the
+  // exact file line for the author to commit ([plan:<file>#<anchor>] trailer
+  // + tracker regen — the static page has no file-write endpoint).
+  const applyDue = (iso) => {
+    const c = cur();
+    const plan = c.plan, sprint = c.sprints[c.si];
+    if (!plan || !sprint) return;
+    if (/[✓✗]/.test(String(sprint.head || ''))) return;
+    if (iso && !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
+    const next = dueEditText(sprint.body, sprint.head, iso || null);
+    if (next === sprint.body) {
+      st.duePending = null; return;
+    }
+    sprint.body = next;
+    st.duePending = { file: plan.file, due: iso || null, line: iso ? `*Due: ${iso}*` : null };
+    doPaint(root);
+  };
+  const onChange = (e) => {
+    const di = e.target.closest ? e.target.closest('[data-due-input]') : null;
+    if (!di || di.disabled) return;
+    applyDue((di.value || '').trim() || null);
+  };
   const onClick = (e) => {
     if (e.target.closest('[data-day-clear]')) { st.day = ''; st.sel = [0, 0]; doPaint(root); return; }
+    // Due clear: empty input clears (removes the Due line); past dates stay
+    // allowed and flag overdue without blocking (paint-detail marks them).
+    if (e.target.closest('[data-due-clear]')) { applyDue(null); return; }
     const dd = e.target.closest('[data-day]');
     if (dd) { st.day = st.day === dd.dataset.day ? '' : dd.dataset.day;
       st.sel = [0, 0]; doPaint(root); return; }
@@ -138,12 +200,14 @@ export function bindChangelogEvents(root, st, helpers) {
   const hideTip = () => { const t = root.querySelector('.ds-cursor-tip'); if (t) t.hidden = true; };
   root.addEventListener('click', onClick); document.addEventListener('keydown', onKey);
   root.addEventListener('mousemove', move);
+  root.addEventListener('change', onChange);
   root.addEventListener('focusin', onFocus);
   root.addEventListener('focusout', onBlur);
   document.addEventListener('mouseleave', hideTip);
   return () => {
     root.removeEventListener('click', onClick); document.removeEventListener('keydown', onKey);
     root.removeEventListener('mousemove', move);
+    root.removeEventListener('change', onChange);
     root.removeEventListener('focusin', onFocus);
     root.removeEventListener('focusout', onBlur);
     document.removeEventListener('mouseleave', hideTip); };

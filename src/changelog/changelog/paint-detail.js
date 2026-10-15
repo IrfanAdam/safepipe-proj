@@ -6,7 +6,10 @@ const marked = {
     let src = String(s||'')
       .replace(/<!--[\s\S]*?-->/g, ' ')
       .replace(/^\s*\{#[^}]*\}\s*$/gm, '')
-      .replace(/\{#[^}]*\}/g, ' ');
+      .replace(/\{#[^}]*\}/g, ' ')
+      // Due lines are scheduling metadata, not prose — strip at render like
+      // {#anchors} (Task 3: the Due control owns display of the date).
+      .replace(/^\s*\*Due:\s*[^*\n]*\*\s*$/gm, '');
     const esc = (t)=> t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     // block-first: split on blank lines so <ul> never spans paragraphs and
     // no stray </p> lands after headings (Task-1 record: Modify/Create <li>s
@@ -129,7 +132,7 @@ const marked = {
 };
 import { hits, badges, unlinked } from '../changelog-links.js';
 import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../changelog-titles.js';
-import { isDone, state, parseGates } from '../changelog-parse.js';
+import { isDone, state, parseGates, dueOf, anchorOf } from '../changelog-parse.js';
 import { esc } from './esc.js';
 import { paintRevs } from './paint-revs.js';
 // Gate verdict (Task 12, owner refinement): the phase's own REF GATE verdict
@@ -210,12 +213,36 @@ export function paintDetail(root, ctx){
       bodySansGates = bodySansGates.replace(/\s*-\s*REF GATE[^\n]*/g, '');
     }
   }
+  // Due control (Task 3, scheduling): incomplete sections only. Complete /
+  // cancelled sections render no control — just the shipped tip.
+  const secShipped = /[✓✗]/.test(String(sprint.head || '')) || isDone(state(sprint.body));
+  const secDue = secShipped ? null : dueOf({ head: sprint.head, body: sprint.body });
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const secAnchor = (String(sprint.body || '').match(/\{#([A-Za-z]+-\d+)\}/) || [])[1]
+    || anchorOf(sprint.head) || '';
+  const dueHTML = secShipped
+    ? `<p class="ds-due ds-is-na" data-tip="shipped — Due n/a"><span>Due</span> n/a</p>`
+    : [
+      `<div class="ds-due" data-due-row>`,
+      `<label>Due <input type="date" data-due-input value="${secDue || ''}"`,
+      ` aria-label="Due date for ${esc(short(sprint.head))}"></label>`,
+      `<button data-due-clear aria-label="Clear due date"`,
+      secDue ? '' : ' disabled',
+      `>clear</button>`,
+      secDue && secDue < todayISO ? `<span class="ds-due-overdue">overdue</span>` : '',
+      `<small data-due-hint>`,
+      secDue ? esc(`*Due: ${secDue}* → .hermes/plans/${plan.file}`) : 'no Due set',
+      secAnchor ? esc(` — commit [plan:${plan.file}#${secAnchor}]`) : '',
+      `</small></div>`,
+    ].join('');
   root.querySelector('[data-col="tasks"]').innerHTML = [
     `<div class="ds-drawer-head"><b>`,
     esc(unitLabel(sprint.head, si)),
     ` · `,
     esc(short(sprint.head)),
     `</b><button data-close aria-label="Close detail">✕</button></div>`,
+    dueHTML,
     `<div class="ds-md">`,
     marked.parse(bodySansGates, {
       phaseDone: isDone(state(sprint.body)),

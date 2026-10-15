@@ -93,3 +93,13 @@
 .ds-drawer-head .ds-gate-tag{color:var(--color-ink-muted)}
 .ds-gate-tag[data-gate-tag="passed"],.ds-gate-tag[data-gate-tag="waiver"]{color:var(--color-accent)}
 .ds-gate-tag[data-gate-tag="failed"]{color:var(--color-ink)}
+/* Due scheduling row (timeline Task 3): quiet inline control under the drawer
+   head — drawer density, token-only. */
+.ds-due{display:flex;align-items:center;gap:var(--cl-8);flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);margin-bottom:var(--cl-12)}
+.ds-due label{display:flex;align-items:center;gap:var(--cl-4);text-transform:uppercase;letter-spacing:var(--tracking-label)}
+.ds-due input[type="date"]{font:inherit;color:var(--color-ink);background:var(--color-surface);border:var(--border-hairline);padding:var(--cl-4) var(--cl-8)}
+.ds-due button{font:inherit;background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);padding:var(--cl-4) var(--cl-9);cursor:pointer}
+.ds-due button[disabled]{opacity:0.45;cursor:default}
+.ds-due-overdue{color:var(--color-accent);font-weight:700;text-transform:uppercase;letter-spacing:var(--tracking-label)}
+.ds-due small{flex-basis:100%;line-height:var(--leading-mono);overflow-wrap:anywhere}
+.ds-due.ds-is-na{margin-bottom:var(--cl-12)}

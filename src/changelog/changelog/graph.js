@@ -1,11 +1,20 @@
 // safepipe changelog — activity graph · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
 import { commits } from '../changelog-links.js';
-import { MONTHS, fmtDate, pDay, isoDay } from '../changelog-parse.js';
+import { MONTHS, fmtDate, pDay, isoDay, dueOf } from '../changelog-parse.js';
 export function graph({ plans, day }) {
   const dc = {};
   commits.forEach((c) => { if (c.date) dc[c.date] = (dc[c.date] || 0) + 1; });
+  // Scheduling (task 3): future Due dates across incomplete sections gain a
+  // ghost-dot marker — is-future reused plus an is-due marker class, no new
+  // colors (styling lands in the page stylesheet, out of this lane).
+  const dues = new Set();
+  (plans || []).forEach((p) => {
+    (p.sprints || []).forEach((s) => {
+      try { const d = dueOf({ head: s.head, body: s.body }); if (d) dues.add(d); } catch {}
+    });
+  });
   const keys = Object.keys(dc).sort();
-  const bounds = keys.concat(plans.map((p) => p.date).filter(Boolean)).sort();
+  const bounds = keys.concat(plans.map((p) => p.date).filter(Boolean), [...dues]).sort();
   if (!bounds.length) return '';
   const max = Math.max(...Object.values(dc), 1);
   const pad = 6 * 7 * 864e5;
@@ -38,7 +47,10 @@ export function graph({ plans, day }) {
     const cells = col.map((d) => {
       const k = isoDay(d),
         todayCls = k === isoDay(today) ? ' is-today' : '';
-      if (d > today) return `<span class="ds-day is-future" data-tip="${fmtDate(k)} · upcoming"></span>`;
+      if (d > today) {
+        if (dues.has(k)) return `<span class="ds-day is-future is-due" data-tip="${fmtDate(k)} · Due"></span>`;
+        return `<span class="ds-day is-future" data-tip="${fmtDate(k)} · upcoming"></span>`;
+      }
       const n = dc[k] || 0;
       if (!n) return `<span class="ds-day${todayCls}" data-tip="${fmtDate(k)} · no changes"></span>`;
       const lv = Math.min(4, Math.ceil(4 * Math.sqrt(n / max)));

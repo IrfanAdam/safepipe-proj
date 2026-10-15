@@ -1,5 +1,5 @@
 // safepipe changelog — chips + graph · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
-import { fmtDate } from '../changelog-parse.js';
+import { fmtDate, dueOf } from '../changelog-parse.js';
 import { graph } from './graph.js';
 export function paintChips(root, ctx){
   const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts } = ctx;
@@ -29,7 +29,20 @@ export function paintChips(root, ctx){
     `)</button>`,
   ].join('')).join('');
   const gEl = root.querySelector('[data-col="graph"]');
-  if (!gEl.dataset.ready) { gEl.innerHTML = graph({ plans, day }); gEl.dataset.ready = '1'; }
+  // Scheduling (timeline Task 3): the graph paints once for perf, but live
+  // Due edits must reflect as ghost dots with no reload — repaint only when
+  // the due signature changes, else keep the cached grid and retoggle days.
+  let duesKey = '';
+  try {
+    const ds = [];
+    (plans || []).forEach((p) => (p.sprints || []).forEach((s) => {
+      const d = dueOf({ head: s.head, body: s.body }); if (d) ds.push(d);
+    }));
+    duesKey = ds.sort().join(',');
+  } catch {}
+  if (!gEl.dataset.ready || gEl.dataset.dues !== duesKey) {
+    gEl.innerHTML = graph({ plans, day }); gEl.dataset.ready = '1'; gEl.dataset.dues = duesKey;
+  }
   else { gEl.querySelectorAll('[data-day]').forEach((el) => { const k = el.dataset.day,
         on = k === day; el.classList.toggle('on',
           on); if (el.getAttribute('aria-pressed') !== String(on)) el.setAttribute('aria-pressed',
