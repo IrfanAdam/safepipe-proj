@@ -9,9 +9,9 @@
   --cl-tl-day:calc(var(--sp-spacing-base) * 3);
   --cl-tl-row:calc(var(--sp-spacing-base) * 7);
 }
-.ds-timeline-tile{font-family:var(--font-display);font-weight:700;font-size:var(--sp-text-lg);letter-spacing:0.02em;background:var(--color-accent);color:var(--sp-text-inverse);border:none;border-radius:var(--radius-md);padding:var(--cl-16) var(--cl-26);cursor:pointer;align-self:center;white-space:nowrap;flex:none}
-.ds-timeline-tile:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
-.ds-timeline-tile[aria-pressed="true"]{outline:var(--cl-2) solid var(--color-ink);outline-offset:var(--cl-1)}
+.ds-timeline-gridtile{flex:none;align-self:flex-start;width:calc(7 * var(--cl-16) + 6 * var(--cl-4));height:calc(7 * var(--cl-16) + 6 * var(--cl-4));box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;font-family:var(--font-display);font-weight:700;font-size:var(--sp-text-md);letter-spacing:0.02em;background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);border-radius:var(--radius-md);padding:var(--cl-8);cursor:pointer}
+.ds-timeline-gridtile:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
+.ds-timeline-gridtile[aria-pressed="true"]{background:var(--color-accent);border-color:var(--color-accent);color:var(--sp-text-inverse)}
 aside.ds-timeline{position:fixed;top:0;right:0;bottom:0;width:min(86vw,var(--size-ds-drawer));box-sizing:border-box;background:var(--color-bg);border-left:var(--border-hairline);z-index:var(--z-ds-drawer);box-shadow:var(--shadow-viewer);display:flex;flex-direction:column;overflow:hidden}
 aside.ds-timeline[hidden]{display:none}
 aside.ds-timeline:not([hidden]){animation:ds-drawer-in var(--dur-glide) var(--ease-signature)}
@@ -60,5 +60,5 @@ aside.ds-timeline:not([hidden]){animation:ds-drawer-in var(--dur-glide) var(--ea
   .ds-tl-head{flex-wrap:wrap}
 }
 @media (prefers-reduced-motion:reduce){
-  .ds-timeline-tile:hover,.ds-tl-bout:hover,.ds-tl-streak:hover,.ds-tl-ghost:hover{outline:none}
+  .ds-timeline-gridtile:hover,.ds-tl-bout:hover,.ds-tl-streak:hover,.ds-tl-ghost:hover{outline:none}
 }
