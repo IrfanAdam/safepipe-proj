@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-15T15:10:27.691Z",
+  "generated": "2026-10-15T15:11:53.326Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "6d44b9a",
+      "full": "6d44b9a897915985072a56bb9cb69b4c814a81fc",
+      "date": "2026-10-15",
+      "time": "20:41",
+      "subject": "feat(changelog): timeline tile gets Gantt icon + micro label [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "5265a58",
       "full": "5265a586a3d11851f8b723d7fefdcc8bb20955f2",
@@ -3465,9 +3474,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/changelog/changelog-timeline.css",
-    "src/changelog/changelog/graph.js",
-    "src/changelog/pages-changelog.js"
-  ]
+  "wip": []
 }
