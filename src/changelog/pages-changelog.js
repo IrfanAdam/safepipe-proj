@@ -53,7 +53,7 @@ const texts = { ...rawTexts };
 plans.forEach((p) => { p.sprints.forEach((s) => { const a = anchorOf(s.head); if (a) texts[p.file] += `\n{#${a}}`; }); });
 const counts = TAGS.map((t) => [t, plans.filter((p) => p.tags.includes(t)).length]).filter(([, n]) => n);
 const st = { active: new Set(), day: '', sel: [0, 0], open: false, stage: 'list',
-  view: 'list', tlSel: null, tlLast: null, tlSort: '', returnView: null };
+  view: 'list', tlSel: null, tlLast: null, tlSort: '', returnView: null, tlDate: '' };
 let tlToken = 0;
 const visiblePlans = () => plans
   .filter((p) => (!st.active.size || p.tags.some((t) => st.active.has(t)))
