@@ -92,12 +92,16 @@ export function sortTimelineRows(rows, sort) {
   }).map(([r]) => r);
 }
 
-// Bout popover lines: title / tasks / 'C commits · R revs' / range + Due.
-// boutPopText stays the one-line form for the summary sumline.
+// Bout popover lines: title / 'P phases · d/t tasks' / 'C commits · R revs' /
+// range + Due. boutPopText stays the one-line form for the summary sumline.
 export function boutPopLines(sum) {
   if (!sum) return '';
   const lines = [sum.title];
-  if (sum.status) lines.push(`${sum.status} tasks`);
+  const scope = [
+    sum.phases ? `${sum.phases} phase${sum.phases === 1 ? '' : 's'}` : '',
+    sum.status ? `${sum.status} tasks` : '',
+  ].filter(Boolean).join(' · ');
+  if (scope) lines.push(scope);
   lines.push(`${sum.commits} commit${sum.commits === 1 ? '' : 's'} · ${sum.revs} rev${sum.revs === 1 ? '' : 's'}`);
   if (sum.range) lines.push(sum.range);
   if (sum.due) lines.push(`Due ${sum.due}${sum.overdue ? ' (overdue)' : ''}`);
@@ -216,7 +220,7 @@ export function paintTimeline(root, ctx) {
       const nm = i === li ? `<span class="ds-tl-barname">${esc(r.plan.title)}</span>` : '';
       return `<button class="${cls} lv${lv}" style="${barGeom(grid.start, b.start, b.end)}"` +
         ` data-tl-bout="${esc(r.plan.file)}:${i}" data-tip="${esc(r.tip)}"` +
-        ` data-pop="${esc(boutPopLines(bs))}"${cur}` +
+        ` data-pop="${esc(boutPopLines(bs))}"${bs && bs.complete ? ' data-popdone="1"' : ''}${cur}` +
         ` aria-label="${esc(`${r.plan.title}, ${b.kind} ${b.start} to ${b.end}`)}">${nm}</button>`;
     }).join('');
     let g = '';

@@ -140,6 +140,7 @@ export const planSummary = (plan = {}, todayISO) => {
 // Bout-scoped summary: same shape, filtered to bout.dates only — commits /
 // revs with date ∈ bout; tasks = sections with hits ∩ bout ≠ ∅ + state line;
 // evals = rev notes dated in bout + feedback blocks inside those sections.
+// phases = owning-section count; complete = all bout checkboxes done.
 export const boutSummary = (plan = {}, bout = {}, todayISO) => {
   const inBout = new Set(bout.dates || []);
   const has = (c) => c && inBout.has(c.date);
@@ -148,9 +149,12 @@ export const boutSummary = (plan = {}, bout = {}, todayISO) => {
   const today = ISO.test(todayISO || '') ? todayISO : isoToday();
   let evals = parseGates(plan.raw || '').filter((g) => REV_NOTE.test(g.note || '') && g.date && inBout.has(g.date)).length;
   for (const s of sections) evals += fbBlocksIn(s.body || '');
+  const status = buildState(sections);
   return {
     title: titleOf(plan),
-    status: buildState(sections),
+    status,
+    phases: sections.length,
+    complete: isDone(status),
     commits: ((plan && plan.commits) || []).filter(has).length,
     revs: revsOf(plan).filter(has).length,
     evals,

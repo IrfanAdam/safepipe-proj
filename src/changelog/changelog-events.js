@@ -66,14 +66,18 @@ export function bindChangelogEvents(root, st, helpers) {
     const p = tlPop();
     if (!p || !el || !el.dataset.pop) { hidePop(); return; }
     // Structured popover: title + 2-line-clamped description (from the
-    // bout's data-tip) + smaller muted stats/date subtext.
+    // bout's data-tip) + phases/tasks line (accent when the bout is fully
+    // done) + smaller muted stats/date subtext.
     const lines = String(el.dataset.pop).split('\n').filter(Boolean);
     const title = lines[0] || '';
-    const sub = lines.slice(1).join('\n');
+    const tasks = lines[1] || '';
+    const sub = lines.slice(2).join('\n');
     const desc = (el.dataset.tip || '').trim();
+    const done = !!el.dataset.popdone;
     p.innerHTML =
       `<b class="ds-tl-pop__title">${escHtml(title)}</b>` +
       (desc && desc !== title ? `<span class="ds-tl-pop__desc">${escHtml(desc)}</span>` : '') +
+      (tasks ? `<span class="ds-tl-pop__tasks${done ? ' is-done' : ''}">${escHtml(tasks)}</span>` : '') +
       (sub ? `<span class="ds-tl-pop__sub">${escHtml(sub)}</span>` : '');
     p.hidden = false;
     const pad = 14;

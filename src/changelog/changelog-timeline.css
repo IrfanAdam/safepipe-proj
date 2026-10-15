@@ -56,7 +56,9 @@ aside.ds-timeline .ds-tl-band.on{background:color-mix(in srgb, var(--color-surfa
 .ds-tl-pop[hidden]{display:none}
 .ds-tl-pop__title{display:block;font-family:var(--font-display);font-weight:700;font-size:var(--sp-text-sm);line-height:1.35;color:var(--color-ink);margin-bottom:var(--cl-4)}
 .ds-tl-pop__desc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:var(--text-micro);line-height:1.5;color:var(--color-ink);margin-bottom:var(--cl-4)}
-.ds-tl-pop__sub{display:block;font-size:var(--text-micro);line-height:1.5;color:var(--color-ink-muted);white-space:pre-line}
+.ds-tl-pop__tasks{display:block;font-size:var(--text-micro);line-height:1.5;color:var(--color-ink);margin-bottom:var(--cl-2)}
+.ds-tl-pop__tasks.is-done{color:var(--color-accent);font-weight:700}
+.ds-tl-pop__sub{display:block;font-size:calc(var(--text-micro) - 2px);line-height:1.5;color:var(--color-ink-muted);white-space:pre-line}
 .ds-tl-fallback{padding:var(--cl-16);font-size:var(--sp-text-sm);color:var(--color-ink-muted)}
 @media (max-width:720px){
   aside.ds-timeline{width:100vw}
