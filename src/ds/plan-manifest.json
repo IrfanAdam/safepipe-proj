@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-15T15:19:01.789Z",
+  "generated": "2026-10-15T15:24:11.484Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -3483,5 +3483,9 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "src/changelog/changelog-events.js",
+    "src/changelog/changelog-timeline.css",
+    "src/changelog/changelog/timeline-paint.js"
+  ]
 }

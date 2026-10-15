@@ -170,6 +170,19 @@ export function bindChangelogEvents(root, st, helpers) {
     if (gh) { openTlPlan(gh.dataset.tlGhost, null, true); return; }
     const tl = e.target.closest('[data-tl-open]');
     if (tl) { openTlPlan(tl.dataset.tlOpen, null, false); return; }
+    // Lane background click: scroll the lane's first track to the left edge.
+    // Bar/ghost/lane-name clicks return above (they open the plan instead).
+    const lane = e.target.closest('.ds-tl-lane');
+    if (lane && st.view === 'timeline') {
+      const sc = root.querySelector('.ds-tl-scroll');
+      const first = lane.querySelector('[data-tl-bout],[data-tl-ghost]');
+      if (sc && first) {
+        const x = first.getBoundingClientRect().left - lane.getBoundingClientRect().left + sc.scrollLeft;
+        const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        sc.scrollTo({ left: Math.max(0, x - 14), behavior: reduce ? 'auto' : 'smooth' });
+      }
+      return;
+    }
     if (e.target.closest('[data-close]')
       || e.target.closest('[data-scrim]')) {
       if (e.target.closest('[data-scrim]') && !st.open && st.view === 'timeline') { closeTimeline(); return; }

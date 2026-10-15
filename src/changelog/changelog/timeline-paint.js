@@ -167,23 +167,32 @@ export function paintTimeline(root, ctx) {
   for (let d = grid.start; cmpDay(d, grid.end) <= 0; d = addDays(d, 1)) {
     const off = Math.round((pISO(d) - pISO(grid.start)) / DAY);
     const isMonth = d.slice(8) === '01';
-    const label = isMonth ? `${dayNum(d)} ${monName(d)}` : dayNum(d);
+    const label = isMonth ? monName(d) : dayNum(d);
     ticks += `<span class="ds-tl-tick${isMonth ? ' is-month' : ''}" style="left:calc(var(--cl-tl-day) * ${off})">${esc(label)}</span>`;
   }
-  // Per-month background bands: literal ds-tl-band / ds-tl-band alt classes,
-  // alternating behind the bars.
+  // Per-month background bands, only for months that hold tracks — empty
+  // padding months stay on the page background so no shading seam reads as
+  // a gap. One consistent wash (no alternation) across the whole lane.
+  const activeMonths = new Set();
+  rows.forEach((r) => {
+    (r.dates || []).forEach((d) => { if (/^\d{4}-\d{2}-\d{2}$/.test(d || '')) activeMonths.add(d.slice(0, 7)); });
+    if (r.ghost) {
+      for (let d = r.ghost.from; cmpDay(d, r.ghost.to) <= 0; d = addDays(d, 1)) activeMonths.add(d.slice(0, 7));
+    }
+  });
   let bands = '';
   {
-    let cur = grid.start, mi = 0;
+    let cur = grid.start;
     while (cmpDay(cur, grid.end) <= 0) {
       const [y, mo] = cur.split('-').map(Number);
       const mEnd = isoOf(new Date(y, mo, 0));
       const segEnd = cmpDay(mEnd, grid.end) < 0 ? mEnd : grid.end;
       const off = Math.round((pISO(cur) - pISO(grid.start)) / DAY);
       const span = Math.max(Math.round((pISO(segEnd) - pISO(cur)) / DAY) + 1, 1);
-      bands += `<div class="ds-tl-band${mi % 2 ? ' alt' : ''}" style="left:calc(var(--cl-tl-day) * ${off});width:calc(var(--cl-tl-day) * ${span})" aria-hidden="true"></div>`;
+      if (activeMonths.has(cur.slice(0, 7))) {
+        bands += `<div class="ds-tl-band on" style="left:calc(var(--cl-tl-day) * ${off});width:calc(var(--cl-tl-day) * ${span})" aria-hidden="true"></div>`;
+      }
       cur = addDays(segEnd, 1);
-      mi += 1;
     }
   }
   const laneW = `width:calc(var(--cl-tl-day) * ${grid.days})`;

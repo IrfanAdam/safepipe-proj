@@ -28,7 +28,7 @@ aside.ds-timeline:not([hidden]){animation:ds-drawer-in var(--dur-glide) var(--ea
 .ds-tl-tick{position:absolute;top:0;height:var(--cl-20);line-height:var(--cl-16);border-left:var(--border-hairline);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding-left:var(--cl-2);white-space:nowrap;overflow:visible}
 aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
 aside.ds-timeline .ds-tl-band{position:absolute;top:0;bottom:0;background:transparent;pointer-events:none}
-aside.ds-timeline .ds-tl-band.alt{background:color-mix(in srgb, var(--color-surface) 60%, transparent)}
+aside.ds-timeline .ds-tl-band.on{background:color-mix(in srgb, var(--color-surface) 60%, transparent)}
 .ds-tl-row{display:flex;align-items:stretch;border-bottom:var(--border-hairline);min-height:var(--cl-tl-row)}
 .ds-tl-row:hover{background:color-mix(in srgb, var(--color-surface) 60%, transparent)}
 .ds-tl-lane{position:relative;flex:none;align-self:stretch}
