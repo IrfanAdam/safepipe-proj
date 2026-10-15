@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-15T15:27:12.581Z",
+  "generated": "2026-10-15T15:27:21.111Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "ea834ba",
+      "full": "ea834ba9ec9bc1ba30399a0ae0428622e8987a0e",
+      "date": "2026-10-15",
+      "time": "20:57",
+      "subject": "feat(changelog): popover phases, done-accent tasks, smaller subtext [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "e2dc63c",
       "full": "e2dc63cbbc8e6995c5141c5b0adc6bc20232b1ee",
@@ -3492,10 +3501,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/changelog/changelog-events.js",
-    "src/changelog/changelog-timeline.css",
-    "src/changelog/changelog-timeline.js",
-    "src/changelog/changelog/timeline-paint.js"
-  ]
+  "wip": []
 }
