@@ -189,7 +189,7 @@ export function paintTimeline(root, ctx) {
   const laneW = `width:calc(var(--cl-tl-day) * ${grid.days})`;
   const todayOff = Math.round((pISO(today) - pISO(grid.start)) / DAY);
   const todayLine = (todayOff >= 0 && todayOff < grid.days)
-    ? `<span class="ds-tl-today" style="left:calc(var(--cl-tl-day) * ${todayOff})"></span>` : '';
+    ? `<span class="ds-tl-todaycol" style="left:calc(var(--cl-tl-day) * ${todayOff})"></span><span class="ds-tl-today" style="left:calc(var(--cl-tl-day) * ${todayOff})"></span>` : '';
   const body = rows.length ? rows.map((r) => {
     // Owner call: the plan name rides its longest bar, not a sidebar label.
     let li = -1, best = -1;

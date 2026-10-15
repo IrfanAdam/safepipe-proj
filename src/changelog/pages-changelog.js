@@ -104,7 +104,7 @@ function doPaint(root) {
   const btn = root.querySelector('[data-view="timeline"]');
   if (btn) {
     const n = list.length, on = st.view === 'timeline';
-    btn.innerHTML = `${TIMELINE_TILE_ICON}<span class="ds-timeline-gridtile__text">Timeline · ${n} track${n === 1 ? '' : 's'}</span>`;
+    btn.innerHTML = `${TIMELINE_TILE_ICON}<span class="ds-timeline-gridtile__text">All ${n} track${n === 1 ? '' : 's'}</span>`;
     btn.setAttribute('aria-pressed', String(on));
     btn.setAttribute('aria-label', `${n} plans in timeline — ${on ? 'close' : 'open'} timeline view`);
   }
