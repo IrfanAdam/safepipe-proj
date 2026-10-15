@@ -1,13 +1,12 @@
 // safepipe changelog — timeline tracks view · [plan:2026-10-15_120000-safepipe-changelog-timeline.md#task-2]
-// Exports: paintTimeline, timelineGrid, sortTimelineRows, boutPopText
-// View layer only: streak/sporadic/ghost tracks + two summary levels over the
-// frozen lane-A model (../changelog-timeline.js). Bout items reuse badges() +
-// paintRevs() — no reimplemented grouping.
+// Exports: paintTimeline, timelineGrid, sortTimelineRows, boutPopText, boutPopLines
+// View layer only: streak/sporadic/ghost tracks + overall summary over the
+// frozen lane-A model (../changelog-timeline.js). Bout popovers reuse
+// boutSummary — no reimplemented grouping.
 import { activeDatesOf, boutsOf, ghostOf, planSummary, boutSummary, planTip, MERGE_GAP } from '../changelog-timeline.js';
-import { hits, commits, badges } from '../changelog-links.js';
-import { state, isDone, parseGates, buildState, dueOf, fmtDate, isoDay } from '../changelog-parse.js';
+import { hits, commits } from '../changelog-links.js';
+import { state, isDone, buildState, dueOf, fmtDate, isoDay } from '../changelog-parse.js';
 import { clip, oneLine } from '../changelog-titles.js';
-import { paintRevs } from './paint-revs.js';
 import { esc } from './esc.js';
 import history from '../../ds/plan-history.json';
 
@@ -105,29 +104,15 @@ const barGeom = (startISO, s, e) => {
   return `left:calc(var(--cl-tl-day) * ${off});width:calc(var(--cl-tl-day) * ${span})`;
 };
 
-function summaryHTML(plan, bout, sum) {
-  const commitsOf = (plan.commits || []).filter((c) => !bout || bout.dates.includes(c.date));
-  const heads = (plan.sprints || []).map((s) => s.head);
-  const gates = parseGates(plan.raw || '');
-  let revsHTML = '';
-  if (bout) {
-    const brev = (plan.revs || []).filter((r) => bout.dates.includes(r.date));
-    const involved = (plan.sprints || []).filter((s) =>
-      (s.commits || []).some((c) => bout.dates.includes(c.date)));
-    revsHTML = involved.map((s) =>
-      paintRevs(brev, { head: s.head, heads, gates })).join('');
-  }
-  const back = bout
-    ? `<button class="ds-tl-back" data-tl-overall aria-label="Back to overall summary">← overall</button>` : '';
-  // Owner call: the overall summary stays a one-line sumline — commit/eval
-  // item lists render only on bout select, never as a second scrolling pane.
-  const items = bout ? `<div class="ds-tl-items">${badges(commitsOf)}${revsHTML}</div>` : '';
+function summaryHTML(plan, sum) {
+  // Owner call: no in-timeline bout panel at all — the plan panel suffices.
+  // The summary is always the one-line overall sumline; a bar click opens
+  // the drawer and its close lands straight back on the timeline.
+  if (!plan || !sum) return '';
   return [
     `<div class="ds-tl-summary" data-tl-summary>`,
     `<b>${esc(sum.title || plan.title)}</b>`,
     `<p class="ds-tl-sumline">${esc(boutPopText(sum))}</p>`,
-    back,
-    items,
     `</div>`,
   ].join('');
 }
@@ -162,17 +147,15 @@ export function paintTimeline(root, ctx) {
   });
   const grid = timelineGrid(rows, today);
   rows = sortTimelineRows(rows, st.tlSort);
-  // Selection: explicit bout or default overall = first track.
-  let selRow = rows[0] || null, selBout = null, selSum = null;
+  // Selection: explicit bout or default overall = first track (bout state only
+  // drives bar highlight + deep link — the summary always shows overall).
+  let selRow = rows[0] || null, selBout = null;
   if (st.tlSel) {
     const hit = rows.find((r) => r.plan.file === st.tlSel.planFile);
     const b = hit && hit.bouts[st.tlSel.boutIdx];
-    if (hit && b) {
-      selRow = hit; selBout = b;
-      try { selSum = boutSummary(hit.plan, b, today); } catch { selSum = null; }
-    } else st.tlSel = null;
+    if (hit && b) { selRow = hit; selBout = b; }
+    else st.tlSel = null;
   }
-  if (!selSum) selSum = (selRow && selRow.sum) || null;
   const selIdx = selRow && selBout ? selRow.bouts.indexOf(selBout) : -1;
   const overdueN = rows.filter((r) => r.ghost && r.ghost.overdue).length;
   // Axis: weekly ticks.
@@ -222,7 +205,7 @@ export function paintTimeline(root, ctx) {
   panel.innerHTML = [
     `<div class="ds-tl-head"><b>Timeline</b><small>${esc(rangeTxt)}</small>`,
     `<button data-tl-close aria-label="Close timeline">✕</button></div>`,
-    selRow && selSum ? summaryHTML(selRow.plan, selBout, selSum) : '',
+    selRow && selRow.sum ? summaryHTML(selRow.plan, selRow.sum) : '',
     `<div class="ds-tl-tools" role="group" aria-label="Timeline tools">`,
     `<button data-tl-sort aria-pressed="${st.tlSort === 'next'}" aria-label="Sort nearest due first">What's next</button>`,
     overdueN ? `<span class="ds-tl-overdue">${overdueN} overdue</span>` : '',

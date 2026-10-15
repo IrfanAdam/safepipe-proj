@@ -166,6 +166,7 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 4. Plan name rides its longest bar (ghost bar / lane fallback); `40ch` spill cap.
 5. Timeline entry is a large WHITE 7×7-cell tile inside the days grid after the last week (surface bg, hairline, `radius-md`); count + pressed state still sync from `doPaint` (text wraps centered). Note: `--cl-24` does not exist in the token scale (22→26) — sizes use `--cl-16/--cl-26`.
 6. Bout popover: one stat per line incl. date range (`boutPopLines`; `boutPopText` stays the sumline form; `.ds-tl-pop` gains `pre-line`).
+7. No in-timeline bout panel at all — the plan panel suffices: `summaryHTML` renders only the one-line overall sumline (bout state drives bar highlight + deep link only); dead `badges`/`paintRevs`/`parseGates` imports + `.ds-tl-items`/`.ds-tl-back` CSS removed. Bar→drawer→✕ lands straight back on the timeline.
 
 - REF GATE (polish): chromium + webkit — white 7×7 tile in grid; 13 rows named on bars, no sidebar; popover 5 lines; bar→drawer-only→✕→timeline; zero page errors; build green.
 

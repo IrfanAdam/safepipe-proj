@@ -21,8 +21,6 @@ aside.ds-timeline:not([hidden]){animation:ds-drawer-in var(--dur-glide) var(--ea
 .ds-tl-head button{font-family:var(--font-mono);font-size:var(--text-micro);background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);padding:var(--cl-4) var(--cl-8);cursor:pointer}
 .ds-tl-summary{padding:var(--cl-8) var(--cl-16);border-bottom:var(--border-hairline);font-size:var(--sp-text-sm)}
 .ds-tl-summary .ds-tl-sumline{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);margin:var(--cl-4) 0 0}
-.ds-tl-summary .ds-tl-items{margin-top:var(--cl-8)}
-.ds-tl-back{font-family:var(--font-mono);font-size:var(--text-micro);background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);padding:var(--cl-4) var(--cl-8);cursor:pointer;margin-top:var(--cl-8)}
 .ds-tl-tools{display:flex;gap:var(--cl-8);align-items:center;padding:var(--cl-8) var(--cl-16);border-bottom:var(--border-hairline);flex-wrap:wrap}
 .ds-tl-tools button{font-family:var(--font-mono);font-size:var(--text-micro);background:var(--color-surface);color:var(--color-ink-muted);border:var(--border-hairline);padding:var(--cl-4) var(--cl-8);cursor:pointer}
 .ds-tl-tools button[aria-pressed="true"]{background:var(--color-accent);border-color:var(--color-accent);color:var(--sp-text-inverse)}
