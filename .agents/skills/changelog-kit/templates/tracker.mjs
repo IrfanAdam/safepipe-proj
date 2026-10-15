@@ -1,58 +1,128 @@
 // changelog-kit tracker template — style-agnostic, configure and copy.
-// Adapts personal_website scripts/ds-track.mjs to any repo.
-// CONFIGURE: TRACKED paths, PLANS dir, OUT manifest, RETRO file, CONTINUATION id.
-import { readdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+// Zero runtime deps: Node stdlib + `git` CLI only. Mirrors the live
+// `plan-track.mjs` defaults; the five machine-editable values live in the
+// AUTOFIX block below — preflight patches the block, never hand-edits.
+import { execFileSync } from 'node:child_process';
+import { readdirSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PLANS = join(root, '.hermes/plans'); // CONFIGURE per repo
-const OUT = join(root, 'src/changelog-manifest.json'); // CONFIGURE per repo
-const RETRO = join(root, '.hermes/plan-links.json'); // {sha: {plan, anchor, note}}
-const TRACKED = ['src', 'DESIGN.md']; // CONFIGURE: paths whose commits count
-const GENERATED = ['src/changelog-manifest.json']; // build outputs, never wip
-const CONTINUATION = 'REPLACE-WITH-SESSION-ID';
+
+// AUTOFIX:CONFIG start — preflight may rewrite these lines, keep the markers.
+const PLANS = join(root, '.hermes', 'plans'); // AUTOFIX:PLANS dir with plan md files
+const OUT = join(root, 'src', 'ds', 'plan-manifest.json'); // AUTOFIX:OUT manifest path
+const HIST = join(root, 'src', 'ds', 'plan-history.json'); // AUTOFIX:HIST history path
+const RETRO = join(root, 'src', 'ds', 'plan-retro.json'); // AUTOFIX:RETRO array-form [{sha,plan,anchor,note}]
+const TRACKED = ['src', 'design-system', 'docs', 'scripts', 'public', '.agents', 'AGENTS.md', '*.html', 'vite.config.js', 'package.json']; // AUTOFIX:TRACKED paths whose commits count
+const GENERATED = ['src/ds/plan-manifest.json', 'src/ds/plan-history.json']; // AUTOFIX:GENERATED build outputs, never wip
+const CONTINUATION = 'REPLACE-WITH-SESSION-ID'; // AUTOFIX:CONTINUATION session id
+const PARSE_MODULE = '../src/changelog/changelog-parse.js'; // AUTOFIX:PARSE split/state/phash module (Lane B)
+// AUTOFIX:CONFIG end.
+
 const TAG = /\[plan:([^\]#\s]+)(?:#([^\]]+))?\]/;
-const sh = (cmd) => { try { return execSync(cmd, { cwd: root, encoding: 'utf8' }); } catch { return null; } };
+const sh = (args) => { try { return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim(); } catch { return null; } };
 
 const plans = existsSync(PLANS) ? readdirSync(PLANS).filter((f) => f.endsWith('.md')).sort() : [];
-const read = (f) => { try { return readFileSync(join(PLANS, f), 'utf8'); } catch { return ''; } };
-const phased = plans.filter((f) => /^## Phase /m.test(read(f)));
-const retro = (() => { try { return JSON.parse(readFileSync(RETRO, 'utf8')).links || {}; } catch { return {}; } })();
-const log = sh(`git log --format='@@%H|%h|%ad|%cI|%s' --name-only --date=short -- ${TRACKED.join(' ')}`);
-if (!log || !log.trim()) {
-  if (!existsSync(OUT)) writeFileSync(OUT, JSON.stringify({ generated: new Date().toISOString(), continuation: CONTINUATION, plans, commits: [], wip: [] }, null, 1) + '\n');
-  console.log('.. track: no log or git unavailable, manifest untouched');
-  process.exit(0);
+
+let commits = [];
+const log = sh(['log', '--format=%H|%h|%ad|%s', '--date=format:%Y-%m-%d|%H:%M', '--', ...TRACKED]);
+if (log) {
+  for (const line of log.split('\n').filter(Boolean)) {
+    // Subjects may contain `|` — rejoin the tail, never a fixed index.
+    // `%ad` expands to `date|time`, so fields are full|sha|date|time|subject.
+    const [full, sha, date, time, ...rest] = line.split('|');
+    const subject = rest.join('|');
+    const m = subject.match(TAG);
+    commits.push({ sha, full, date, time, subject, plan: m ? m[1] : null, anchor: m ? (m[2] || null) : null });
+  }
 }
-const commits = log.split(/^@@/m).filter(Boolean).map((block) => {
-  const [head, ...files] = block.split('\n');
-  const [full, sha, date, iso, ...rest] = head.split('|');
-  const subject = rest.join('|');
-  const m = subject.match(TAG);
-  return { sha, full, date, time: (iso.match(/T(\d{2}:\d{2})/) || [])[1] || '', subject: subject.replace(TAG, '').trim(), plan: m ? m[1] : null, anchor: m ? (m[2] || null) : null, files: files.map((f) => f.trim()).filter(Boolean) };
-}).filter((c) => c.files.some((f) => !GENERATED.includes(f))).map(({ files, ...c }) => c);
-const st = sh(`git status --short -- ${TRACKED.join(' ')}`) || '';
-const wip = st.trim() ? st.trim().split('\n').map((l) => l.trim()).filter(Boolean).filter((l) => !GENERATED.some((g) => l.endsWith(g))) : [];
-let prevDoc = null; let prev = [];
-try { prevDoc = JSON.parse(readFileSync(OUT, 'utf8')); prev = prevDoc.commits || []; } catch { prev = []; }
+
+// Porcelain prefixes vary in width — drop the status columns, never a fixed
+// slice, so a path char can never be eaten.
+const status = sh(['status', '--short', '--', ...TRACKED]) || '';
+const genBase = new Set(GENERATED.map((g) => g.split('/').pop()));
+const wip = status.split('\n').filter(Boolean)
+  .map((l) => l.slice(2).trimStart())
+  .filter((f) => ![...genBase].some((g) => f.endsWith(g)));
+
+// Shallow-clone guard: merge fresh log OVER the previous manifest (dedupe by
+// sha, fresh first) so truncated CI clones never shrink history.
+let prev = { commits: [], generated: null };
+if (existsSync(OUT)) {
+  try { prev = JSON.parse(readFileSync(OUT, 'utf8')); } catch { /* corrupt → rebuild */ }
+}
 const seen = new Set(commits.map((c) => c.sha));
-prev.forEach((c) => { if (!seen.has(c.sha)) { commits.push(c); seen.add(c.sha); } });
-commits.forEach((c) => { const r = retro[c.sha]; if (r) { c.plan = r.plan; c.anchor = r.anchor ?? null; } });
-Object.keys(retro).forEach((short) => {
-  if (commits.some((c) => c.sha === short)) return;
-  const line = sh(`git show -s --format='%H|%h|%ad|%cI|%s' --date=short ${short}`);
-  if (!line) return;
-  const head = line.trim().split('\n')[0]; if (!head) return;
-  const [full, sha, date, iso, ...rest] = head.split('|'); if (!full || !sha) return;
-  const subject = rest.join('|'); const r = retro[sha] || retro[short]; if (!r) return;
-  const m = subject.match(TAG);
-  commits.push({ sha, full, date, time: (iso.match(/T(\d{2}:\d{2})/) || [])[1] || '', subject: m ? subject.replace(TAG, '').trim() : subject.trim(), plan: r.plan, anchor: r.anchor ?? null });
-});
-commits.sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
-const doc = { generated: new Date().toISOString(), continuation: CONTINUATION, plans, commits, wip };
-const strip = (o) => JSON.stringify({ ...o, generated: null });
-if (prevDoc && strip(prevDoc) === strip(doc)) doc.generated = prevDoc.generated;
-writeFileSync(OUT, JSON.stringify(doc, null, 1) + '\n');
-console.log(`track — ${plans.length} plans (${phased.length} phased) · ${commits.length} commits (${commits.filter((c) => c.plan).length} linked) · ${wip.length} wip · cont ${CONTINUATION}`);
+for (const c of prev.commits || []) if (!seen.has(c.sha)) { commits.push(c); seen.add(c.sha); }
+
+// Plumbing exclusion: commits touching only GENERATED files are tracker
+// output, not work — drop the plan-less ones so triage can reach empty.
+const genSet = new Set(GENERATED);
+const filesOf = (sha) => {
+  try { return execFileSync('git', ['show', '--name-only', '--format=', sha], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean); }
+  catch { return ['unknown']; }
+};
+for (let i = commits.length - 1; i >= 0; i--) {
+  if (!commits[i].plan) {
+    const fs = filesOf(commits[i].full);
+    if (fs.length && fs.every((f) => genSet.has(f))) commits.splice(i, 1);
+  }
+}
+
+// Retro: pre-trailer history, array-form current, legacy map-form parses.
+// Never rewrite git history.
+let retroRows = [];
+try {
+  const raw = JSON.parse(readFileSync(RETRO, 'utf8'));
+  retroRows = Array.isArray(raw) ? raw : Object.entries(raw.links || {}).map(([sha, r]) => ({ sha, ...r }));
+} catch { /* no retro file yet */ }
+if (retroRows.length) {
+  const bySha = new Map(retroRows.map((r) => [r.sha, r]));
+  for (const c of commits) {
+    const r = bySha.get(c.sha);
+    if (r) { c.plan = r.plan; c.anchor = r.anchor || null; }
+  }
+}
+
+const linked = commits.filter((c) => c.plan).length;
+
+// Plan-iteration history: one snapshot per plan per unseen content hash.
+// Shared hash fn comes from the Lane B parse module — the SAME fnv1a the
+// views use, never a second implementation. If Lane B has not landed yet,
+// the manifest still writes; preflight reports history as pending.
+let hist = {};
+try { hist = JSON.parse(readFileSync(HIST, 'utf8')); } catch { /* start empty */ }
+let histAdded = 0;
+try {
+  const { split, state, phash } = await import(PARSE_MODULE);
+  for (const f of plans) {
+    const md = readFileSync(join(PLANS, f), 'utf8');
+    const h = phash(md);
+    hist[f] ||= [];
+    const ix = hist[f].findIndex((v) => v.hash === h);
+    if (ix === -1) {
+      const now = new Date();
+      const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      hist[f].push({ sha: null, date: now.toISOString().slice(0, 10), time: hhmm, hash: h,
+        sections: split(md).map((s) => ({ head: s.head.slice(0, 80), hash: phash(s.head + '\n' + s.body), state: state(s.body) })) });
+      histAdded++;
+    } else if (ix !== hist[f].length - 1) {
+      hist[f].push(...hist[f].splice(ix, 1)); // move-to-end, keep provenance
+      histAdded++;
+    }
+  }
+  if (histAdded) writeFileSync(HIST, JSON.stringify(hist, null, 1) + '\n');
+} catch {
+  console.log('.. track: parse module unavailable, history skipped (Lane B pending)');
+}
+
+const next = { generated: prev.generated || new Date().toISOString(), plans, commits, wip };
+const same = (a, b) => JSON.stringify({ ...a, generated: 0 }) === JSON.stringify({ ...b, generated: 0 });
+if (!existsSync(OUT) || !same(prev, next)) {
+  next.generated = new Date().toISOString();
+  mkdirSync(dirname(OUT), { recursive: true });
+  writeFileSync(OUT, JSON.stringify(next, null, 2) + '\n');
+  console.log(`track — ${plans.length} plans · ${commits.length} commits (${linked} linked) · ${wip.length} wip · manifest updated`);
+} else {
+  console.log(`track — ${plans.length} plans · ${commits.length} commits (${linked} linked) · ${wip.length} wip · clean`);
+}

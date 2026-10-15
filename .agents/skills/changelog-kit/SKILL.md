@@ -1,7 +1,7 @@
 ---
 name: changelog-kit
 description: Use when adding plan-linked changelog, calendar, drawer.
-version: 0.2.0
+version: 0.3.0
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -29,6 +29,8 @@ Style-agnostic transferable system. Builds plan-to-commit traceability plus thre
 3. **Link layer** — pure hits/badges/unlinked functions over the manifest.
 4. **Views** — calendar graph, filter chips, build cards, rail plus detail panel, triage block.
 
+Runtime: tracker + preflight + backfill run on Node stdlib plus the `git` CLI only (no runtime deps). Theme lives one layer out: portable core is plan contract + tracker + pure parse/link + view roles; host shell/CSS/tokens are Lane D chrome.
+
 ## Data Contracts (do not rename shapes)
 
 ### Plan file
@@ -43,7 +45,7 @@ Style-agnostic transferable system. Builds plan-to-commit traceability plus thre
 ### Commit trailer
 
 - Subject line carries exactly one `[plan:<file>#<anchor>]`; anchor is a verbatim substring of exactly one phase body; braced form for N<10 (bare `#phase-1` collides with `#phase-10`).
-- Pre-trailer history lives in the retro file (`sha -> plan, anchor, note`); never rewrite history.
+- Pre-trailer history lives in the retro file; never rewrite history. Two shapes parse: array-form `[{sha, plan, anchor, note}]` (current) and legacy map-form `{links: {sha: {plan, anchor, note}}}`. Tracker reads both, writes array-form.
 - Tracker parses subject only, never body.
 
 ### Manifest JSON
@@ -64,11 +66,15 @@ Style-agnostic transferable system. Builds plan-to-commit traceability plus thre
 - History file is generated: excluded from wip exactly like the manifest.
 - Backfill script (`plan-backfill.mjs`) walks `git log --follow --reverse` per plan, rehashes each committed version, merges dedupe-by-hash — idempotent, rerunnable; recovers only committed snapshots, so history is thin when plans were tracked late and complete going forward.
 - Views: cards show `rev <n> · <last-date>` when n>1; rail rows show an `edited` marker when the section hash differs across versions or the head is new.
+- Per-phase scope: revision/eval panels take `scope.head`, resolve it to a canonical anchor (`revAnchor`), and filter diff parts to that anchor only — a phase detail never shows sibling-phase churn.
+- Moved-phase migration: when phases move between plan files (see `references/plan-split.md`), history entries move with the phase (same section hashes, new file key, `movedFrom: {file, head}` provenance on the migrated snapshot). Pointers in the old file are dropped; the new file is the record. Never duplicate the phase in both files' histories.
+- Evals threading: gate `· rev <date>` notes and `feedback|review|pass|retro|critique|rework`-headed blocks are first-class rows alongside hash diffs (`gateText` strips the `· rev` prefix and quote wrapping; `fbBlocksOf` collects headed bullet blocks capped at 10, overflow noted as `… N more in the plan`). Attribution is by cleaned-head match with token-overlap fallback (`fileFor`/`blockFor`, exact match wins at 100, overlap needs ≥2 shared tokens plus non-empty bullets).
 
 ### Link layer (pure, no DOM)
 
-- `hits(file, text, isFirstPhase)`: commits where plan matches file AND (anchor ? text includes anchor : isFirstPhase).
-- `badges(list)`: timeline grouped by date — `<div class="ds-timeline"><div class="ds-timeline-date">YYYY-MM-DD</div><div class="ds-timeline-item"><a>sha</a> <span>subject</span><small>date time</small></div>…</div>` with left line `border-left: var(--border-hairline)` on `.ds-timeline` (`padding-left: var(--space-16)`) and dots via `::before` `width: var(--space-8)` `background: var(--color-accent)` `border: var(--border-hairline)` `border-radius:50%` at `left: calc(-1*var(--space-16)-var(--space-4))` plus date dot `var(--space-10)` `background: var(--color-panel)`; date is explicit line, commits are readable rows with mono sha + subject + muted date second line; wip is excluded from Unlinked when untracked is 0.
+- `hits(file, text, isFirstPhase)`: commits where plan matches file AND (anchor ? digit-boundary `anchorHit(text, anchor)` : isFirstPhase). Bare anchors never use `includes` — `task-1` must not match `{#task-10}`.
+- `badges(list)`: timeline grouped by date into Day groups newest-first — `<details class="ds-timeline-group" open><summary class="ds-timeline-date"><span class="ds-caret">‹›</span><span class="ds-day-num">Day N</span> · D Mon, YYYY</summary><div class="ds-timeline-items"><div class="ds-timeline-item"><a>sha</a> <span>subject</span><small>date time</small></div>…</div></details>` inside `<details class="ds-commits-panel ds-panel" open><summary>Commits · N</summary><div class="ds-timeline">…`. Day numbers derive from the FILTERED date list client-side (newest date = Day N, oldest = Day 1), never stored.
+- `paintRevs(revs, scope)`: same Day-grouped `details` timeline for iteration history — `<details class="ds-evals ds-revs ds-panel" open><summary>Evals · N</summary><div class="ds-timeline">…`. Gate-eval rows (`ds-timeline-item--eval`, no timestamp) thread above their date's iteration rows (`ds-timeline-item--iter` with `date time` stamp); dates with no evals render plain iteration rows. Empty revs + empty gates render nothing.
 - `unlinked(planTexts)`: commits with no plan, unknown plan, or anchor in no phase body; when no untracked commits, triage hides (wip alone does not count as Unlinked) — `xs` from `commits.filter(no plan)` only, never `concat(wip)`.
 
 ### Parse helpers (pure, no DOM)
@@ -92,15 +98,16 @@ Style-agnostic transferable system. Builds plan-to-commit traceability plus thre
 - Calendar: date-to-count map from commits; week columns Mon–Sun; dated cells are filter buttons with count-plus-date tip; selected day toggles.
 - Chips: All(N) plus per-tag counts plus active day-clear chip; multi-select OR.
 - Cards: one row per build (sequence plus title plus tags plus date/time/phase-count/progress line); click opens panel on task stage.
-- Panel: two panes side-by-side (phase rail plus task detail) plus pinned description footer; detail renders markdown plus `badges(hits(...))` as left-line timeline (date as explicit line, dots per commit, readable mono sha + subject + muted date second line); rail click switches phase in place; close via button/scrim/Escape.
+- Panel: two panes side-by-side (phase rail plus task detail) plus pinned description footer; detail renders markdown plus `badges(hits(...))` commits timeline plus `paintRevs(history[file], scope)` evals timeline (both Day-grouped `details` timelines); rail click switches phase in place (rev scope follows the open phase); close via button/scrim/Escape.
 - Triage: global unlinked block rendered once, hidden when all tracked.
 - Tooltip: single cursor-following node fed by data-tip attributes; never per-button spans. Style DS-adherent: `font-family: var(--font-mono)` `font-size: var(--text-micro)` `line-height: var(--font-leading-relaxed)` (not `1.5`), `color: var(--color-bg)` `background: var(--color-ink)` (via bridging `var(--text-primary)`/`var(--bg-primary)`), `padding: var(--space-8) var(--space-10)` `border-radius: var(--radius-xs)` `box-shadow: var(--shadow-sm)` `transition: opacity var(--motion-duration-sm) var(--motion-easing-standard)` `max-width: min(40ch,60vw)` or `var(--size-tooltip)` — verify `grep -rn -E '#[0-9a-fA-F]{3,8}|rgba?\(|[0-9]+px' src/pitch/pitch-changelog*` shows 0 outside `var(`.
-- Gate verdict inline (no visualization): in the phase panel head, directly after DONE, a quiet gate tag from that phase's parsed `REF GATE` line — "GATE PASSED" (passed + waiver), "GATE FAILED", "GATE OPEN" (done but unreviewed), nothing when locked/gateless. Same mono micro treatment as DONE, token-only; probe hook `data-gate-state`. Reviewer + evidence live in the plan file, not on screen.
+- Gate verdict below the phase title (no rail, no stepper): in the phase panel head, the first `h2` (phase title) is followed by a `p.ds-status` line — `✓ DONE` (or `✓ done (date)` / `✗ cancelled`) with the gate suffix on the same line: `GATE PASSED` (passed + waiver), `GATE FAILED`, `GATE OPEN` (done but unreviewed), nothing when locked/gateless. A fully-done phase whose heading lacks the mark still gets its DONE line so the verdict has a line to sit on. Same mono micro treatment as DONE, token-only; probe hook `data-gate-state`. Reviewer + evidence live in the plan file, not on screen. Supersedes the retired stepper/popover and inline-after-DONE variants — do not reintroduce them.
 
 ## Procedure
 
-1. Configure: plansDir, trackedPaths, manifestPath, retroFile, continuationId, tagSet, repoUrl.
-2. Tracker lane: adapt `templates/tracker.mjs`; add build plus predev hooks; run twice, assert second run is timestamp-stable. Wire plan-history snapshots into the same hook; run `plan-backfill.mjs` once for committed history, assert rerun adds 0.
+0. Preflight first: run `templates/preflight.mjs` (default `--fix`) before any lane. It checks → auto-patches → re-verifies: plan trailer coverage, tracked-path coverage (every `git log` sha accounted for or deliberately out of scope), plan-shape survey (every plan yields sections via split or the plan-shapes adapter), manifest/retro/history wiring, build-hook wiring. Loud fail only when it cannot fix: `exit 1 PREFLIGHT FAIL:<reason>` with evidence. `--check` is CI-strict (no writes, fail on any drift).
+1. Configure: plansDir, trackedPaths, manifestPath, retroFile, continuationId, tagSet, repoUrl. All five machine-editable values live in `// AUTOFIX:`-marked blocks in the tracker template — preflight patches the blocks, never hand-edits around them.
+2. Tracker lane: adapt `templates/tracker.mjs` (TRACKED/GENERATED/RETRO/OUT/CONTINUATION defaults mirror the live `plan-track.mjs`: wide TRACKED, `src/ds/plan-manifest.json` + `src/ds/plan-history.json` GENERATED, array-form retro); add build plus predev hooks; run twice, assert second run is timestamp-stable. Wire plan-history snapshots into the same hook (shared `phash` import); run `plan-backfill.mjs` once for committed history, assert rerun adds 0.
 3. Parse lane: copy pure helpers; unit-test fenced split, norm, state, tags, titles.
 4. Views lane: implement calendar/cards/panel/chips/events against the contracts using host idioms (glob, fetch, or SSG).
 5. Chrome lane: names/titles map, triage block, shell layout in host visual language.
@@ -108,7 +115,7 @@ Style-agnostic transferable system. Builds plan-to-commit traceability plus thre
 
 ## Parallel Implementation Model (parent plus 4 lanes)
 
-- One delegate call, 4 children, file-disjoint scopes; shared shell/manifest/index stay parent-only; children never run git or trackers.
+- One delegate call, 4 children, file-disjoint scopes; shared shell/manifest/index stay parent-only; children never run git or trackers. Parent runs preflight (`--fix`) before dispatch and `--check` after integration.
 - Lane A tracker: script plus manifest plus retro file plus build hooks plus shallow-merge plus plumbing exclusions.
 - Lane B parse: chunks/split/norm/state plus format plus tags plus titles plus tests.
 - Lane C views: calendar plus cards plus rail/detail plus chips plus events plus tooltip plus triage.
@@ -129,7 +136,7 @@ Style-agnostic transferable system. Builds plan-to-commit traceability plus thre
 - Badge list declared after the template that uses it is a runtime crash on first open.
 - Manifest committed inside the feature commit bakes stale wip — feature commit first, regenerate, then refresh commit. With a `post-commit: node scripts/ds-track.mjs` hook the manifest is auto-regenerated after every commit (leaving a dirty `M` diff); never `git commit --amend` to fold it — the hook's `prev.commits` merge retains the old sha as a ghost. Recover with `git restore --staged <manifest>; git restore <manifest>; node scripts/ds-track.mjs` then re-stage and recommit, and treat `graphData*.js` `META.generatedAt` timestamp-only bumps the same as `manifest.generated` churn (discard if only `generatedAt` changed).
 - `src/js/mechanics/graphData*.js` churn is timestamp-only unless `NODES`/`EDGES`/`GROUPS` changed — verify with `git diff -U0 src/js/mechanics/graphData*.js | grep -E 'NODES|EDGES|GROUPS'`; if only `generatedAt` shows, `git restore` the four files and skip the chore.
-- Timeline grouping: `badges(list)` must group by date with a `lastDate` guard — emitting a flat `<p><br>` list loses the explicit date line and the left-line timeline never forms; iterate in list order, emit `<div class="ds-timeline-date">` only when `c.date !== last`, then `badgeItem(c)`.
+- Timeline grouping: `badges(list)` and `paintRevs(revs, scope)` must group by date into Day-grouped `details`/`summary` groups newest-first (see Link layer) — emitting a flat `<p><br>` list or bare date `<div>`s loses the Day labels and the eval threading never forms; iterate sorted newest-first, emit one `<details class="ds-timeline-group" open>` per date with `Day N` in the summary.
 - Triage wip leak: `unlinked()` must filter `commits.filter(no plan)` only and hide the block when untracked length is 0 (`if (!xs.length) return all-tracked`); never `concat(wip)` — wip alone must not count as Unlinked or `All tracked` never appears despite 0 untracked commits.
 - Dev/prod CSS order split: Vite bundles page `<link>` stylesheets into hashed chunks whose order can differ from dev source order — never override `:root` custom properties across stylesheets (page file redefining tokens' `--space-N` silently loses in prod when tokens chunk loads last). Give page-local vars a unique prefix (`--cl-N`) so rendering is order-proof; when the host token scale lacks odd steps, derive them with `calc()` off the base spacing token instead of raw px so the zero-raw-values gate stays green.
 - Phantom checkboxes: `norm()` must only synthesize `- [ ]` items from task-headed `###` subsections; non-task subsections (Risks, Notes) pass through verbatim or a shipped plan renders N-1/N with a bogus open item.
@@ -156,10 +163,18 @@ Style-agnostic transferable system. Builds plan-to-commit traceability plus thre
 - [ ] New plan file appears with zero renderer edits.
 - [ ] Tracker: linked count plus 0 wip; rerun is diff-clean (timestamp preserved) and handles `|` in subjects.
 - [ ] Plumbing commits touching only GENERATED files are excluded; triage shows 0 untracked commits (wip only).
-- [ ] Phase with commits shows timeline (date headers + dot rows); without shows none; triage hides when untracked 0 (wip alone hidden).
+- [ ] Phase with commits shows Day-grouped commits timeline; phase detail shows evals timeline (gate `· rev` notes + feedback blocks threaded above iteration rows) scoped to the open phase; without shows none; triage hides when untracked 0 (wip alone hidden).
 - [ ] Calendar day filters cards; chips OR-filter; sequence renumbers on filter; day blobs use CRM radius token `var(--radius-xs)` (4px, not square, not circle) and violet tints.
 - [ ] Every card times every rail phase opens correct detail; close paths work; changelog is `changelog.html` with `✕` close like pitch (no extra header nav links) and uses CRM tokens/foundations, not the source project's palette.
 - [ ] Prod/dev parity: `vite build` then `grep -c "var(--cl-" dist/assets/changelog-*.css` >0 and `grep -c "var(--space-[0-9]" dist/assets/changelog-*.css` ==0 on the changelog chunk; `curl -s https://…/assets/changelog-*.css` byte-identical to `dist/assets/changelog-*.css` (`cmp` or `md5`) and changelog HTML asset hash matches `dist/changelog.html` — catches the `:root --space-N` order-flip that makes local spacing correct but prod 4x off.
 - [ ] Browser capture unavailable: simulate the pure pipeline in node (read plansDir + manifest, run split/tags/hits/unlinked) and assert card count, per-section hit counts, and the exact unlinked set before claiming the log is linked.
 - [ ] New page is linked from the host nav/sidebar in the same build — a shipped-but-unlinked page is found only by URL.
-- [ ] Plan history covers every plan file; tracker rerun is diff-clean; backfill rerun adds 0; every live section hash-matches its plan's last history entry (same hash fn both sides); edited plans show rev counts, untouched plans show none.
+- [ ] Plan history covers every plan file; tracker rerun is diff-clean; backfill rerun adds 0; every live section hash-matches its plan's last history entry (same hash fn both sides); edited plans show rev counts, untouched plans show none; moved phases show revs under the new file (old file holds no pointer).
+- [ ] Preflight `--check` passes (trailer coverage, path coverage, shape survey, hook wiring) with no `PREFLIGHT FAIL`.
+
+## References
+
+- `references/plan-shapes.md` — Task/Step adapter + anchor rules.
+- `references/parallel-lanes.md` — 4-lane fan-out.
+- `references/install-checklist.md` — backward-compatible install on existing repos + forward setup on new ones.
+- `references/plan-split.md` — splitting phases between plans with history migration.
