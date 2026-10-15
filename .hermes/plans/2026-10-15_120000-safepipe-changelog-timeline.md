@@ -180,8 +180,8 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 18. Schedule picker: native date input + clear + hint scaffolding replaced by accent text trigger (`Schedule · 26 Oct 2026` / `Schedule when?`) opening a Safepipe-themed month popup (surface card, mono cells, accent select, accent today ring, Mo–Su like the days grid, month nav, Clear footer, Esc/outside-dismiss, same `applyDue` live edit + repaint).
 
 19. Timeline surface batch: drawer panel now resets margin+padding so the in-drawer commit-list `.ds-timeline` rule (changelog-drawer.css) can no longer leak `padding-left:12px` onto the aside — head/axis/rows sit flush with the drawer's left edge; head-date scrub input removed (markup, CSS, `change` wiring); done bars drop the full accent for a muted accent (`color-mix` accent 60% × `neutral-5` ≈ #a494f3) and neutral bars darken one quiet step (`neutral-3` → 50% `neutral-5` mix ≈ #eaeaea); dead `lv*` bar rules deleted.
-
 20. Title inset + softer done bars: the timeline head title now carries the `cl-16` left inset (matching the ✕'s `cl-16` from the right; the grid below stays flush); fully-done bars muted further, 60% → 45% accent × `neutral-5` (≈ `#b3a7ef`). All 13 bars verified down to two fills — done `#b3a7ef` / neutral `#eaeaea`.
+21. Past lockout: picker days before today render muted + `disabled` (click is a no-op) — schedules only run today-forward. Existing overdue Dues keep their flag, they just can't be (re-)picked.
 
 - REF GATE (polish): chromium + webkit — white 7×7 tile in grid; 13 rows named on bars, no sidebar; popover 5 lines; bar→drawer-only→✕→timeline; zero page errors; build green.
 

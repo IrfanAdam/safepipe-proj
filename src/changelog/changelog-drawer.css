@@ -59,6 +59,7 @@
 .ds-panel-date{color:var(--color-ink-muted);font-weight:400;letter-spacing:var(--tracking-label)}
 .ds-panel[open] > .ds-panel-title{margin-bottom:var(--cl-4)}
 .ds-panel > .ds-panel-title{cursor:pointer;list-style:none;display:flex;align-items:center;gap:var(--cl-2)}
+.ds-panel > div.ds-panel-title{cursor:default}
 .ds-panel > .ds-panel-title::-webkit-details-marker{display:none}
 .ds-panel > .ds-panel-title::marker{content:""}
 .ds-day-num{color:var(--color-accent);font-weight:800}
@@ -110,6 +111,8 @@
 .ds-due-day:hover{background:color-mix(in srgb, var(--color-accent) 25%, transparent)}
 .ds-due-day.is-sel{background:var(--color-accent);color:var(--color-bg);font-weight:700}
 .ds-due-day.is-today{outline:var(--cl-1) solid var(--color-accent);outline-offset:calc(-1 * var(--cl-1))}
+.ds-due-day.is-past{color:var(--color-ink-muted);opacity:0.45;cursor:default}
+.ds-due-day.is-past:hover{background:transparent}
 .ds-due-cal__foot{display:flex;justify-content:flex-end;margin-top:var(--cl-4)}
 .ds-due-cal__foot button{background:none;border:0;padding:var(--cl-4) 0;color:var(--color-ink-muted);font-family:var(--font-mono);font-size:calc(var(--text-micro) - 2px);text-decoration:underline;text-underline-offset:var(--cl-2);cursor:pointer}
 .ds-due-cal__foot button:hover{color:var(--color-accent)}

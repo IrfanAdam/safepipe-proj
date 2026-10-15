@@ -172,8 +172,9 @@ export function bindChangelogEvents(root, st, helpers) {
     for (let i = 0; i < lead; i++) cells += '<span aria-hidden="true"></span>';
     for (let d = 1; d <= days; d++) {
       const iso = `${y}-${pad2(mo)}-${pad2(d)}`;
-      cells += `<button class="ds-due-day${iso === sel ? ' is-sel' : ''}${iso === today ? ' is-today' : ''}"` +
-        ` data-due-pick="${iso}"${iso === sel ? ' aria-pressed="true"' : ''} aria-label="${iso}">${d}</button>`;
+      const past = iso < today;
+      cells += `<button class="ds-due-day${iso === sel ? ' is-sel' : ''}${iso === today ? ' is-today' : ''}${past ? ' is-past' : ''}"` +
+        ` data-due-pick="${iso}"${iso === sel ? ' aria-pressed="true"' : ''}${past ? ' disabled aria-disabled="true"' : ''} aria-label="${iso}">${d}</button>`;
     }
     pop.innerHTML =
       `<div class="ds-due-cal__head"><button data-due-nav="-1" aria-label="Previous month">‹</button>` +
@@ -190,8 +191,10 @@ export function bindChangelogEvents(root, st, helpers) {
     const dp = root.querySelector('[data-due-pop]:not([hidden])');
     if (dp && !(e.target.closest && e.target.closest('[data-due-pop],[data-due-open]'))) dp.hidden = true;
     if (e.target.closest('[data-day-clear]')) { st.day = ''; st.sel = [0, 0]; doPaint(root); return; }
-    // Due scheduling: the themed popup owns picking; Clear removes the Due
-    // line. Past dates stay allowed and flag overdue without blocking.
+    // Due scheduling: the themed popup owns picking (past days are disabled
+    // — schedules only run today-forward); Clear removes the Due line.
+    // Existing overdue Dues still display their flag, they just can't be
+    // (re-)picked.
     if (e.target.closest('[data-due-clear]')) { applyDue(null); return; }
     const dopen = e.target.closest('[data-due-open]');
     if (dopen) {
