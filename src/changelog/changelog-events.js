@@ -61,10 +61,21 @@ export function bindChangelogEvents(root, st, helpers) {
   const { cur, doPaint } = helpers;
   const tlPop = () => root.querySelector('[data-tl-pop]');
   const hidePop = () => { const p = tlPop(); if (p) p.hidden = true; };
+  const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const showPop = (el, x, y) => {
     const p = tlPop();
     if (!p || !el || !el.dataset.pop) { hidePop(); return; }
-    p.textContent = el.dataset.pop; p.hidden = false;
+    // Structured popover: title + 2-line-clamped description (from the
+    // bout's data-tip) + smaller muted stats/date subtext.
+    const lines = String(el.dataset.pop).split('\n').filter(Boolean);
+    const title = lines[0] || '';
+    const sub = lines.slice(1).join('\n');
+    const desc = (el.dataset.tip || '').trim();
+    p.innerHTML =
+      `<b class="ds-tl-pop__title">${escHtml(title)}</b>` +
+      (desc && desc !== title ? `<span class="ds-tl-pop__desc">${escHtml(desc)}</span>` : '') +
+      (sub ? `<span class="ds-tl-pop__sub">${escHtml(sub)}</span>` : '');
+    p.hidden = false;
     const pad = 14;
     const r = p.getBoundingClientRect();
     let px = (x ?? 0) + pad, py = (y ?? 0) + pad;

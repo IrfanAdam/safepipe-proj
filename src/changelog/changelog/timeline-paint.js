@@ -46,7 +46,8 @@ const ghostSection = (plan) => {
 // Commit-density level mirroring the calendar sqrt scale (graph.js).
 const lvOf = (n, max) => !n ? 0 : Math.min(4, Math.ceil(4 * Math.sqrt(n / Math.max(max, 1))));
 
-// Global column bounds: min(active, planDate) → max(today, latestDue).
+// Global column bounds: min(active, planDate) → max(today, latestDue),
+// padded to whole prev/next months so empty month context always shows.
 export function timelineGrid(rows, today) {
   const t = today || todayISO();
   let start = t, end = t, any = false;
@@ -62,6 +63,21 @@ export function timelineGrid(rows, today) {
     }
   }
   if (any && cmpDay(end, t) < 0) end = t;
+  // Pad to the full previous month → full next month.
+  const shiftMonth = (iso, delta) => {
+    const [y, m] = iso.split('-').map(Number);
+    return isoOf(new Date(y, m - 1 + delta, 1));
+  };
+  const firstOfMonth = (iso) => {
+    const [y, m] = iso.split('-').map(Number);
+    return isoOf(new Date(y, m - 1, 1));
+  };
+  const lastOfMonth = (iso) => {
+    const [y, m] = iso.split('-').map(Number);
+    return isoOf(new Date(y, m, 0));
+  };
+  start = firstOfMonth(shiftMonth(start, -1));
+  end = lastOfMonth(shiftMonth(end, 1));
   const days = Math.max(Math.round((pISO(end) - pISO(start)) / DAY) + 1, 1);
   return { start, end, days };
 }
@@ -214,6 +230,25 @@ export function paintTimeline(root, ctx) {
     `<div class="ds-tl-scroll"><div class="ds-tl-axis">` +
     `<div class="ds-tl-ticks" style="${laneW}">${ticks}</div></div>${body}</div>`,
   ].join('');
+  // Keep today in view on open: with prev/next-month padding the lane is
+  // wider than the drawer, so nudge the scroll only when today is off-screen
+  // (never yanks an already-visible position on repaint). Deferred to rAF so
+  // layout (lane width) is settled in every engine before measuring.
+  try {
+    requestAnimationFrame(() => {
+      try {
+        const sc = panel.querySelector('.ds-tl-scroll');
+        const lane = panel.querySelector('.ds-tl-lane');
+        if (!sc || !lane || todayOff < 0 || todayOff >= grid.days) return;
+        const dayPx = lane.getBoundingClientRect().width / grid.days;
+        if (!dayPx) return;
+        const x = todayOff * dayPx;
+        if (x < sc.scrollLeft || x > sc.scrollLeft + sc.clientWidth) {
+          sc.scrollLeft = Math.max(0, x - sc.clientWidth * 0.3);
+        }
+      } catch { /* scroll hint only */ }
+    });
+  } catch { /* scroll hint only */ }
   if (pop) pop.hidden = true;
 }
 
