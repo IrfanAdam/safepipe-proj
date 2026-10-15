@@ -242,13 +242,18 @@ export function paintDetail(root, ctx){
     ` · `,
     esc(short(sprint.head)),
     `</b><button data-close aria-label="Close detail">✕</button></div>`,
-    dueHTML,
-    `<div class="ds-md">`,
-    marked.parse(bodySansGates, {
-      phaseDone: isDone(state(sprint.body)),
-      gateSuffix: gateSuffixOf(gates, phaseN),
-    }) + paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN }) + (hs.length ? badges(hs) : ''),
-    `</div>`,
+    // Due row sits directly under the section title: split the head line
+    // off before parsing. Bodies with no head keep the old order.
+    (() => {
+      const markOpts = {
+        phaseDone: isDone(state(sprint.body)),
+        gateSuffix: gateSuffixOf(gates, phaseN),
+      };
+      const revsHTML = paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN }) + (hs.length ? badges(hs) : '');
+      const hm = String(bodySansGates || '').match(/^(#{1,4}\s+[^\n]+)\n([\s\S]*)$/);
+      if (!hm) return [dueHTML, `<div class="ds-md">`, marked.parse(bodySansGates, markOpts) + revsHTML, `</div>`].join('');
+      return [`<div class="ds-md">`, marked.parse(hm[1], markOpts) + dueHTML + marked.parse(hm[2], markOpts) + revsHTML, `</div>`].join('');
+    })(),
   ].join('');
   const u = unlinked(texts);
   root.querySelector('[data-col="triage"]').innerHTML = /All tracked/.test(u) ? '' : `<hr class="ds-hr">${u}`;
