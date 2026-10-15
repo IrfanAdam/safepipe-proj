@@ -95,10 +95,21 @@
 .ds-gate-tag[data-gate-tag="failed"]{color:var(--color-ink)}
 /* Due scheduling row (timeline Task 3): quiet inline control under the drawer
    head — drawer density, token-only. */
-.ds-due{display:flex;align-items:center;gap:var(--cl-8);flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);margin-bottom:var(--cl-12)}
-.ds-due label{display:flex;align-items:center;gap:var(--cl-4);text-transform:uppercase;letter-spacing:var(--tracking-label)}
-.ds-due input[type="date"]{font:inherit;color:var(--color-ink);background:var(--color-surface);border:var(--border-hairline);padding:var(--cl-4) var(--cl-8)}
-.ds-due button{font:inherit;background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);padding:var(--cl-4) var(--cl-9);cursor:pointer}
-.ds-due button[disabled]{opacity:0.45;cursor:default}
+.ds-due{position:relative;display:flex;align-items:center;gap:var(--cl-8);flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);margin-bottom:var(--cl-12)}
+.ds-due-sched{background:none;border:0;padding:0;font-family:var(--font-mono);font-size:var(--text-micro);font-weight:700;color:var(--color-accent);cursor:pointer}
+.ds-due-sched:hover{text-decoration:underline;text-underline-offset:var(--cl-2)}
 .ds-due-overdue{color:var(--color-accent);font-weight:700;text-transform:uppercase;letter-spacing:var(--tracking-label)}
-.ds-due small{flex-basis:100%;line-height:var(--leading-mono);overflow-wrap:anywhere}
+.ds-due-pop{position:absolute;top:100%;left:0;z-index:2;background:var(--color-bg);border:var(--border-hairline);border-radius:var(--cl-6);box-shadow:var(--sp-elevation-2);padding:var(--cl-8) var(--cl-8) var(--cl-4);margin-top:var(--cl-4);width:max-content}
+.ds-due-cal__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--cl-4)}
+.ds-due-cal__head b{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink)}
+.ds-due-cal__head button{background:none;border:0;padding:0 var(--cl-4);color:var(--color-ink-muted);font-size:var(--sp-text-sm);cursor:pointer}
+.ds-due-cal__head button:hover{color:var(--color-accent)}
+.ds-due-cal__grid{display:grid;grid-template-columns:repeat(7,var(--cl-26));gap:var(--cl-2)}
+.ds-due-cal__dow{font-family:var(--font-mono);font-size:calc(var(--text-micro) - 2px);color:var(--color-ink-muted);text-align:center}
+.ds-due-day{width:var(--cl-26);height:var(--cl-26);display:flex;align-items:center;justify-content:center;background:transparent;border:0;border-radius:var(--radius-xs);padding:0;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink);cursor:pointer}
+.ds-due-day:hover{background:color-mix(in srgb, var(--color-accent) 25%, transparent)}
+.ds-due-day.is-sel{background:var(--color-accent);color:var(--color-bg);font-weight:700}
+.ds-due-day.is-today{outline:var(--cl-1) solid var(--color-accent);outline-offset:calc(-1 * var(--cl-1))}
+.ds-due-cal__foot{display:flex;justify-content:flex-end;margin-top:var(--cl-4)}
+.ds-due-cal__foot button{background:none;border:0;padding:var(--cl-4) 0;color:var(--color-ink-muted);font-family:var(--font-mono);font-size:calc(var(--text-micro) - 2px);text-decoration:underline;text-underline-offset:var(--cl-2);cursor:pointer}
+.ds-due-cal__foot button:hover{color:var(--color-accent)}

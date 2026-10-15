@@ -150,6 +150,40 @@ export function bindChangelogEvents(root, st, helpers) {
     st.duePending = { file: plan.file, due: iso || null, line: iso ? `*Due: ${iso}*` : null };
     doPaint(root);
   };
+  // Themed due datepicker: material-like month grid in Safepipe tokens
+  // (surface card, accent select, mono cells). Monday-first like the days
+  // grid. Rendered into [data-due-pop] on open; nav re-renders in place.
+  const DUE_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const dueToday = () => { const n = new Date(); return `${n.getFullYear()}-${pad2(n.getMonth() + 1)}-${pad2(n.getDate())}`; };
+  let dueView = ''; // YYYY-MM shown in the popup
+  const renderDueCal = () => {
+    const pop = root.querySelector('[data-due-pop]');
+    const btn = root.querySelector('[data-due-open]');
+    if (!pop || !btn) return;
+    const sel = (btn.dataset.due || '').trim();
+    dueView = /^\d{4}-\d{2}$/.test(dueView) ? dueView : (sel || dueToday()).slice(0, 7);
+    const [y, mo] = dueView.split('-').map(Number);
+    const lead = (new Date(y, mo - 1, 1).getDay() + 6) % 7;
+    const days = new Date(y, mo, 0).getDate();
+    const today = dueToday();
+    let cells = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+      .map((d) => `<span class="ds-due-cal__dow" aria-hidden="true">${d}</span>`).join('');
+    for (let i = 0; i < lead; i++) cells += '<span aria-hidden="true"></span>';
+    for (let d = 1; d <= days; d++) {
+      const iso = `${y}-${pad2(mo)}-${pad2(d)}`;
+      cells += `<button class="ds-due-day${iso === sel ? ' is-sel' : ''}${iso === today ? ' is-today' : ''}"` +
+        ` data-due-pick="${iso}"${iso === sel ? ' aria-pressed="true"' : ''} aria-label="${iso}">${d}</button>`;
+    }
+    pop.innerHTML =
+      `<div class="ds-due-cal__head"><button data-due-nav="-1" aria-label="Previous month">‹</button>` +
+      `<b>${DUE_MON[mo - 1]} ${y}</b>` +
+      `<button data-due-nav="1" aria-label="Next month">›</button></div>` +
+      `<div class="ds-due-cal__grid">${cells}</div>` +
+      `<div class="ds-due-cal__foot"><button data-due-clear>Clear</button></div>`;
+    const focus = pop.querySelector('.is-sel') || pop.querySelector('.is-today');
+    if (focus) focus.focus();
+  };
   const onChange = (e) => {
     const tld = e.target.closest ? e.target.closest('[data-tl-date]') : null;
     if (tld) {
@@ -157,15 +191,35 @@ export function bindChangelogEvents(root, st, helpers) {
       if (!v || /^\d{4}-\d{2}-\d{2}$/.test(v)) { st.tlDate = v; doPaint(root); }
       return;
     }
-    const di = e.target.closest ? e.target.closest('[data-due-input]') : null;
-    if (!di || di.disabled) return;
-    applyDue((di.value || '').trim() || null);
   };
   const onClick = (e) => {
+    // Open datepicker popup: clicks outside it just dismiss it and continue
+    // to normal handling below.
+    const dp = root.querySelector('[data-due-pop]:not([hidden])');
+    if (dp && !(e.target.closest && e.target.closest('[data-due-pop],[data-due-open]'))) dp.hidden = true;
     if (e.target.closest('[data-day-clear]')) { st.day = ''; st.sel = [0, 0]; doPaint(root); return; }
-    // Due clear: empty input clears (removes the Due line); past dates stay
-    // allowed and flag overdue without blocking (paint-detail marks them).
+    // Due scheduling: the themed popup owns picking; Clear removes the Due
+    // line. Past dates stay allowed and flag overdue without blocking.
     if (e.target.closest('[data-due-clear]')) { applyDue(null); return; }
+    const dopen = e.target.closest('[data-due-open]');
+    if (dopen) {
+      const pop = root.querySelector('[data-due-pop]');
+      if (pop) {
+        if (pop.hidden) { dueView = ''; renderDueCal(); pop.hidden = false; }
+        else pop.hidden = true;
+      }
+      return;
+    }
+    const dnav = e.target.closest('[data-due-nav]');
+    if (dnav) {
+      const [y, mo] = (dueView || dueToday().slice(0, 7)).split('-').map(Number);
+      const n = new Date(y, mo - 1 + Number(dnav.dataset.dueNav), 1);
+      dueView = `${n.getFullYear()}-${pad2(n.getMonth() + 1)}`;
+      renderDueCal();
+      return;
+    }
+    const dpick = e.target.closest('[data-due-pick]');
+    if (dpick) { applyDue(dpick.dataset.duePick); return; }
     const dd = e.target.closest('[data-day]');
     if (dd) { st.day = st.day === dd.dataset.day ? '' : dd.dataset.day;
       st.sel = [0, 0]; doPaint(root); return; }
@@ -241,6 +295,8 @@ export function bindChangelogEvents(root, st, helpers) {
   };
   const onKey = (e) => {
     if (e.key !== 'Escape') return;
+    const dp = root.querySelector('[data-due-pop]');
+    if (dp && !dp.hidden) { dp.hidden = true; return; }
     const p = tlPop();
     if (p && !p.hidden) { hidePop(); return; }
     if (st.open) {

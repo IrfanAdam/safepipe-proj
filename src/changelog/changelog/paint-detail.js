@@ -132,7 +132,7 @@ const marked = {
 };
 import { hits, badges, unlinked } from '../changelog-links.js';
 import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../changelog-titles.js';
-import { isDone, state, parseGates, dueOf, anchorOf } from '../changelog-parse.js';
+import { isDone, state, parseGates, dueOf, fmtDate } from '../changelog-parse.js';
 import { esc } from './esc.js';
 import { paintRevs } from './paint-revs.js';
 // Gate verdict (Task 12, owner refinement): the phase's own REF GATE verdict
@@ -219,22 +219,19 @@ export function paintDetail(root, ctx){
   const secDue = secShipped ? null : dueOf({ head: sprint.head, body: sprint.body });
   const now = new Date(); now.setHours(0, 0, 0, 0);
   const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const secAnchor = (String(sprint.body || '').match(/\{#([A-Za-z]+-\d+)\}/) || [])[1]
-    || anchorOf(sprint.head) || '';
+  // Schedule trigger: accent text (or 'Schedule when?') opening the themed
+  // month popup. No native date input, no hint line, never a Due n/a.
   const dueHTML = secShipped
     ? ''
     : [
       `<div class="ds-due" data-due-row>`,
-      `<label>Due <input type="date" data-due-input value="${secDue || ''}"`,
-      ` aria-label="Due date for ${esc(short(sprint.head))}"></label>`,
-      `<button data-due-clear aria-label="Clear due date"`,
-      secDue ? '' : ' disabled',
-      `>clear</button>`,
+      `<button class="ds-due-sched" data-due-open data-due="${secDue || ''}" aria-haspopup="dialog"`,
+      ` aria-label="Schedule due date for ${esc(short(sprint.head))}">`,
+      secDue ? esc(`Schedule · ${fmtDate(secDue)}`) : 'Schedule when?',
+      `</button>`,
       secDue && secDue < todayISO ? `<span class="ds-due-overdue">overdue</span>` : '',
-      `<small data-due-hint>`,
-      secDue ? esc(`*Due: ${secDue}* → .hermes/plans/${plan.file}`) : 'no Due set',
-      secAnchor ? esc(` — commit [plan:${plan.file}#${secAnchor}]`) : '',
-      `</small></div>`,
+      `<div class="ds-due-pop" data-due-pop hidden role="dialog" aria-label="Pick a due date"></div>`,
+      `</div>`,
     ].join('');
   root.querySelector('[data-col="tasks"]').innerHTML = [
     `<div class="ds-drawer-head"><b>`,
