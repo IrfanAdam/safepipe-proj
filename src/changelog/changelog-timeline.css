@@ -17,13 +17,16 @@
    surface, and the pressed/selected state stays light too — no accent,
    no ink outline. */
 .ds-timeline-gridtile:hover,.ds-timeline-gridtile[aria-pressed="true"]{background:var(--color-surface)}
-aside.ds-timeline{position:fixed;top:0;right:0;bottom:0;margin:0;width:min(86vw,var(--size-ds-drawer));box-sizing:border-box;background:var(--color-bg);border-left:var(--border-hairline);z-index:var(--z-ds-drawer);box-shadow:var(--shadow-viewer);display:flex;flex-direction:column;overflow:hidden}
+/* margin+padding reset: the in-drawer commit-list rule `.ds-timeline`
+   (changelog-drawer.css) leaks onto this aside — zeroed so the panel and
+   its rows stay flush with the drawer's left edge. */
+aside.ds-timeline{position:fixed;top:0;right:0;bottom:0;margin:0;padding:0;width:min(86vw,var(--size-ds-drawer));box-sizing:border-box;background:var(--color-bg);border-left:var(--border-hairline);z-index:var(--z-ds-drawer);box-shadow:var(--shadow-viewer);display:flex;flex-direction:column;overflow:hidden}
 aside.ds-timeline[hidden]{display:none}
 aside.ds-timeline:not([hidden]){animation:ds-drawer-in var(--dur-glide) var(--ease-signature)}
 .ds-tl-head{display:flex;gap:var(--cl-8);align-items:flex-start;padding:var(--cl-16) var(--cl-16) var(--cl-8) 0 !important}
-.ds-tl-titlewrap{display:flex;flex-direction:column;gap:var(--cl-4);flex:1 1 auto;min-width:0}
-.ds-tl-titlewrap b{font-family:var(--font-display);font-size:var(--sp-text-lg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ds-tl-titlewrap input[type="date"]{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink);background:var(--color-surface);border:var(--border-hairline);border-radius:var(--radius-xs);padding:var(--cl-4) var(--cl-8);max-width:22ch}
+/* Owner call (2026-10-16): the head-date scrub input is gone — the title
+   alone sits flush left in the head. */
+.ds-tl-head b{font-family:var(--font-display);font-size:var(--sp-text-lg);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ds-tl-head small{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);align-self:center}
 .ds-tl-head button{font-family:var(--font-mono);font-size:var(--text-micro);background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);padding:var(--cl-4) var(--cl-8);cursor:pointer}
 .ds-tl-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding-bottom:var(--cl-16);padding-left:0 !important;margin-left:0 !important}
@@ -37,18 +40,13 @@ aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
 .ds-tl-lane{position:relative;flex:none;align-self:stretch}
 .ds-tl-lane-name{align-self:center;font:inherit;text-align:left;color:var(--color-ink);cursor:pointer;background:none;border:none;padding:var(--cl-4) var(--cl-8);font-size:var(--sp-text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .ds-tl-barname{position:absolute;left:0;top:50%;transform:translateY(-50%);font-family:var(--font-display);font-weight:600;font-size:var(--text-micro);letter-spacing:0.02em;color:var(--color-ink);background:transparent;padding:0 var(--cl-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;width:20ch;text-align:left}
-.ds-tl-bout{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-20);border:none;border-radius:var(--radius-xs);background:var(--sp-neutral-3);cursor:pointer;padding:0;box-sizing:border-box}
-.ds-tl-bout.lv1{background:var(--sp-neutral-3)}
-.ds-tl-bout.lv2{background:var(--sp-neutral-3)}
-.ds-tl-bout.lv3{background:var(--sp-neutral-3)}
-.ds-tl-bout.lv4{background:var(--sp-neutral-3)}
-.ds-tl-bout[data-popdone="1"]{background:var(--color-accent);border-color:var(--color-accent)}
-.ds-tl-streak{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-26);border:none;border-radius:var(--radius-xs);background:var(--sp-neutral-3);cursor:pointer;padding:0;box-sizing:border-box}
-.ds-tl-streak.lv1{background:var(--sp-neutral-3)}
-.ds-tl-streak.lv2{background:var(--sp-neutral-3)}
-.ds-tl-streak.lv3{background:var(--sp-neutral-3)}
-.ds-tl-streak.lv4{background:var(--sp-neutral-3)}
-.ds-tl-streak[data-popdone="1"]{background:var(--color-accent);border-color:var(--color-accent)}
+/* Owner call (2026-10-16): neutral bars a touch darker than before;
+   fully-done bars wear a muted accent — never the full dark violet.
+   Density lv* no longer shades (all levels share the one neutral). */
+.ds-tl-bout{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-20);border:none;border-radius:var(--radius-xs);background:color-mix(in srgb, var(--sp-neutral-5) 50%, var(--sp-neutral-3));cursor:pointer;padding:0;box-sizing:border-box}
+.ds-tl-bout[data-popdone="1"]{background:color-mix(in srgb, var(--color-accent) 60%, var(--sp-neutral-5));border-color:color-mix(in srgb, var(--color-accent) 60%, var(--sp-neutral-5))}
+.ds-tl-streak{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-26);border:none;border-radius:var(--radius-xs);background:color-mix(in srgb, var(--sp-neutral-5) 50%, var(--sp-neutral-3));cursor:pointer;padding:0;box-sizing:border-box}
+.ds-tl-streak[data-popdone="1"]{background:color-mix(in srgb, var(--color-accent) 60%, var(--sp-neutral-5));border-color:color-mix(in srgb, var(--color-accent) 60%, var(--sp-neutral-5))}
 .ds-tl-bout:hover,.ds-tl-streak:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-tl-bout[aria-current="true"],.ds-tl-streak[aria-current="true"]{outline:var(--cl-2) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-tl-ghost{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-8);border:var(--cl-1) dashed var(--color-ink-muted);border-radius:var(--radius-xs);background:transparent;cursor:pointer;padding:0}

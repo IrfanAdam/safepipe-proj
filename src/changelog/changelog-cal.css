@@ -1,7 +1,7 @@
 /* safepipe changelog — week-columns graph · [plan:2026-10-07_130000-safepipe-changelog.md#task-3] */
-.ds-graph{margin:0;overflow-x:auto;padding:var(--cl-4) var(--cl-4) var(--cl-12);--cl-16:calc(var(--sp-spacing-base) * 3.5);--cl-4:calc(var(--sp-spacing-base) * 0.75)}
+.ds-graph{margin:0;overflow-x:auto;padding:var(--cl-4) 0 var(--cl-12) var(--cl-4);--cl-16:calc(var(--sp-spacing-base) * 3.5);--cl-4:calc(var(--sp-spacing-base) * 0.75)}
 .ds-graph-labels{display:flex;gap:var(--cl-4);width:max-content;margin:0 0 var(--cl-2) calc(var(--cl-26) + var(--cl-4))}
-.ds-graph-row{display:flex;gap:var(--cl-4);width:max-content}
+.ds-graph-row{display:flex;gap:var(--cl-4);width:max-content;min-width:100%}
 .ds-dows{display:flex;flex-direction:column;gap:var(--cl-4);width:var(--cl-26);flex:none}
 .ds-dows span{height:var(--cl-16);display:flex;align-items:center;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
 .ds-week{display:flex;flex-direction:column;gap:var(--cl-4)}

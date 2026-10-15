@@ -226,9 +226,8 @@ export function paintTimeline(root, ctx) {
       `<div class="ds-tl-lane" style="${laneW}">${bars}${g}${todayLine}${laneOpen}</div></div>`;
   }).join('') : `<p class="ds-tl-empty">Nothing matches the current filters yet.</p>`;
   const rangeTxt = rows.length ? `${fmtDate(grid.start)} → ${fmtDate(grid.end)}` : '';
-  const tlDateVal = (st.tlDate && /^\d{4}-\d{2}-\d{2}$/.test(st.tlDate)) ? st.tlDate : todayRaw;
   panel.innerHTML = [
-    `<div class="ds-tl-head"><div class="ds-tl-titlewrap"><b>Timeline</b><input type="date" data-tl-date value="${esc(tlDateVal)}" aria-label="Set timeline date"></div><small>${esc(rangeTxt)}</small>`,
+    `<div class="ds-tl-head"><b>Timeline</b><small>${esc(rangeTxt)}</small>`,
     `<button data-tl-close aria-label="Close timeline">✕</button></div>`,
     `<div class="ds-tl-scroll"><div class="ds-tl-axis">` +
     `<div class="ds-tl-ticks" style="${laneW}">${ticks}</div></div>${body}</div>`,

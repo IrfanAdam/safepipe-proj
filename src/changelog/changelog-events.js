@@ -184,14 +184,6 @@ export function bindChangelogEvents(root, st, helpers) {
     const focus = pop.querySelector('.is-sel') || pop.querySelector('.is-today');
     if (focus) focus.focus();
   };
-  const onChange = (e) => {
-    const tld = e.target.closest ? e.target.closest('[data-tl-date]') : null;
-    if (tld) {
-      const v = (tld.value || '').trim();
-      if (!v || /^\d{4}-\d{2}-\d{2}$/.test(v)) { st.tlDate = v; doPaint(root); }
-      return;
-    }
-  };
   const onClick = (e) => {
     // Open datepicker popup: clicks outside it just dismiss it and continue
     // to normal handling below.
@@ -339,14 +331,12 @@ export function bindChangelogEvents(root, st, helpers) {
   const hideTip = () => { const t = root.querySelector('.ds-cursor-tip'); if (t) t.hidden = true; };
   root.addEventListener('click', onClick); document.addEventListener('keydown', onKey);
   root.addEventListener('mousemove', move);
-  root.addEventListener('change', onChange);
   root.addEventListener('focusin', onFocus);
   root.addEventListener('focusout', onBlur);
   document.addEventListener('mouseleave', hideTip);
   return () => {
     root.removeEventListener('click', onClick); document.removeEventListener('keydown', onKey);
     root.removeEventListener('mousemove', move);
-    root.removeEventListener('change', onChange);
     root.removeEventListener('focusin', onFocus);
     root.removeEventListener('focusout', onBlur);
     document.removeEventListener('mouseleave', hideTip); };

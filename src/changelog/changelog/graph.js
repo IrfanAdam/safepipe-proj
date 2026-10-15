@@ -84,10 +84,13 @@ export function graph({ plans, day }) {
     return `<div class="ds-week">${cells}</div>`;
   }).join('');
   const dows = `<div class="ds-dows" aria-hidden="true">${DOWS.map((d) => `<span>${d}</span>`).join('')}</div>`;
-  // Owner call: the timeline entry is a large WHITE tile inside the days
-  // grid itself (not out of it) — a 7×7-cell block after the last week.
-  // Its label + pressed state sync every paint from doPaint via
-  // [data-view=timeline], so the text wraps and centers on its own.
+  // Owner call (2026-10-16): the timeline entry is a large 7×7-cell tile
+  // inside the days grid itself (not out of it) — planted after the last
+  // week and pulled to the right edge of the graph. It rests on the page
+  // background, lights to the surface on hover, and never wears accent
+  // (selected stays light too). Its label + pressed state sync every paint
+  // from doPaint via [data-view=timeline], so the text wraps and centers
+  // on its own.
   const tile = `<button class="ds-timeline-gridtile" data-view="timeline" aria-pressed="false" aria-label="Open timeline view">${TIMELINE_TILE_ICON}<span class="ds-timeline-gridtile__text">Timeline</span></button>`;
   return [
     `<div class="ds-graph-labels">`,
