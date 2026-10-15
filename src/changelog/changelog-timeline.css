@@ -27,10 +27,9 @@ aside.ds-timeline:not([hidden]){animation:ds-drawer-in var(--dur-glide) var(--ea
 .ds-tl-ticks{position:relative;flex:none;height:var(--cl-20)}
 .ds-tl-tick{position:absolute;top:0;height:var(--cl-20);line-height:var(--cl-16);border-left:var(--border-hairline);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding-left:var(--cl-2);white-space:nowrap;overflow:visible}
 aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
-aside.ds-timeline .ds-tl-band{position:absolute;top:0;bottom:0;background:transparent;pointer-events:none}
-aside.ds-timeline .ds-tl-band.on{background:color-mix(in srgb, var(--color-surface) 60%, transparent)}
 .ds-tl-row{display:flex;align-items:stretch;border-bottom:var(--border-hairline);min-height:var(--cl-tl-row)}
-.ds-tl-row:hover{background:color-mix(in srgb, var(--color-surface) 60%, transparent)}
+.ds-tl-row.has-track{background:color-mix(in srgb, var(--color-surface) 45%, transparent)}
+.ds-tl-row:hover{background:color-mix(in srgb, var(--color-surface) 80%, transparent)}
 .ds-tl-lane{position:relative;flex:none;align-self:stretch}
 .ds-tl-lane-name{align-self:center;font:inherit;text-align:left;color:var(--color-ink);cursor:pointer;background:none;border:none;padding:var(--cl-4) var(--cl-8);font-size:var(--sp-text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .ds-tl-barname{position:absolute;left:0;top:50%;transform:translateY(-50%);font-family:var(--font-display);font-weight:600;font-size:var(--text-micro);letter-spacing:0.02em;color:var(--color-ink);background:color-mix(in srgb, var(--color-bg) 80%, transparent);padding:0 var(--cl-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;width:20ch}

@@ -174,7 +174,8 @@ export function bindChangelogEvents(root, st, helpers) {
     if (gh) { openTlPlan(gh.dataset.tlGhost, null, true); return; }
     const tl = e.target.closest('[data-tl-open]');
     if (tl) { openTlPlan(tl.dataset.tlOpen, null, false); return; }
-    // Lane background click: scroll the lane's first track to the left edge.
+    // Lane background click: the lane's first track jumps to the left edge —
+    // instant (not smooth) so repeated clicks never race mid-animation.
     // Bar/ghost/lane-name clicks return above (they open the plan instead).
     const lane = e.target.closest('.ds-tl-lane');
     if (lane && st.view === 'timeline') {
@@ -182,8 +183,7 @@ export function bindChangelogEvents(root, st, helpers) {
       const first = lane.querySelector('[data-tl-bout],[data-tl-ghost]');
       if (sc && first) {
         const x = first.getBoundingClientRect().left - lane.getBoundingClientRect().left + sc.scrollLeft;
-        const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-        sc.scrollTo({ left: Math.max(0, x - 14), behavior: reduce ? 'auto' : 'smooth' });
+        sc.scrollTo({ left: Math.max(0, x - 14), behavior: 'auto' });
       }
       return;
     }

@@ -174,31 +174,9 @@ export function paintTimeline(root, ctx) {
     const label = isMonth ? monName(d) : dayNum(d);
     ticks += `<span class="ds-tl-tick${isMonth ? ' is-month' : ''}" style="left:calc(var(--cl-tl-day) * ${off})">${esc(label)}</span>`;
   }
-  // Per-month background bands, only for months that hold tracks — empty
-  // padding months stay on the page background so no shading seam reads as
-  // a gap. One consistent wash (no alternation) across the whole lane.
-  const activeMonths = new Set();
-  rows.forEach((r) => {
-    (r.dates || []).forEach((d) => { if (/^\d{4}-\d{2}-\d{2}$/.test(d || '')) activeMonths.add(d.slice(0, 7)); });
-    if (r.ghost) {
-      for (let d = r.ghost.from; cmpDay(d, r.ghost.to) <= 0; d = addDays(d, 1)) activeMonths.add(d.slice(0, 7));
-    }
-  });
-  let bands = '';
-  {
-    let cur = grid.start;
-    while (cmpDay(cur, grid.end) <= 0) {
-      const [y, mo] = cur.split('-').map(Number);
-      const mEnd = isoOf(new Date(y, mo, 0));
-      const segEnd = cmpDay(mEnd, grid.end) < 0 ? mEnd : grid.end;
-      const off = Math.round((pISO(cur) - pISO(grid.start)) / DAY);
-      const span = Math.max(Math.round((pISO(segEnd) - pISO(cur)) / DAY) + 1, 1);
-      if (activeMonths.has(cur.slice(0, 7))) {
-        bands += `<div class="ds-tl-band on" style="left:calc(var(--cl-tl-day) * ${off});width:calc(var(--cl-tl-day) * ${span})" aria-hidden="true"></div>`;
-      }
-      cur = addDays(segEnd, 1);
-    }
-  }
+  // Lane highlight lives on the ROW (has-track wash, full lane width) — never
+  // on month bands: any month-boundary shade change reads as a gap, so no
+  // band elements are emitted at all. Months differ only by the `Oct` tick.
   const laneW = `width:calc(var(--cl-tl-day) * ${grid.days})`;
   const todayOff = Math.round((pISO(today) - pISO(grid.start)) / DAY);
   const todayLine = (todayOff >= 0 && todayOff < grid.days)
@@ -233,8 +211,8 @@ export function paintTimeline(root, ctx) {
     }
     const laneOpen = (!bars && !g)
       ? `<button class="ds-tl-lane-name" data-tl-open="${esc(r.plan.file)}" data-tip="${esc(r.tip)}" aria-label="Open ${esc(r.plan.title)}">${esc(r.plan.title)}</button>` : '';
-    return `<div class="ds-tl-row" data-tl-row="${esc(r.plan.file)}">` +
-      `<div class="ds-tl-lane" style="${laneW}">${bands}${bars}${g}${todayLine}${laneOpen}</div></div>`;
+    return `<div class="ds-tl-row${r.dates.length ? ' has-track' : ''}" data-tl-row="${esc(r.plan.file)}">` +
+      `<div class="ds-tl-lane" style="${laneW}">${bars}${g}${todayLine}${laneOpen}</div></div>`;
   }).join('') : `<p class="ds-tl-empty">Nothing matches the current filters yet.</p>`;
   const rangeTxt = rows.length ? `${fmtDate(grid.start)} → ${fmtDate(grid.end)}` : '';
   panel.innerHTML = [
