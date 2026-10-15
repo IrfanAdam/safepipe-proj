@@ -107,12 +107,15 @@ function summaryHTML(plan, bout, sum) {
   }
   const back = bout
     ? `<button class="ds-tl-back" data-tl-overall aria-label="Back to overall summary">← overall</button>` : '';
+  // Owner call: the overall summary stays a one-line sumline — commit/eval
+  // item lists render only on bout select, never as a second scrolling pane.
+  const items = bout ? `<div class="ds-tl-items">${badges(commitsOf)}${revsHTML}</div>` : '';
   return [
     `<div class="ds-tl-summary" data-tl-summary>`,
     `<b>${esc(sum.title || plan.title)}</b>`,
     `<p class="ds-tl-sumline">${esc(boutPopText(sum))}</p>`,
     back,
-    `<div class="ds-tl-items">${badges(commitsOf)}${revsHTML}</div>`,
+    items,
     `</div>`,
   ].join('');
 }

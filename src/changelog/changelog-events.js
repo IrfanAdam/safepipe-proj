@@ -33,7 +33,11 @@ export function dueEditText(raw, head, due) {
     for (let k = shaped.length - 1; k >= 1; k--) out.splice(shaped[k], 1);
     return out.join('\n');
   }
-  out.splice(hi + 1, 0, line);
+  // Scheduling convention: the Due line sits after the head/Tags line, so a
+  // following *Tags:* line keeps its place directly under the head.
+  let at = hi + 1;
+  if (/^\s*\*Tags:/i.test(lines[hi + 1] || '')) at = hi + 2;
+  out.splice(at, 0, line);
   return out.join('\n');
 }
 export function bindChangelogEvents(root, st, helpers) {

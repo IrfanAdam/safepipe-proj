@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { split, state, isDone, buildState, parseGates, anchorHit, parseDue, dueOf } from '../src/changelog/changelog-parse.js';
 import { MERGE_GAP, activeDatesOf, boutsOf, ghostOf, planSummary, boutSummary, planTip, evalsOf } from '../src/changelog/changelog-timeline.js';
 import { tipOf, descOf } from '../src/changelog/changelog-titles.js';
+import { dueEditText } from '../src/changelog/changelog-events.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const plansDir = join(root, '.hermes', 'plans');
@@ -206,5 +207,32 @@ describe('tips stay clean', () => {
     assert.ok(planTip(p).length > 0);
     assert.equal(planTip({ sprints: [], goal: 'Shiny **goal** here {#x}' }), 'Shiny goal here');
     assert.equal(planTip({ sprints: [] }), '');
+  });
+});
+
+describe('gate verdicts ignore backticked code spans', () => {
+  const gates = (line) => parseGates(line + '\nBody here');
+  it('backticked PREFLIGHT FAIL stays open, bare FAIL fails, tick PASSED passes', () => {
+    assert.equal(gates('- REF GATE 1: green, no `PREFLIGHT FAIL`.')[0].state, 'open');
+    assert.equal(gates('- REF GATE 1: green, FAIL found')[0].state, 'failed');
+    assert.equal(gates('- REF GATE 1: green ✓ PASSED')[0].state, 'passed');
+  });
+});
+
+describe('dueEditText respects the head/Tags line', () => {
+  const raw = '## Task 1 — Head\n*Tags: Tooling*\n\nBody text\n';
+  it('inserts after a following Tags line, else directly under the head', () => {
+    const withTags = dueEditText(raw, 'Task 1 — Head', '2026-10-22').split('\n');
+    assert.equal(withTags[2], '*Due: 2026-10-22*');
+    assert.equal(withTags[1], '*Tags: Tooling*');
+    const plain = dueEditText('## Task 1 — Head\n\nBody\n', 'Task 1 — Head', '2026-10-22').split('\n');
+    assert.equal(plain[1], '*Due: 2026-10-22*');
+  });
+  it('replaces without duplicating and clears exactly', () => {
+    const once = dueEditText(raw, 'Task 1 — Head', '2026-10-22');
+    const twice = dueEditText(once, 'Task 1 — Head', '2026-10-23');
+    assert.equal(twice.split('\n').filter((l) => /^\s*\*Due:/.test(l)).length, 1);
+    assert.ok(twice.includes('*Due: 2026-10-23*'));
+    assert.equal(dueEditText(twice, 'Task 1 — Head', null), raw);
   });
 });

@@ -155,7 +155,7 @@ export const parseGates = (md) => {
     let st = 'open';
     if (/PASSED by owner waiver/i.test(line)) st = 'waiver';
     else if (/✓\s*PASSED/i.test(line)) st = 'passed';
-    else if (/FAIL/i.test(line)) st = 'failed';
+    else if (/FAIL/i.test(line.replace(/`[^`]*`/g, ''))) st = 'failed';
     const dm = `${paren} ${rest}`.match(/(\d{4}-\d{2}-\d{2})/);
     const reviewer = /owner/i.test(line) ? 'owner' : '';
     let evidence = '';
