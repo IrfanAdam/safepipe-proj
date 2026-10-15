@@ -169,4 +169,4 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 
 - REF GATE (polish): chromium + webkit — tile large in months row; 13 rows named on bars, no sidebar; popover 5 lines; bar→drawer-only→✕→timeline; zero page errors; build green.
 
-### Follow-up ✓ done
+### Follow-up ✓ done ead03a5
