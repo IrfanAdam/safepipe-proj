@@ -211,7 +211,10 @@ export function paintTimeline(root, ctx) {
     }
     const laneOpen = (!bars && !g)
       ? `<button class="ds-tl-lane-name" data-tl-open="${esc(r.plan.file)}" data-tip="${esc(r.tip)}" aria-label="Open ${esc(r.plan.title)}">${esc(r.plan.title)}</button>` : '';
-    return `<div class="ds-tl-row${r.dates.length ? ' has-track' : ''}" data-tl-row="${esc(r.plan.file)}">` +
+    // Rows carry the same explicit lane width: block rows otherwise size to
+    // the viewport, so the wash/borders would stop at the viewport edge
+    // instead of covering the whole track column.
+    return `<div class="ds-tl-row${r.dates.length ? ' has-track' : ''}" data-tl-row="${esc(r.plan.file)}" style="${laneW}">` +
       `<div class="ds-tl-lane" style="${laneW}">${bars}${g}${todayLine}${laneOpen}</div></div>`;
   }).join('') : `<p class="ds-tl-empty">Nothing matches the current filters yet.</p>`;
   const rangeTxt = rows.length ? `${fmtDate(grid.start)} → ${fmtDate(grid.end)}` : '';
