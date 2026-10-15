@@ -3684,5 +3684,35 @@
     }
    ]
   }
+ ],
+ "2026-10-15_120000-safepipe-changelog-timeline.md": [
+  {
+   "sha": null,
+   "date": "2026-10-15",
+   "time": "16:53",
+   "hash": "65b4f672",
+   "sections": [
+    {
+     "head": "Task 1: Due contract + timeline model (pure, tested)",
+     "hash": "f6338ce1",
+     "state": ""
+    },
+    {
+     "head": "Task 2: Timeline view — button, side panel, tracks, summaries, nav",
+     "hash": "9faeca93",
+     "state": ""
+    },
+    {
+     "head": "Task 3: Scheduling — date setter, ghost reflection, upcoming view",
+     "hash": "ef0ec5b7",
+     "state": ""
+    },
+    {
+     "head": "Task 4: Skill sync + ship",
+     "hash": "749b1b83",
+     "state": ""
+    }
+   ]
+  }
  ]
 }
