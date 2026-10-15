@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-15T19:43:50.805Z",
+  "generated": "2026-10-15T19:48:13.683Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "6cdb728",
+      "full": "6cdb72873333ea77385775ca10a7fa7d62245d72",
+      "date": "2026-10-16",
+      "time": "01:18",
+      "subject": "feat(changelog): due picker blocks past days [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "66fbe50",
       "full": "66fbe505d9c03759267416ff552d9640af90c17f",
@@ -3575,7 +3584,6 @@
   ],
   "wip": [
     "src/changelog/changelog-cards.css",
-    "src/changelog/changelog-drawer.css",
     "src/changelog/changelog-links.js",
     "src/changelog/changelog/paint-revs.js",
     "src/changelog/pages-changelog.js"
