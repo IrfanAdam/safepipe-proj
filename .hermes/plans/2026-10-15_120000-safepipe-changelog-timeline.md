@@ -184,6 +184,7 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 21. Past lockout: picker days before today render muted + `disabled` (click is a no-op) — schedules only run today-forward. Existing overdue Dues keep their flag, they just can't be (re-)picked.
 
 22. Coverage + quieter accent: every bar now paints its done share from the left — `--tl-done` inline per bar (phasesDone/phases among the bout's phases; e.g. 4/5 → 80%, 1/2 → 50%, fully done → 100%) as a hard-stop gradient from the muted accent (45% → 35% accent × `neutral-5` ≈ `#bdb4eb`) to the neutral (`#eaeaea`); `[data-popdone]` fill rules retired (the gradient covers 100%).
+23. Lane density + softer done wash: `--cl-tl-row` 48→36px (bout padding 14→8px/side, streak 11→5px/side) and `--tl-bar-done` accent 35% → 30% (blob-lv1 parity) — verified rowH 36 live.
 
 - REF GATE (polish): chromium + webkit — white 7×7 tile in grid; 13 rows named on bars, no sidebar; popover 5 lines; bar→drawer-only→✕→timeline; zero page errors; build green.
 
