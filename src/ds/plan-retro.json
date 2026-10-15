@@ -232,5 +232,17 @@
     "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
     "anchor": null,
     "note": "harness portability (skill snapshots + AGENTS.md) — no owning task, attached for triage-zero"
+  },
+  {
+    "sha": "4deb429",
+    "plan": "2026-10-13_233337-ops3d-twin-work.md",
+    "anchor": "phase-04",
+    "note": "plan-split re-point: time/sim/ops phases moved out of v3-iteration plan; trailer cites pre-split file, follows the phase"
+  },
+  {
+    "sha": "6f3e285",
+    "plan": "2026-10-07_130000-safepipe-changelog.md",
+    "anchor": "task-7",
+    "note": "changelog-kit 0.2.0->0.3.0 kit carry-forward (Day-grouped timelines, evals threading, preflight, plan-split refs)"
   }
 ]
