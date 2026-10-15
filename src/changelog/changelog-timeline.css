@@ -10,7 +10,9 @@
   --cl-tl-day:calc(var(--sp-spacing-base) * 8);
   --cl-tl-row:calc(var(--sp-spacing-base) * 12);
 }
-.ds-timeline-gridtile{flex:none;align-self:flex-start;width:calc(7 * var(--cl-16) + 6 * var(--cl-4));height:calc(7 * var(--cl-16) + 6 * var(--cl-4));box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;font-family:var(--font-display);font-weight:700;font-size:var(--sp-text-md);letter-spacing:0.02em;background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);border-radius:var(--radius-md);padding:var(--cl-8);cursor:pointer}
+.ds-timeline-gridtile{flex:none;align-self:flex-start;width:calc(7 * var(--cl-16) + 6 * var(--cl-4));height:calc(7 * var(--cl-16) + 6 * var(--cl-4));box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--cl-4);text-align:center;font-family:var(--font-display);font-weight:600;font-size:var(--text-micro);letter-spacing:0.02em;background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);border-radius:var(--radius-md);padding:var(--cl-8);cursor:pointer}
+.ds-timeline-gridtile svg{display:block;flex:none;width:var(--cl-26);height:var(--cl-26)}
+.ds-timeline-gridtile__text{display:block;text-wrap:balance}
 .ds-timeline-gridtile:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-timeline-gridtile[aria-pressed="true"]{background:var(--color-accent);border-color:var(--color-accent);color:var(--sp-text-inverse)}
 aside.ds-timeline{position:fixed;top:0;right:0;bottom:0;width:min(86vw,var(--size-ds-drawer));box-sizing:border-box;background:var(--color-bg);border-left:var(--border-hairline);z-index:var(--z-ds-drawer);box-shadow:var(--shadow-viewer);display:flex;flex-direction:column;overflow:hidden}

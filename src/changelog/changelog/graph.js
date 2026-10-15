@@ -1,6 +1,10 @@
 // safepipe changelog — activity graph · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
 import { commits } from '../changelog-links.js';
 import { MONTHS, fmtDate, pDay, isoDay, dueOf } from '../changelog-parse.js';
+// Timeline entry glyph: Gantt mark (axis + 3 bars) on the 24 box —
+// stroke 2, round caps, currentColor. Inlined into the grid tile below and
+// re-applied by pages-changelog doPaint (which rewrites the tile label).
+export const TIMELINE_TILE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 4v16M10 7h9M10 12h6M10 17h9"/></svg>`;
 export function graph({ plans, day }) {
   const dc = {};
   commits.forEach((c) => { if (c.date) dc[c.date] = (dc[c.date] || 0) + 1; });
@@ -84,7 +88,7 @@ export function graph({ plans, day }) {
   // grid itself (not out of it) — a 7×7-cell block after the last week.
   // Its label + pressed state sync every paint from doPaint via
   // [data-view=timeline], so the text wraps and centers on its own.
-  const tile = `<button class="ds-timeline-gridtile" data-view="timeline" aria-pressed="false" aria-label="Open timeline view">Timeline</button>`;
+  const tile = `<button class="ds-timeline-gridtile" data-view="timeline" aria-pressed="false" aria-label="Open timeline view">${TIMELINE_TILE_ICON}<span class="ds-timeline-gridtile__text">Timeline</span></button>`;
   return [
     `<div class="ds-graph-labels">`,
     labels,
