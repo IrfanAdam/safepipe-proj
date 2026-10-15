@@ -51,7 +51,9 @@ const plans = entries.map(([p, md]) => {
 const texts = { ...rawTexts };
 plans.forEach((p) => { p.sprints.forEach((s) => { const a = anchorOf(s.head); if (a) texts[p.file] += `\n{#${a}}`; }); });
 const counts = TAGS.map((t) => [t, plans.filter((p) => p.tags.includes(t)).length]).filter(([, n]) => n);
-const st = { active: new Set(), day: '', sel: [0, 0], open: false, stage: 'list' };
+const st = { active: new Set(), day: '', sel: [0, 0], open: false, stage: 'list',
+  view: 'list', tlSel: null, tlLast: null, tlSort: '', returnView: null };
+let tlToken = 0;
 const visiblePlans = () => plans
   .filter((p) => (!st.active.size || p.tags.some((t) => st.active.has(t)))
     && (!st.day || p.date === st.day || commits.some((c) => c.plan === p.file && c.date === st.day)));
@@ -67,12 +69,28 @@ const cur = () => {
 export function render() {
   return [
     `<p class="ds-crumb">Start · Changelog</p><div class="ds-hero wide"><h1>What shipped, in order.</h1></div>`,
-    `<hr class="ds-hr"><div class="ds-graph" data-col="graph"></div><div class="ds-chips" data-col="chips"></div>`,
+    `<hr class="ds-hr"><div class="ds-graph-row-wrap"><div class="ds-graph" data-col="graph"></div>`,
+    `<button class="ds-timeline-open" data-view="timeline" aria-pressed="false" aria-label="Open timeline view">Timeline</button></div>`,
+    `<div class="ds-chips" data-col="chips"></div>`,
     `<div class="ds-plan-grid"><div class="ds-col" data-col="plan"></div></div><div class="ds-md" data-col="triage">`,
     `</div><div class="ds-scrim" data-scrim hidden></div><span class="ds-cursor-tip" hidden role="tooltip"><span class="ds-cursor-tip__text"></span></span>`,
+    `<aside class="ds-timeline" data-timeline hidden aria-label="Plan timeline"></aside>`,
+    `<div class="ds-tl-pop" data-tl-pop hidden role="status"></div>`,
     `<aside class="ds-drawer" data-drawer hidden aria-label="Build detail">`,
     `<div class="ds-rail" data-col="sprint"></div><div class="ds-task" data-col="tasks"></div></aside>`,
   ].join('');
+}
+function syncTimelineURL() {
+  try {
+    const q = new URLSearchParams(location.search);
+    if (st.view === 'timeline') {
+      q.set('view', 'timeline');
+      if (st.tlSel) { q.set('plan', st.tlSel.planFile); q.set('bout', String(st.tlSel.boutIdx)); }
+      else q.delete('plan'), q.delete('bout');
+    } else q.delete('view'), q.delete('plan'), q.delete('bout');
+    const s = q.toString();
+    globalThis.history.replaceState(null, '', location.pathname + (s ? '?' + s : ''));
+  } catch {}
 }
 function doPaint(root) {
   const { list, pi, plan, sprints, si } = cur();
@@ -81,8 +99,45 @@ function doPaint(root) {
     sel: st.sel, open: st.open, stage: st.stage, counts, plans, texts,
     rev: plan ? revOf(plan.file) : null, revOf, edited: plan ? (s) => sectionEdited(plan.file, s) : () => false,
     revs: plan ? (history[plan.file] || []) : [] });
+  const btn = root.querySelector('[data-view="timeline"]');
+  if (btn) {
+    const n = list.length, on = st.view === 'timeline';
+    btn.textContent = `Timeline · ${n} track${n === 1 ? '' : 's'}`;
+    btn.setAttribute('aria-pressed', String(on));
+    btn.setAttribute('aria-label', `${n} plans in timeline — ${on ? 'close' : 'open'} timeline view`);
+  }
+  syncTimelineURL();
+  const my = ++tlToken;
+  const panel = root.querySelector('[data-timeline]');
+  if (st.view !== 'timeline') { if (panel) panel.hidden = true; return; }
+  import('./changelog/timeline-paint.js').then((m) => {
+    if (my !== tlToken || st.view !== 'timeline') return;
+    m.paintTimeline(root, { list, st });
+  }).catch(() => {
+    if (my !== tlToken || !panel) return;
+    panel.hidden = false;
+    panel.innerHTML = `<div class="ds-tl-head"><b>Timeline</b>` +
+      `<button data-tl-close aria-label="Close timeline">✕</button></div>` +
+      `<p class="ds-tl-fallback">Timeline tracks are unavailable — the timeline model module has not landed yet.</p>`;
+  });
 }
 export function mount(root) {
-  st.open = false; st.stage = 'list'; doPaint(root);
+  st.open = false; st.stage = 'list';
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('view') === 'timeline') {
+      st.view = 'timeline';
+      const f = q.get('plan'), b = q.get('bout');
+      if (f && plans.some((p) => p.file === f)) {
+        const li = visiblePlans().findIndex((p) => p.file === f);
+        st.sel = [Math.max(li, 0), 0]; st.open = true; st.stage = 'tasks'; st.returnView = 'timeline';
+        if (b !== null && b !== '' && Number.isInteger(Number(b))) {
+          st.tlSel = { planFile: f, boutIdx: Number(b) };
+          st.tlLast = st.tlSel;
+        }
+      }
+    }
+  } catch {}
+  doPaint(root);
   return bindChangelogEvents(root, st, { cur, doPaint });
 }
