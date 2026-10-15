@@ -40,6 +40,23 @@ export function dueEditText(raw, head, due) {
   out.splice(at, 0, line);
   return out.join('\n');
 }
+// Live-body preview edit (exported for node probes): file-shaped bodies go
+// through dueEditText; norm()-synthesized bodies from ###-fallback plans
+// carry no raw heading line, so dueEditText no-ops on them — preview then
+// edits the live body directly (Due first line for set, strip all Due lines
+// for clear). parseDue scans the whole body, so ghost preview works; the
+// FILE commit always goes through dueEditText on the raw plan text. An
+// enabled control therefore always edits — never a silent no-op.
+export function duePreviewEdit(body, head, due) {
+  const src = String(body || '');
+  const next = dueEditText(src, head, due);
+  if (next !== src) return next;
+  if (!due) {
+    if (!/^\s*\*Due:\s*[^*\n]*\*\s*$/m.test(src)) return src;
+    return src.replace(/^\s*\*Due:\s*[^*\n]*\*\s*$/gm, '').replace(/^\n+/, '');
+  }
+  return `*Due: ${due}*\n${src}`;
+}
 export function bindChangelogEvents(root, st, helpers) {
   const { cur, doPaint } = helpers;
   const tlPop = () => root.querySelector('[data-tl-pop]');
@@ -96,7 +113,7 @@ export function bindChangelogEvents(root, st, helpers) {
     if (!plan || !sprint) return;
     if (/[✓✗]/.test(String(sprint.head || ''))) return;
     if (iso && !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
-    const next = dueEditText(sprint.body, sprint.head, iso || null);
+    const next = duePreviewEdit(sprint.body, sprint.head, iso || null);
     if (next === sprint.body) {
       st.duePending = null; return;
     }

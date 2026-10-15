@@ -109,6 +109,8 @@
 
 ### Task 3 ✓ done 1e89d6c
 
+Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes the raw heading into checkbox items) made the live Due setter a silent no-op on 10/10 open sections of production-ready.md. Preview now edits the live body directly (`duePreviewEdit`); file commits still go through `dueEditText` on raw text (88/88). An enabled control always edits — node sweep 32/32 incomplete sections round-trip; live set→ghost→clear→0 proven on production-ready Task 1 in chromium + webkit.
+
 ## Task 4: Skill sync + ship
 
 *Tags: Tooling*

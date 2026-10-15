@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { split, state, isDone, buildState, parseGates, anchorHit, parseDue, dueOf } from '../src/changelog/changelog-parse.js';
 import { MERGE_GAP, activeDatesOf, boutsOf, ghostOf, planSummary, boutSummary, planTip, evalsOf } from '../src/changelog/changelog-timeline.js';
 import { tipOf, descOf } from '../src/changelog/changelog-titles.js';
-import { dueEditText } from '../src/changelog/changelog-events.js';
+import { dueEditText, duePreviewEdit } from '../src/changelog/changelog-events.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const plansDir = join(root, '.hermes', 'plans');
@@ -234,5 +234,46 @@ describe('dueEditText respects the head/Tags line', () => {
     assert.equal(twice.split('\n').filter((l) => /^\s*\*Due:/.test(l)).length, 1);
     assert.ok(twice.includes('*Due: 2026-10-23*'));
     assert.equal(dueEditText(twice, 'Task 1 — Head', null), raw);
+  });
+});
+
+describe('duePreviewEdit fallback for norm-synthesized bodies', () => {
+  // ###-fallback plans (e.g. production-ready): norm() consumes the raw
+  // heading into checkbox items, so dueEditText no-ops on the live body.
+  const fb = (file) => {
+    const p = corpus.find((x) => x.file === file);
+    assert.ok(p, 'corpus has ' + file);
+    return p;
+  };
+  it('file path edits all sections; live fallback round-trips set/clear', () => {
+    const p = fb('2026-10-07_120000-safepipe-production-ready.md');
+    const open = p.sprints.filter((s) => { const st = state(s.body); return st && !isDone(st); });
+    assert.ok(open.length >= 10, 'expected the 10 open tasks, got ' + open.length);
+    for (const s of open) {
+      assert.equal(dueEditText(s.body, s.head, '2026-10-22'), s.body, 'documents the live-body no-op for ' + s.head);
+      const set = duePreviewEdit(s.body, s.head, '2026-10-22');
+      assert.notEqual(set, s.body, 'preview set edits ' + s.head);
+      assert.equal(parseDue(set), '2026-10-22');
+      assert.notEqual(dueOf({ head: s.head, body: set }), null);
+      assert.equal(ghostOf({ ...p, sprints: p.sprints.map((x) => x === s ? { ...x, body: set } : x) }, TODAY) === null, false);
+      assert.equal(duePreviewEdit(set, s.head, null), s.body, 'clear restores ' + s.head);
+    }
+  });
+  it('every incomplete corpus section round-trips (expect all editable)', () => {
+    let open = 0, edited = 0;
+    for (const p of corpus) {
+      for (const s of p.sprints) {
+        const st = state(s.body);
+        if (!st || isDone(st)) continue;
+        open++;
+        const set = duePreviewEdit(s.body, s.head, '2026-10-22');
+        if (set !== s.body && parseDue(set) === '2026-10-22'
+          && duePreviewEdit(set, s.head, null) === s.body) edited++;
+      }
+    }
+    assert.equal(edited, open, `${edited}/${open} incomplete sections round-trip`);
+  });
+  it('descOf never surfaces a Due line as the description', () => {
+    assert.equal(descOf('*Due: 2026-10-22*\n- [ ] **1 X** detail'), '');
   });
 });

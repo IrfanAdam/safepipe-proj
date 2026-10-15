@@ -74,6 +74,8 @@ export const planSentence = ({ h1, goal, slug },
   max);
 export const descOf = (body) => {
   let text = String(body || '').replace(/^## .*$/m, '');
+  // Due lines are scheduling metadata, not prose — never a description.
+  text = text.replace(/^\s*\*Due:\s*[^*\n]*\*\s*$/gm, ' ');
   text = text.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\{#[^}]*\}/g, ' ');
   for (const b of text.split(/\n\n+/)) {
     const t = b.trim();
