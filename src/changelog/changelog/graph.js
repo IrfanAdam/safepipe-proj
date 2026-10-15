@@ -80,9 +80,14 @@ export function graph({ plans, day }) {
     return `<div class="ds-week">${cells}</div>`;
   }).join('');
   const dows = `<div class="ds-dows" aria-hidden="true">${DOWS.map((d) => `<span>${d}</span>`).join('')}</div>`;
+  // Owner call: the timeline entry is a large tile in the months row, after
+  // the last month — not a small button pulled right of the grid. Its label
+  // + pressed state sync every paint from doPaint via [data-view=timeline].
+  const tile = `<button class="ds-timeline-tile" data-view="timeline" aria-pressed="false" aria-label="Open timeline view">Timeline</button>`;
   return [
     `<div class="ds-graph-labels">`,
     labels,
+    tile,
     `</div><div class="ds-graph-row" role="group" aria-label="Changes by day">`,
     dows,
     cols,

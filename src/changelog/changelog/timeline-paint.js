@@ -77,6 +77,18 @@ export function sortTimelineRows(rows, sort) {
   }).map(([r]) => r);
 }
 
+// Bout popover lines: one stat per line (title / tasks / commits / revs /
+// range + Due). boutPopText stays the one-line form for the summary sumline.
+export function boutPopLines(sum) {
+  if (!sum) return '';
+  const lines = [sum.title];
+  if (sum.status) lines.push(`${sum.status} tasks`);
+  lines.push(`${sum.commits} commit${sum.commits === 1 ? '' : 's'}`);
+  lines.push(`${sum.revs} rev${sum.revs === 1 ? '' : 's'}`);
+  if (sum.range) lines.push(sum.range);
+  if (sum.due) lines.push(`Due ${sum.due}${sum.overdue ? ' (overdue)' : ''}`);
+  return lines.filter(Boolean).join('\n');
+}
 // Bout popover snippet: "{title} · {d/t} tasks · {C} commits · {R} revs · {range}" + Due.
 export function boutPopText(sum) {
   if (!sum) return '';
@@ -126,6 +138,10 @@ export function paintTimeline(root, ctx) {
   const pop = root.querySelector('[data-tl-pop]');
   if (!panel) return;
   if (st.view !== 'timeline') { panel.hidden = true; if (pop) pop.hidden = true; return; }
+  // Owner call: a plan opened from the timeline shows the one familiar plan
+  // panel, never two panels at once — the timeline hides underneath and its
+  // close (✕/scrim/Esc, same drawer path) lands back on the timeline.
+  if (st.open && st.returnView === 'timeline') { panel.hidden = true; if (pop) pop.hidden = true; return; }
   panel.hidden = false;
   const today = todayISO();
   const dc = {};
@@ -170,6 +186,12 @@ export function paintTimeline(root, ctx) {
   const todayLine = (todayOff >= 0 && todayOff < grid.days)
     ? `<span class="ds-tl-today" style="left:calc(var(--cl-tl-day) * ${todayOff})"></span>` : '';
   const body = rows.length ? rows.map((r) => {
+    // Owner call: the plan name rides its longest bar, not a sidebar label.
+    let li = -1, best = -1;
+    r.bouts.forEach((b, i) => {
+      const span = Math.round((pISO(b.end) - pISO(b.start)) / DAY);
+      if (span > best) { best = span; li = i; }
+    });
     const bars = r.bouts.map((b, i) => {
       let bs = null;
       try { bs = boutSummary(r.plan, b, today); } catch { bs = null; }
@@ -177,23 +199,24 @@ export function paintTimeline(root, ctx) {
       const lv = lvOf(n, max);
       const cls = b.kind === 'streak' ? 'ds-tl-streak' : 'ds-tl-bout';
       const cur = (selRow === r && selIdx === i) ? ' aria-current="true"' : '';
+      const nm = i === li ? `<span class="ds-tl-barname">${esc(r.plan.title)}</span>` : '';
       return `<button class="${cls} lv${lv}" style="${barGeom(grid.start, b.start, b.end)}"` +
         ` data-tl-bout="${esc(r.plan.file)}:${i}" data-tip="${esc(r.tip)}"` +
-        ` data-pop="${esc(boutPopText(bs))}"${cur}` +
-        ` aria-label="${esc(`${r.plan.title}, ${b.kind} ${b.start} to ${b.end}`)}"></button>`;
+        ` data-pop="${esc(boutPopLines(bs))}"${cur}` +
+        ` aria-label="${esc(`${r.plan.title}, ${b.kind} ${b.start} to ${b.end}`)}">${nm}</button>`;
     }).join('');
     let g = '';
     if (r.ghost) {
       const gTip = `Due ${r.ghost.to}${r.ghost.overdue ? ' · overdue' : ''} · ` + r.tip;
+      const gNm = li < 0 ? `<span class="ds-tl-barname">${esc(r.plan.title)}</span>` : '';
       g = `<button class="ds-tl-ghost${r.ghost.overdue ? ' is-overdue' : ''}" style="${barGeom(grid.start, r.ghost.from, r.ghost.to)}"` +
         ` data-tl-ghost="${esc(r.plan.file)}" data-tip="${esc(gTip)}"` +
-        ` aria-label="${esc('Upcoming work due ' + r.ghost.to + ' in ' + r.plan.title)}"></button>`;
+        ` aria-label="${esc('Upcoming work due ' + r.ghost.to + ' in ' + r.plan.title)}">${gNm}</button>`;
     }
+    const laneOpen = (!bars && !g)
+      ? `<button class="ds-tl-lane-name" data-tl-open="${esc(r.plan.file)}" data-tip="${esc(r.tip)}" aria-label="Open ${esc(r.plan.title)}">${esc(r.plan.title)}</button>` : '';
     return `<div class="ds-tl-row" data-tl-row="${esc(r.plan.file)}">` +
-      `<button class="ds-tl-label" data-tl-open="${esc(r.plan.file)}" data-tip="${esc(r.tip)}"` +
-      ` aria-label="Open ${esc(r.plan.title)}"><b>${esc(r.plan.title)}</b>` +
-      `<small>${esc([r.plan.date, r.frac].filter(Boolean).join(' · '))}</small></button>` +
-      `<div class="ds-tl-lane" style="${laneW}">${bars}${g}${todayLine}</div></div>`;
+      `<div class="ds-tl-lane" style="${laneW}">${bars}${g}${todayLine}${laneOpen}</div></div>`;
   }).join('') : `<p class="ds-tl-empty">Nothing matches the current filters yet.</p>`;
   const rangeTxt = rows.length ? `${fmtDate(grid.start)} → ${fmtDate(grid.end)}` : '';
   panel.innerHTML = [
@@ -204,7 +227,7 @@ export function paintTimeline(root, ctx) {
     `<button data-tl-sort aria-pressed="${st.tlSort === 'next'}" aria-label="Sort nearest due first">What's next</button>`,
     overdueN ? `<span class="ds-tl-overdue">${overdueN} overdue</span>` : '',
     `</div>`,
-    `<div class="ds-tl-scroll"><div class="ds-tl-axis"><span class="ds-tl-corner"></span>` +
+    `<div class="ds-tl-scroll"><div class="ds-tl-axis">` +
     `<div class="ds-tl-ticks" style="${laneW}">${ticks}</div></div>${body}</div>`,
   ].join('');
   if (pop) pop.hidden = true;

@@ -157,3 +157,16 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 - Single cursor-tip node fed by `data-tip`; strip markdown before clipping; hide when empty.
 - New stylesheet: `--cl-*` prefix only, `calc()` off `--sp-*`; never override `:root --sp-*` (prod order-flip).
 - Detail renderer strips `<!-- -->`, `{#…}`, summary `|…` table blocks at parse top (Due lines join that strip list at render).
+
+## Follow-up polish (owner steer, 2026-10-15)
+
+1. Timeline panel opens like the plan panel: same right-drawer width (`--size-ds-drawer`) + same `ds-drawer-in` glide (`--dur-glide`, `--ease-signature`).
+2. Bar click opens the one familiar plan panel — the timeline hides underneath (`st.open && returnView === 'timeline'`); its ✕/scrim/Esc lands back on the timeline with the bout still selected. Cold `?view=timeline&plan=&bout=` behaves the same.
+3. Compact rows: sidebar label column + corner spacer gone; no per-row dates (axis only).
+4. Plan name rides its longest bar (ghost bar / lane fallback); `40ch` spill cap.
+5. Timeline entry is a large tile in the months row after November (accent, `sp-text-lg`); count + pressed state still sync from `doPaint`. Note: `--cl-24` does not exist in the token scale (22→26) — tile uses `--cl-26`.
+6. Bout popover: one stat per line incl. date range (`boutPopLines`; `boutPopText` stays the sumline form; `.ds-tl-pop` gains `pre-line`).
+
+- REF GATE (polish): chromium + webkit — tile large in months row; 13 rows named on bars, no sidebar; popover 5 lines; bar→drawer-only→✕→timeline; zero page errors; build green.
+
+### Follow-up ✓ done
