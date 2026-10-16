@@ -249,6 +249,7 @@ export function bindChangelogEvents(root, st, helpers) {
     // Tags more expansion
     const moreBtn = e.target.closest('[data-tags-more]');
     if (moreBtn) {
+      e.preventDefault(); e.stopPropagation();
       const idx = Number(moreBtn.dataset.tagsMore);
       const row = root.querySelectorAll('.ds-pick')[idx];
       if (row) {

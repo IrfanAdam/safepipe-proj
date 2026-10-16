@@ -14,7 +14,7 @@
 .ds-plan-grid .ds-date{grid-column:2;grid-row:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
 .ds-plan-grid .ds-state{grid-column:3;grid-row:2;justify-self:end;white-space:nowrap;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
 .ds-plan-grid .ds-tags{grid-column:3;grid-row:1;margin-left:auto;min-width:0;justify-self:end;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38ch}
-.ds-tags-more{background:none;border:none;color:var(--color-accent);font-family:var(--font-mono);font-size:var(--text-micro);cursor:pointer;padding:0}
+.ds-tags-more{color:var(--color-accent);font-family:var(--font-mono);font-size:var(--text-micro);cursor:pointer}
 .ds-tags-more:hover{text-decoration:underline}
 .ds-tags-expanded{white-space:normal;overflow:visible;text-overflow:clip;max-width:none}
 @media (max-width:640px){

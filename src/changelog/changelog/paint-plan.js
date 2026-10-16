@@ -72,7 +72,7 @@ export function paintPlan(root, ctx){
       stateTxt,
       `</span></small></span><span class="ds-tags">`,
       esc(tagsVisible),
-      tagsOverflow > 0 ? ` <button class="ds-tags-more" data-tags-more="${i}" aria-label="Show ${tagsOverflow} more tags">+${tagsOverflow}</button>` : '',
+      tagsOverflow > 0 ? ` <span class="ds-tags-more" role="button" tabindex="0" data-tags-more="${i}" aria-label="Show ${tagsOverflow} more tags">+${tagsOverflow}</span>` : '',
       `</span></button>`,
     ].join('');
   }).join('');
