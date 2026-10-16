@@ -5,6 +5,7 @@
 // logout need no repaint.
 import { getSchedUser, isSchedAuthed, setSchedUser, clearSchedUser, takePendingToken } from '../logic/schedule-auth.js';
 const BODY_ON = 'is-sched-auth';
+let menuBound = false;
 export function applyScheduleState() {
   const user = getSchedUser();
   try { document.body.classList.toggle(BODY_ON, !!user); } catch {}
@@ -139,8 +140,8 @@ export function initScheduleGate() {
       }
     });
   }
-  if (!document.dataset.schedMenuBound) {
-    document.dataset.schedMenuBound = '1';
+  if (!menuBound) {
+    menuBound = true;
     document.addEventListener('click', (e) => {
       const menu = document.querySelector('[data-user-menu]');
       if (!menu || menu.hidden) return;

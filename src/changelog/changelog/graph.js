@@ -11,12 +11,13 @@ export function graph({ plans, day }) {
   // Scheduling (task 3): future Due dates across incomplete sections gain a
   // ghost-dot marker — is-future reused plus an is-due marker class, no new
   // colors (styling lands in the page stylesheet, out of this lane).
-  const dues = new Set();
+  const dueCounts = new Map();
   (plans || []).forEach((p) => {
     (p.sprints || []).forEach((s) => {
-      try { const d = dueOf({ head: s.head, body: s.body }); if (d) dues.add(d); } catch {}
+      try { const d = dueOf({ head: s.head, body: s.body }); if (d) dueCounts.set(d, (dueCounts.get(d) || 0) + 1); } catch {}
     });
   });
+  const dues = new Set(dueCounts.keys());
   const keys = Object.keys(dc).sort();
   const bounds = keys.concat(plans.map((p) => p.date).filter(Boolean), [...dues]).sort();
   if (!bounds.length) return '';
@@ -52,8 +53,8 @@ export function graph({ plans, day }) {
       const k = isoDay(d),
         todayCls = k === isoDay(today) ? ' is-today' : '';
       if (d > today) {
-        if (dues.has(k)) return `<span class="ds-day is-future is-due" data-due-day="${k}" data-tip="${fmtDate(k)} · Due"></span>`;
-        return `<span class="ds-day is-future" data-tip="${fmtDate(k)} · upcoming"></span>`;
+        if (dues.has(k)) return `<span class="ds-day is-future is-due" data-due-day="${k}" data-tip="${dueCounts.get(k)} Due · ${fmtDate(k)}"></span>`;
+        return `<span class="ds-day is-future" data-tip="${fmtDate(k)}"></span>`;
       }
       const n = dc[k] || 0;
       if (!n) return `<span class="ds-day${todayCls}" data-tip="${fmtDate(k)} · no changes"></span>`;
