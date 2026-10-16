@@ -7,8 +7,10 @@ import { h1Of, planSentence } from './changelog-titles.js';
 
 import names from '../ds/changelog-names.json';
 import history from '../ds/plan-history.json';
-import { goal, split, parseMeta, anchorOf, phash } from './changelog-parse.js';
+import { goal, split, parseMeta, anchorOf, phash, dueOf } from './changelog-parse.js';
 import { paint } from './changelog-paint.js';
+import { duePreviewEdit } from './changelog-events.js';
+import { loadDueOverrides, dropDueOverride } from '../logic/due-overrides.js';
 import { TIMELINE_TILE_ICON } from './changelog/graph.js';
 import { bindChangelogEvents } from './changelog-events.js';
 
@@ -48,6 +50,24 @@ const plans = entries.map(([p, md]) => {
     tags: planTags(md, sprints),
     raw: md };
 }).filter((pl) => pl.sprints.length && !HIDDEN.test(pl.raw));
+// Re-apply same-device due overrides (production has no file writer): stored
+// picks fill sections the FILE leaves dateless; a file-carried Due always
+// wins, so hand edits and dev writes are never clobbered — stale entries drop.
+try {
+  for (const o of loadDueOverrides()) {
+    const plan = plans.find((p) => p.file === o.file);
+    const sec = plan ? plan.sprints.find((s) => s.head === o.head) : null;
+    if (!sec) { dropDueOverride(o.file, o.head); continue; }
+    const current = dueOf(sec);
+    if (o.due) {
+      if (current) { dropDueOverride(o.file, o.head); continue; }
+      sec.body = duePreviewEdit(sec.body, sec.head, o.due);
+    } else {
+      if (!current) { dropDueOverride(o.file, o.head); continue; }
+      sec.body = duePreviewEdit(sec.body, sec.head, null);
+    }
+  }
+} catch {}
 // Augment texts with anchor tokens so boundary-aware matching sees section
 // numbers even when the raw markdown never spells the anchor literally.
 const texts = { ...rawTexts };
@@ -130,6 +150,28 @@ function doPaint(root) {
 }
 export function mount(root) {
   st.open = false; st.stage = 'list';
+  // Survive file-watch reloads (setting a deadline rewrites the plan file,
+  // and the dev server reloads on the .md change): restore the UI snapshot
+  // taken at unload so the drawer reopens where the author left it.
+  try {
+    const raw = sessionStorage.getItem('safepipe-ui-snapshot');
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (Array.isArray(s.sel)) st.sel = s.sel;
+      if (typeof s.open === 'boolean') st.open = s.open;
+      if (typeof s.stage === 'string') st.stage = s.stage;
+      if (s.view === 'timeline' || s.view === 'list') st.view = s.view;
+      sessionStorage.removeItem('safepipe-ui-snapshot');
+    }
+  } catch {}
+  try {
+    window.addEventListener('beforeunload', () => {
+      try {
+        sessionStorage.setItem('safepipe-ui-snapshot',
+          JSON.stringify({ sel: st.sel, open: st.open, stage: st.stage, view: st.view }));
+      } catch {}
+    });
+  } catch {}
   try {
     const q = new URLSearchParams(location.search);
     if (q.get('view') === 'timeline') {
