@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16T17:45:47.140Z",
+  "generated": "2026-10-16T18:13:39.746Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,24 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "8a84588",
+      "full": "8a8458814df6bbeb5ebc3535886f65fd1b5b095b",
+      "date": "2026-10-16",
+      "time": "23:43",
+      "subject": "fix(changelog): Clear-all as tag-stack text, Gantt icon on All-tracks tile [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
+    {
+      "sha": "2e5a895",
+      "full": "2e5a895e00262f20ba338ca48e72085a62d5cc54",
+      "date": "2026-10-16",
+      "time": "23:29",
+      "subject": "feat(changelog): filter bar — clear button, tag dropdown, timeline chip, expandable tags",
+      "plan": null,
+      "anchor": null
+    },
     {
       "sha": "055a557",
       "full": "055a557fc330253cb9c158411b0496bb298e1c47",
@@ -3744,12 +3762,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/changelog/changelog-cards.css",
-    "src/changelog/changelog.css",
-    "src/changelog/changelog/graph.js",
-    "src/changelog/changelog/paint-chips.js",
-    "src/changelog/changelog/paint-plan.js",
-    "src/changelog/pages-changelog.js"
-  ]
+  "wip": []
 }
