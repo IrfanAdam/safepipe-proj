@@ -132,10 +132,12 @@ export function bindChangelogEvents(root, st, helpers) {
   };
   // Due set/clear against the open section: same edit the file commit
   // carries, applied to the live section body so ghostOf recomputes on the
-  // next doPaint with no build. Done/cancelled sections render no control,
-  // so reaching here with one is a no-op guard. st.duePending records the
-  // exact file line for the author to commit ([plan:<file>#<anchor>] trailer
-  // + tracker regen — the static page has no file-write endpoint).
+  // next doPaint with no build. The dev/preview server exposes a local-only
+  // write endpoint ('/__ds/due', vite.config.js ds-due-writer) so the edit
+  // lands in the plan file immediately; on a static build nothing answers and
+  // st.duePending records the exact file line for the author's commit
+  // ([plan:<file>#<anchor>] trailer + tracker regen). Done/cancelled
+  // sections render no control, so reaching here with one is a no-op guard.
   const applyDue = (iso) => {
     const c = cur();
     const plan = c.plan, sprint = c.sprints[c.si];
@@ -149,6 +151,13 @@ export function bindChangelogEvents(root, st, helpers) {
     sprint.body = next;
     st.duePending = { file: plan.file, due: iso || null, line: iso ? `*Due: ${iso}*` : null };
     doPaint(root);
+    if (typeof fetch === 'function') {
+      fetch('/__ds/due', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: plan.file, head: sprint.head, due: iso || null }),
+      }).then((r) => { if (r.ok) st.duePending = null; }).catch(() => {});
+    }
   };
   // Themed due datepicker: material-like month grid in Safepipe tokens
   // (surface card, accent select, mono cells). Monday-first like the days

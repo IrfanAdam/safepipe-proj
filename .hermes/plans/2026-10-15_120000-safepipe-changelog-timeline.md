@@ -158,7 +158,7 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 - New stylesheet: `--cl-*` prefix only, `calc()` off `--sp-*`; never override `:root --sp-*` (prod order-flip).
 - Detail renderer strips `<!-- -->`, `{#…}`, summary `|…` table blocks at parse top (Due lines join that strip list at render).
 
-## Follow-up polish (owner steer, 2026-10-15)
+## Follow-up polish (owner steer, 2026-10-15) ✓ done {#follow-up}
 
 1. Timeline panel opens like the plan panel: same right-drawer width (`--size-ds-drawer`) + same `ds-drawer-in` glide (`--dur-glide`, `--ease-signature`).
 2. Bar click opens the one familiar plan panel — the timeline hides underneath (`st.open && returnView === 'timeline'`); its ✕/scrim/Esc lands back on the timeline with the bout still selected. Cold `?view=timeline&plan=&bout=` behaves the same.

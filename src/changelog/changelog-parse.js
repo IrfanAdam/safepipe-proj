@@ -62,8 +62,19 @@ export const norm = (body) => {
   return out;
 };
 
+// Explicit anchor token declared in a head: `## Follow-up polish {#follow-up}`.
+// A group with no `Phase|Task|Step` number MUST declare one to become a
+// section — the opt-in is what keeps prose heads (`## File map`, `## Pitfalls`,
+// `## REF GATE`, `## License table`) out of the section list.
+export const declaredAnchor = (head) =>
+  (String(head || '').match(/\{#([A-Za-z][\w-]*)\}/) || [])[1] || null;
+
 // Section number → canonical anchor token (`Task 10: …` → `task-10`).
+// A declared `{#anchor}` wins over the derived number: it is the author
+// stating the token outright.
 export const anchorOf = (head) => {
+  const d = declaredAnchor(head);
+  if (d) return d;
   const m = String(head || '').match(/^(Phase|Task|Step)\s+(\d+)/i);
   return m ? `${m[1].toLowerCase()}-${Number(m[2])}` : null;
 };
@@ -83,14 +94,26 @@ export const anchorHitCI = (text, anchor) =>
 // Section number for gate ownership (`Task 3` → 3, `Phase 03` → 3,
 // `Step 0` → 0). Falls back when the head carries no number — callers
 // pass their positional index. Same head-number rule as anchorOf: a
-// section is judged by its OWN gate, never the gate at its position
-// (positional index misattributes verdicts on Task-headed plans).
+// section is judged by its OWN gate, never by its position (positional
+// index misattributes verdicts on Task-headed plans).
+//
+// A declared-anchor group with no number owns NO numbered gate → null, never
+// the positional fallback: `## Follow-up {#follow-up}` sitting at index 4 must
+// not display Task 4's `GATE PASSED`. (An unanchored numberless head keeps the
+// positional fallback, which only numbered-free legacy heads reach.)
 export const gateNOf = (head, fb) => {
   const m = String(head || '').match(/^(Phase|Task|Step)\s+(\d+)/i);
-  return m ? Number(m[2]) : fb;
+  if (m) return Number(m[2]);
+  if (declaredAnchor(head)) return null;
+  return fb;
 };
 
-const SECTION = /^(Phase|Task|Step)\b/;
+// A section is a `Phase|Task|Step N` unit, OR any head that declares an
+// explicit `{#anchor}`. The declared-anchor branch is what lets a real work
+// group (e.g. `## Follow-up polish {#follow-up}`) own its commits instead of
+// leaving them unfiled — the alternative, a catch-all "Further commits" bucket,
+// hides unfiled work and is banned. Numberless prose heads stay excluded.
+const SECTION = (head) => /^(Phase|Task|Step)\b/.test(head) || !!declaredAnchor(head);
 
 const toSection = (marker, p) => {
   const nl = p.indexOf('\n');
@@ -104,7 +127,7 @@ const toSection = (marker, p) => {
 export const split = (md) => {
   const secs = chunks(md).slice(1)
     .map((s) => toSection('## ', s))
-    .filter((s) => SECTION.test(s.head));
+    .filter((s) => SECTION(s.head));
   if (secs.length) return secs;
   // Fallback: `### Task`-based plans with no matching `##` sections.
   // No `##`-in-preamble guard: the SECTION filter below already drops non-task
@@ -115,7 +138,7 @@ export const split = (md) => {
   if (parts.length < 2) return [];
   return parts.slice(1)
     .map((p) => toSection('### ', p))
-    .filter((s) => SECTION.test(s.head));
+    .filter((s) => SECTION(s.head));
 };
 
 export const state = (body) => {

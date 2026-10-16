@@ -19,6 +19,9 @@
 .ds-drawer-head{display:flex;gap:var(--cl-8);align-items:center;padding-top:var(--cl-6);margin-bottom:var(--cl-4)}
 .ds-drawer-head b{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-mono);font-size:var(--text-micro);text-transform:uppercase;letter-spacing:var(--tracking-mono);color:var(--color-ink-muted)}
 .ds-drawer-head button{font-family:var(--font-mono);font-size:var(--text-micro);background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);padding:var(--cl-4) var(--cl-9);cursor:pointer}
+/* Logged-in-only schedule CTA: hidden until the gate sets body.is-sched-auth. */
+.ds-drawer-head .ds-sched-cta{display:none}
+body.is-sched-auth .ds-drawer-head .ds-sched-cta{display:block}
 /* Task/phase title opens the body: lead with a smaller top inset than generic
    in-body h2s so it sits a touch higher under the tag head. */
 [data-col="tasks"] .ds-md > h2:first-child{margin-top:var(--cl-8)}

@@ -1,248 +1,260 @@
 [
-  {
-    "sha": "5370999",
-    "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
-    "anchor": null,
-    "note": "v0 boilerplate shell — pre-trailer, attaches to first section"
-  },
-  {
-    "sha": "ba00e7f",
-    "plan": "2026-10-05_150017-safepipe-ds-extraction.md",
-    "anchor": null,
-    "note": "Plan A measured DS — pre-trailer, attaches to first section"
-  },
-  {
-    "sha": "bbc5d17",
-    "plan": "2026-10-05_150017-safepipe-ds-extraction.md",
-    "anchor": null,
-    "note": "gallery component docs — pre-trailer, attaches to first section"
-  },
-  {
-    "sha": "b5e4c38",
-    "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
-    "anchor": null,
-    "note": "prototype screens + fig archive — pre-trailer, attaches to first section"
-  },
-  {
-    "sha": "9603e71",
-    "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
-    "anchor": null,
-    "note": "rail More menu — pre-trailer, attaches to first section"
-  },
-  {
-    "sha": "0827f04",
-    "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
-    "anchor": null,
-    "note": "MPA deploy fix for page bundles — pre-trailer, attaches to first section"
-  },
-  {
-    "sha": "f3721aa",
-    "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
-    "anchor": null,
-    "note": "pitch content from Fig — pre-trailer, attaches to first section"
-  },
-  {
-    "sha": "83cd61e",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-0",
-    "note": "trailer in body not subject — Phase 0 TDD batch, tasks 1-5"
-  },
-  {
-    "sha": "e9279bd",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-0",
-    "note": "re-point: bare task-1 matches no section — Phase 0 camera batch"
-  },
-  {
-    "sha": "b789b14",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-0",
-    "note": "re-point: refresh picking up 83cd61e — same Phase 0 batch"
-  },
-  {
-    "sha": "ccbc26e",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 tube walls + neutral chevron flow — Task 10 flow≠amber"
-  },
-  {
-    "sha": "2c14b61",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 mapbox satellite base + crossfade — Phase 1 satellite ground"
-  },
-  {
-    "sha": "3ab1323",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 flow chevrons to tube width — Task 10 attention lock"
-  },
-  {
-    "sha": "d5f4bd8",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 compass/scale furniture + TOP label restraint — Task 10"
-  },
-  {
-    "sha": "ef68282",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 neutral pipes over quiet land — Task 10 terrain-agent pass"
-  },
-  {
-    "sha": "04a5b49",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 open-source satellite base MapLibre+Esri/Terrarium — Phase 1 ground"
-  },
-  {
-    "sha": "ddd4507",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 grazing-angle armor, terrain-seated labels — Task 10"
-  },
-  {
-    "sha": "6086d3b",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 circular satellite monitor clipped to TOP scope disc — Phase 1"
-  },
-  {
-    "sha": "432fdca",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 render-fidelity MSAA/fog/vignette pass — Task 10 attention"
-  },
-  {
-    "sha": "3f4896e",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 valley-seated water lines, trough carve — Task 8 landscape"
-  },
-  {
-    "sha": "5cfb524",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 emissive hierarchy + label leaders — Task 10"
-  },
-  {
-    "sha": "d9994f2",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 SCOPE toggle flies camera to TOP/network — Phase 1"
-  },
-  {
-    "sha": "795dce9",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 satellite base + SAT/TWIN/SCOPE bar in gallery — Phase 1"
-  },
-  {
-    "sha": "24d7397",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 terrain loop1 surveyed carve axis + relief — Tasks 6-8"
-  },
-  {
-    "sha": "f299a0f",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 satellite never black, opaque base — Phase 1 ground"
-  },
-  {
-    "sha": "cd74165",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 sat bar above system cluster — gallery Phase 1 specimen"
-  },
-  {
-    "sha": "9790bf4",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 real-map parity pan/zoom/colors — Phase 1 map ground"
-  },
-  {
-    "sha": "1b7b48f",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 loop-1 atmosphere + rim ring — Task 10"
-  },
-  {
-    "sha": "a7dec9d",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 crossfade slant-zoom + map follow — Phase 1"
-  },
-  {
-    "sha": "dfc8411",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 Terrarium-primary DEM + status bus + ?site= — Task 6 DEM loader"
-  },
-  {
-    "sha": "d371f08",
-    "plan": "2026-10-07_130000-safepipe-changelog.md",
-    "anchor": "task-5",
-    "note": "Oct 9 tracker + changelog catch-up — sanity-pass bookkeeping, not DS work"
-  },
-  {
-    "sha": "8b94752",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 9 DEM-surveyed Viterbi water + lake basins — Task 8"
-  },
-  {
-    "sha": "f2ece53",
-    "plan": "2026-10-10_150100-ops3d-sangachal-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 10 MapLibre-owns-ground pivot, 90min pre-plan — architecture Phase 1 reuses"
-  },
-  {
-    "sha": "451b1e8",
-    "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
-    "anchor": "phase-1",
-    "note": "Oct 10 late-map-load watchdog tag clear — Phase 1 satellite groundwork"
-  },
-  {
-    "sha": "14c71da",
-    "plan": "2026-10-10_150100-ops3d-sangachal-twin.md",
-    "anchor": "phase-4",
-    "note": "Oct 10 scope lens stands down at full TWIN — Phase 4 scope-lens parity"
-  },
-  {
-    "sha": "8ed3e56",
-    "plan": "2026-10-10_150100-ops3d-sangachal-twin.md",
-    "anchor": "phase-4",
-    "note": "Oct 11 map-view seed/follow kills outer-disc flash — Phase 4 disc parity"
-  },
-  {
-    "sha": "6934f4e",
-    "plan": "2026-10-05_150017-safepipe-domain-logic.md",
-    "anchor": null,
-    "note": "close domain-logic tasks 1-5 — pre-trailer, attaches to first section"
-  },
-  {
-    "sha": "3d51ca7",
-    "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
-    "anchor": null,
-    "note": "ring2 probe .gitignore hygiene — pre-trailer, exact task unknown"
-  },
-  {
-    "sha": "b389190",
-    "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
-    "anchor": null,
-    "note": "harness portability (skill snapshots + AGENTS.md) — no owning task, attached for triage-zero"
-  },
-  {
-    "sha": "4deb429",
-    "plan": "2026-10-13_233337-ops3d-twin-work.md",
-    "anchor": "phase-04",
-    "note": "plan-split re-point: time/sim/ops phases moved out of v3-iteration plan; trailer cites pre-split file, follows the phase"
-  },
-  {
-    "sha": "6f3e285",
-    "plan": "2026-10-07_130000-safepipe-changelog.md",
-    "anchor": "task-7",
-    "note": "changelog-kit 0.2.0->0.3.0 kit carry-forward (Day-grouped timelines, evals threading, preflight, plan-split refs)"
-  }
+ {
+  "sha": "5370999",
+  "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
+  "anchor": null,
+  "note": "v0 boilerplate shell — pre-trailer, attaches to first section"
+ },
+ {
+  "sha": "ba00e7f",
+  "plan": "2026-10-05_150017-safepipe-ds-extraction.md",
+  "anchor": null,
+  "note": "Plan A measured DS — pre-trailer, attaches to first section"
+ },
+ {
+  "sha": "bbc5d17",
+  "plan": "2026-10-05_150017-safepipe-ds-extraction.md",
+  "anchor": null,
+  "note": "gallery component docs — pre-trailer, attaches to first section"
+ },
+ {
+  "sha": "b5e4c38",
+  "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
+  "anchor": null,
+  "note": "prototype screens + fig archive — pre-trailer, attaches to first section"
+ },
+ {
+  "sha": "9603e71",
+  "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
+  "anchor": null,
+  "note": "rail More menu — pre-trailer, attaches to first section"
+ },
+ {
+  "sha": "0827f04",
+  "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
+  "anchor": null,
+  "note": "MPA deploy fix for page bundles — pre-trailer, attaches to first section"
+ },
+ {
+  "sha": "f3721aa",
+  "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
+  "anchor": null,
+  "note": "pitch content from Fig — pre-trailer, attaches to first section"
+ },
+ {
+  "sha": "83cd61e",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-0",
+  "note": "trailer in body not subject — Phase 0 TDD batch, tasks 1-5"
+ },
+ {
+  "sha": "e9279bd",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-0",
+  "note": "re-point: bare task-1 matches no section — Phase 0 camera batch"
+ },
+ {
+  "sha": "b789b14",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-0",
+  "note": "re-point: refresh picking up 83cd61e — same Phase 0 batch"
+ },
+ {
+  "sha": "ccbc26e",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 tube walls + neutral chevron flow — Task 10 flow≠amber"
+ },
+ {
+  "sha": "2c14b61",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 mapbox satellite base + crossfade — Phase 1 satellite ground"
+ },
+ {
+  "sha": "3ab1323",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 flow chevrons to tube width — Task 10 attention lock"
+ },
+ {
+  "sha": "d5f4bd8",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 compass/scale furniture + TOP label restraint — Task 10"
+ },
+ {
+  "sha": "ef68282",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 neutral pipes over quiet land — Task 10 terrain-agent pass"
+ },
+ {
+  "sha": "04a5b49",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 open-source satellite base MapLibre+Esri/Terrarium — Phase 1 ground"
+ },
+ {
+  "sha": "ddd4507",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 grazing-angle armor, terrain-seated labels — Task 10"
+ },
+ {
+  "sha": "6086d3b",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 circular satellite monitor clipped to TOP scope disc — Phase 1"
+ },
+ {
+  "sha": "432fdca",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 render-fidelity MSAA/fog/vignette pass — Task 10 attention"
+ },
+ {
+  "sha": "3f4896e",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 valley-seated water lines, trough carve — Task 8 landscape"
+ },
+ {
+  "sha": "5cfb524",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 emissive hierarchy + label leaders — Task 10"
+ },
+ {
+  "sha": "d9994f2",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 SCOPE toggle flies camera to TOP/network — Phase 1"
+ },
+ {
+  "sha": "795dce9",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 satellite base + SAT/TWIN/SCOPE bar in gallery — Phase 1"
+ },
+ {
+  "sha": "24d7397",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 terrain loop1 surveyed carve axis + relief — Tasks 6-8"
+ },
+ {
+  "sha": "f299a0f",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 satellite never black, opaque base — Phase 1 ground"
+ },
+ {
+  "sha": "cd74165",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 sat bar above system cluster — gallery Phase 1 specimen"
+ },
+ {
+  "sha": "9790bf4",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 real-map parity pan/zoom/colors — Phase 1 map ground"
+ },
+ {
+  "sha": "1b7b48f",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 loop-1 atmosphere + rim ring — Task 10"
+ },
+ {
+  "sha": "a7dec9d",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 crossfade slant-zoom + map follow — Phase 1"
+ },
+ {
+  "sha": "dfc8411",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 Terrarium-primary DEM + status bus + ?site= — Task 6 DEM loader"
+ },
+ {
+  "sha": "d371f08",
+  "plan": "2026-10-07_130000-safepipe-changelog.md",
+  "anchor": "task-5",
+  "note": "Oct 9 tracker + changelog catch-up — sanity-pass bookkeeping, not DS work"
+ },
+ {
+  "sha": "8b94752",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 9 DEM-surveyed Viterbi water + lake basins — Task 8"
+ },
+ {
+  "sha": "f2ece53",
+  "plan": "2026-10-10_150100-ops3d-sangachal-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 10 MapLibre-owns-ground pivot, 90min pre-plan — architecture Phase 1 reuses"
+ },
+ {
+  "sha": "451b1e8",
+  "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+  "anchor": "phase-1",
+  "note": "Oct 10 late-map-load watchdog tag clear — Phase 1 satellite groundwork"
+ },
+ {
+  "sha": "14c71da",
+  "plan": "2026-10-10_150100-ops3d-sangachal-twin.md",
+  "anchor": "phase-4",
+  "note": "Oct 10 scope lens stands down at full TWIN — Phase 4 scope-lens parity"
+ },
+ {
+  "sha": "8ed3e56",
+  "plan": "2026-10-10_150100-ops3d-sangachal-twin.md",
+  "anchor": "phase-4",
+  "note": "Oct 11 map-view seed/follow kills outer-disc flash — Phase 4 disc parity"
+ },
+ {
+  "sha": "6934f4e",
+  "plan": "2026-10-05_150017-safepipe-domain-logic.md",
+  "anchor": null,
+  "note": "close domain-logic tasks 1-5 — pre-trailer, attaches to first section"
+ },
+ {
+  "sha": "3d51ca7",
+  "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+  "anchor": null,
+  "note": "ring2 probe .gitignore hygiene — pre-trailer, exact task unknown"
+ },
+ {
+  "sha": "b389190",
+  "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+  "anchor": null,
+  "note": "harness portability (skill snapshots + AGENTS.md) — no owning task, attached for triage-zero"
+ },
+ {
+  "sha": "4deb429",
+  "plan": "2026-10-13_233337-ops3d-twin-work.md",
+  "anchor": "phase-04",
+  "note": "plan-split re-point: time/sim/ops phases moved out of v3-iteration plan; trailer cites pre-split file, follows the phase"
+ },
+ {
+  "sha": "6f3e285",
+  "plan": "2026-10-07_130000-safepipe-changelog.md",
+  "anchor": "task-7",
+  "note": "changelog-kit 0.2.0->0.3.0 kit carry-forward (Day-grouped timelines, evals threading, preflight, plan-split refs)"
+ },
+ {
+  "sha": "446350f",
+  "plan": "2026-10-12_175646-ops3d-geo-triangulation.md",
+  "anchor": "lane-a",
+  "note": "OSM rebuild (landuse/water/power/barriers) — Lane A owns data-pipe/* + vectors + ring2 tests; trailer said #phase-01, a section the plan never declared"
+ },
+ {
+  "sha": "9cca07e",
+  "plan": "2026-10-12_175646-ops3d-geo-triangulation.md",
+  "anchor": "lane-b",
+  "note": "elev-*.mjs triangulation scripts — Lane B owns new elevation scripts; trailer said #phase-01"
+ }
 ]

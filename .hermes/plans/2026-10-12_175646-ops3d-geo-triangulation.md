@@ -20,19 +20,19 @@
 - Imagery: Esri satellite under twin canvas (attributed in HUD). No third-party pixels in-repo, ever.
 - Environment: NO gdal/ogr2ogr, NO postgis/psql on this machine; java present.
 
-## Lane A — OSM completeness (owns: `scripts/data-pipe/*`, `public/data/sangachal-vectors.json`, `src/ring2/vectors.js`, `tests/ring2-vectors*.test.js`)
+## Lane A — OSM completeness (owns: `scripts/data-pipe/*`, `public/data/sangachal-vectors.json`, `src/ring2/vectors.js`, `tests/ring2-vectors*.test.js`) {#lane-a}
 
 - Re-query Overpass for the AOI: building count vs installed, water bodies (Caspian edge + inland), landuse classes, power/barrier deltas vs installed. Triangulate counts; list added/missing with way ids.
 - Integrate deltas through the existing chain (overpass→clip→classify→validate→wire); buildings stay outlines this round (extrusion is a queued lever, not this lane).
 - Verify: `node --test tests/ring2-vectors*.test.js` green; counts + ODbL attribution in `docs/source-manifest.json` (report text, parent edits manifest).
 
-## Lane B — Elevation triangulation (owns: new `scripts/data-pipe/elev-*.mjs` + scratch only)
+## Lane B — Elevation triangulation (owns: new `scripts/data-pipe/elev-*.mjs` + scratch only) {#lane-b}
 
 - Fetch Copernicus GLO-30 tile(s) for the AOI from AWS open data (`s3://copernicus-dem-30m`, no auth) + SRTM 1-arcsec void-filled tile for the same bbox; compare vs live Terrarium field: relief ratio, RMSE at control points, shoreline (-24 m) agreement.
 - Verdict rule: integrate (as validation note + manifest entry) only if a source beats Terrarium on measured agreement AND license allows; DEM swap needs parent approval — default is report, not swap.
 - Respect access: Copernicus Dataspace OAuth endpoints and USGS EarthExplorer (login-walled) are investigate-only; use no-credential mirrors (AWS) for bytes. Name exact missing files + official download pages for anything gated.
 
-## Lane C — Source recon: Cesium / OSM2World / GDAL / PostGIS (read-only + scratch probes, no repo writes)
+## Lane C — Source recon: Cesium / OSM2World / GDAL / PostGIS (read-only + scratch probes, no repo writes) {#lane-c}
 
 - Cesium ion / OSM Buildings / World Terrain: token-free verdict only (ion needs an account token; streaming-only terms — no vendoring). Report what would unlock with a token vs without.
 - OSM2World (java present, fully open source): effort verdict — trial on a small Sangachal OSM extract to scratch if cheap (CLI/glTF out, scratch only); report whether its output could validate our procedural masses. No committed models without license review.

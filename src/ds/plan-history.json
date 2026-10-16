@@ -3175,6 +3175,29 @@
    "date": "2026-10-12",
    "hash": "f74c36c4",
    "sections": []
+  },
+  {
+   "sha": null,
+   "date": "2026-10-16",
+   "time": "15:43",
+   "hash": "4fb545ac",
+   "sections": [
+    {
+     "head": "Lane A — OSM completeness (owns: `scripts/data-pipe/*`, `public/data/sangachal-v",
+     "hash": "3303be35",
+     "state": ""
+    },
+    {
+     "head": "Lane B — Elevation triangulation (owns: new `scripts/data-pipe/elev-*.mjs` + scr",
+     "hash": "9b7c8cbb",
+     "state": ""
+    },
+    {
+     "head": "Lane C — Source recon: Cesium / OSM2World / GDAL / PostGIS (read-only + scratch ",
+     "hash": "a62ae120",
+     "state": ""
+    }
+   ]
   }
  ],
  "2026-10-13_233337-ops3d-twin-work.md": [
@@ -3653,6 +3676,39 @@
   },
   {
    "sha": null,
+   "date": "2026-10-16",
+   "time": "15:43",
+   "hash": "7a837e6f",
+   "sections": [
+    {
+     "head": "Phase 01 — Make it real",
+     "hash": "7a5f8d44",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 02 — Asset / infrastructure layer",
+     "hash": "1b838041",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 03 — Time variance",
+     "hash": "9619e562",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 04 — Simulation",
+     "hash": "a9ba8807",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "53581ece",
+     "state": "0/7"
+    }
+   ]
+  },
+  {
+   "sha": null,
    "date": "2026-10-14",
    "time": "15:12",
    "hash": "c88d17c4",
@@ -3665,6 +3721,105 @@
     {
      "head": "Phase 02 — Asset / infrastructure layer",
      "hash": "1b838041",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 03 — Time variance",
+     "hash": "9619e562",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 04 — Simulation",
+     "hash": "a9ba8807",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "53581ece",
+     "state": "0/7"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-16",
+   "time": "16:26",
+   "hash": "2777d7b5",
+   "sections": [
+    {
+     "head": "Phase 01 — Make it real",
+     "hash": "6a4dd82b",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 02 — Asset / infrastructure layer",
+     "hash": "1e5a6192",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 03 — Time variance",
+     "hash": "9619e562",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 04 — Simulation",
+     "hash": "a9ba8807",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "53581ece",
+     "state": "0/7"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-16",
+   "time": "16:30",
+   "hash": "20c31dc0",
+   "sections": [
+    {
+     "head": "Phase 01 — Make it real",
+     "hash": "6a4dd82b",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 02 — Asset / infrastructure layer",
+     "hash": "6e12e8a5",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 03 — Time variance",
+     "hash": "9619e562",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 04 — Simulation",
+     "hash": "a9ba8807",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "53581ece",
+     "state": "0/7"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-16",
+   "time": "16:40",
+   "hash": "95bc97c0",
+   "sections": [
+    {
+     "head": "Phase 01 — Make it real",
+     "hash": "a1a8263b",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 02 — Asset / infrastructure layer",
+     "hash": "6e12e8a5",
      "state": "0/1"
     },
     {
@@ -4410,6 +4565,39 @@
     {
      "head": "Task 4: Skill sync + ship",
      "hash": "1d4c1a1e",
+     "state": "1/1"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-16",
+   "time": "15:43",
+   "hash": "eaa61d72",
+   "sections": [
+    {
+     "head": "Task 1: Due contract + timeline model (pure, tested)",
+     "hash": "bf2ecc1c",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Timeline view — button, side panel, tracks, summaries, nav",
+     "hash": "401b65a5",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Scheduling — date setter, ghost reflection, upcoming view",
+     "hash": "6385c37a",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Skill sync + ship",
+     "hash": "1d4c1a1e",
+     "state": "1/1"
+    },
+    {
+     "head": "Follow-up polish (owner steer, 2026-10-15) ✓ done {#follow-up}",
+     "hash": "27e0dfbb",
      "state": "1/1"
     }
    ]
