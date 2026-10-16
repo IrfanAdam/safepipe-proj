@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16T18:13:39.746Z",
+  "generated": "2026-10-16T18:14:24.330Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "b7f891f",
+      "full": "b7f891fa88ce11c4817353729213bcbbdd92201b",
+      "date": "2026-10-16",
+      "time": "23:44",
+      "subject": "fix(changelog): smaller tag chips — 12px type, tighter padding [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "8a84588",
       "full": "8a8458814df6bbeb5ebc3535886f65fd1b5b095b",
