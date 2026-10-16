@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16T12:08:13.915Z",
+  "generated": "2026-10-16T15:46:18.606Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "b466390",
+      "full": "b466390cc2841886179d5c5a64c84fbb384330d5",
+      "date": "2026-10-16",
+      "time": "21:16",
+      "subject": "fix(changelog): user menu outside-click close, due-count tips, drop upcoming suffix [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "1a0fdc3",
       "full": "1a0fdc3253d07f700910d2e989b38b1b2397f319",
