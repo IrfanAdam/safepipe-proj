@@ -45,7 +45,8 @@ body{background:var(--color-bg);color:var(--color-ink);font-family:var(--sp-font
 .hbar .brand b{color:var(--sp-sky)}
 .hbar-right{display:flex;gap:var(--cl-14);align-items:center}
 .hbar-tag{font-size:14px;font-weight:600;color:var(--sp-text-secondary)}
-.hbar-close{display:grid;place-items:center;text-decoration:none;background:var(--sp-navy);color:#fff;border-radius:var(--sp-radius-md);width:36px;height:36px;font-size:15px}
+.hbar-close{display:grid;place-items:center;text-decoration:none;background:transparent;color:var(--color-ink-muted);border:var(--border-hairline);border-radius:var(--sp-radius-md);width:36px;height:36px;font-size:13px;transition:color .15s ease}
+.hbar-close:hover{color:var(--color-ink)}
 .ds-crumb{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin:0 0 var(--cl-12)}
 #cl-root{padding-top:var(--cl-22);padding-bottom:var(--cl-32)}
 .ds-hero h1{font-family:var(--font-display);font-weight:700;font-size:clamp(40px,6vw,68px);letter-spacing:-0.02em;line-height:1.02;color:var(--color-ink);margin:0;text-wrap:balance;overflow-wrap:break-word}
