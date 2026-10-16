@@ -19,9 +19,10 @@
 .ds-drawer-head{display:flex;gap:var(--cl-8);align-items:center;padding-top:var(--cl-6);margin-bottom:var(--cl-4)}
 .ds-drawer-head b{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-mono);font-size:var(--text-micro);text-transform:uppercase;letter-spacing:var(--tracking-mono);color:var(--color-ink-muted)}
 .ds-drawer-head button{font-family:var(--font-mono);font-size:var(--text-micro);background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);padding:var(--cl-4) var(--cl-9);cursor:pointer}
-/* Logged-in-only schedule CTA: hidden until the gate sets body.is-sched-auth. */
-.ds-drawer-head .ds-sched-cta{display:none}
-body.is-sched-auth .ds-drawer-head .ds-sched-cta{display:block}
+/* Generic login gate: any control marked data-requires-auth stays hidden for
+   logged-out visitors (until the gate sets body.is-sched-auth). Mark future
+   login-gated controls with the attribute — no new CSS needed. */
+body:not(.is-sched-auth) [data-requires-auth]{display:none}
 /* Task/phase title opens the body: lead with a smaller top inset than generic
    in-body h2s so it sits a touch higher under the tag head. */
 [data-col="tasks"] .ds-md > h2:first-child{margin-top:var(--cl-8)}
@@ -105,10 +106,9 @@ body.is-sched-auth .ds-drawer-head .ds-sched-cta{display:block}
 .ds-due{position:relative;display:flex;align-items:center;gap:var(--cl-8);flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);margin-bottom:var(--cl-12)}
 .ds-due-sched{background:none;border:0;padding:0;font-family:var(--font-mono);font-size:var(--text-micro);font-weight:700;color:var(--color-accent);cursor:pointer}
 .ds-due-sched:hover{text-decoration:underline;text-underline-offset:var(--cl-2)}
-/* Scheduling is login-gated: logged-out visitors get no setter control —
-   a set date shows as plain text, and dateless rows hide entirely. */
+/* Logged-out due display: a set date shows as plain text, and dateless rows
+   hide entirely. Setter buttons hide via the generic data-requires-auth gate. */
 .ds-due-static{display:none}
-body:not(.is-sched-auth) [data-due-open]{display:none}
 body:not(.is-sched-auth) .ds-due-static{display:inline}
 body:not(.is-sched-auth) .ds-due:not(:has(.ds-due-static)){display:none}
 .ds-due-overdue{color:var(--color-accent);font-weight:700;text-transform:uppercase;letter-spacing:var(--tracking-label)}

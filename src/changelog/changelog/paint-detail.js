@@ -230,7 +230,7 @@ export function paintDetail(root, ctx){
     ? ''
     : [
       `<div class="ds-due" data-due-row>`,
-      `<button class="ds-due-sched" data-due-open data-due="${secDue || ''}" aria-haspopup="dialog"`,
+      `<button class="ds-due-sched" data-due-open data-requires-auth data-due="${secDue || ''}" aria-haspopup="dialog"`,
       ` aria-label="Schedule due date for ${esc(short(sprint.head))}">`,
       secDue ? esc(`Schedule · ${fmtDate(secDue)}`) : 'Schedule when?',
       `</button>`,
@@ -254,9 +254,9 @@ export function paintDetail(root, ctx){
   root.querySelector('[data-col="tasks"]').innerHTML = [
     `<div class="ds-drawer-head">`,
     tagsHead,
-    // Logged-in-only schedule CTA: always rendered, shown by CSS under
-    // body.is-sched-auth. Display-only until the scheduling action lands.
-    `<button class="ds-sched-cta" data-schedule-cta type="button" title="Schedule">Schedule</button>`,
+    // Logged-in-only schedule CTA: always rendered, hidden by the generic
+    // data-requires-auth gate until body.is-sched-auth. Display-only until the scheduling action lands.
+    `<button class="ds-sched-cta" data-requires-auth data-schedule-cta type="button" title="Schedule">Schedule</button>`,
     `<button data-close aria-label="Close detail">✕</button></div>`,
     // Due row sits directly under the section title: split the head line
     // off before parsing. Bodies with no head keep the old order.
