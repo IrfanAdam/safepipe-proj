@@ -231,11 +231,11 @@ export function paintDetail(root, ctx){
     : [
       `<div class="ds-due" data-due-row>`,
       `<button class="ds-due-sched" data-due-open data-requires-auth data-due="${secDue || ''}" aria-haspopup="dialog"`,
-      ` aria-label="Schedule due date for ${esc(short(sprint.head))}">`,
-      secDue ? esc(`Schedule · ${fmtDate(secDue)}`) : 'Schedule when?',
+      ` aria-label="Set deadline for ${esc(short(sprint.head))}">`,
+      secDue ? esc(`Deadline · ${fmtDate(secDue)}`) : 'Add deadline',
       `</button>`,
       // Logged-out readers see the date as plain text (see CSS gate below).
-      secDue ? `<span class="ds-due-static">Due · ${esc(fmtDate(secDue))}</span>` : '',
+      secDue ? `<span class="ds-due-static">Deadline · ${esc(fmtDate(secDue))}</span>` : '',
       secDue && secDue < todayISO ? `<span class="ds-due-overdue">overdue</span>` : '',
       `<div class="ds-due-pop" data-due-pop hidden role="dialog" aria-label="Pick a due date"></div>`,
       `</div>`,
@@ -254,9 +254,6 @@ export function paintDetail(root, ctx){
   root.querySelector('[data-col="tasks"]').innerHTML = [
     `<div class="ds-drawer-head">`,
     tagsHead,
-    // Logged-in-only schedule CTA: always rendered, hidden by the generic
-    // data-requires-auth gate until body.is-sched-auth. Display-only until the scheduling action lands.
-    `<button class="ds-sched-cta" data-requires-auth data-schedule-cta type="button" title="Schedule">Schedule</button>`,
     `<button data-close aria-label="Close detail">✕</button></div>`,
     // Due row sits directly under the section title: split the head line
     // off before parsing. Bodies with no head keep the old order.

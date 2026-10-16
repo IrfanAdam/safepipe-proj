@@ -11,9 +11,43 @@ export function applyScheduleState() {
   const entry = document.querySelector('[data-schedule-entry]');
   if (entry) {
     entry.classList.toggle('on', !!user);
-    entry.textContent = user ? 'Schedule ✓' : 'Schedule';
-    entry.setAttribute('title', user ? `Signed in as ${user.login} — click to log out` : 'Log in with GitHub to schedule');
+    entry.textContent = user ? user.login : 'Schedule';
+    entry.setAttribute('title', user ? `Signed in as ${user.login}` : 'Log in with GitHub to schedule');
+    entry.setAttribute('aria-haspopup', user ? 'menu' : 'dialog');
   }
+  closeUserMenu();
+}
+function closeUserMenu() {
+  const menu = document.querySelector('[data-user-menu]');
+  if (menu) menu.hidden = true;
+  const entry = document.querySelector('[data-schedule-entry]');
+  if (entry) entry.setAttribute('aria-expanded', 'false');
+}
+function toggleUserMenu() {
+  const entry = document.querySelector('[data-schedule-entry]');
+  let menu = document.querySelector('[data-user-menu]');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.className = 'ds-user-menu';
+    menu.setAttribute('data-user-menu', '');
+    menu.setAttribute('role', 'menu');
+    menu.hidden = true;
+    menu.innerHTML = '<button role="menuitem" data-user-logout>Log out</button>';
+    document.body.appendChild(menu);
+    menu.querySelector('[data-user-logout]').addEventListener('click', () => {
+      clearSchedUser();
+      applyScheduleState();
+    });
+  }
+  if (!menu.hidden) { closeUserMenu(); return; }
+  try {
+    const r = entry.getBoundingClientRect();
+    menu.style.top = `${r.bottom + 8}px`;
+    menu.style.right = `${Math.max(8, window.innerWidth - r.right)}px`;
+  } catch {}
+  menu.hidden = false;
+  try { entry.setAttribute('aria-expanded', 'true'); } catch {}
+  try { menu.querySelector('[data-user-logout]').focus(); } catch {}
 }
 function closeGate() {
   const gate = document.querySelector('[data-schedule-gate]');
@@ -96,13 +130,27 @@ export function initScheduleGate() {
   const entry = document.querySelector('[data-schedule-entry]');
   if (entry && !entry.dataset.bound) {
     entry.dataset.bound = '1';
-    entry.addEventListener('click', () => {
+    entry.addEventListener('click', (e) => {
+      e.stopPropagation();
       if (isSchedAuthed()) {
-        clearSchedUser();
-        applyScheduleState();
+        toggleUserMenu();
       } else {
         openGate();
       }
+    });
+  }
+  if (!document.dataset.schedMenuBound) {
+    document.dataset.schedMenuBound = '1';
+    document.addEventListener('click', (e) => {
+      const menu = document.querySelector('[data-user-menu]');
+      if (!menu || menu.hidden) return;
+      const entry = document.querySelector('[data-schedule-entry]');
+      if (entry && entry.contains(e.target)) return;
+      if (menu.contains(e.target)) return;
+      closeUserMenu();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeUserMenu();
     });
   }
 }

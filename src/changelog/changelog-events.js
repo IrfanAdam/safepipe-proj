@@ -83,7 +83,7 @@ export function bindChangelogEvents(root, st, helpers) {
       ? `<span class="ds-tl-pop__tasks">${phOk ? `<b>${escHtml(ph[0])}</b>/${escHtml(ph[1])} phase${ph[1] === '1' ? '' : 's'}` : ''}${phOk && tkOk ? ' · ' : ''}${tkOk ? `<b>${escHtml(tk[0])}</b>/${escHtml(tk[1])} tasks` : ''}</span>` : '';
     const due = (el.dataset.due || '').trim();
     const dueRow = due
-      ? `<button class="ds-tl-pop__due" data-tl-due="${escHtml(due)}">Schedule deadline · ${escHtml((el.dataset.duetxt || '').trim() || due)}</button>`
+      ? `<button class="ds-tl-pop__due" data-tl-due="${escHtml(due)}">Deadline · ${escHtml((el.dataset.duetxt || '').trim() || due)}</button>`
       : ((el.dataset.donetxt || '').trim()
         ? `<span class="ds-tl-pop__done">Done ${escHtml((el.dataset.donetxt || '').trim())}</span>` : '');
     p.innerHTML =
