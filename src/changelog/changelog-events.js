@@ -105,24 +105,28 @@ export function bindChangelogEvents(root, st, helpers) {
     const r = el.getBoundingClientRect();
     showPop(el, r.left + r.width / 2, r.bottom);
   };
-  // Row scroll: 'l' brings the cluster's right edge in from the left, 'r'
-  // the first track in from the right; 'auto' only moves when a track sits
-  // outside the visible window (a no-op when the bar is already in view).
+  // Row scroll: 'l' brings the cluster's end in from the left, 'r' its start
+  // in from the right; 'auto' uses nearest-edge — clipped-left nudges the
+  // start in, clipped-right pulls the end in (or the start, when the cluster
+  // is wider than the window). No-op only when fully visible.
   // Instant, matching the lane-jump rule — repeated clicks never race.
   const scrollRowIntoView = (row, dir) => {
     const sc = root.querySelector('.ds-tl-scroll');
     if (!sc) return;
     const tracks = [...row.querySelectorAll('[data-tl-bout],[data-tl-ghost]')];
     if (!tracks.length) return;
-    const vr = sc.getBoundingClientRect();
+    const vr = sc.getBoundingClientRect(), pad = 14;
     const f = tracks[0].getBoundingClientRect(), l = tracks[tracks.length - 1].getBoundingClientRect();
+    const fDoc = f.left - vr.left + sc.scrollLeft, lDoc = l.right - vr.left + sc.scrollLeft;
+    const viewL = sc.scrollLeft, viewR = viewL + sc.clientWidth;
     let x = null;
-    if (dir === 'l' || (dir === 'auto' && l.right < vr.left)) {
-      x = l.right - vr.left + sc.scrollLeft - sc.clientWidth + 14;
-    } else if (dir === 'r' || (dir === 'auto' && f.left > vr.right)) {
-      x = f.left - vr.left + sc.scrollLeft - 14;
+    if (dir === 'l') x = lDoc - sc.clientWidth + pad;
+    else if (dir === 'r') x = fDoc - pad;
+    else if (fDoc < viewL + pad) x = fDoc - pad;
+    else if (lDoc > viewR - pad) {
+      x = (lDoc - fDoc <= sc.clientWidth) ? lDoc - sc.clientWidth + pad : fDoc - pad;
     }
-    if (x !== null) sc.scrollTo({ left: Math.max(0, x), behavior: 'auto' });
+    if (x !== null && Math.abs(x - sc.scrollLeft) > 1) sc.scrollTo({ left: Math.max(0, x), behavior: 'auto' });
     // Programmatic scrolls don't reliably raise scroll events in every
     // engine/harness, so re-sync the edge carets explicitly (user-driven
     // scrolls are covered by the scroller's own onscroll in paint).

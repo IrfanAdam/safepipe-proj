@@ -52,7 +52,7 @@ aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
 .ds-tl-streak{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-26);border:none;border-radius:var(--radius-xs);background:linear-gradient(90deg, var(--tl-bar-done) 0, var(--tl-bar-done) var(--tl-done,0%), var(--tl-bar) var(--tl-done,0%), var(--tl-bar) 100%);cursor:pointer;padding:0;box-sizing:border-box}
 .ds-tl-bout:hover,.ds-tl-streak:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-tl-bout[aria-current="true"],.ds-tl-streak[aria-current="true"]{outline:var(--cl-2) solid var(--color-ink);outline-offset:var(--cl-1)}
-.ds-tl-ghost{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-8);border:var(--cl-1) dashed var(--color-ink-muted);border-radius:var(--radius-xs);background:transparent;cursor:pointer;padding:0}
+.ds-tl-ghost{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-26);border:var(--cl-1) dashed var(--color-ink-muted);border-radius:var(--radius-xs);background:transparent;cursor:pointer;padding:0;box-sizing:border-box}
 .ds-tl-ghost.is-overdue{border-color:var(--sp-warning);background:color-mix(in srgb, var(--sp-warning) 18%, transparent)}
 .ds-tl-ghost:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-tl-todaycol{position:absolute;top:0;bottom:0;width:var(--cl-tl-day);background:color-mix(in srgb, var(--color-accent) 10%, transparent);pointer-events:none}
