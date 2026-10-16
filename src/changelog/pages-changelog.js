@@ -4,7 +4,7 @@ import { hits } from './changelog-links.js';
 import { commits } from './changelog-links.js';
 import { TAGS, tagsFor, planTags, parseExplicit } from './changelog-tags.js';
 import { h1Of, planSentence } from './changelog-titles.js';
-import { TIMELINE_TILE_ICON } from './changelog/graph.js';
+
 import names from '../ds/changelog-names.json';
 import history from '../ds/plan-history.json';
 import { goal, split, parseMeta, anchorOf, phash } from './changelog-parse.js';
@@ -108,7 +108,7 @@ function doPaint(root) {
   const btn = root.querySelector('[data-view="timeline"]');
   if (btn) {
     const n = list.length, on = st.view === 'timeline';
-    btn.innerHTML = `${TIMELINE_TILE_ICON}<span class="ds-timeline-gridtile__text">All ${n} track${n === 1 ? '' : 's'}</span>`;
+    btn.innerHTML = `<span aria-hidden="true">→</span> All ${n} track${n === 1 ? '' : 's'}`;
     btn.setAttribute('aria-pressed', String(on));
     btn.setAttribute('aria-label', `${n} plans in timeline — ${on ? 'close' : 'open'} timeline view`);
   }

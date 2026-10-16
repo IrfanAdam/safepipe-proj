@@ -53,6 +53,9 @@ export function paintPlan(root, ctx){
       frac,
       rev ? `rev ${rev.n} · ${fmtDate(rev.last)}` : '',
     ].filter(Boolean).join(' · ');
+    const tagCount = Math.min(3, p.tags.length);
+    const tagsVisible = p.tags.slice(0, tagCount).join(' · ');
+    const tagsOverflow = p.tags.length - tagCount;
     return [
       `<button class="ds-pick`,
       i === sel[0] ? ' on' : '',
@@ -68,7 +71,8 @@ export function paintPlan(root, ctx){
       `</span><span class="ds-state">`,
       stateTxt,
       `</span></small></span><span class="ds-tags">`,
-      p.tags.join(' · '),
+      esc(tagsVisible),
+      tagsOverflow > 0 ? ` <button class="ds-tags-more" data-tags-more="${i}" aria-label="Show ${tagsOverflow} more tags">+${tagsOverflow}</button>` : '',
       `</span></button>`,
     ].join('');
   }).join('');
