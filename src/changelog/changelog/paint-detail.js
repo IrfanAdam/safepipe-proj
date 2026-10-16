@@ -9,7 +9,10 @@ const marked = {
       .replace(/\{#[^}]*\}/g, ' ')
       // Due lines are scheduling metadata, not prose — strip at render like
       // {#anchors} (Task 3: the Due control owns display of the date).
-      .replace(/^\s*\*Due:\s*[^*\n]*\*\s*$/gm, '');
+      .replace(/^\s*\*Due:\s*[^*\n]*\*\s*$/gm, '')
+      // Section `*Tags: …*` / `**Tags: …**` lines are metadata, not prose —
+      // the drawer head owns tag display, so strip at render like Due/anchors.
+      .replace(/^\s*\*{1,2}Tags:\s*[^*\n]*\*{1,2}\s*$/gm, '');
     const esc = (t)=> t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     // block-first: split on blank lines so <ul> never spans paragraphs and
     // no stray </p> lands after headings (Task-1 record: Modify/Create <li>s
@@ -235,12 +238,21 @@ export function paintDetail(root, ctx){
       `<div class="ds-due-pop" data-due-pop hidden role="dialog" aria-label="Pick a due date"></div>`,
       `</div>`,
     ].join('');
+  // Drawer head owns the section tags: single ellipsized line, at most 2
+  // visible plus `· +N` overflow, full list in title + data-tip. The `*Tags:*`
+  // body line is stripped at render above, so it never repeats below status.
+  const secTags = Array.isArray(sprint.tags) ? sprint.tags : [];
+  const visTags = secTags.slice(0, 2);
+  const moreTags = secTags.length - visTags.length;
+  const tagsTxt = visTags.join(' · ') + (moreTags > 0 ? ` · +${moreTags}` : '');
+  const tagsFull = secTags.join(' · ');
+  const tagsHead = secTags.length
+    ? `<b data-tip="${esc(tagsFull)}" title="${esc(tagsFull)}">${esc(tagsTxt)}</b>`
+    : `<b></b>`;
   root.querySelector('[data-col="tasks"]').innerHTML = [
-    `<div class="ds-drawer-head"><b>`,
-    esc(unitLabel(sprint.head, si)),
-    ` · `,
-    esc(short(sprint.head)),
-    `</b><button data-close aria-label="Close detail">✕</button></div>`,
+    `<div class="ds-drawer-head">`,
+    tagsHead,
+    `<button data-close aria-label="Close detail">✕</button></div>`,
     // Due row sits directly under the section title: split the head line
     // off before parsing. Bodies with no head keep the old order.
     (() => {
