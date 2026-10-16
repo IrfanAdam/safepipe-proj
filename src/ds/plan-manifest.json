@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16T11:23:58.059Z",
+  "generated": "2026-10-16T11:30:23.314Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "f15c6dc",
+      "full": "f15c6dced26be9e45815028ecc8ce193190e7515",
+      "date": "2026-10-16",
+      "time": "17:00",
+      "subject": "fix(changelog): due setter login-gated, logged-out sees plain date or nothing [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "cd92eb0",
       "full": "cd92eb0d7862c92f3d62d851714c93d41e7f2ec6",
