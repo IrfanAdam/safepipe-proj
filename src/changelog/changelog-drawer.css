@@ -29,7 +29,8 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-pick{display:block;width:100%;text-align:left;font:inherit;background:none;border:none;border-bottom:var(--border-hairline);padding:var(--cl-8) var(--cl-12);font-size:var(--text-ds-body);color:var(--color-ink);cursor:pointer;position:relative}
 .ds-pick:last-child{border-bottom:none}
 .ds-pick small{display:block;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);margin-top:var(--cl-2)}
-.ds-pick.on{background:var(--color-surface);box-shadow:inset var(--cl-2) 0 0 var(--color-accent)}
+.ds-pick.on{background:var(--color-surface);border-left:var(--cl-2) solid var(--color-accent);padding-left:calc(var(--cl-12) - var(--cl-2));box-shadow:none}
+.ds-rail .ds-pick.on{padding-left:calc(var(--cl-16) - var(--cl-2))}
 .ds-pick.on small{color:var(--color-ink-muted)}
 .ds-pick.is-open .ds-num{color:var(--color-ink-muted)}
 .ds-commits{font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.7;color:var(--color-ink-muted);word-break:break-all}
