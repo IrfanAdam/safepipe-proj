@@ -58,6 +58,14 @@ aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
 .ds-tl-todaycol{position:absolute;top:0;bottom:0;width:var(--cl-tl-day);background:color-mix(in srgb, var(--color-accent) 10%, transparent);pointer-events:none}
 .ds-tl-today{position:absolute;top:0;bottom:0;border-left:var(--cl-2) dotted color-mix(in srgb, var(--color-accent) 55%, transparent);pointer-events:none}
 .ds-tl-empty{padding:var(--cl-16);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
+/* Off-screen carets: sticky to the visible lane edge, shown only when the
+   row's tracks sit outside the scroll window (see syncTlEdges). Hover stays
+   outline-only per the toggle rule — no fill change. */
+.ds-tl-edge{position:sticky;display:inline-flex;align-items:center;justify-content:center;width:var(--cl-26);height:var(--cl-26);margin-top:calc((var(--cl-tl-row) - var(--cl-26)) / 2);padding:0;background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);border-radius:var(--radius-xs);font-family:var(--font-mono);font-size:var(--text-micro);cursor:pointer;z-index:1}
+.ds-tl-edge[hidden]{display:none}
+.ds-tl-edge.is-l{left:var(--cl-8)}
+.ds-tl-edge.is-r{float:right;right:var(--cl-8)}
+.ds-tl-edge:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-tl-pop{position:fixed;z-index:var(--z-ds-controls);max-width:min(40ch,70vw);font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.5;color:var(--color-ink);background:var(--color-surface);border:var(--border-hairline);padding:var(--cl-8) var(--cl-12);border-radius:var(--cl-6);box-shadow:var(--sp-elevation-2);pointer-events:none;box-sizing:border-box;white-space:normal}
 .ds-tl-pop[hidden]{display:none}
 .ds-tl-pop__title{display:block;font-family:var(--font-display);font-weight:700;font-size:var(--sp-text-sm);line-height:1.35;color:var(--color-ink);margin-bottom:var(--cl-4)}

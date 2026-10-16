@@ -46,6 +46,22 @@ const ghostSection = (plan) => {
 // Commit-density level mirroring the calendar sqrt scale (graph.js).
 const lvOf = (n, max) => !n ? 0 : Math.min(4, Math.ceil(4 * Math.sqrt(n / Math.max(max, 1))));
 
+// Edge-caret sync: per row, reveal « when the tracks sit left of the visible
+// window, » when right of it. Runs on paint, scroll, and post-layout rAF.
+export function syncTlEdges(panel) {
+  if (!panel) return;
+  const sc = panel.querySelector('.ds-tl-scroll');
+  if (!sc) return;
+  const vr = sc.getBoundingClientRect(), slop = 24;
+  panel.querySelectorAll('[data-tl-row]').forEach((row) => {
+    const tracks = [...row.querySelectorAll('[data-tl-bout],[data-tl-ghost]')];
+    const L = row.querySelector('[data-tl-edge="l"]'), R = row.querySelector('[data-tl-edge="r"]');
+    if (!tracks.length) { if (L) L.hidden = true; if (R) R.hidden = true; return; }
+    const f = tracks[0].getBoundingClientRect(), l = tracks[tracks.length - 1].getBoundingClientRect();
+    if (L) L.hidden = !(l.right < vr.left + slop);
+    if (R) R.hidden = !(f.left > vr.right - slop);
+  });
+}
 // Global column bounds: min(active, planDate) → max(today, latestDue),
 // padded to whole prev/next months so empty month context always shows.
 export function timelineGrid(rows, today) {
@@ -223,11 +239,14 @@ export function paintTimeline(root, ctx) {
     }
     const laneOpen = (!bars && !g)
       ? `<button class="ds-tl-lane-name" data-tl-open="${esc(r.plan.file)}" data-tip="${esc(r.tip)}" aria-label="Open ${esc(r.plan.title)}">${esc(r.plan.title)}</button>` : '';
-    // Rows carry the same explicit lane width: block rows otherwise size to
-    // the viewport, so the wash/borders would stop at the viewport edge
-    // instead of covering the whole track column.
+    // Off-screen carets: sticky edge buttons, revealed by syncTlEdges when the
+    // row's tracks sit outside the visible scroll window. Click scrolls them in.
     return `<div class="ds-tl-row${r.dates.length ? ' has-track' : ''}" data-tl-row="${esc(r.plan.file)}" style="${laneW}">` +
-      `<div class="ds-tl-lane" style="${laneW}">${bars}${g}${todayLine}${laneOpen}</div></div>`;
+      `<div class="ds-tl-lane" style="${laneW}">` +
+      `<button class="ds-tl-edge is-l" data-tl-edge="l" aria-label="Scroll track into view" hidden>«</button>` +
+      `${bars}${g}${todayLine}${laneOpen}` +
+      `<button class="ds-tl-edge is-r" data-tl-edge="r" aria-label="Scroll track into view" hidden>»</button>` +
+      `</div></div>`;
   }).join('') : `<p class="ds-tl-empty">Nothing matches the current filters yet.</p>`;
   const rangeTxt = rows.length ? `${fmtDate(grid.start)} → ${fmtDate(grid.end)}` : '';
   panel.innerHTML = [
@@ -241,6 +260,11 @@ export function paintTimeline(root, ctx) {
   // (never yanks an already-visible position on repaint). Deferred to rAF so
   // layout (lane width) is settled in every engine before measuring.
   try {
+    const sc = panel.querySelector('.ds-tl-scroll');
+    if (sc) {
+      sc.onscroll = () => { try { syncTlEdges(panel); } catch {} };
+      syncTlEdges(panel);
+    }
     requestAnimationFrame(() => {
       try {
         const sc = panel.querySelector('.ds-tl-scroll');
@@ -252,6 +276,7 @@ export function paintTimeline(root, ctx) {
         if (x < sc.scrollLeft || x > sc.scrollLeft + sc.clientWidth) {
           sc.scrollLeft = Math.max(0, x - sc.clientWidth * 0.3);
         }
+        syncTlEdges(panel);
       } catch { /* scroll hint only */ }
     });
   } catch { /* scroll hint only */ }

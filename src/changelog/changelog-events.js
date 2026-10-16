@@ -105,6 +105,31 @@ export function bindChangelogEvents(root, st, helpers) {
     const r = el.getBoundingClientRect();
     showPop(el, r.left + r.width / 2, r.bottom);
   };
+  // Row scroll: 'l' brings the cluster's right edge in from the left, 'r'
+  // the first track in from the right; 'auto' only moves when a track sits
+  // outside the visible window (a no-op when the bar is already in view).
+  // Instant, matching the lane-jump rule — repeated clicks never race.
+  const scrollRowIntoView = (row, dir) => {
+    const sc = root.querySelector('.ds-tl-scroll');
+    if (!sc) return;
+    const tracks = [...row.querySelectorAll('[data-tl-bout],[data-tl-ghost]')];
+    if (!tracks.length) return;
+    const vr = sc.getBoundingClientRect();
+    const f = tracks[0].getBoundingClientRect(), l = tracks[tracks.length - 1].getBoundingClientRect();
+    let x = null;
+    if (dir === 'l' || (dir === 'auto' && l.right < vr.left)) {
+      x = l.right - vr.left + sc.scrollLeft - sc.clientWidth + 14;
+    } else if (dir === 'r' || (dir === 'auto' && f.left > vr.right)) {
+      x = f.left - vr.left + sc.scrollLeft - 14;
+    }
+    if (x !== null) sc.scrollTo({ left: Math.max(0, x), behavior: 'auto' });
+    // Programmatic scrolls don't reliably raise scroll events in every
+    // engine/harness, so re-sync the edge carets explicitly (user-driven
+    // scrolls are covered by the scroller's own onscroll in paint).
+    import('./changelog/timeline-paint.js')
+      .then((m) => { try { m.syncTlEdges(root.querySelector('[data-timeline]')); } catch {} })
+      .catch(() => {});
+  };
   const closeTimeline = () => {
     st.view = 'list'; st.tlSel = null; st.returnView = null; hidePop(); doPaint(root);
   };
@@ -203,6 +228,42 @@ export function bindChangelogEvents(root, st, helpers) {
     const dp = root.querySelector('[data-due-pop]:not([hidden])');
     if (dp && !(e.target.closest && e.target.closest('[data-due-pop],[data-due-open]'))) dp.hidden = true;
     if (e.target.closest('[data-day-clear]')) { st.day = ''; st.sel = [0, 0]; doPaint(root); return; }
+    // Filter dropdown toggle
+    const tf = e.target.closest('[data-tag-filter]');
+    if (tf) {
+      const dd = root.querySelector('[data-tag-dropdown]');
+      if (dd) { dd.hidden = !dd.hidden; tf.setAttribute('aria-expanded', String(!dd.hidden)); }
+      return;
+    }
+    // Checkbox in filter dropdown
+    const topt = e.target.closest('[data-tag-opt]');
+    if (topt) {
+      const t = topt.dataset.tagOpt;
+      if (t) { st.active.has(t) ? st.active.delete(t) : st.active.add(t); }
+      st.sel = [0, 0]; doPaint(root); return;
+    }
+    // Clear all filters
+    if (e.target.closest('[data-tag-clear]')) {
+      st.active = new Set(); st.day = ''; st.sel = [0, 0]; doPaint(root); return;
+    }
+    // Tags more expansion
+    const moreBtn = e.target.closest('[data-tags-more]');
+    if (moreBtn) {
+      const idx = Number(moreBtn.dataset.tagsMore);
+      const row = root.querySelectorAll('.ds-pick')[idx];
+      if (row) {
+        const tagsEl = row.querySelector('.ds-tags');
+        if (tagsEl && !tagsEl.classList.contains('ds-tags-expanded')) {
+          const c = cur();
+          const p = c.list[idx];
+          if (p) {
+            tagsEl.innerHTML = esc(p.tags.join(' · '));
+            tagsEl.classList.add('ds-tags-expanded');
+          }
+        }
+      }
+      return;
+    }
     // Due scheduling: the themed popup owns picking (past days are disabled
     // — schedules only run today-forward); Clear removes the Due line.
     // Existing overdue Dues still display their flag, they just can't be
@@ -230,6 +291,15 @@ export function bindChangelogEvents(root, st, helpers) {
     const dd = e.target.closest('[data-day]');
     if (dd) { st.day = st.day === dd.dataset.day ? '' : dd.dataset.day;
       st.sel = [0, 0]; doPaint(root); return; }
+    // Timeline tile carries .ds-chip for styling but is a view toggle, not a
+    // tag filter — it must win over the chip branch below (closest matches
+    // the button itself, so order is the only thing that saves it).
+    const tv = e.target.closest('[data-view="timeline"]');
+    if (tv) {
+      st.view = st.view === 'timeline' ? 'list' : 'timeline';
+      if (st.view === 'list') { st.tlSel = null; st.returnView = null; }
+      hidePop(); doPaint(root); return;
+    }
     const chip = e
       .target
       .closest('.ds-chip');
@@ -239,12 +309,6 @@ export function bindChangelogEvents(root, st, helpers) {
       } else { st.active.has(t) ? st.active.delete(t) : st.active.add(t);
       } st.sel = [0,
         0]; doPaint(root); return; }
-    const tv = e.target.closest('[data-view="timeline"]');
-    if (tv) {
-      st.view = st.view === 'timeline' ? 'list' : 'timeline';
-      if (st.view === 'list') { st.tlSel = null; st.returnView = null; }
-      hidePop(); doPaint(root); return;
-    }
     if (e.target.closest('[data-tl-close]')) { closeTimeline(); return; }
     // Schedule-deadline link: leave the timeline and reveal the Due cell on
     // the calendar. Never sets the day filter (a future Due would empty the
@@ -271,13 +335,23 @@ export function bindChangelogEvents(root, st, helpers) {
     // Lane background click: the lane's first track jumps to the left edge —
     // instant (not smooth) so repeated clicks never race mid-animation.
     // Bar/ghost/lane-name clicks return above (they open the plan instead).
+    const edge = e.target.closest('[data-tl-edge]');
+    if (edge && st.view === 'timeline') {
+      const row = edge.closest('[data-tl-row]');
+      if (row) scrollRowIntoView(row, edge.dataset.tlEdge);
+      return;
+    }
     const lane = e.target.closest('.ds-tl-lane');
     if (lane && st.view === 'timeline') {
-      const sc = root.querySelector('.ds-tl-scroll');
-      const first = lane.querySelector('[data-tl-bout],[data-tl-ghost]');
-      if (sc && first) {
-        const x = first.getBoundingClientRect().left - lane.getBoundingClientRect().left + sc.scrollLeft;
-        sc.scrollTo({ left: Math.max(0, x - 14), behavior: 'auto' });
+      const row = lane.closest('[data-tl-row]');
+      if (row) scrollRowIntoView(row, 'auto');
+      else {
+        const sc = root.querySelector('.ds-tl-scroll');
+        const first = lane.querySelector('[data-tl-bout],[data-tl-ghost]');
+        if (sc && first) {
+          const x = first.getBoundingClientRect().left - lane.getBoundingClientRect().left + sc.scrollLeft;
+          sc.scrollTo({ left: Math.max(0, x - 14), behavior: 'auto' });
+        }
       }
       return;
     }
@@ -323,6 +397,19 @@ export function bindChangelogEvents(root, st, helpers) {
     }
     // Moving onto the popover itself (reaching the deadline link) keeps it open.
     if (e.target.closest('[data-tl-pop]')) return;
+    // Row hover shows the row's own popover (first bout carries the data),
+    // so empty lane space reads the same as the bar — stable while moving
+    // across the row via the popFor guard.
+    const row = e.target.closest ? e.target.closest('[data-tl-row]') : null;
+    if (row && st.view === 'timeline') {
+      const rep = row.querySelector('[data-tl-bout]');
+      if (rep && rep.dataset.pop) {
+        if (rep === popFor) return;
+        const tip = root.querySelector('.ds-cursor-tip');
+        if (tip) tip.hidden = true;
+        showPop(rep, e.clientX, e.clientY); return;
+      }
+    }
     const el = e.target.closest('[data-tip]'), tip = root.querySelector('.ds-cursor-tip');
     hidePop();
     if (!tip) return;
