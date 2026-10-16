@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16T11:05:45.149Z",
+  "generated": "2026-10-16T11:10:26.996Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "9b0fc07",
+      "full": "9b0fc07fc28a742231e71872f6168dbd67ef8dc9",
+      "date": "2026-10-16",
+      "time": "16:40",
+      "subject": "feat(changelog): GitHub OAuth login for schedule gate, Vercel functions like personal site [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "6ca07d5",
       "full": "6ca07d506985c3a2de3c8bcfcd63ca2aeccb8e43",
