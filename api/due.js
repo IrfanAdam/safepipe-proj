@@ -1,13 +1,11 @@
 // safepipe — due-date commit endpoint (Vercel serverless).
 // The static production build cannot write plan files, so deadline picks are
 // committed to git here and ride the next deploy. Auth: the caller sends its
-// read:user OAuth token (proves identity only); the server checks the login
-// against DUE_AUTHOR and commits with the server-side DUE_TOKEN
-// (fine-grained PAT: contents read+write on this repo). The user's token can
-// never write anything itself.
+// OAuth token (read:user + public_repo); the server checks the login against
+// DUE_AUTHOR and commits AS THE AUTHOR with that same token — no service
+// token, no extra secrets beyond the existing OAuth app.
 //
 // Env (Vercel -> Settings -> Environment Variables, Production):
-//   DUE_TOKEN   fine-grained PAT, this repo only, Contents read+write
 //   DUE_AUTHOR  GitHub login allowed to set deadlines (e.g. IrfanAdam)
 //   DUE_REPO    owner/repo (e.g. IrfanAdam/safepipe-proj)
 //   DUE_BRANCH  main
@@ -60,9 +58,8 @@ export default async function handler(req, res) {
   const author = process.env.DUE_AUTHOR;
   const repo = process.env.DUE_REPO;
   const branch = process.env.DUE_BRANCH || 'main';
-  const pat = process.env.DUE_TOKEN;
-  if (!author || !repo || !pat) {
-    res.status(500).send('Missing DUE_AUTHOR / DUE_REPO / DUE_TOKEN env vars in Vercel.');
+  if (!author || !repo) {
+    res.status(500).send('Missing DUE_AUTHOR / DUE_REPO env vars in Vercel.');
     return;
   }
   if (typeof token !== 'string' || !token) { res.status(401).send('Login required'); return; }
@@ -85,16 +82,16 @@ export default async function handler(req, res) {
     if (!me.ok) { res.status(401).send('Login required'); return; }
     const { login } = await me.json();
     if (!login || login !== author) { res.status(403).send('Not the schedule owner'); return; }
-    // Load, edit (same algorithm as the client preview), commit.
+    // Load, edit (same algorithm as the client preview), commit as the author.
     const path = `.hermes/plans/${file}`;
-    const cur = await gh(pat, `/repos/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`);
+    const cur = await gh(token, `/repos/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`);
     if (!cur.ok) { res.status(400).send('Plan file not found in repo'); return; }
     const { sha, content } = await cur.json();
     const raw = Buffer.from(content || '', 'base64').toString('utf8');
     const next = dueEditText(raw, head.trim(), due);
     if (next === raw) { res.status(200).json({ unchanged: true }); return; }
     const msg = `chore(${file}): ${due ? `set due ${due}` : 'clear due'} [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]`;
-    const put = await gh(pat, `/repos/${repo}/contents/${encodeURIComponent(path)}`, {
+    const put = await gh(token, `/repos/${repo}/contents/${encodeURIComponent(path)}`, {
       method: 'PUT',
       body: JSON.stringify({
         message: msg,

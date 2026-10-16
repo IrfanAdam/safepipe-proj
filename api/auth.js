@@ -11,7 +11,9 @@ export default function handler(req, res) {
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   const origin = `${proto}://${host}`;
   const redirectUri = `${origin}/api/callback`;
-  // Identity only: read:user proves who they are, nothing more.
-  const url = `https://github.com/login/oauth/authorize?client_id=${encodeURIComponent(clientId)}&scope=read:user&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  // Identity + plan-file commits: read:user proves who they are, public_repo
+  // lets /api/due commit the deadline to this repo's plan files as them —
+  // no service token, no extra env. Re-login is needed to grant the scope.
+  const url = `https://github.com/login/oauth/authorize?client_id=${encodeURIComponent(clientId)}&scope=read:user%20public_repo&redirect_uri=${encodeURIComponent(redirectUri)}`;
   res.redirect(302, url);
 }
