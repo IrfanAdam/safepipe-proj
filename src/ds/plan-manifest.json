@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16T10:05:18.833Z",
+  "generated": "2026-10-16T10:56:53.872Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "8d7efa9",
+      "full": "8d7efa9dae24cce3f71eb724b7a6774df170dfd9",
+      "date": "2026-10-16",
+      "time": "16:26",
+      "subject": "fix(changelog): uniform timeline bar height for bouts and streaks [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "ec9ad78",
       "full": "ec9ad7878b744fc3e8f8e6b62f8571c979ce5536",
@@ -780,7 +789,7 @@
       "time": "18:25",
       "subject": "feat(geotri): OSM rebuild 2877/27662 — landuse/water/power/barriers closed, M1 still absent [plan:2026-10-12_175646-ops3d-geo-triangulation.md#phase-01]",
       "plan": "2026-10-12_175646-ops3d-geo-triangulation.md",
-      "anchor": "phase-01"
+      "anchor": "lane-a"
     },
     {
       "sha": "11b347a",
@@ -798,7 +807,7 @@
       "time": "18:07",
       "subject": "feat(geotri): elevation triangulation scripts + manifest — Terrarium holds, GLO-30 gap named [plan:2026-10-12_175646-ops3d-geo-triangulation.md#phase-01]",
       "plan": "2026-10-12_175646-ops3d-geo-triangulation.md",
-      "anchor": "phase-01"
+      "anchor": "lane-b"
     },
     {
       "sha": "10956ad",
@@ -3645,5 +3654,11 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "src/changelog/changelog-events.js",
+    "src/changelog/changelog-parse.js",
+    "src/changelog/changelog/paint-detail.js",
+    "src/ds/plan-retro.json",
+    "vite.config.js"
+  ]
 }
