@@ -234,6 +234,8 @@ export function paintDetail(root, ctx){
       ` aria-label="Schedule due date for ${esc(short(sprint.head))}">`,
       secDue ? esc(`Schedule · ${fmtDate(secDue)}`) : 'Schedule when?',
       `</button>`,
+      // Logged-out readers see the date as plain text (see CSS gate below).
+      secDue ? `<span class="ds-due-static">Due · ${esc(fmtDate(secDue))}</span>` : '',
       secDue && secDue < todayISO ? `<span class="ds-due-overdue">overdue</span>` : '',
       `<div class="ds-due-pop" data-due-pop hidden role="dialog" aria-label="Pick a due date"></div>`,
       `</div>`,
