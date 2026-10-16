@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16T11:10:26.996Z",
+  "generated": "2026-10-16T11:23:58.059Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "cd92eb0",
+      "full": "cd92eb0d7862c92f3d62d851714c93d41e7f2ec6",
+      "date": "2026-10-16",
+      "time": "16:53",
+      "subject": "feat(changelog): due local-write endpoint, declared-anchor sections, sched-cta style [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "9b0fc07",
       "full": "9b0fc07fc28a742231e71872f6168dbd67ef8dc9",
@@ -3681,11 +3690,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/changelog/changelog-drawer.css",
-    "src/changelog/changelog-events.js",
-    "src/changelog/changelog-parse.js",
-    "src/ds/plan-retro.json",
-    "vite.config.js"
-  ]
+  "wip": []
 }
