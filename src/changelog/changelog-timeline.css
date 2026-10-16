@@ -48,7 +48,7 @@ aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
 /* Owner call (2026-10-16): bars paint done-coverage — a hard stop the muted
    accent covers from the left up to --tl-done (per bar), the remainder
    neutral; a fully done bout covers 100%. Density lv* no longer shades. */
-.ds-tl-bout{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-20);border:none;border-radius:var(--radius-xs);background:linear-gradient(90deg, var(--tl-bar-done) 0, var(--tl-bar-done) var(--tl-done,0%), var(--tl-bar) var(--tl-done,0%), var(--tl-bar) 100%);cursor:pointer;padding:0;box-sizing:border-box}
+.ds-tl-bout{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-26);border:none;border-radius:var(--radius-xs);background:linear-gradient(90deg, var(--tl-bar-done) 0, var(--tl-bar-done) var(--tl-done,0%), var(--tl-bar) var(--tl-done,0%), var(--tl-bar) 100%);cursor:pointer;padding:0;box-sizing:border-box}
 .ds-tl-streak{position:absolute;top:50%;transform:translateY(-50%);height:var(--cl-26);border:none;border-radius:var(--radius-xs);background:linear-gradient(90deg, var(--tl-bar-done) 0, var(--tl-bar-done) var(--tl-done,0%), var(--tl-bar) var(--tl-done,0%), var(--tl-bar) 100%);cursor:pointer;padding:0;box-sizing:border-box}
 .ds-tl-bout:hover,.ds-tl-streak:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-tl-bout[aria-current="true"],.ds-tl-streak[aria-current="true"]{outline:var(--cl-2) solid var(--color-ink);outline-offset:var(--cl-1)}
