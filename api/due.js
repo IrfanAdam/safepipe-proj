@@ -1,14 +1,10 @@
 // safepipe — due-date commit endpoint (Vercel serverless).
 // The static production build cannot write plan files, so deadline picks are
 // committed to git here and ride the next deploy. Auth: the caller sends its
-// OAuth token (read:user + public_repo); the server checks the login against
-// DUE_AUTHOR and commits AS THE AUTHOR with that same token — no service
-// token, no extra secrets beyond the existing OAuth app.
-//
-// Env (Vercel -> Settings -> Environment Variables, Production):
-//   DUE_AUTHOR  GitHub login allowed to set deadlines (e.g. IrfanAdam)
-//   DUE_REPO    owner/repo (e.g. IrfanAdam/safepipe-proj)
-//   DUE_BRANCH  main
+// OAuth token (read:user + public_repo); the server checks the login is the
+// REPO OWNER and commits with that same token. Zero extra env, zero extra
+// secrets: repo coordinates come from Vercel's own system variables and the
+// author is whoever owns the repo.
 const DUE_SHAPE = /^\s*\*Due:\s*[^*\n]*\*\s*$/;
 const escRe = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // Port of dueEditText (src/changelog/changelog-events.js) — keep in sync:
@@ -55,13 +51,14 @@ const gh = (token, path, opts = {}) => fetch(`https://api.github.com${path}`, {
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
   const { token, file, head, due = null } = req.body || {};
-  const author = process.env.DUE_AUTHOR;
-  const repo = process.env.DUE_REPO;
-  const branch = process.env.DUE_BRANCH || 'main';
-  if (!author || !repo) {
-    res.status(500).send('Missing DUE_AUTHOR / DUE_REPO env vars in Vercel.');
+  const owner = process.env.VERCEL_GIT_REPO_OWNER;
+  const slug = process.env.VERCEL_GIT_REPO_SLUG;
+  const branch = process.env.VERCEL_GIT_COMMIT_REF || 'main';
+  if (!owner || !slug) {
+    res.status(500).send('Repo context unavailable');
     return;
   }
+  const repo = `${owner}/${slug}`;
   if (typeof token !== 'string' || !token) { res.status(401).send('Login required'); return; }
   // Plan files only — no paths, no traversal, no other trees.
   if (typeof file !== 'string' || !/^[\w][\w\-. ]*\.md$/.test(file) || file.includes('..')) {
@@ -81,7 +78,7 @@ export default async function handler(req, res) {
     const me = await gh(token, '/user');
     if (!me.ok) { res.status(401).send('Login required'); return; }
     const { login } = await me.json();
-    if (!login || login !== author) { res.status(403).send('Not the schedule owner'); return; }
+    if (!login || login !== owner) { res.status(403).send('Not the repo owner'); return; }
     // Load, edit (same algorithm as the client preview), commit as the author.
     const path = `.hermes/plans/${file}`;
     const cur = await gh(token, `/repos/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`);
