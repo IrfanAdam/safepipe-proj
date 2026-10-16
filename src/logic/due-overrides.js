@@ -4,8 +4,10 @@
 // so without this the pick evaporates on reload. Overrides are keyed by plan
 // file + section head and re-applied to the live bodies at boot. The FILE is
 // source of truth whenever it already carries a Due: a stored date is applied
-// only to a section with no Due (a stored *clear* always strips), so a
-// hand-edited or dev-written Due is never clobbered by a stale override.
+// only to a section with no Due (a stored *clear* always strips) — except a
+// SERVER-CONFIRMED pick (committed to git via /api/due), which outranks the
+// bundle during the deploy window so a refresh never flashes the stale date.
+// Confirmed picks expire in a day, by which point the redeploy carries them.
 const KEY = 'safepipe-due-overrides';
 const store = () => {
   try { return globalThis.localStorage || null; } catch { return null; }
@@ -22,9 +24,9 @@ const writeAll = (arr) => {
   const s = store();
   try { if (s) s.setItem(KEY, JSON.stringify(arr)); } catch {}
 };
-export function saveDueOverride(file, head, due) {
+export function saveDueOverride(file, head, due, committed = false) {
   const arr = loadDueOverrides().filter((o) => !(o.file === file && o.head === head));
-  arr.push({ file, head, due: due || null });
+  arr.push({ file, head, due: due || null, committed: !!committed, at: Date.now() });
   writeAll(arr);
 }
 export function dropDueOverride(file, head) {

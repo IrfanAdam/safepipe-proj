@@ -210,7 +210,15 @@ export function bindChangelogEvents(root, st, helpers) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, file: plan.file, head: sprint.head, due: iso || null }),
-        }).then((r2) => { if (r2 && r2.ok) st.duePending = null; }).catch(() => {});
+        }).then((r2) => {
+          if (r2 && r2.ok) {
+            // Server committed it: the repo is now NEWER than this bundle.
+            // Mark the override authoritative so a mid-deploy refresh keeps
+            // showing the confirmed date instead of the stale file value.
+            try { saveDueOverride(plan.file, sprint.head, iso || null, true); } catch {}
+            st.duePending = null;
+          }
+        }).catch(() => {});
       }).catch(() => {});
     }
   };

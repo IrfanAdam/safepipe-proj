@@ -60,6 +60,15 @@ try {
     if (!sec) { dropDueOverride(o.file, o.head); continue; }
     const current = dueOf(sec);
     if (o.due) {
+      if (current === o.due) { dropDueOverride(o.file, o.head); continue; }
+      // Server-confirmed pick (committed to git): the repo is newer than this
+      // bundle during the deploy window, so it outranks the file. Expires in
+      // a day — by then the redeploy carries the value (or a hand-edit won,
+      // and the file takes over again).
+      if (o.committed && Date.now() - (o.at || 0) < 86400000) {
+        sec.body = duePreviewEdit(sec.body, sec.head, o.due);
+        continue;
+      }
       if (current) { dropDueOverride(o.file, o.head); continue; }
       sec.body = duePreviewEdit(sec.body, sec.head, o.due);
     } else {
