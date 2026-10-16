@@ -4,6 +4,14 @@
 const USER_KEY = 'safepipe-schedule-user';
 const PENDING_KEY = 'safepipe-oauth-pending';
 let memUser = null;
+let memToken = null; // read:user OAuth token, memory-only: proves identity to
+// /api/due (validated server-side against DUE_AUTHOR). Never persisted.
+export function setSchedToken(token) {
+  memToken = typeof token === 'string' && token ? token : null;
+}
+export function getSchedToken() {
+  return memToken;
+}
 const localStore = () => {
   try { return globalThis.localStorage || null; } catch { return null; }
 };

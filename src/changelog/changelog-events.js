@@ -3,6 +3,7 @@
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
 import { saveDueOverride, dropDueOverride } from '../logic/due-overrides.js';
+import { getSchedToken } from '../logic/schedule-auth.js';
 // Due scheduling (task 3): pure file-text edit — insert/replace/clear the
 // single `*Due: YYYY-MM-DD*` line under the owning head, idempotently (first
 // Due-shaped line wins, extras removed, never duplicated). Head not found →
@@ -193,10 +194,23 @@ export function bindChangelogEvents(root, st, helpers) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file: plan.file, head: sprint.head, due: iso || null }),
       }).then((r) => {
-        if (!r.ok) return;
-        st.duePending = null;
-        // File now carries the value — the stored override is redundant.
-        try { dropDueOverride(plan.file, sprint.head); } catch {}
+        if (r.ok) {
+          st.duePending = null;
+          // File now carries the value — the stored override is redundant.
+          try { dropDueOverride(plan.file, sprint.head); } catch {}
+          return;
+        }
+        // Static host (production): no file writer — commit through /api/due
+        // (GitHub-backed, lands via deploy). The local override stays until
+        // the redeployed bundle carries the value, so the UI never flickers.
+        let token = null;
+        try { token = getSchedToken(); } catch {}
+        if (!token) return;
+        return fetch('/api/due', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, file: plan.file, head: sprint.head, due: iso || null }),
+        }).then((r2) => { if (r2 && r2.ok) st.duePending = null; }).catch(() => {});
       }).catch(() => {});
     }
   };

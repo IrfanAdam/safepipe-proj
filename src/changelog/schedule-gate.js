@@ -3,7 +3,7 @@
 // OAuth popup flow (same-window redirect when popups are blocked). Pane CTAs
 // render always but stay hidden by CSS until body.is-sched-auth — login and
 // logout need no repaint.
-import { getSchedUser, isSchedAuthed, setSchedUser, clearSchedUser, takePendingToken } from '../logic/schedule-auth.js';
+import { getSchedUser, isSchedAuthed, setSchedUser, clearSchedUser, takePendingToken, setSchedToken, getSchedToken } from '../logic/schedule-auth.js';
 const BODY_ON = 'is-sched-auth';
 let menuBound = false;
 export function applyScheduleState() {
@@ -37,6 +37,7 @@ function toggleUserMenu() {
     document.body.appendChild(menu);
     menu.querySelector('[data-user-logout]').addEventListener('click', () => {
       clearSchedUser();
+      setSchedToken(null);
       applyScheduleState();
     });
   }
@@ -63,6 +64,7 @@ async function completeWithToken(token) {
     const u = await r.json();
     if (!u || !u.login) throw new Error('no login');
     setSchedUser({ login: u.login, provider: 'github' });
+    setSchedToken(token); // memory-only: identity proof for /api/due commits
   } catch {
     // Token rejected (or offline) — stay logged out, gate stays available.
   }
