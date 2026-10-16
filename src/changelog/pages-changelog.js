@@ -9,6 +9,7 @@ import names from '../ds/changelog-names.json';
 import history from '../ds/plan-history.json';
 import { goal, split, parseMeta, anchorOf, phash } from './changelog-parse.js';
 import { paint } from './changelog-paint.js';
+import { TIMELINE_TILE_ICON } from './changelog/graph.js';
 import { bindChangelogEvents } from './changelog-events.js';
 
 // Plan-iteration revisions: versions append (tracker hook + backfill), oldest first.
@@ -108,7 +109,7 @@ function doPaint(root) {
   const btn = root.querySelector('[data-view="timeline"]');
   if (btn) {
     const n = list.length, on = st.view === 'timeline';
-    btn.innerHTML = `<span aria-hidden="true">→</span> All ${n} track${n === 1 ? '' : 's'}`;
+    btn.innerHTML = `<span class="ds-chip-timeline__icon" aria-hidden="true">${TIMELINE_TILE_ICON}</span> All ${n} track${n === 1 ? '' : 's'}`;
     btn.setAttribute('aria-pressed', String(on));
     btn.setAttribute('aria-label', `${n} plans in timeline — ${on ? 'close' : 'open'} timeline view`);
   }

@@ -1,6 +1,6 @@
 // safepipe changelog — chips + graph · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
 import { fmtDate, dueOf } from '../changelog-parse.js';
-import { graph } from './graph.js';
+import { graph, TIMELINE_TILE_ICON } from './graph.js';
 const INLINE_TAGS = 5;
 export function paintChips(root, ctx){
   const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts } = ctx;
@@ -38,16 +38,17 @@ export function paintChips(root, ctx){
     `</div>`,
   ].join('') : '';
   const hasFilters = active.size > 0 || day;
+  // Text-like clear: sits with the tag stack, not a pill pulled right.
   const clearBtn = hasFilters ? [
-    `<button class="ds-chip ds-chip-clear" data-tag-clear aria-label="Clear all filters">`,
-    `Clear ✕</button>`,
+    `<button class="ds-chip-clear" data-tag-clear aria-label="Clear all filters">`,
+    `Clear all</button>`,
   ].join('') : '';
   const tlBtn = [
     `<button class="ds-chip ds-chip-timeline" data-view="timeline" aria-pressed="false" aria-label="Open timeline view">`,
-    `<span aria-hidden="true">→</span> All ${plans.length} track${plans.length === 1 ? '' : 's'}`,
+    `<span class="ds-chip-timeline__icon" aria-hidden="true">${TIMELINE_TILE_ICON}</span> All ${plans.length} track${plans.length === 1 ? '' : 's'}`,
     `</button>`,
   ].join('');
-  root.querySelector('[data-col="chips"]').innerHTML = dayChip + tagPills + filterBtn + tlBtn + clearBtn;
+  root.querySelector('[data-col="chips"]').innerHTML = dayChip + tagPills + clearBtn + filterBtn + tlBtn;
   const gEl = root.querySelector('[data-col="graph"]');
   // Scheduling (timeline Task 3): the graph paints once for perf, but live
   // Due edits must reflect as ghost dots with no reload — repaint only when
