@@ -58,6 +58,10 @@ let tlToken = 0;
 const visiblePlans = () => plans
   .filter((p) => (!st.active.size || p.tags.some((t) => st.active.has(t)))
     && (!st.day || p.date === st.day || commits.some((c) => c.plan === p.file && c.date === st.day)));
+// Timeline ignores the landing day-blob filter: tracks always span the full
+// range. Track chips (st.active) still apply.
+const visiblePlansNoDay = () => plans
+  .filter((p) => !st.active.size || p.tags.some((t) => st.active.has(t)));
 const visibleSprints = (plan) => {
   const ss = st.active.size ? plan.sprints.filter((s) => s.tags.some((t) => st.active.has(t))) : plan.sprints;
   return ss.length ? ss : plan.sprints;
@@ -114,7 +118,7 @@ function doPaint(root) {
   if (st.view !== 'timeline') { if (panel) panel.hidden = true; return; }
   import('./changelog/timeline-paint.js').then((m) => {
     if (my !== tlToken || st.view !== 'timeline') return;
-    m.paintTimeline(root, { list, st });
+    m.paintTimeline(root, { list: st.view === 'timeline' ? visiblePlansNoDay() : list, st });
   }).catch(() => {
     if (my !== tlToken || !panel) return;
     panel.hidden = false;

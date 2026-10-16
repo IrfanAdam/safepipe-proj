@@ -51,7 +51,7 @@ body{background:var(--color-bg);color:var(--color-ink);font-family:var(--sp-font
 .ds-user-menu{position:fixed;z-index:var(--z-ds-controls);background:var(--color-surface);border:var(--border-hairline);border-radius:var(--sp-radius-md);box-shadow:var(--shadow-viewer);padding:var(--cl-4);min-width:140px}
 .ds-user-menu[hidden]{display:none}
 .ds-user-menu button{display:block;width:100%;text-align:left;background:none;border:0;padding:var(--cl-8) var(--cl-12);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink);cursor:pointer;border-radius:var(--sp-radius-sm)}
-.ds-user-menu button:hover{background:var(--color-accent-soft, var(--color-viewer-shade))}
+.ds-user-menu button:hover{background:none;outline:1px solid var(--color-ink);outline-offset:-1px}
 /* schedule login gate: backdrop reuses the viewer shade, card the DS surface */
 .ds-gate{position:fixed;inset:0;z-index:var(--z-ds-controls);display:grid;place-items:center;background:var(--color-viewer-shade);padding:var(--cl-16)}
 .ds-gate[hidden]{display:none}

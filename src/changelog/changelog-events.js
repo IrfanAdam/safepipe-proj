@@ -109,8 +109,11 @@ export function bindChangelogEvents(root, st, helpers) {
     st.view = 'list'; st.tlSel = null; st.returnView = null; hidePop(); doPaint(root);
   };
   const openTlPlan = (file, boutIdx, ghost) => {
-    const c = cur();
-    const li = c.list.findIndex((p) => p.file === file);
+    let c = cur();
+    let li = c.list.findIndex((p) => p.file === file);
+    // The timeline ignores the landing day filter, so its row may be absent
+    // from the day-filtered list: drop the day (explicit navigation) and retry.
+    if (li < 0 && st.day) { st.day = ''; c = cur(); li = c.list.findIndex((p) => p.file === file); }
     if (li < 0) return;
     const plan = c.list[li];
     const apply = (si) => {
