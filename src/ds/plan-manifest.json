@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16T11:32:08.548Z",
+  "generated": "2026-10-16T12:08:13.915Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,24 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "1a0fdc3",
+      "full": "1a0fdc3253d07f700910d2e989b38b1b2397f319",
+      "date": "2026-10-16",
+      "time": "17:38",
+      "subject": "feat(changelog): deadline copy, drop drawer CTA, username menu with logout [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
+    {
+      "sha": "2c22672",
+      "full": "2c2267252321008d7c92c39f2c97926d9270c61b",
+      "date": "2026-10-16",
+      "time": "17:03",
+      "subject": "refactor(changelog): generic data-requires-auth login gate, drop bespoke rules [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "f15c6dc",
       "full": "f15c6dced26be9e45815028ecc8ce193190e7515",
@@ -3699,8 +3717,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/changelog/changelog-drawer.css",
-    "src/changelog/changelog/paint-detail.js"
-  ]
+  "wip": []
 }
