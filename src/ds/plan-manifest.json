@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16T10:56:53.872Z",
+  "generated": "2026-10-16T11:00:24.771Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "f69303f",
+      "full": "f69303fcb01f7031fe994c0ffb3c76ad8df6e163",
+      "date": "2026-10-16",
+      "time": "16:30",
+      "subject": "fix(changelog): subtle ghost close button in header [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "8d7efa9",
       "full": "8d7efa9dae24cce3f71eb724b7a6774df170dfd9",
