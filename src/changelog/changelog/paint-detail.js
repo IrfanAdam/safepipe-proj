@@ -133,7 +133,7 @@ const marked = {
     return html;
   }
 };
-import { hits, badges, unlinked, commits as planCommits } from '../changelog-links.js';
+import { hits, badges, unlinked } from '../changelog-links.js';
 import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../changelog-titles.js';
 import { isDone, state, parseGates, dueOf, fmtDate, gateNOf } from '../changelog-parse.js';
 import { esc } from './esc.js';
@@ -252,6 +252,9 @@ export function paintDetail(root, ctx){
   root.querySelector('[data-col="tasks"]').innerHTML = [
     `<div class="ds-drawer-head">`,
     tagsHead,
+    // Logged-in-only schedule CTA: always rendered, shown by CSS under
+    // body.is-sched-auth. Display-only until the scheduling action lands.
+    `<button class="ds-sched-cta" data-schedule-cta type="button" title="Schedule">Schedule</button>`,
     `<button data-close aria-label="Close detail">✕</button></div>`,
     // Due row sits directly under the section title: split the head line
     // off before parsing. Bodies with no head keep the old order.
@@ -260,15 +263,8 @@ export function paintDetail(root, ctx){
         phaseDone: isDone(state(sprint.body)),
         gateSuffix: gateSuffixOf(gates, phaseN),
       };
-      const revsHTML = paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN }) + (hs.length ? badges(hs) : '') + (() => {
-        // Plan-linked commits whose anchor hits NO section (e.g. `#follow-up`
-        // polish batches) are invisible in every section's badges — surface
-        // them once per section so post-done work stays tracked.
-        const seen = new Set(hs);
-        plan.sprints.forEach((s, i) => { for (const c of hits(plan.file, s.body, i === 0)) seen.add(c); });
-        const orphans = planCommits.filter((c) => c.plan === plan.file && !seen.has(c));
-        return orphans.length ? badges(orphans, 'Further commits') : '';
-      })();
+      const revsHTML = paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN })
+        + (hs.length ? badges(hs) : '');
       const hm = String(bodySansGates || '').match(/^(#{1,4}\s+[^\n]+)\n([\s\S]*)$/);
       if (!hm) return [dueHTML, `<div class="ds-md">`, marked.parse(bodySansGates, markOpts) + revsHTML, `</div>`].join('');
       return [`<div class="ds-md">`, marked.parse(hm[1], markOpts) + dueHTML + marked.parse(hm[2], markOpts) + revsHTML, `</div>`].join('');

@@ -45,6 +45,18 @@ body{background:var(--color-bg);color:var(--color-ink);font-family:var(--sp-font
 .hbar .brand b{color:var(--sp-sky)}
 .hbar-right{display:flex;gap:var(--cl-14);align-items:center}
 .hbar-tag{font-size:14px;font-weight:600;color:var(--sp-text-secondary)}
+.hbar-schedule{font-family:var(--font-display);font-weight:600;font-size:14px;background:var(--color-accent);color:var(--sp-text-inverse);border:var(--cl-1) solid var(--color-accent);border-radius:var(--sp-radius-md);padding:var(--cl-8) var(--cl-16);cursor:pointer}
+.hbar-schedule.on{background:transparent;color:var(--color-ink-muted);border-color:var(--color-border)}
+/* schedule login gate: backdrop reuses the viewer shade, card the DS surface */
+.ds-gate{position:fixed;inset:0;z-index:var(--z-ds-controls);display:grid;place-items:center;background:var(--color-viewer-shade);padding:var(--cl-16)}
+.ds-gate[hidden]{display:none}
+.ds-gate-card{background:var(--color-surface);border:var(--border-hairline);border-radius:var(--sp-radius-md);box-shadow:var(--shadow-viewer);padding:var(--cl-22);max-width:340px}
+.ds-gate-eyebrow{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin:0 0 var(--cl-8)}
+.ds-gate-card h2{font-family:var(--font-display);font-size:20px;margin:0 0 var(--cl-8);color:var(--color-ink)}
+.ds-gate-card p{font-size:14px;color:var(--sp-text-secondary);margin:0 0 var(--cl-16)}
+.ds-gate-actions{display:flex;gap:var(--cl-8)}
+.ds-gate-primary{font-family:var(--font-display);font-weight:600;font-size:14px;background:var(--color-accent);color:var(--sp-text-inverse);border:var(--cl-1) solid var(--color-accent);border-radius:var(--sp-radius-md);padding:var(--cl-8) var(--cl-16);cursor:pointer}
+.ds-gate-ghost{font-family:var(--font-display);font-weight:600;font-size:14px;background:transparent;color:var(--color-ink-muted);border:var(--border-hairline);border-radius:var(--sp-radius-md);padding:var(--cl-8) var(--cl-16);cursor:pointer}
 .hbar-close{display:grid;place-items:center;text-decoration:none;background:transparent;color:var(--color-ink-muted);border:var(--border-hairline);border-radius:var(--sp-radius-md);width:36px;height:36px;font-size:13px;transition:color .15s ease}
 .hbar-close:hover{color:var(--color-ink)}
 .ds-crumb{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin:0 0 var(--cl-12)}

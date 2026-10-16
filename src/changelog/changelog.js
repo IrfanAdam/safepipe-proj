@@ -1,8 +1,10 @@
 // safepipe changelog — boot: mount pages-changelog into shell · [plan:2026-10-07_130000-safepipe-changelog.md#task-3]
 import { render, mount } from './pages-changelog.js';
+import { initScheduleGate } from './schedule-gate.js';
 const root = document.getElementById('cl-root');
 root.innerHTML = render();
 const teardown = mount(root);
+initScheduleGate();
 // deep links ?day= & ?sha= kept for compat
 try {
   const q = new URLSearchParams(location.search);
