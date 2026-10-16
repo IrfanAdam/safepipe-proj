@@ -1,22 +1,46 @@
 // safepipe logic — schedule gate state (pure, zero DOM) · [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]
-// Personal-site-style auth: one click, remembered on this device only.
-const KEY = 'safepipe-schedule-auth';
-let mem = false;
-const store = () => {
+// Real GitHub identity (via /api/auth + /api/callback): the signed-in user
+// is remembered on this device; the OAuth token itself is never persisted.
+const USER_KEY = 'safepipe-schedule-user';
+const PENDING_KEY = 'safepipe-oauth-pending';
+let memUser = null;
+const localStore = () => {
   try { return globalThis.localStorage || null; } catch { return null; }
 };
+const sessionStore = () => {
+  try { return globalThis.sessionStorage || null; } catch { return null; }
+};
+export function getSchedUser() {
+  const s = localStore();
+  try {
+    if (s) {
+      const raw = s.getItem(USER_KEY);
+      if (raw) return JSON.parse(raw);
+    }
+  } catch {}
+  return memUser;
+}
 export function isSchedAuthed() {
-  const s = store();
-  try { if (s) return s.getItem(KEY) === 'on'; } catch {}
-  return mem;
+  return !!getSchedUser();
 }
-export function schedLogIn() {
-  const s = store();
-  try { if (s) s.setItem(KEY, 'on'); } catch {}
-  mem = true;
+export function setSchedUser(user) {
+  const s = localStore();
+  try { if (s) s.setItem(USER_KEY, JSON.stringify(user)); } catch {}
+  memUser = user;
 }
-export function schedLogOut() {
-  const s = store();
-  try { if (s) s.removeItem(KEY); } catch {}
-  mem = false;
+export function clearSchedUser() {
+  const s = localStore();
+  try { if (s) s.removeItem(USER_KEY); } catch {}
+  memUser = null;
+}
+// Same-window OAuth return: one-time pickup of the pending token.
+export function takePendingToken() {
+  const s = sessionStore();
+  try {
+    if (s) {
+      const t = s.getItem(PENDING_KEY);
+      if (t) { s.removeItem(PENDING_KEY); return t; }
+    }
+  } catch {}
+  return null;
 }
