@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-16T09:57:07.199Z",
+  "generated": "2026-10-16T10:05:18.833Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "ec9ad78",
+      "full": "ec9ad7878b744fc3e8f8e6b62f8571c979ce5536",
+      "date": "2026-10-16",
+      "time": "15:35",
+      "subject": "fix(changelog): align drawer tag head with rail plan line, lift phase title [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "435bf61",
       "full": "435bf61746cd8dcfc5e70f774c6839747d608053",
