@@ -115,6 +115,7 @@ body:not(.is-sched-auth) .ds-due:not(:has(.ds-due-static)){display:none}
 .ds-due-status{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
 button.ds-due-status{background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:var(--cl-2)}
 .ds-due-status.is-warn,.ds-due-status.is-err{color:var(--color-accent);font-weight:700}
+.ds-due-status.is-ok{color:var(--color-ink);font-weight:700}
 .ds-due-pop{position:absolute;top:100%;left:0;z-index:2;background:var(--color-bg);border:var(--border-hairline);border-radius:var(--cl-6);box-shadow:var(--sp-elevation-2);padding:var(--cl-8) var(--cl-8) var(--cl-4);margin-top:var(--cl-4);width:max-content}
 .ds-due-cal__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--cl-4)}
 .ds-due-cal__head b{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink)}

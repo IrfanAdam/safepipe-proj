@@ -201,10 +201,12 @@ export function bindChangelogEvents(root, st, helpers) {
       try { saveDueOverride(plan.file, sprint.head, iso || null); } catch {}
     }
     // Optimistic save: the date above is already the UI — the git commit runs
-    // in the background and only speaks on failure. Runs even when the
-    // preview is unchanged, so a retry after a failed commit re-fires the
-    // pipeline instead of no-op'ing on identical text.
+    // in the background with a live inline status (publishing… → published ✓
+    // or retry). Runs even when the preview is unchanged, so a retry after a
+    // failed commit re-fires the pipeline instead of no-op'ing on identical
+    // text.
     // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
+    st.dueCommit = { file: plan.file, head: sprint.head, state: 'saving' };
     try { doPaint(root); } catch {}
     commitDue(plan, sprint, iso || null);
   };
@@ -224,10 +226,10 @@ export function bindChangelogEvents(root, st, helpers) {
     } finally { if (t) clearTimeout(t); }
   };
   const commitDue = (plan, sprint, iso) => {
-    // Commit state for the due row (paint-detail reads ctx.dueCommit): null
-    // while the background commit is in flight (the painted date IS the UI),
-    // needs-login | failed only when the commit cannot land. Nothing here
-    // ever opens the login gate — it opens only on an explicit tap.
+    // Commit state for the due row (paint-detail reads ctx.dueCommit):
+    // saving (set by applyDue) → saved (auto-dismissed) | needs-login |
+    // failed. Nothing here ever opens the login gate — it opens only on an
+    // explicit tap.
     // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
     const gen = ++dueGen;
     const failDue = (state) => {
@@ -235,6 +237,34 @@ export function bindChangelogEvents(root, st, helpers) {
       st.dueCommit = { file: plan.file, head: sprint.head, state };
       try { doPaint(root); } catch {}
     };
+    // Success is confirmed, not assumed: flash 'published ✓', then dismiss.
+    // Gen + file/head guarded so a rapid re-pick never clears newer state.
+    const markSaved = () => {
+      if (gen !== dueGen) return;
+      st.dueCommit = { file: plan.file, head: sprint.head, state: 'saved' };
+      try { doPaint(root); } catch {}
+      try {
+        setTimeout(() => {
+          try {
+            if (gen === dueGen && st.dueCommit && st.dueCommit.state === 'saved'
+              && st.dueCommit.file === plan.file && st.dueCommit.head === sprint.head) {
+              st.dueCommit = null;
+              doPaint(root);
+            }
+          } catch {}
+        }, 2500);
+      } catch {}
+    };
+    // Safety net: bounded fetches resolve every path, but 'publishing…'
+    // must never stick if one somehow doesn't — fail visibly at 60s.
+    try {
+      setTimeout(() => {
+        try {
+          if (gen === dueGen && st.dueCommit && st.dueCommit.state === 'saving'
+            && st.dueCommit.file === plan.file && st.dueCommit.head === sprint.head) failDue('failed');
+        } catch {}
+      }, 60000);
+    } catch {}
     if (typeof fetch !== 'function') return;
     (async () => {
       try {
@@ -242,10 +272,9 @@ export function bindChangelogEvents(root, st, helpers) {
         if (gen !== dueGen) return;
         if (r && r.ok) {
           st.duePending = null;
-          st.dueCommit = null;
           // File now carries the value — the stored override is redundant.
           try { dropDueOverride(plan.file, sprint.head); } catch {}
-          try { doPaint(root); } catch {}
+          markSaved();
           return;
         }
       } catch {
@@ -289,8 +318,7 @@ export function bindChangelogEvents(root, st, helpers) {
         if (applied) { try { dropDueOverride(plan.file, sprint.head); } catch {} }
         else { try { saveDueOverride(plan.file, sprint.head, iso || null, true); } catch {} }
         st.duePending = null;
-        st.dueCommit = null;
-        try { doPaint(root); } catch {}
+        markSaved();
         return;
       }
       if (r2 && (r2.status === 401 || r2.status === 403)) {

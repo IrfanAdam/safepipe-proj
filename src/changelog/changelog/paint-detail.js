@@ -226,16 +226,21 @@ export function paintDetail(root, ctx){
   const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   // Schedule trigger: accent text (or 'Schedule when?') opening the themed
   // month popup. No native date input, no hint line, never a Due n/a.
-  // Commit state for this section's pick (set by commitDue in events):
-  // needs-login | failed. Null (including while the background commit is in
-  // flight — the painted date IS the UI) shows nothing. Mismatched
-  // file/head never renders another section's status.
+  // Commit state for this section's pick (set by applyDue/commitDue):
+  // saving → saved (auto-dismissed) | needs-login | failed. Null shows
+  // nothing. The status is inline and never blocks — the painted date IS
+  // the UI; this only answers "did it publish?". Mismatched file/head
+  // never renders another section's status.
   // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
   const dc = dueCommit && plan && sprint
     && dueCommit.file === plan.file && dueCommit.head === sprint.head ? dueCommit.state : '';
-  const dueStatusHTML = !dc || secShipped ? '' : dc === 'needs-login'
-    ? `<button class="ds-due-status is-warn" data-due-retry="login">only on this device — sign in again to publish</button>`
-    : `<button class="ds-due-status is-err" data-due-retry="commit">couldn't reach git — tap to retry</button>`;
+  const dueStatusHTML = !dc || secShipped ? '' : dc === 'saving'
+    ? `<span class="ds-due-status" data-due-status="saving">publishing…</span>`
+    : dc === 'saved'
+      ? `<span class="ds-due-status is-ok" data-due-status="saved">published ✓</span>`
+      : dc === 'needs-login'
+        ? `<button class="ds-due-status is-warn" data-due-retry="login">only on this device — sign in again to publish</button>`
+        : `<button class="ds-due-status is-err" data-due-retry="commit">couldn't reach git — tap to retry</button>`;
   const dueHTML = secShipped
     ? ''
     : [
