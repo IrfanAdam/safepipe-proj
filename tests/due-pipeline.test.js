@@ -394,9 +394,10 @@ describe('canonicalHead (send-time head resolution)', () => {
 });
 
 describe('due progress + published status are read-back-verified, never assumed', () => {
-  it('toast vocabulary is pinned: publishing → updating → live, one at a time', async () => {
+  it('toast vocabulary is pinned: commit slot + deploy slot, two at a time', async () => {
     const prog = await import('../src/changelog/due-progress.js?due-prog-steps=1');
-    assert.deepEqual(prog.DUE_PROGRESS_STEPS, ['publishing', 'deploying', 'live']);
+    assert.deepEqual(prog.DUE_PROGRESS_COMMIT_STEPS, ['publishing', 'committed']);
+    assert.deepEqual(prog.DUE_PROGRESS_DEPLOY_STEPS, ['deploying', 'live']);
   });
   it('read-back mismatch never shows published (saved iff paint equals pick)', () => {
     assert.equal(confirmPublish('2026-11-01', '2026-11-01'), 'saved');
@@ -521,29 +522,41 @@ describe('due progress card (DOM keying, repo stub conventions)', () => {
     };
     return import('../src/changelog/due-progress.js?due-prog=1');
   };
-  it('one morphing line: spinner while busy, check when landed, stale keys ignored', async () => {
+  it('two stacked slots: Published stays while Updating runs, stale keys ignored', async () => {
     const prog = await setup();
     const a = { file: 'f.md', head: 'H', due: '2026-11-01' };
     prog.showDueProgress(a);
     const card = globalThis.document.getElementById('ds-due-progress');
     assert.ok(card && !card.hidden);
-    const label = () => card.querySelector('[data-prog-label]').textContent;
-    const spinning = () => !card.querySelector('[data-prog-spin]').hidden;
-    const checked = () => !card.querySelector('[data-prog-tick]').hidden;
-    assert.equal(label(), 'Publishing…');
-    assert.equal(spinning(), true, 'publishing shows the spinner');
-    assert.equal(checked(), false);
+    const commitLabel = () => card.querySelector('[data-prog-commit-label]').textContent;
+    const deployLabel = () => card.querySelector('[data-prog-deploy-label]').textContent;
+    const deployHidden = () => !!card.querySelector('[data-prog-deploy-row]').hidden;
+    const commitSpinning = () => !card.querySelector('[data-prog-commit-spin]').hidden;
+    const commitChecked = () => !card.querySelector('[data-prog-commit-tick]').hidden;
+    const deploySpinning = () => !card.querySelector('[data-prog-deploy-spin]').hidden;
+    const deployChecked = () => !card.querySelector('[data-prog-deploy-tick]').hidden;
+    assert.equal(commitLabel(), 'Publishing…');
+    assert.equal(commitSpinning(), true, 'publishing shows the spinner');
+    assert.equal(commitChecked(), false);
+    assert.equal(deployHidden(), true, 'deploy slot hidden until commit lands');
+    prog.setDueProgressStep(a, 'committed');
+    assert.equal(commitLabel(), 'Published ✓', 'commit lands first');
+    assert.equal(commitChecked(), true);
+    assert.equal(deployHidden(), false, 'second slot revealed while updating is awaited');
+    assert.equal(deployLabel(), 'Updating everywhere…', 'both infos visible at once');
+    assert.equal(deploySpinning(), true);
+    assert.equal(deployChecked(), false);
     prog.setDueProgressStep(a, 'deploying');
-    assert.equal(label(), 'Updating everywhere…', 'same slot morphs, no second row');
-    assert.equal(spinning(), true, 'updating shows the spinner');
-    assert.equal(checked(), false);
+    assert.equal(commitLabel(), 'Published ✓', 'deploying never collapses the commit row');
+    assert.equal(deployLabel(), 'Updating everywhere…', 'deploying is an idempotent re-assert');
     prog.setDueProgressStep({ file: 'f.md', head: 'OTHER', due: '2026-11-01' }, 'live');
-    assert.equal(label(), 'Updating everywhere…', 'a stale pick never advances newer state');
+    assert.equal(deployLabel(), 'Updating everywhere…', 'a stale pick never advances newer state');
     prog.setDueProgressStep(a, 'live');
-    assert.equal(label(), 'Live ✓');
-    assert.equal(checked(), true);
+    assert.equal(commitLabel(), 'Published ✓');
+    assert.equal(deployLabel(), 'Live ✓');
+    assert.equal(deployChecked(), true);
     prog.setDueProgressStep(a, 'bogus-step');
-    assert.equal(label(), 'Live ✓', 'unknown steps are ignored');
+    assert.equal(deployLabel(), 'Live ✓', 'unknown steps are ignored');
   });
   it('a rapid re-pick protects the new card from the old hide', async () => {
     const prog = await setup();

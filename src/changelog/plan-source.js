@@ -45,8 +45,15 @@ export async function fetchLiveTexts(files, opts = {}) {
   const list = Array.isArray(files) ? files : [];
   const branch = opts && opts.branch ? String(opts.branch) : undefined;
   const fetchImpl = (opts && opts.fetchImpl) || fetch;
+  // Cache-bust each raw fetch (same ?_= trick as fetchFileText): the commits
+  // API detects the new sha with no CDN lag, but the bodies still ride
+  // raw.githubusercontent.com edge cache — without a bust a phone polling
+  // on cellular can repaint pre-commit bytes for minutes after the sha flips.
+  let bust = 0;
+  try { bust = Date.now(); } catch { bust = 0; }
+  const suffix = '?_=' + String(bust);
   const settled = await Promise.allSettled(
-    list.map((file) => fetchOne(file, planRawUrl(file, branch), fetchImpl)),
+    list.map((file) => fetchOne(file, planRawUrl(file, branch) + suffix, fetchImpl)),
   );
   const out = {};
   for (let i = 0; i < list.length; i += 1) {
