@@ -28,11 +28,15 @@
     width:calc(100% + var(--sp-spacing-xl) * 2);
     margin-left:calc(-1 * var(--sp-spacing-xl));
     margin-right:calc(-1 * var(--sp-spacing-xl));
-    padding-left:var(--sp-spacing-xl);
-    padding-right:var(--sp-spacing-xl);
+    padding-left:0;
+    padding-right:0;
     box-sizing:border-box;
   }
-  .ds-plan-grid .ds-pick{grid-template-columns:auto minmax(0,1fr)}
+  .ds-plan-grid .ds-pick{
+    grid-template-columns:auto minmax(0,1fr);
+    padding:var(--cl-12) var(--cl-16)
+  }
+  .ds-plan-grid .ds-pick.on{padding-left:calc(var(--cl-16) - var(--cl-2))}
   .ds-plan-grid .ds-num{grid-column:1 / -1;grid-row:1}
   .ds-plan-grid .ds-main b{grid-column:1 / -1;grid-row:2;white-space:normal}
   .ds-plan-grid .ds-date{grid-column:1 / -1;grid-row:3;white-space:normal}
