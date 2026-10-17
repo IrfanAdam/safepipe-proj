@@ -63,6 +63,7 @@ search, member rows with `In progress N WOs, M tasks`) → profile (certs, locat
    member card, profile header, info card, tab strip). `npm run build` exit 0.
 
 ## Task 4 — PIP fact-sheet record (`#/pip`) + Assets (`#/assets`)
+*Due: 2026-10-27*
 
 **Objective:** Tabbed record (Upcoming / History / Fact sheet / Constructions / Data) with all 14 legacy
 sections (Correspondence, ROW & Permits, …, HCA Mapping); Assets screen as card grid from `Cards` page.
