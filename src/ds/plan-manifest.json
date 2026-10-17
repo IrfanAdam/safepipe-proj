@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-17T11:06:56.758Z",
+  "generated": "2026-10-17T11:08:12.936Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -17,6 +17,15 @@
     "2026-10-15_120000-safepipe-changelog-timeline.md"
   ],
   "commits": [
+    {
+      "sha": "78a5183",
+      "full": "78a51839ac330d9eeef62ecc32ed27814d2fa8f4",
+      "date": "2026-10-17",
+      "time": "16:38",
+      "subject": "chore(retro): link 4 unlinked changelog commits to follow-up [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "21b8959",
       "full": "21b8959315761ec2c5263f94564872fc2821ffe1",
@@ -77,8 +86,8 @@
       "date": "2026-10-17",
       "time": "00:47",
       "subject": "fix(changelog): selected row same height as default",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
     },
     {
       "sha": "be149a8",
@@ -113,8 +122,8 @@
       "date": "2026-10-16",
       "time": "23:53",
       "subject": "fix(changelog): +N inline with tags, not new line",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
     },
     {
       "sha": "b7f891f",
@@ -140,8 +149,8 @@
       "date": "2026-10-16",
       "time": "23:29",
       "subject": "feat(changelog): filter bar — clear button, tag dropdown, timeline chip, expandable tags",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
     },
     {
       "sha": "055a557",
@@ -266,8 +275,8 @@
       "date": "2026-10-16",
       "time": "01:38",
       "subject": "fix(changelog): right-align plan tags, add tlDate state",
-      "plan": null,
-      "anchor": null
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
     },
     {
       "sha": "3160e7a",
