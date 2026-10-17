@@ -47,7 +47,7 @@ button.ds-day.is-future.on{opacity:1;border-color:var(--color-ink);outline:var(-
     -webkit-overflow-scrolling:touch;
     scrollbar-width:thin;
     scroll-padding-left:var(--cl-16);
-    background:linear-gradient(to right, color-mix(in srgb, var(--color-accent) 28%, var(--color-surface)) 0, color-mix(in srgb, var(--color-accent) 28%, var(--color-surface)) 22px, color-mix(in srgb, var(--color-accent) 16%, var(--color-surface)) 72px, color-mix(in srgb, var(--color-surface) 48%, transparent) 152px, transparent 232px);
+    background:transparent;
   }
   .ds-graph-row{position:relative}
   .ds-dows{

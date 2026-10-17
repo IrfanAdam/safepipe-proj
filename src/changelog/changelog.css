@@ -72,12 +72,13 @@ a.ds-gate-primary{text-decoration:none;display:inline-block}
 .ds-hero.wide .lede{max-width:none}
 .ds-hr{border:none;border-top:var(--border-hairline);margin:var(--cl-14) 0}
 .ds-chips{display:flex;gap:var(--cl-8);flex-wrap:wrap;align-items:center;margin:0 0 var(--cl-12);position:relative}
-.ds-chip-timeline{margin-left:auto;display:inline-flex;align-items:center;gap:var(--cl-8)}
+.ds-chip-timeline{display:inline-flex;align-items:center;gap:var(--cl-8)}
 .ds-chip-timeline__icon{display:inline-flex}
 .ds-chip-timeline__icon svg{display:block;width:var(--cl-14);height:var(--cl-14)}
-/* Text-like clear: no pill chrome, appended to the tag stack. Hover stays
-   outline-only per the toggle rule — no fill change. */
-.ds-chip-clear{background:none;border:var(--cl-1) solid transparent;padding:var(--cl-6) var(--cl-4);font-family:var(--font-display);font-weight:600;letter-spacing:0.06em;font-size:var(--sp-text-xs);color:var(--color-ink-muted);cursor:pointer}
+/* Text-like clear: no pill chrome, last in the chip stack and pushed to the
+   right end via margin-left:auto. Hover stays outline-only per the toggle
+   rule — no fill change. */
+.ds-chip-clear{margin-left:auto;background:none;border:var(--cl-1) solid transparent;padding:var(--cl-6) var(--cl-4);font-family:var(--font-display);font-weight:600;letter-spacing:0.06em;font-size:var(--sp-text-xs);color:var(--color-ink-muted);cursor:pointer}
 .ds-chip-clear:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-chip-filter{color:var(--color-ink-muted)}
 .ds-tag-dropdown{position:absolute;top:calc(100% + var(--cl-4));left:0;z-index:var(--z-ds-controls);background:var(--color-surface);border:var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-viewer);padding:var(--cl-8);min-width:220px;display:flex;flex-direction:column;gap:var(--cl-4)}

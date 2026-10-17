@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-17T13:53:56.495Z",
+  "generated": "2026-10-17T14:01:45.619Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -18,6 +18,24 @@
     "2026-10-17_180000-safepipe-smooth-scheduling.md"
   ],
   "commits": [
+    {
+      "sha": "1e6d3ce",
+      "full": "1e6d3ce78aa7c9820c104050c28587510dce441c",
+      "date": "2026-10-17",
+      "time": "19:24",
+      "subject": "chore(manifest): refresh after edge-to-edge mobile fix (plumbing — manifest-only, auto-excluded)",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "616f09e",
+      "full": "616f09e009ce59607a54dbafdca4de5e7dd0969a",
+      "date": "2026-10-17",
+      "time": "19:24",
+      "subject": "fix(changelog): edge-to-edge cards + week-bar left fade at 390px [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
     {
       "sha": "63ef21d",
       "full": "63ef21d5cea4eca214c7ef946ff5d1784b9b7f29",
@@ -4252,6 +4270,8 @@
   "wip": [
     "public/version.json",
     "src/changelog/changelog-cal.css",
-    "src/changelog/changelog-cards.css"
+    "src/changelog/changelog-cards.css",
+    "src/changelog/changelog.css",
+    "src/changelog/changelog/paint-chips.js"
   ]
 }

@@ -34,9 +34,9 @@
   }
   .ds-plan-grid .ds-pick{
     grid-template-columns:auto minmax(0,1fr);
-    padding:var(--cl-12) var(--cl-16)
+    padding:var(--cl-12) var(--sp-spacing-xl)
   }
-  .ds-plan-grid .ds-pick.on{padding-left:calc(var(--cl-16) - var(--cl-2))}
+  .ds-plan-grid .ds-pick.on{padding-left:calc(var(--sp-spacing-xl) - var(--cl-2))}
   .ds-plan-grid .ds-num{grid-column:1 / -1;grid-row:1}
   .ds-plan-grid .ds-main b{grid-column:1 / -1;grid-row:2;white-space:normal}
   .ds-plan-grid .ds-date{grid-column:1 / -1;grid-row:3;white-space:normal}
