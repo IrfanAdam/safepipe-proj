@@ -129,7 +129,15 @@ async function dueHandler(req, res) {
       return;
     }
     const next = edit.next;
-    if (next === edit.text) { res.status(200).json({ unchanged: true, repo, branch, fileSha: sha || null }); return; }
+    // Idempotent success: the head is found and the file already carries the
+    // requested value (timeout retry or duplicate tap after the commit
+    // landed). Report SUCCESS with the current content — never `unchanged`,
+    // so a retry-after-success converges instead of failing forever.
+    // `unchanged` is reserved for head-not-found above.
+    if (next === edit.text) {
+      res.status(200).json({ committed: sha || null, repo, branch, fileSha: sha || null, content: edit.text });
+      return;
+    }
     const msg = `chore(${file}): ${due ? `set due ${due}` : 'clear due'} [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]`;
     const put = await gh(token, `/repos/${repo}/contents/${encodeURIComponent(path)}`, {
       method: 'PUT',

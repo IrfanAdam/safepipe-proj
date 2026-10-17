@@ -2,7 +2,7 @@
 // Exports: bindChangelogEvents — click/key/hover wiring over shared state st
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
-import { saveDueOverride, dropDueOverride } from '../logic/due-overrides.js';
+import { saveDueOverride } from '../logic/due-overrides.js';
 import { getSchedToken, clearSchedToken, clearSchedUser } from '../logic/schedule-auth.js';
 import { openScheduleGate } from './schedule-gate.js';
 import { showDueProgress, setDueProgressStep, hideDueProgress } from './due-progress.js';
@@ -285,7 +285,7 @@ export function bindChangelogEvents(root, st, helpers) {
       setTimeout(() => {
         try {
           if (gen === dueGen && st.dueCommit && st.dueCommit.state === 'saving'
-            && st.dueCommit.file === plan.file && st.dueCommit.head === commitHead) failDue('failed');
+            && st.dueCommit.file === plan.file && st.dueCommit.head === commitHead) failDue('failed', 'timeout');
         } catch {}
       }, 60000);
     } catch {}
@@ -298,8 +298,19 @@ export function bindChangelogEvents(root, st, helpers) {
         if (gen !== dueGen) return;
         if (r && r.ok) {
           st.duePending = null;
-          // File now carries the value — the stored override is redundant.
-          try { dropDueOverride(plan.file, sprint.head); } catch {}
+          // File now carries the value — record it as a confirmed override
+          // and re-apply so the painted date matches the pick immediately
+          // (the in-memory plans predate this write; the next rebuild
+          // confirms the override against file text and self-drops it).
+          try { saveDueOverride(plan.file, commitHead, iso || null, true); } catch {}
+          try {
+            const live0 = await import('./pages-changelog.js');
+            if (gen !== dueGen) return;
+            if (live0 && typeof live0.reapplyDueOverrides === 'function') {
+              try { live0.reapplyDueOverrides(root); } catch {}
+            }
+          } catch {}
+          if (gen !== dueGen) return;
           try { setDueProgressStep(progDetail, 'committed'); } catch {}
           try { setDueProgressStep(progDetail, 'live'); } catch {}
           try { hideDueProgress(progDetail, 1800); } catch {}
@@ -380,8 +391,19 @@ export function bindChangelogEvents(root, st, helpers) {
           } catch {}
         }
         if (gen !== dueGen) return;
-        if (applied) { try { dropDueOverride(plan.file, commitHead); } catch {} }
-        else { try { saveDueOverride(plan.file, commitHead, iso || null, true); } catch {} }
+        // Save the confirmed override BEFORE the rebuild: the rebuild's
+        // applier confirms it against the server text (self-drops on match)
+        // or paints it when the server text lacks the value — either way the
+        // painted date equals the pick at the "published" moment, never stale.
+        try { saveDueOverride(plan.file, commitHead, iso || null, true); } catch {}
+        if (!applied) {
+          try {
+            if (live && typeof live.reapplyDueOverrides === 'function') {
+              try { live.reapplyDueOverrides(root); } catch {}
+            }
+          } catch {}
+        }
+        if (gen !== dueGen) return;
         st.duePending = null;
         try { setDueProgressStep(progDetail, 'live'); } catch {}
         try { hideDueProgress(progDetail, 1800); } catch {}

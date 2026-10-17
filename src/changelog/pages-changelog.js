@@ -127,6 +127,18 @@ export async function refreshLivePlans(root) {
 // swaps one file's live text, rebuilds, repaints with selection/filter/sort
 // untouched. Returns true on success, false on bad args/unknown file.
 // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-3]
+// Re-apply stored overrides to the in-memory plans and repaint (no fetch).
+// The commit success path saves a confirmed override AFTER the last rebuild,
+// so without this the painted date lags the pick until the next poll.
+// [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
+export function reapplyDueOverrides(root) {
+  if (!root) return false;
+  try {
+    applyDueOverrides();
+    doPaint(root);
+    return true;
+  } catch { return false; }
+}
 export function applyServerFileText(root, file, text) {
   if (!root || typeof file !== 'string' || !file || typeof text !== 'string') return false;
   try {
@@ -180,6 +192,9 @@ async function pollAppVersion() {
     try {
       // Mid-pick on this device: the datepicker popover is open — wait.
       if (typeof document !== 'undefined' && document.querySelector('.ds-due-pop')) return;
+      // A commit is in flight (publishing…): never tear the page down
+      // mid-POST — the reload waits for the next quiet tick.
+      if (typeof document !== 'undefined' && document.querySelector('[data-due-status="saving"]')) return;
     } catch {}
     try {
       const ls = typeof localStorage !== 'undefined' ? localStorage : null;
