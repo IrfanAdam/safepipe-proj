@@ -86,7 +86,7 @@ export default async function handler(req, res) {
     const { sha, content } = await cur.json();
     const raw = Buffer.from(content || '', 'base64').toString('utf8');
     const next = dueEditText(raw, head.trim(), due);
-    if (next === raw) { res.status(200).json({ unchanged: true }); return; }
+    if (next === raw) { res.status(200).json({ unchanged: true, repo, branch, fileSha: sha || null }); return; }
     const msg = `chore(${file}): ${due ? `set due ${due}` : 'clear due'} [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]`;
     const put = await gh(token, `/repos/${repo}/contents/${encodeURIComponent(path)}`, {
       method: 'PUT',
@@ -103,7 +103,12 @@ export default async function handler(req, res) {
       return;
     }
     const done = await put.json();
-    res.status(200).json({ committed: (done.commit || {}).sha || null });
+    res.status(200).json({
+      committed: (done.commit || {}).sha || null,
+      repo,
+      branch,
+      fileSha: (done.content || {}).sha || null,
+    });
   } catch (e) {
     res.status(500).send('Due commit failed');
   }

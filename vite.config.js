@@ -71,6 +71,11 @@ const dueWriter = () => {
 };
 
 export default defineConfig({
+  define: {
+    __REPO_OWNER__: JSON.stringify(process.env.VERCEL_GIT_REPO_OWNER || 'IrfanAdam'),
+    __REPO_SLUG__: JSON.stringify(process.env.VERCEL_GIT_REPO_SLUG || 'safepipe-proj'),
+    __REPO_REF__: JSON.stringify(process.env.VERCEL_GIT_COMMIT_REF || 'main'),
+  },
   server: { port: 5175, host: '0.0.0.0', open: false },
   plugins: [dueWriter()],
   // MPA: every root *.html below is a bundled entry — all pages land in dist/

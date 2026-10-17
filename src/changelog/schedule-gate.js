@@ -111,6 +111,9 @@ function openGate() {
   gate.hidden = false;
   try { gate.querySelector('[data-gate-login]').focus(); } catch {}
 }
+export function openScheduleGate() {
+  openGate();
+}
 export function initScheduleGate() {
   applyScheduleState();
   // Same-window OAuth return: complete the pending login, if any.
