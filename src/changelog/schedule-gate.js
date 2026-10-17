@@ -5,6 +5,20 @@
 // logout need no repaint.
 import { getSchedUser, isSchedAuthed, setSchedUser, clearSchedUser, takePendingToken, setSchedToken, getSchedToken } from '../logic/schedule-auth.js';
 const BODY_ON = 'is-sched-auth';
+// Canonical live site — scheduling (OAuth + /api/due) only exists there.
+// Update this if the production domain ever changes.
+const PROD_SITE = 'https://safepipe-proj.vercel.app/changelog.html';
+// Local authoring hosts: login is disabled here on purpose — the OAuth
+// callback and /api/due are production serverless routes, so a local token
+// could never commit. Show a redirect to the live site instead.
+function isLocalHost() {
+  try {
+    const h = String(window.location.hostname || '').toLowerCase();
+    if (!h || h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '0.0.0.0') return true;
+    if (/\.local$|\.lan$|\.internal$/.test(h)) return true;
+  } catch { return false; }
+  return false;
+}
 let menuBound = false;
 export function applyScheduleState() {
   const user = getSchedUser();
@@ -82,6 +96,7 @@ function loginWithGitHub() {
 }
 function openGate() {
   let gate = document.querySelector('[data-schedule-gate]');
+  const local = isLocalHost();
   if (!gate) {
     gate = document.createElement('div');
     gate.className = 'ds-gate';
@@ -90,26 +105,30 @@ function openGate() {
     gate.innerHTML = [
       '<div class="ds-gate-card" role="dialog" aria-modal="true" aria-label="Log in with GitHub to schedule">',
       '<p class="ds-gate-eyebrow">Schedule</p>',
-      '<h2>Log in to schedule</h2>',
-      '<p>Sign in with GitHub — this device remembers you.</p>',
-      '<div class="ds-gate-actions">',
-      '<button class="ds-gate-primary" data-gate-login>Continue with GitHub</button>',
-      '<button class="ds-gate-ghost" data-gate-cancel>Cancel</button>',
-      '</div></div>',
+      // Local authoring build: no login here — scheduling is a production
+      // action. The card swaps to a redirect to the live site.
+      local
+        ? `<h2>Scheduling lives on the live site</h2><p>Log in and pick dates on production — they commit to git and reach every device.</p><div class="ds-gate-actions"><a class="ds-gate-primary" data-gate-prod href="${PROD_SITE}">Open live site</a><button class="ds-gate-ghost" data-gate-cancel>Cancel</button></div>`
+        : '<h2>Log in to schedule</h2>',
+      local ? '' : '<p>Sign in with GitHub — this device remembers you.</p>',
+      local ? '' : '<div class="ds-gate-actions"><button class="ds-gate-primary" data-gate-login>Continue with GitHub</button><button class="ds-gate-ghost" data-gate-cancel>Cancel</button></div>',
+      '</div>',
     ].join('');
     document.body.appendChild(gate);
     gate.addEventListener('click', (e) => { if (e.target === gate) closeGate(); });
     gate.querySelector('[data-gate-cancel]').addEventListener('click', closeGate);
-    gate.querySelector('[data-gate-login]').addEventListener('click', () => {
-      closeGate();
-      loginWithGitHub();
-    });
+    if (!local) {
+      gate.querySelector('[data-gate-login]').addEventListener('click', () => {
+        closeGate();
+        loginWithGitHub();
+      });
+    }
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeGate();
     });
   }
   gate.hidden = false;
-  try { gate.querySelector('[data-gate-login]').focus(); } catch {}
+  try { gate.querySelector('[data-gate-login],[data-gate-prod]').focus(); } catch {}
 }
 export function openScheduleGate() {
   openGate();

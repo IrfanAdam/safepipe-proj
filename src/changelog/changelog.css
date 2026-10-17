@@ -63,6 +63,7 @@ body{background:var(--color-bg);color:var(--color-ink);font-family:var(--sp-font
 .ds-gate-actions{display:flex;gap:var(--cl-8)}
 .ds-gate-primary{font-family:var(--font-display);font-weight:600;font-size:14px;background:var(--color-accent);color:var(--sp-text-inverse);border:var(--cl-1) solid var(--color-accent);border-radius:var(--sp-radius-md);padding:var(--cl-8) var(--cl-16);cursor:pointer}
 .ds-gate-ghost{font-family:var(--font-display);font-weight:600;font-size:14px;background:transparent;color:var(--color-ink-muted);border:var(--border-hairline);border-radius:var(--sp-radius-md);padding:var(--cl-8) var(--cl-16);cursor:pointer}
+a.ds-gate-primary{text-decoration:none;display:inline-block}
 .hbar-close{display:grid;place-items:center;text-decoration:none;background:transparent;color:var(--color-ink-muted);border:var(--border-hairline);border-radius:var(--sp-radius-md);width:36px;height:36px;font-size:13px;transition:color .15s ease}
 .hbar-close:hover{color:var(--color-ink)}
 .ds-crumb{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin:0 0 var(--cl-12)}
@@ -106,4 +107,12 @@ body{background:var(--color-bg);color:var(--color-ink);font-family:var(--sp-font
 @media (max-width:420px){
   .hbar{padding:0 var(--cl-16);gap:var(--cl-8)}
   .hbar .brand{font-size:var(--sp-text-lg)}
+}
+/* mobile tag bottom-sheet: inline pills hide behind the filter button, whose
+   dropdown restyles as a fixed sheet (backdrop via 100vmax scrim spread). */
+/* [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling] */
+.ds-chip-filter__icon{width:var(--cl-14);height:var(--cl-14);flex:none;vertical-align:middle}
+@media (max-width:640px){
+  .ds-chips .ds-chip[data-tag]{display:none}
+  .ds-tag-dropdown{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:var(--z-ds-drawer);max-height:70dvh;overflow:auto;border-radius:var(--radius-md) var(--radius-md) 0 0;box-shadow:0 0 0 100vmax var(--color-viewer-shade),var(--shadow-viewer)}
 }

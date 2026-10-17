@@ -5,7 +5,6 @@ const INLINE_TAGS = 5;
 export function paintChips(root, ctx){
   const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts } = ctx;
   const visibleTags = counts.slice(0, INLINE_TAGS);
-  const overflowTags = counts.slice(INLINE_TAGS);
   const dayChip = day ? [
     `<button class="ds-chip on" data-day-clear aria-label="Clear day filter">`,
     fmtDate(day),
@@ -24,19 +23,21 @@ export function paintChips(root, ctx){
     n,
     `)</button>`,
   ].join('')).join('');
-  const filterBtn = overflowTags.length ? [
-    `<button class="ds-chip ds-chip-filter" data-tag-filter aria-haspopup="true" aria-expanded="false" aria-label="More filters">`,
-    `<span aria-hidden="true">⚙</span> +${overflowTags.length}`,
+  const filterCount = active.size ? `${active.size} on` : `${counts.length}`;
+  const filterLabel = `Open filters, ${counts.length} tags${active.size ? `, ${active.size} active` : ''}`;
+  const filterBtn = counts.length ? [
+    `<button class="ds-chip ds-chip-filter" data-tag-filter aria-haspopup="true" aria-expanded="false" aria-label="${filterLabel}">`,
+    `<svg class="ds-chip-filter__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h12L9.5 8.2V12l-3 1.5V8.2L2 3z"/></svg> ${filterCount}`,
     `</button>`,
-    `<div class="ds-tag-dropdown" data-tag-dropdown hidden role="menu" aria-label="Additional filters">`,
-    overflowTags.map(([t, n]) => [
+    `<div class="ds-tag-dropdown" data-tag-dropdown hidden role="menu" aria-label="All filters">`,
+    counts.map(([t, n]) => [
       `<label class="ds-tag-option">`,
       `<input type="checkbox" data-tag-opt="${t}" ${active.has(t) ? 'checked' : ''}>`,
       `${t} (${n})`,
       `</label>`,
     ]).join(''),
     `</div>`,
-  ].join('') : '';
+  ].join('') : ''; // [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
   const hasFilters = active.size > 0 || day;
   // Text-like clear: sits with the tag stack, not a pill pulled right.
   const clearBtn = hasFilters ? [

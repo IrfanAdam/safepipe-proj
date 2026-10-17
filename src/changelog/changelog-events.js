@@ -211,8 +211,21 @@ export function bindChangelogEvents(root, st, helpers) {
     // silently local-only: without a token the login gate opens so the
     // date can be committed to git and reach every device via redeploy.
     st.dueCommit = { file: plan.file, head: sprint.head, state: 'saving' };
-    doPaint(root);
+    try { doPaint(root); } catch {}
     const gen = ++dueGen;
+    // Watchdog: the 'saving' state must never stick. Every async path below
+    // resolves it — except a hung request or a paint throw — so a 45s guard
+    // fails it visibly. Skipped once the freeze overlay owns the flow (the
+    // repo-confirm poll legitimately runs for minutes, with its own timeout
+    // plus per-attempt abort budgets).
+    let frozen = false;
+    try {
+      setTimeout(() => {
+        try {
+          if (gen === dueGen && !frozen && st.dueCommit && st.dueCommit.state === 'saving') failDue('failed');
+        } catch {}
+      }, 45000);
+    } catch {}
     const failDue = (state) => {
       if (gen !== dueGen) return;
       st.dueCommit = { file: plan.file, head: sprint.head, state };
@@ -286,7 +299,7 @@ export function bindChangelogEvents(root, st, helpers) {
                 try { doPaint(root); } catch {}
                 return;
               }
-              try { show(null, { file: plan.file, head: sprint.head, due: iso || null }); } catch {}
+              try { show(null, { file: plan.file, head: sprint.head, due: iso || null }); frozen = true; } catch {}
               try { if (typeof setStep === 'function') setStep('committed'); } catch {}
               let confirmMod = null;
               try { confirmMod = await import('../logic/due-deploy-confirm.js'); } catch { confirmMod = null; }
@@ -415,6 +428,15 @@ export function bindChangelogEvents(root, st, helpers) {
       const dd = root.querySelector('[data-tag-dropdown]');
       if (dd) { dd.hidden = !dd.hidden; tf.setAttribute('aria-expanded', String(!dd.hidden)); }
       return;
+    }
+    // Outside-dismiss: a click outside an open tag dropdown and outside its
+    // button closes it (same idiom as the datepicker dismiss above).
+    // [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
+    const openDd = root.querySelector('[data-tag-dropdown]:not([hidden])');
+    if (openDd && !(e.target.closest && e.target.closest('[data-tag-dropdown],[data-tag-filter]'))) {
+      openDd.hidden = true;
+      const fb = root.querySelector('[data-tag-filter]');
+      if (fb) fb.setAttribute('aria-expanded', 'false');
     }
     // Checkbox in filter dropdown
     const topt = e.target.closest('[data-tag-opt]');

@@ -24,6 +24,9 @@ button.ds-day:focus-visible{outline:var(--cl-1) solid var(--color-accent);outlin
    they are incomplete (nothing logged yet), never solid like history. */
 button.ds-day.is-future{background:var(--color-surface);border-color:var(--color-accent)}
 button.ds-day.is-future:hover{background:var(--color-surface)}
+/* Selected future dot: hollow look kept, but full-strength with an ink
+   border + outer ring so selection reads at a glance. */
+button.ds-day.is-future.on{opacity:1;border-color:var(--color-ink);outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 /* phone tap size — day-filter cells 14px → 16px (44px-class target is not
    reachable without dropping a week column; 16px is the max that keeps all
    16 weeks + the 26px DoW column inside 342px of content:

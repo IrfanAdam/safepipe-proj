@@ -77,6 +77,19 @@ export function assetHash(asset) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Every attempt gets its own abort budget: a hung request (blackholed
+// connection, stalled radio) becomes a failed attempt instead of stalling
+// the whole confirmation — the overall deadline is only checked between
+// attempts. [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
+const fetchBounded = async (fetchImpl, url, init, ms = 20000) => {
+  const c = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const t = c ? setTimeout(() => { try { c.abort(); } catch {} }, ms) : null;
+  try {
+    return await fetchImpl(url, { ...init, ...(c ? { signal: c.signal } : {}) });
+  } finally {
+    if (t) clearTimeout(t);
+  }
+};
 const throwIfAborted = (signal) => {
   if (signal && signal.aborted) {
     const e = new Error('confirmDueLive: aborted');
@@ -92,7 +105,7 @@ async function pollRepo({ fetchImpl, token, repo, branch, file, head, due, fileS
     throwIfAborted(signal);
     let entry = null;
     try {
-      const r = await fetchImpl(url, {
+      const r = await fetchBounded(fetchImpl, url, {
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
         cache: 'no-store',
       });
@@ -116,7 +129,7 @@ async function pollDeploy({ fetchImpl, pageUrl, currentAsset, deadline, interval
   for (;;) {
     throwIfAborted(signal);
     try {
-      const r = await fetchImpl(`${base}${sep}_=${Date.now()}`, { cache: 'no-store' });
+      const r = await fetchBounded(fetchImpl, `${base}${sep}_=${Date.now()}`, { cache: 'no-store' });
       if (r && r.ok) {
         const html = await r.text();
         const found = extractChangelogAsset(html);
