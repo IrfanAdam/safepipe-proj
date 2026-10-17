@@ -53,8 +53,10 @@ button.ds-day.is-future.on{opacity:1;border-color:var(--color-ink);outline:var(-
     position:sticky;
     left:0;
     z-index:2;
-    background:var(--color-bg);
-    /* weekday stays pinned while blobs scroll — solid page bg with soft edge */
+    background:color-mix(in srgb, var(--color-bg) 88%, transparent);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+    /* weekday stays pinned while blobs scroll — faded page bg with soft edge */
     box-shadow:4px 0 8px -6px color-mix(in srgb, var(--color-ink) 10%, transparent);
   }
   .ds-dows::after{
@@ -64,7 +66,7 @@ button.ds-day.is-future.on{opacity:1;border-color:var(--color-ink);outline:var(-
     right:calc(-1 * var(--cl-12));
     bottom:0;
     width:var(--cl-12);
-    background:linear-gradient(to right, var(--color-bg), transparent);
+    background:linear-gradient(to right, color-mix(in srgb, var(--color-bg) 88%, transparent), transparent);
     pointer-events:none;
   }
 }
