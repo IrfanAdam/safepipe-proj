@@ -234,10 +234,10 @@ export function bindChangelogEvents(root, st, helpers) {
     // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
     const gen = ++dueGen;
     const progDetail = { file: plan.file, head: sprint.head, due: iso || null };
-    const failDue = (state) => {
+    const failDue = (state, reason) => {
       if (gen !== dueGen) return;
       try { hideDueProgress(progDetail, 0); } catch {}
-      st.dueCommit = { file: plan.file, head: sprint.head, state };
+      st.dueCommit = { file: plan.file, head: sprint.head, state, reason: reason || null };
       try { doPaint(root); } catch {}
     };
     // Success is confirmed, not assumed: flash 'published ✓', then dismiss.
@@ -286,7 +286,7 @@ export function bindChangelogEvents(root, st, helpers) {
           return;
         }
       } catch {
-        if (gen === dueGen) failDue('failed');
+        if (gen === dueGen) failDue('failed', 'offline');
         return;
       }
       // Static host (production): no file writer — commit through /api/due
@@ -299,15 +299,24 @@ export function bindChangelogEvents(root, st, helpers) {
       let r2 = null;
       try {
         r2 = await postDue('/api/due', payload);
-      } catch {
+      } catch (e1) {
         try { r2 = await postDue('/api/due', payload); }
-        catch { if (gen === dueGen) failDue('failed'); return; }
+        catch (e2) {
+          if (gen === dueGen) {
+            const timedOut = (e1 && e1.name === 'AbortError') || (e2 && e2.name === 'AbortError');
+            failDue('failed', timedOut ? 'timeout' : 'offline');
+          }
+          return;
+        }
       }
       if (gen !== dueGen) return;
       if (r2 && r2.ok) {
         let body = null;
         try { body = await r2.json(); } catch {}
-        if (body && (body.unchanged || body.committed === false)) { failDue('failed'); return; }
+        if (body && (body.unchanged || body.committed === false)) {
+          failDue('failed', body.unchanged ? 'unchanged' : 'error');
+          return;
+        }
         if (gen !== dueGen) return;
         try { setDueProgressStep(progDetail, 'committed'); } catch {}
         // Server truth wins: apply the committed file text directly — no
@@ -332,6 +341,15 @@ export function bindChangelogEvents(root, st, helpers) {
         markSaved();
         return;
       }
+      if (r2 && !r2.ok && r2.status !== 401 && r2.status !== 403) {
+        // Non-auth HTTP failure: log the server reason for diagnostics and
+        // surface the status code inline so a retry report names the cause.
+        let detail = '';
+        try { detail = await r2.text(); } catch {}
+        try { console.error('[due-commit] publish failed', r2.status, String(detail).slice(0, 300)); } catch {}
+        failDue('failed', `http ${r2.status}`);
+        return;
+      }
       if (r2 && (r2.status === 401 || r2.status === 403)) {
         // Token rejected or pre-scope grant (needs public_repo): clear the
         // whole session so the badge never outlives the proof. The inline
@@ -341,7 +359,7 @@ export function bindChangelogEvents(root, st, helpers) {
         failDue('needs-login');
         return;
       }
-      failDue('failed');
+      failDue('failed', 'error');
     })();
   };
   // Themed due datepicker: material-like month grid in Safepipe tokens

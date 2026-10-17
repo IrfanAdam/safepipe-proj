@@ -234,13 +234,15 @@ export function paintDetail(root, ctx){
   // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
   const dc = dueCommit && plan && sprint
     && dueCommit.file === plan.file && dueCommit.head === sprint.head ? dueCommit.state : '';
+  const dr = dueCommit && plan && sprint
+    && dueCommit.file === plan.file && dueCommit.head === sprint.head ? (dueCommit.reason || '') : '';
   const dueStatusHTML = !dc || secShipped ? '' : dc === 'saving'
     ? `<span class="ds-due-status" data-due-status="saving">publishing…</span>`
     : dc === 'saved'
       ? `<span class="ds-due-status is-ok" data-due-status="saved">published ✓</span>`
       : dc === 'needs-login'
         ? `<button class="ds-due-status is-warn" data-due-retry="login">only on this device — sign in again to publish</button>`
-        : `<button class="ds-due-status is-err" data-due-retry="commit">couldn't reach git — tap to retry</button>`;
+        : `<button class="ds-due-status is-err" data-due-retry="commit">couldn't publish${dr ? ` (${dr})` : ''} — tap to retry</button>`;
   const dueHTML = secShipped
     ? ''
     : [
