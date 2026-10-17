@@ -5,6 +5,7 @@
 import { saveDueOverride, dropDueOverride } from '../logic/due-overrides.js';
 import { getSchedToken, clearSchedToken, clearSchedUser } from '../logic/schedule-auth.js';
 import { openScheduleGate } from './schedule-gate.js';
+import { showDueProgress, setDueProgressStep, hideDueProgress } from './due-progress.js';
 // Due scheduling (task 3): pure file-text edit — insert/replace/clear the
 // single `*Due: YYYY-MM-DD*` line under the owning head, idempotently (first
 // Due-shaped line wins, extras removed, never duplicated). Head not found →
@@ -232,8 +233,10 @@ export function bindChangelogEvents(root, st, helpers) {
     // explicit tap.
     // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
     const gen = ++dueGen;
+    const progDetail = { file: plan.file, head: sprint.head, due: iso || null };
     const failDue = (state) => {
       if (gen !== dueGen) return;
+      try { hideDueProgress(progDetail, 0); } catch {}
       st.dueCommit = { file: plan.file, head: sprint.head, state };
       try { doPaint(root); } catch {}
     };
@@ -265,6 +268,8 @@ export function bindChangelogEvents(root, st, helpers) {
         } catch {}
       }, 60000);
     } catch {}
+    // Narrate the background commit in the progress card (non-blocking).
+    try { showDueProgress(progDetail); } catch {}
     if (typeof fetch !== 'function') return;
     (async () => {
       try {
@@ -274,6 +279,9 @@ export function bindChangelogEvents(root, st, helpers) {
           st.duePending = null;
           // File now carries the value — the stored override is redundant.
           try { dropDueOverride(plan.file, sprint.head); } catch {}
+          try { setDueProgressStep(progDetail, 'committed'); } catch {}
+          try { setDueProgressStep(progDetail, 'live'); } catch {}
+          try { hideDueProgress(progDetail, 1800); } catch {}
           markSaved();
           return;
         }
@@ -301,6 +309,7 @@ export function bindChangelogEvents(root, st, helpers) {
         try { body = await r2.json(); } catch {}
         if (body && (body.unchanged || body.committed === false)) { failDue('failed'); return; }
         if (gen !== dueGen) return;
+        try { setDueProgressStep(progDetail, 'committed'); } catch {}
         // Server truth wins: apply the committed file text directly — no
         // CDN wait, no confirm poll. Falls back to the painted preview when
         // the helper is unavailable.
@@ -318,6 +327,8 @@ export function bindChangelogEvents(root, st, helpers) {
         if (applied) { try { dropDueOverride(plan.file, sprint.head); } catch {} }
         else { try { saveDueOverride(plan.file, sprint.head, iso || null, true); } catch {} }
         st.duePending = null;
+        try { setDueProgressStep(progDetail, 'live'); } catch {}
+        try { hideDueProgress(progDetail, 1800); } catch {}
         markSaved();
         return;
       }

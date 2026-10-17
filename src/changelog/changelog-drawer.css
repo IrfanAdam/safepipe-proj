@@ -116,6 +116,16 @@ body:not(.is-sched-auth) .ds-due:not(:has(.ds-due-static)){display:none}
 button.ds-due-status{background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:var(--cl-2)}
 .ds-due-status.is-warn,.ds-due-status.is-err{color:var(--color-accent);font-weight:700}
 .ds-due-status.is-ok{color:var(--color-ink);font-weight:700}
+/* Due publish progress card (scheduling pipeline): small floating narrator
+   for the background commit (publishing → published → live). Non-modal —
+   pointer-events:none, auto-dismissed, failures hide it. Token-only. */
+.ds-due-progress{position:fixed;left:50%;bottom:var(--cl-22);transform:translateX(-50%);z-index:calc(var(--z-ds-controls) + 10);background:var(--color-surface);border:var(--border-hairline);border-radius:var(--sp-radius-md);box-shadow:var(--sp-elevation-2);padding:var(--cl-12) var(--cl-16);pointer-events:none;max-width:calc(100vw - var(--cl-32))}
+.ds-due-progress[hidden]{display:none}
+.ds-due-progress__steps{list-style:none;margin:0;padding:0;display:flex;gap:var(--cl-12)}
+.ds-due-progress__steps li{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding-left:var(--cl-14);position:relative;white-space:nowrap}
+.ds-due-progress__steps li::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:var(--cl-7);height:var(--cl-7);border-radius:50%;border:var(--cl-1) solid var(--color-border);background:var(--color-bg);box-sizing:border-box}
+.ds-due-progress__steps li.is-on{color:var(--color-ink);font-weight:700}
+.ds-due-progress__steps li.is-on::before{background:var(--color-accent);border-color:var(--color-accent)}
 .ds-due-pop{position:absolute;top:100%;left:0;z-index:2;background:var(--color-bg);border:var(--border-hairline);border-radius:var(--cl-6);box-shadow:var(--sp-elevation-2);padding:var(--cl-8) var(--cl-8) var(--cl-4);margin-top:var(--cl-4);width:max-content}
 .ds-due-cal__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--cl-4)}
 .ds-due-cal__head b{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink)}
