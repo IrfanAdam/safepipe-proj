@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-17T12:06:46.278Z",
+  "generated": "2026-10-17T12:06:57.174Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -18,6 +18,15 @@
     "2026-10-17_180000-safepipe-smooth-scheduling.md"
   ],
   "commits": [
+    {
+      "sha": "18c4d0c",
+      "full": "18c4d0c3480d27f06cc614e0d9690754ad2988e0",
+      "date": "2026-10-17",
+      "time": "17:36",
+      "subject": "fix(schedule): self-update only from neutral timeline, cache-primed reload [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-3]",
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+      "anchor": "task-3"
+    },
     {
       "sha": "1312d87",
       "full": "1312d878a3ae4db62df792a539178e45936ba5b6",
@@ -4042,7 +4051,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/changelog/pages-changelog.js"
-  ]
+  "wip": []
 }
