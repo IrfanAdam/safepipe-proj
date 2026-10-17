@@ -98,3 +98,12 @@ body{background:var(--color-bg);color:var(--color-ink);font-family:var(--sp-font
 .ds-md a{color:inherit}
 .ds-note{color:var(--color-ink-muted)}
 .note{padding:8px 0 40px;font-size:13px;color:var(--sp-text-muted)}
+/* phone header: at ≤420px the single-row hbar had no slack — measured at 320px
+   (scrollWidth 281 vs clientWidth 270) the ✕ fell ~10px outside the rounded
+   card. Tighten padding/gap and step the brand down one token so the row fits
+   the narrowest phones (brand 83→~79 + right 144 + gap 8 = 231 inside 240);
+   ≥421px, including desktop, is untouched. */
+@media (max-width:420px){
+  .hbar{padding:0 var(--cl-16);gap:var(--cl-8)}
+  .hbar .brand{font-size:var(--sp-text-lg)}
+}

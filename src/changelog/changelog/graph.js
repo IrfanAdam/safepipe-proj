@@ -35,19 +35,26 @@ export function graph({ plans, day }) {
     weeks.push(col); ws.setDate(ws.getDate() + 7);
   }
   const DOWS = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
-  const spans = []; let lead = 0;
+  const spans = []; let lead = 0; let leadIn = 0;
   weeks.forEach((col) => {
     const f = col.find((d) => d.getDate() === 1);
-    if (f) { spans.push({ mo: f.getMonth(), n: lead + 1 }); lead = 0; }
+    if (f) { if (!spans.length) leadIn = lead; spans.push({ mo: f.getMonth(), n: 1 }); lead = 0; }
     else if (spans.length) spans[spans.length - 1].n++; else lead++;
   });
-  const labels = spans.map((s) => [
+  // Month labels: the weeks before the first month-start render as a text-less
+  // spacer span of their own width, so the first label starts exactly at its
+  // month's week — before, the lead-in was folded into the first span's width
+  // and that label drew up to ~6 weeks left of the month it names.
+  const mono = (mo, n) => [
     `<span class="ds-month" style="width: calc(`,
-    s.n,
+    n,
     ` * (var(--cl-16) + var(--cl-4)) - var(--cl-4))">`,
-    MONTHS[s.mo],
+    mo == null ? '' : MONTHS[mo],
     `</span>`,
-  ].join('')).join('');
+  ].join('');
+  const labels = spans.length
+    ? (leadIn ? mono(null, leadIn) : '') + spans.map((s) => mono(s.mo, s.n)).join('')
+    : '';
   const cols = weeks.map((col) => {
     const cells = col.map((d) => {
       const k = isoDay(d),

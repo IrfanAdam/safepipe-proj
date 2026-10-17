@@ -186,6 +186,10 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 22. Coverage + quieter accent: every bar now paints its done share from the left — `--tl-done` inline per bar (phasesDone/phases among the bout's phases; e.g. 4/5 → 80%, 1/2 → 50%, fully done → 100%) as a hard-stop gradient from the muted accent (45% → 35% accent × `neutral-5` ≈ `#bdb4eb`) to the neutral (`#eaeaea`); `[data-popdone]` fill rules retired (the gradient covers 100%).
 23. Lane density + softer done wash: `--cl-tl-row` 48→36px (bout padding 14→8px/side, streak 11→5px/side) and `--tl-bar-done` accent 35% → 30% (blob-lv1 parity) — verified rowH 36 live.
 
+24. Mobile responsive pass (owner steer, 2026-10-17): phone widths ≤720px. Build rows stack id+title / date / state / tags at ≤640 (the query set columns but not rows — tags sat on the title's row, state on the date's); calendar cells 14→16px (max that keeps 16 weeks + DoW column inside 342px); drawer/timeline ✕ get 32px hit boxes and rail pick titles a 2-line clamp (were hard-cut mid-word); due-picker day cells 26→36px with ≥32px nav/Clear/sched hit boxes; header tightens ≤420px (✕ fell ~10px outside the card at 320); scroll chaining contained in the rail/task/timeline panes; first `.ds-month` label now starts on its month's own week (text-less lead-in spacer — the only desktop-visible delta is that one label shifting one week); touch taps no longer latch the hover tooltip / timeline popover (`touchInput` guard; desktop hover byte-identical). Verified: 320/390 rects + zero-overlap scans, desktop 1280 parity (cells 14px, tags col3/row1 38ch), build green.
+
 - REF GATE (polish): chromium + webkit — white 7×7 tile in grid; 13 rows named on bars, no sidebar; popover 5 lines; bar→drawer-only→✕→timeline; zero page errors; build green.
 
 ### Follow-up ✓ done ead03a5
+
+### Mobile pass ✓ done

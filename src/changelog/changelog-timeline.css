@@ -33,7 +33,7 @@ aside.ds-timeline.is-open{opacity:1;transform:none;visibility:visible}
 .ds-tl-head b{font-family:var(--font-display);font-size:var(--sp-text-lg);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ds-tl-head small{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);align-self:center}
 .ds-tl-head button{font-family:var(--font-mono);font-size:var(--text-micro);background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);padding:var(--cl-4) var(--cl-8);cursor:pointer}
-.ds-tl-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding-bottom:var(--cl-16);padding-left:var(--cl-16) !important;margin-left:0 !important}
+.ds-tl-scroll{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;padding-bottom:var(--cl-16);padding-left:var(--cl-16) !important;margin-left:0 !important}
 .ds-tl-axis{display:flex;position:sticky;top:0;background:var(--color-bg);z-index:2;border-bottom:var(--border-hairline);padding:var(--cl-8) 0 var(--cl-4) !important;margin-left:0 !important}
 .ds-tl-ticks{position:relative;flex:none;height:var(--cl-20)}
 .ds-tl-tick{position:absolute;top:0;height:var(--cl-20);line-height:var(--cl-16);border-left:var(--border-hairline);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);width:var(--cl-tl-day);text-align:center;padding-left:0;white-space:nowrap;overflow:visible}
@@ -79,6 +79,10 @@ aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
 @media (max-width:720px){
   aside.ds-timeline{width:100vw}
   .ds-tl-head{flex-wrap:wrap}
+  /* Phone close: ≥32px tap target (was 25×24). The head still fits one row —
+     the title's flex slack absorbs the extra width, so no ellipsis and the
+     cl-16 head/grid inset stays flush. */
+  .ds-tl-head button{min-width:var(--cl-32);min-height:var(--cl-32);display:inline-flex;align-items:center;justify-content:center;padding:0}
 }
 @media (prefers-reduced-motion:reduce){
   aside.ds-timeline{transition:none}

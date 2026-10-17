@@ -64,6 +64,15 @@ export function bindChangelogEvents(root, st, helpers) {
   const { cur, doPaint } = helpers;
   const tlPop = () => root.querySelector('[data-tl-pop]');
   let popFor = null;
+  // Last input device, tracked from pointer/touch events. A tap fires the
+  // compatibility hover events (mouseover/mousemove at the touch point) right
+  // before its click, so a hover-only tip would latch on and stay: touch never
+  // fires mouseleave, and no click branch hides the tip — every tap on a
+  // [data-tip] row/bar/day-cell therefore leaves the tooltip parked over the
+  // thing just tapped (no tap path dismisses it). Touch input is never treated
+  // as hover; the next real mouse/pen event clears the flag, so desktop hover
+  // behaves exactly as before.
+  let touchInput = false;
   const hidePop = () => { popFor = null; const p = tlPop(); if (p) p.hidden = true; };
   const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const showPop = (el, x, y) => {
@@ -573,6 +582,7 @@ export function bindChangelogEvents(root, st, helpers) {
     if (st.view === 'timeline') { closeTimeline(); }
   };
   const move = (e) => {
+    if (touchInput) return; // a tap's synthetic hover must not latch a tip/pop
     const bout = e.target.closest ? e.target.closest('[data-tl-bout]') : null;
     if (bout && st.view === 'timeline') {
       if (bout === popFor) return; // same bar: stay put so the deadline link is clickable
@@ -633,14 +643,31 @@ export function bindChangelogEvents(root, st, helpers) {
     if (bout) hidePop();
   };
   const hideTip = () => { const t = root.querySelector('.ds-cursor-tip'); if (t) t.hidden = true; };
+  // Input-device tracking (see touchInput above): touch marks the device and
+  // clears anything already showing; the next mouse/pen move or press clears
+  // it again. touchstart/pointerdown both precede a tap's synthetic mousemove,
+  // so `move` sees the flag for the whole gesture. Passive: nothing here
+  // cancels the gesture, so scrolling stays native.
+  const onPointer = (e) => {
+    const t = e.pointerType;
+    if (t === 'touch') { touchInput = true; hideTip(); hidePop(); }
+    else if (t === 'mouse' || t === 'pen') touchInput = false;
+  };
+  const onTouchStart = () => { touchInput = true; hideTip(); hidePop(); };
   root.addEventListener('click', onClick); document.addEventListener('keydown', onKey);
   root.addEventListener('mousemove', move);
+  root.addEventListener('pointerdown', onPointer);
+  root.addEventListener('pointermove', onPointer);
+  root.addEventListener('touchstart', onTouchStart, { passive: true });
   root.addEventListener('focusin', onFocus);
   root.addEventListener('focusout', onBlur);
   document.addEventListener('mouseleave', hideTip);
   return () => {
     root.removeEventListener('click', onClick); document.removeEventListener('keydown', onKey);
     root.removeEventListener('mousemove', move);
+    root.removeEventListener('pointerdown', onPointer);
+    root.removeEventListener('pointermove', onPointer);
+    root.removeEventListener('touchstart', onTouchStart);
     root.removeEventListener('focusin', onFocus);
     root.removeEventListener('focusout', onBlur);
     document.removeEventListener('mouseleave', hideTip); };

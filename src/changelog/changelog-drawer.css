@@ -3,13 +3,13 @@
 .ds-scrim.is-open{opacity:1;visibility:visible}
 .ds-drawer{position:fixed;top:0;right:0;bottom:0;width:min(86vw,var(--size-ds-drawer));box-sizing:border-box;background:var(--color-bg);border-left:var(--border-hairline);z-index:var(--z-ds-drawer);overflow:hidden;padding:0;box-shadow:var(--shadow-viewer);display:flex;gap:0;align-items:stretch;opacity:0;transform:translateX(103%);visibility:hidden;transition:opacity var(--dur-panel) var(--ease-glide),transform var(--dur-panel) var(--ease-glide),visibility var(--dur-panel);will-change:transform,opacity}
 .ds-drawer.is-open{opacity:1;transform:none;visibility:visible}
-.ds-rail{flex:0 0 38%;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;border-right:var(--border-hairline);padding:var(--cl-18) 0 var(--cl-30) 0;display:flex;flex-direction:column}
+.ds-rail{flex:0 0 38%;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;border-right:var(--border-hairline);padding:var(--cl-18) 0 var(--cl-30) 0;display:flex;flex-direction:column}
 .ds-rail .ds-pick{padding:var(--cl-12) var(--cl-16);font-size:0.86em}
 .ds-rail .ds-pick small{display:block}
 .ds-rail [data-prov]{margin:auto 0 var(--cl-10);padding:var(--cl-16) var(--cl-16) 0}
 .ds-rail-foot{padding:var(--cl-10) var(--cl-16) 0; border-top:var(--border-hairline);font-size:var(--text-micro);line-height:var(--leading-prose);color:var(--color-ink-muted)}
 .ds-rail-plan{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--sp-text-primary);font-weight:600;line-height:var(--leading-prose);padding:var(--cl-8) var(--cl-16) var(--cl-8);margin:0 0 var(--cl-6);border-bottom:var(--border-hairline);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none;height:auto}
-.ds-task{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;padding:var(--cl-18) var(--cl-16) var(--cl-30)}
+.ds-task{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:var(--cl-18) var(--cl-16) var(--cl-30)}
 @media (prefers-reduced-motion:reduce){.ds-drawer,.ds-scrim{transition:none;animation:none}}
 @media (max-width:720px){.ds-drawer{width:100vw;flex-direction:column}.ds-rail{flex:none;border-right:none;border-bottom:var(--border-hairline);padding:var(--cl-16) 0 var(--cl-12) 0;max-height:38vh}}
 /* drawer head + picks */
@@ -152,3 +152,23 @@ button.ds-due-status{background:none;border:0;padding:0;cursor:pointer;text-deco
 .ds-freeze-live{position:absolute;width:var(--cl-1);height:var(--cl-1);overflow:hidden;clip-path:inset(50%)}
 @keyframes ds-freeze-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.ds-freeze-spinner{animation:none}}
+/* Phone (≤720px): the rail is full-width here, so a pick title that lost its
+   tail to the desktop one-line ellipsis (measured: 57px of "Timeline view —
+   button, side panel, tracks, summaries, nav" cut at 390px, i.e. the
+   distinguishing words) gets a second line instead. Desktop ≥1024px keeps
+   nowrap+ellipsis; the flush-left rail rhythm and the ✕'s look are unchanged —
+   only its hit box grows to a ≥32px tap target (was 27×24). */
+@media (max-width:720px){
+  .ds-drawer-head button{min-width:var(--cl-32);min-height:var(--cl-32);display:inline-flex;align-items:center;justify-content:center;padding:0}
+  .ds-rail .ds-pick .ds-row b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;white-space:normal}
+  /* due picker on a phone: every control was far under a comfortable tap size
+     (measured 390px: trigger 159×14, nav 13×16, day cell 26×26, Clear 30×19).
+     Day cells go to 36px — 7×36 + 6×gap(cl-2) + 2×cl-8 padding = 280px, inside
+     the 374px task pane — and the text controls get a ≥32px hit box. The quiet
+     inline look is unchanged; desktop stays byte-identical. */
+  .ds-due-sched{display:inline-flex;align-items:center;min-height:var(--cl-32)}
+  .ds-due-cal__head button{min-width:var(--cl-32);min-height:var(--cl-32);display:inline-flex;align-items:center;justify-content:center;padding:0}
+  .ds-due-cal__grid{grid-template-columns:repeat(7,var(--cl-36))}
+  .ds-due-day{width:var(--cl-36);height:var(--cl-36)}
+  .ds-due-cal__foot button{display:inline-flex;align-items:center;min-height:var(--cl-32)}
+}

@@ -24,3 +24,13 @@ button.ds-day:focus-visible{outline:var(--cl-1) solid var(--color-accent);outlin
    they are incomplete (nothing logged yet), never solid like history. */
 button.ds-day.is-future{background:var(--color-surface);border-color:var(--color-accent)}
 button.ds-day.is-future:hover{background:var(--color-surface)}
+/* phone tap size — day-filter cells 14px → 16px (44px-class target is not
+   reachable without dropping a week column; 16px is the max that keeps all
+   16 weeks + the 26px DoW column inside 342px of content:
+   16*(16+3) - 3 + 3 + 26 + 3 padding = 333px ≤ 342px). Only the cell size var
+   moves — --cl-4 stays 3px, so the .ds-month inline widths, which read
+   (var(--cl-16) + var(--cl-4)) in JS, stay aligned. Tints/radius/outlines
+   untouched. Must stay after line 2: same specificity, later wins. */
+@media (max-width:640px){
+  .ds-graph{--cl-16:calc(var(--sp-spacing-base) * 4)}
+}
