@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-17T11:45:35.112Z",
+  "generated": "2026-10-17T11:46:38.602Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -19,8 +19,8 @@
   ],
   "commits": [
     {
-      "sha": "e8bb96c",
-      "full": "e8bb96c5f7d6295ad17cdc919f14b5cc377cc070",
+      "sha": "51bb0e3",
+      "full": "51bb0e31fe715bcb6435d944fcc403609f154d3c",
       "date": "2026-10-17",
       "time": "17:15",
       "subject": "docs(plan): close smooth-scheduling tasks + regen manifest",
@@ -28,8 +28,8 @@
       "anchor": null
     },
     {
-      "sha": "1cdecb2",
-      "full": "1cdecb26f915d1335218bd72e10c251d755fce7a",
+      "sha": "d65bcdb",
+      "full": "d65bcdb8f2e4d5932feab29cd774fa04712b706d",
       "date": "2026-10-17",
       "time": "17:15",
       "subject": "feat(schedule): sha-gated plan sync, instant foreground refresh [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-3]",
@@ -37,8 +37,8 @@
       "anchor": "task-3"
     },
     {
-      "sha": "cfb6e18",
-      "full": "cfb6e18e1390146cc4f936d23c23ae5fa69d4eac",
+      "sha": "0300298",
+      "full": "0300298b7863219b2228b74ad1eed373a556e62e",
       "date": "2026-10-17",
       "time": "17:15",
       "subject": "feat(schedule): optimistic due save, background commit, freeze retired [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]",
@@ -46,8 +46,8 @@
       "anchor": "task-2"
     },
     {
-      "sha": "ac86a68",
-      "full": "ac86a685ed199b60adf52995f7d45ea21cb11d4d",
+      "sha": "d27f94c",
+      "full": "d27f94c2fda16c194df2e6356ad95b35e8f417db",
       "date": "2026-10-17",
       "time": "17:15",
       "subject": "feat(schedule): sticky per-device login, gate only on explicit tap [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-1]",
@@ -3923,6 +3923,42 @@
       "subject": "safepipe v0 boilerplate: web-first Vite shell, ontology stub, DS tokens, twin placeholder",
       "plan": "2026-10-05_150017-safepipe-prototype-screens.md",
       "anchor": null
+    },
+    {
+      "sha": "e8bb96c",
+      "full": "e8bb96c5f7d6295ad17cdc919f14b5cc377cc070",
+      "date": "2026-10-17",
+      "time": "17:15",
+      "subject": "docs(plan): close smooth-scheduling tasks + regen manifest",
+      "plan": null,
+      "anchor": null
+    },
+    {
+      "sha": "1cdecb2",
+      "full": "1cdecb26f915d1335218bd72e10c251d755fce7a",
+      "date": "2026-10-17",
+      "time": "17:15",
+      "subject": "feat(schedule): sha-gated plan sync, instant foreground refresh [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-3]",
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+      "anchor": "task-3"
+    },
+    {
+      "sha": "cfb6e18",
+      "full": "cfb6e18e1390146cc4f936d23c23ae5fa69d4eac",
+      "date": "2026-10-17",
+      "time": "17:15",
+      "subject": "feat(schedule): optimistic due save, background commit, freeze retired [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]",
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+      "anchor": "task-2"
+    },
+    {
+      "sha": "ac86a68",
+      "full": "ac86a685ed199b60adf52995f7d45ea21cb11d4d",
+      "date": "2026-10-17",
+      "time": "17:15",
+      "subject": "feat(schedule): sticky per-device login, gate only on explicit tap [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-1]",
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+      "anchor": "task-1"
     },
     {
       "sha": "0c4c968",
