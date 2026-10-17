@@ -249,7 +249,7 @@ export function paintDetail(root, ctx){
   const tagsTxt = visTags.join(' · ') + (moreTags > 0 ? ` · +${moreTags}` : '');
   const tagsFull = secTags.join(' · ');
   const tagsHead = secTags.length
-    ? `<b data-tip="${esc(tagsFull)}" title="${esc(tagsFull)}">${esc(tagsTxt)}</b>`
+    ? `<b data-tip="${esc(tagsFull)}">${esc(tagsTxt)}</b>`
     : `<b></b>`;
   root.querySelector('[data-col="tasks"]').innerHTML = [
     `<div class="ds-drawer-head">`,
