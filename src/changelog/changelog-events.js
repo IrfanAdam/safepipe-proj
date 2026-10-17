@@ -334,8 +334,8 @@ export function bindChangelogEvents(root, st, helpers) {
     })();
   };
   // Themed due datepicker: material-like month grid in Safepipe tokens
-  // (surface card, accent select, mono cells). Monday-first like the days
-  // grid. Rendered into [data-due-pop] on open; nav re-renders in place.
+  // (surface card, accent select, mono cells). Sunday-first week.
+  // Rendered into [data-due-pop] on open; nav re-renders in place.
   const DUE_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const pad2 = (n) => String(n).padStart(2, '0');
   const dueToday = () => { const n = new Date(); return `${n.getFullYear()}-${pad2(n.getMonth() + 1)}-${pad2(n.getDate())}`; };
@@ -347,10 +347,10 @@ export function bindChangelogEvents(root, st, helpers) {
     const sel = (btn.dataset.due || '').trim();
     dueView = /^\d{4}-\d{2}$/.test(dueView) ? dueView : (sel || dueToday()).slice(0, 7);
     const [y, mo] = dueView.split('-').map(Number);
-    const lead = (new Date(y, mo - 1, 1).getDay() + 6) % 7;
+    const lead = new Date(y, mo - 1, 1).getDay();
     const days = new Date(y, mo, 0).getDate();
     const today = dueToday();
-    let cells = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+    let cells = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
       .map((d) => `<span class="ds-due-cal__dow" aria-hidden="true">${d}</span>`).join('');
     for (let i = 0; i < lead; i++) cells += '<span aria-hidden="true"></span>';
     for (let d = 1; d <= days; d++) {
