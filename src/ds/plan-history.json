@@ -4172,39 +4172,6 @@
   {
    "sha": null,
    "date": "2026-10-17",
-   "time": "17:54",
-   "hash": "b49cbecf",
-   "sections": [
-    {
-     "head": "Phase 01 — Make it real",
-     "hash": "ef41bc28",
-     "state": "0/1"
-    },
-    {
-     "head": "Phase 02 — Asset / infrastructure layer",
-     "hash": "8116a1a9",
-     "state": "0/1"
-    },
-    {
-     "head": "Phase 03 — Time variance",
-     "hash": "9619e562",
-     "state": "0/3"
-    },
-    {
-     "head": "Phase 04 — Simulation",
-     "hash": "a9ba8807",
-     "state": "0/1"
-    },
-    {
-     "head": "Phase 05 — Operations layer",
-     "hash": "53581ece",
-     "state": "0/7"
-    }
-   ]
-  },
-  {
-   "sha": null,
-   "date": "2026-10-17",
    "time": "18:38",
    "hash": "0e0ded2e",
    "sections": [
@@ -4277,6 +4244,39 @@
     {
      "head": "Phase 01 — Make it real",
      "hash": "7a5f8d44",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 02 — Asset / infrastructure layer",
+     "hash": "8116a1a9",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 03 — Time variance",
+     "hash": "9619e562",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 04 — Simulation",
+     "hash": "a9ba8807",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "53581ece",
+     "state": "0/7"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-17",
+   "time": "17:54",
+   "hash": "b49cbecf",
+   "sections": [
+    {
+     "head": "Phase 01 — Make it real",
+     "hash": "ef41bc28",
      "state": "0/1"
     },
     {
