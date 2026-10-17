@@ -4238,12 +4238,12 @@
   {
    "sha": null,
    "date": "2026-10-17",
-   "time": "18:55",
-   "hash": "53f1ee93",
+   "time": "17:54",
+   "hash": "b49cbecf",
    "sections": [
     {
      "head": "Phase 01 — Make it real",
-     "hash": "7a5f8d44",
+     "hash": "ef41bc28",
      "state": "0/1"
     },
     {
@@ -4271,12 +4271,12 @@
   {
    "sha": null,
    "date": "2026-10-17",
-   "time": "17:54",
-   "hash": "b49cbecf",
+   "time": "18:55",
+   "hash": "53f1ee93",
    "sections": [
     {
      "head": "Phase 01 — Make it real",
-     "hash": "ef41bc28",
+     "hash": "7a5f8d44",
      "state": "0/1"
     },
     {
