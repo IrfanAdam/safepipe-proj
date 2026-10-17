@@ -2,7 +2,7 @@
 // Exports: bindChangelogEvents — click/key/hover wiring over shared state st
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
-import { saveDueOverride, dueFailureReason, duePublishStep, confirmPublish, headingOf, findHeadIndex } from '../logic/due-overrides.js';
+import { saveDueOverride, saveDueConfirm, dueFailureReason, duePublishStep, confirmPublish, headingOf, findHeadIndex } from '../logic/due-overrides.js';
 import { getSchedToken, clearSchedToken, clearSchedUser } from '../logic/schedule-auth.js';
 import { openScheduleGate } from './schedule-gate.js';
 import { showDueProgress, setDueProgressStep, hideDueProgress } from './due-progress.js';
@@ -187,6 +187,9 @@ export function bindChangelogEvents(root, st, helpers) {
   // only the latest pick's async continuations may touch the freeze overlay
   // or commit state — stale confirmations are ignored.
   let dueGen = 0;
+  // Per-file commit chains (see commitDue): serialized network order per
+  // plan file so rapid re-picks can't land out of order.
+  const dueFlights = {};
   const applyDue = (iso) => {
     const c = cur();
     const plan = c.plan, sprint = c.sprints[c.si];
@@ -309,7 +312,12 @@ export function bindChangelogEvents(root, st, helpers) {
     // Narrate the background commit in the progress card (non-blocking).
     try { showDueProgress(progDetail); } catch {}
     if (typeof fetch !== 'function') return;
-    (async () => {
+    // Per-file serialization: a rapid re-pick chains behind the in-flight
+    // commit for the same file, so concurrent POSTs can't land out of order
+    // (slow first pick overwriting a fast second pick = apparent revert).
+    // UI guards stay gen-based — the superseded flight's response is still
+    // ignored; only the network order is enforced. Other files run parallel.
+    const flight = async () => {
       try {
         const r = await postDue('/__ds/due', { file: plan.file, head: sprint.head, due: iso || null });
         if (gen !== dueGen) return;
@@ -408,6 +416,10 @@ export function bindChangelogEvents(root, st, helpers) {
         // or paints it when the server text lacks the value — either way the
         // painted date equals the pick at the "published" moment, never stale.
         try { saveDueOverride(plan.file, commitHead, iso || null, true); } catch {}
+        // Claim this value against lagged sync fetches: for the next 120s a
+        // fetched file that predates our commit is held, never painted, so
+        // the date can't revert to its previous value on CDN lag.
+        try { saveDueConfirm({ file: plan.file, head: commitHead, due: iso || null }); } catch {}
         // Server truth wins: apply the committed file text directly — no
         // CDN wait, no confirm poll. Falls back to the painted preview when
         // the helper is unavailable.
@@ -457,7 +469,13 @@ export function bindChangelogEvents(root, st, helpers) {
         return;
       }
       failDue('failed', 'error');
-    })();
+    };
+    try {
+      const prev = dueFlights[plan.file] || null;
+      dueFlights[plan.file] = (prev ? prev.catch(() => {}) : Promise.resolve()).then(flight, flight);
+      // Never leave an unhandled rejection on the chain tail.
+      try { dueFlights[plan.file].catch(() => {}); } catch {}
+    } catch { try { flight(); } catch {} }
   };
   // Themed due datepicker: material-like month grid in Safepipe tokens
   // (surface card, accent select, mono cells). Sunday-first week.

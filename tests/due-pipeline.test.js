@@ -28,6 +28,11 @@ import {
   dueFailureReason,
   duePublishStep,
   confirmPublish,
+  saveDueConfirm,
+  readDueConfirm,
+  clearDueConfirm,
+  dueFetchVerdict,
+  DUE_CONFIRM_WINDOW_MS,
   normHead,
   headingOf,
   findHeadIndex,
@@ -531,5 +536,45 @@ describe('due progress card (DOM keying, repo stub conventions)', () => {
     assert.equal(card.hidden, false, 'stale hide must not dismiss the re-pick');
     prog.hideDueProgress(b, 0);
     assert.equal(card.hidden, true);
+  });
+});
+
+describe('dueFetchVerdict (post-commit lagged-fetch guard)', () => {
+  const rec = { file: 'p.md', head: 'H', due: '2026-11-02', at: 1000000 };
+  it('no claim takes the fetched text', () => {
+    assert.equal(dueFetchVerdict(null, 'p.md', '2026-10-01', 1000000), 'apply');
+  });
+  it('other files are unaffected', () => {
+    assert.equal(dueFetchVerdict(rec, 'other.md', null, 1000000), 'apply');
+  });
+  it('lagged pre-commit text is held, never painted', () => {
+    assert.equal(dueFetchVerdict(rec, 'p.md', '2026-10-01', 1000000 + 5000), 'skip');
+    assert.equal(dueFetchVerdict(rec, 'p.md', null, 1000000 + 5000), 'skip');
+  });
+  it('file truth carrying our value confirms and settles', () => {
+    assert.equal(dueFetchVerdict(rec, 'p.md', '2026-11-02', 1000000 + 5000), 'confirmed');
+  });
+  it('clear claims confirm on absence', () => {
+    const clr = { file: 'p.md', head: 'H', due: null, at: 1000000 };
+    assert.equal(dueFetchVerdict(clr, 'p.md', null, 1000000 + 1000), 'confirmed');
+    assert.equal(dueFetchVerdict(clr, 'p.md', '2026-10-01', 1000000 + 1000), 'skip');
+  });
+  it('expired claims accept the fetched text', () => {
+    assert.equal(dueFetchVerdict(rec, 'p.md', '2026-10-01', 1000000 + DUE_CONFIRM_WINDOW_MS), 'apply');
+    assert.equal(dueFetchVerdict(rec, 'p.md', '2026-10-01', 1000000 + DUE_CONFIRM_WINDOW_MS + 1), 'apply');
+  });
+  it('confirm store round-trips and clears', () => {
+    saveDueConfirm({ file: 'p.md', head: 'H', due: '2026-11-02' });
+    const back = readDueConfirm();
+    assert.equal(back.file, 'p.md');
+    assert.equal(back.due, '2026-11-02');
+    assert.ok(Number.isFinite(back.at));
+    clearDueConfirm();
+    assert.equal(readDueConfirm(), null);
+  });
+  it('malformed records never block a fetch', () => {
+    assert.equal(dueFetchVerdict({ file: 'p.md' }, 'p.md', null, 1000000), 'apply');
+    saveDueConfirm({ file: 'p.md' });
+    assert.equal(readDueConfirm(), null);
   });
 });

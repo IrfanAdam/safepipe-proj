@@ -10,7 +10,7 @@ import history from '../ds/plan-history.json';
 import { goal, split, parseMeta, anchorOf, phash, dueOf } from './changelog-parse.js';
 import { paint } from './changelog-paint.js';
 import { duePreviewEdit } from './changelog-events.js';
-import { loadDueOverrides, dropDueOverride, overrideVerdict, canonicalHead } from '../logic/due-overrides.js';
+import { loadDueOverrides, dropDueOverride, overrideVerdict, canonicalHead, readDueConfirm, clearDueConfirm, dueFetchVerdict, findHeadIndex } from '../logic/due-overrides.js';
 import { getSchedToken } from '../logic/schedule-auth.js';
 import { TIMELINE_TILE_ICON } from './changelog/graph.js';
 import { bindChangelogEvents } from './changelog-events.js';
@@ -130,8 +130,35 @@ export async function refreshLivePlans(root) {
     const changed = typeof src.changedTexts === 'function' ? src.changedTexts(rawTexts, live) : {};
     const keys = Object.keys(changed);
     if (!keys.length) return false;
+    // Post-commit fetch guard: a lagged sync fetch (CDN pre-commit bytes)
+    // must not regress a just-published date to its previous value. While
+    // our confirm claim is fresh, hold the current paint for files whose
+    // fetched text predates the commit; clear the claim once file truth
+    // carries our value.
+    try {
+      const rec = readDueConfirm();
+      if (rec) {
+        let settled = false;
+        for (const k of keys) {
+          if (k !== rec.file) continue;
+          let curDue = null;
+          let found = false;
+          try {
+            const secs = split(changed[k]);
+            const heads = secs.map((s) => s.head);
+            const ix = findHeadIndex(heads, rec.head);
+            if (ix >= 0 && ix < secs.length) { curDue = dueOf(secs[ix]) || null; found = true; }
+          } catch { found = false; }
+          const v = dueFetchVerdict(rec, k, found ? curDue : undefined, Date.now());
+          if (v === 'skip') { delete changed[k]; }
+          else if (v === 'confirmed') { settled = true; }
+        }
+        if (settled) { try { clearDueConfirm(); } catch {} }
+        if (!Object.keys(changed).length) return false;
+      }
+    } catch {}
     const merged = { ...rawTexts };
-    for (const k of keys) merged[k] = changed[k];
+    for (const k of Object.keys(changed)) merged[k] = changed[k];
     rebuildPlans(merged);
     paintPreservingPicker(root);
     return true;
