@@ -160,7 +160,7 @@ export function bindChangelogEvents(root, st, helpers) {
     const plan = c.list[li];
     const apply = (si) => {
       st.sel = [li, Math.min(Math.max(si, 0), Math.max(plan.sprints.length - 1, 0))];
-      st.open = true; st.stage = 'tasks'; st.returnView = 'timeline';
+      st.open = true; st.openFile = file; st.stage = 'tasks'; st.returnView = 'timeline';
       if (boutIdx !== null && boutIdx !== undefined) {
         st.tlSel = { planFile: file, boutIdx };
         st.tlLast = st.tlSel;
@@ -247,10 +247,15 @@ export function bindChangelogEvents(root, st, helpers) {
     // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
     const gen = ++dueGen;
     const progDetail = { file: plan.file, head: sprint.head, due: iso || null };
+    // Head actually sent to /api/due — resolved against the live plans just
+    // before the POST (below), so it is always canonical current text.
+    // progDetail keeps the pick-time head so the progress card key still
+    // matches every step/hide call in this flight.
+    let commitHead = sprint.head;
     const failDue = (state, reason) => {
       if (gen !== dueGen) return;
       try { hideDueProgress(progDetail, 0); } catch {}
-      st.dueCommit = { file: plan.file, head: sprint.head, state, reason: reason || null };
+      st.dueCommit = { file: plan.file, head: commitHead, state, reason: reason || null };
       keepDuePop();
     };
     // Success is confirmed, not assumed: flash 'published ✓', then dismiss.
@@ -260,13 +265,13 @@ export function bindChangelogEvents(root, st, helpers) {
       // Stamp our own commit time: the deploy self-update must not reload
       // this page for its own deploy while it is still building.
       try { localStorage.setItem('safepipe-last-due-commit', String(Date.now())); } catch {}
-      st.dueCommit = { file: plan.file, head: sprint.head, state: 'saved' };
+      st.dueCommit = { file: plan.file, head: commitHead, state: 'saved' };
       keepDuePop();
       try {
         setTimeout(() => {
           try {
             if (gen === dueGen && st.dueCommit && st.dueCommit.state === 'saved'
-              && st.dueCommit.file === plan.file && st.dueCommit.head === sprint.head) {
+              && st.dueCommit.file === plan.file && st.dueCommit.head === commitHead) {
               st.dueCommit = null;
               keepDuePop();
             }
@@ -280,7 +285,7 @@ export function bindChangelogEvents(root, st, helpers) {
       setTimeout(() => {
         try {
           if (gen === dueGen && st.dueCommit && st.dueCommit.state === 'saving'
-            && st.dueCommit.file === plan.file && st.dueCommit.head === sprint.head) failDue('failed');
+            && st.dueCommit.file === plan.file && st.dueCommit.head === commitHead) failDue('failed');
         } catch {}
       }, 60000);
     } catch {}
@@ -308,10 +313,29 @@ export function bindChangelogEvents(root, st, helpers) {
       // Static host (production): no file writer — commit through /api/due
       // (GitHub-backed). The local override stays until the server truth
       // lands, so the UI never flickers.
+      // Send-time canonical head: the pick's closure head may predate a sync
+      // rebuild (live refresh / applyServerFileText) or a rename — resolve
+      // against the current plans so the server never 200s `unchanged`
+      // (head-not-found) for a stale head. progDetail keeps the pick-time
+      // head so the progress card key still matches.
+      try {
+        const live = await import('./pages-changelog.js');
+        if (gen !== dueGen) return;
+        if (live && typeof live.canonicalDueHead === 'function') {
+          const h = live.canonicalDueHead(plan.file, sprint.head);
+          if (typeof h === 'string' && h) commitHead = h;
+        }
+      } catch {}
+      if (gen !== dueGen) return;
+      if (commitHead !== sprint.head && st.dueCommit && st.dueCommit.state === 'saving'
+        && st.dueCommit.file === plan.file && st.dueCommit.head === sprint.head) {
+        st.dueCommit = { file: plan.file, head: commitHead, state: 'saving' };
+        keepDuePop();
+      }
       let token = null;
       try { token = getSchedToken(); } catch {}
       if (!token) { failDue('needs-login'); return; }
-      const payload = { token, file: plan.file, head: sprint.head, due: iso || null };
+      const payload = { token, file: plan.file, head: commitHead, due: iso || null };
       let r2 = null;
       try {
         r2 = await postDue('/api/due', payload);
@@ -330,7 +354,14 @@ export function bindChangelogEvents(root, st, helpers) {
         let body = null;
         try { body = await r2.json(); } catch {}
         if (body && (body.unchanged || body.committed === false)) {
-          failDue('failed', body.unchanged ? 'unchanged' : 'error');
+          // The server reports WHY it left the text alone (body.reason, e.g.
+          // head-not-found with headPreview/fileLines for diagnostics). Only
+          // the allowlisted code reaches the UI — everything else stays
+          // generic, and raw server text is never displayed.
+          let reason = body.unchanged ? 'unchanged' : 'error';
+          try { if (body && body.reason === 'head-not-found') reason = 'head-not-found'; } catch {}
+          try { console.error('[due-commit] publish left file unchanged', reason, plan.file); } catch {}
+          failDue('failed', reason);
           return;
         }
         if (gen !== dueGen) return;
@@ -349,8 +380,8 @@ export function bindChangelogEvents(root, st, helpers) {
           } catch {}
         }
         if (gen !== dueGen) return;
-        if (applied) { try { dropDueOverride(plan.file, sprint.head); } catch {} }
-        else { try { saveDueOverride(plan.file, sprint.head, iso || null, true); } catch {} }
+        if (applied) { try { dropDueOverride(plan.file, commitHead); } catch {} }
+        else { try { saveDueOverride(plan.file, commitHead, iso || null, true); } catch {} }
         st.duePending = null;
         try { setDueProgressStep(progDetail, 'live'); } catch {}
         try { hideDueProgress(progDetail, 1800); } catch {}
@@ -583,7 +614,10 @@ export function bindChangelogEvents(root, st, helpers) {
     const b = e.target.closest('.ds-pick'); if (!b) return;
     const col = b.closest('[data-col]'), i = [...col.querySelectorAll('.ds-pick')].indexOf(b);
     if (col.dataset.col === 'plan') { st.sel = [i,
-        st.sel[1]]; st.open = true; st.stage = 'tasks'; } else { st.sel = [st.sel[0],
+        st.sel[1]]; st.open = true; st.stage = 'tasks';
+      // Pin the explicitly opened plan by file so its drawer survives
+      // leaving the day filter; the filter keeps applying to lists only.
+      try { const c = cur(); if (c.list[i]) st.openFile = c.list[i].file; } catch {} } else { st.sel = [st.sel[0],
         i]; st.stage = 'tasks'; }
     doPaint(root);
   };

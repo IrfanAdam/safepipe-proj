@@ -302,10 +302,51 @@ const visibleSprints = (plan) => {
   const ss = st.active.size ? plan.sprints.filter((s) => s.tags.some((t) => st.active.has(t))) : plan.sprints;
   return ss.length ? ss : plan.sprints;
 };
+// Canonical head for a due commit, resolved from the live plans at send
+// time: a pick's closure head goes stale across sync rebuilds (live refresh,
+// applyServerFileText) or renames, and the server 200s `unchanged`
+// (head-not-found) for it. Exact match wins; then server-parity normalized
+// and single-candidate prefix-fuzzy matches (api/due.js); else null.
+export function canonicalDueHead(file, head) {
+  try {
+    const plan = plans.find((p) => p.file === file);
+    if (!plan) return null;
+    const want = String(head || '');
+    if (plan.sprints.some((s) => s.head === want)) return want;
+    const norm = (s) => String(s || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+    const nw = norm(want);
+    const byNorm = plan.sprints.find((s) => norm(s.head) === nw);
+    if (byNorm) return byNorm.head;
+    const key = nw.slice(0, 40);
+    if (key) {
+      const cand = plan.sprints.filter((s) => norm(s.head).includes(key));
+      if (cand.length === 1) return cand[0].head;
+    }
+  } catch {}
+  return null;
+}
 const cur = () => {
-  const list = visiblePlans(), pi = Math.min(st.sel[0], Math.max(list.length - 1, 0));
+  const list = visiblePlans(), pi = Math.min(Math.max(st.sel[0], 0), Math.max(list.length - 1, 0));
+  // An explicitly opened drawer keeps its detail even when its plan leaves
+  // the day filter (e.g. a due edit moves it off the filtered day): the day
+  // filter applies to lists only. Pinned by file identity; the list cursor
+  // (pi) stays day-filtered for highlight/nav.
+  if (st.open) {
+    if (!st.openFile) {
+      const fplan = list[pi];
+      if (fplan) st.openFile = fplan.file;
+    }
+    if (st.openFile) {
+      const pinned = plans.find((p) => p.file === st.openFile);
+      if (pinned) {
+        const sprints = visibleSprints(pinned);
+        return { list, pi, plan: pinned, sprints, si: Math.min(Math.max(st.sel[1], 0), Math.max(sprints.length - 1, 0)) };
+      }
+      st.openFile = null;
+    }
+  } else if (st.openFile) st.openFile = null;
   const plan = list[pi], sprints = plan ? visibleSprints(plan) : [];
-  return { list, pi, plan, sprints, si: Math.min(st.sel[1], Math.max(sprints.length - 1, 0)) };
+  return { list, pi, plan, sprints, si: Math.min(Math.max(st.sel[1], 0), Math.max(sprints.length - 1, 0)) };
 };
 export function render() {
   return [
@@ -409,7 +450,7 @@ export function mount(root) {
       const f = q.get('plan'), b = q.get('bout');
       if (f && plans.some((p) => p.file === f)) {
         const li = visiblePlans().findIndex((p) => p.file === f);
-        st.sel = [Math.max(li, 0), 0]; st.open = true; st.stage = 'tasks'; st.returnView = 'timeline';
+        st.sel = [Math.max(li, 0), 0]; st.open = true; st.openFile = f; st.stage = 'tasks'; st.returnView = 'timeline';
         if (b !== null && b !== '' && Number.isInteger(Number(b))) {
           st.tlSel = { planFile: f, boutIdx: Number(b) };
           st.tlLast = st.tlSel;
