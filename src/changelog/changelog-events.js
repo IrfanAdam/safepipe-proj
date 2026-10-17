@@ -190,6 +190,10 @@ export function bindChangelogEvents(root, st, helpers) {
   // Per-file commit chains (see commitDue): serialized network order per
   // plan file so rapid re-picks can't land out of order.
   const dueFlights = {};
+  // Supersede controller for the latest flight: a re-pick aborts the
+  // previous flight's hung POST so the new pick starts at once. Declared
+  // here (module strict mode — no implicit globals).
+  let dueFlightCtl = null;
   const applyDue = (iso) => {
     const c = cur();
     const plan = c.plan, sprint = c.sprints[c.si];
@@ -217,17 +221,30 @@ export function bindChangelogEvents(root, st, helpers) {
   // Bounded POST: a hung request becomes a failed attempt after 20s, never a
   // stuck state. One retry for network/timeout faults only — 4xx answers are
   // final (re-sending a rejected token fixes nothing).
-  const postDue = async (url, payload) => {
+  const postDue = async (url, payload, extSignal) => {
     const c = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const t = c ? setTimeout(() => { try { c.abort(); } catch {} }, 20000) : null;
+    // Supersede link: a re-pick aborts the previous flight's controller, so
+    // a hung POST on slow radio settles at once and the new pick's chained
+    // flight starts now instead of waiting out the 20s budget (mobile stall).
+    // The aborted flight's response stays gen-ignored; order is unchanged.
+    const link = (c && extSignal && typeof extSignal.addEventListener === 'function')
+      ? () => { try { c.abort(); } catch {} } : null;
     try {
+      if (link) {
+        if (extSignal.aborted) { try { c.abort(); } catch {} }
+        else { try { extSignal.addEventListener('abort', link, { once: true }); } catch {} }
+      }
       return await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         ...(c ? { signal: c.signal } : {}),
       });
-    } finally { if (t) clearTimeout(t); }
+    } finally {
+      if (t) clearTimeout(t);
+      if (link) { try { extSignal.removeEventListener('abort', link); } catch {} }
+    }
   };
   // The detail repaint rebuilds the datepicker shell — restore an open picker
   // after paint so background commits never slam it shut. Dismissal stays
@@ -242,6 +259,12 @@ export function bindChangelogEvents(root, st, helpers) {
       try { const p2 = root.querySelector('[data-due-pop]'); if (p2) p2.hidden = false; } catch {}
     }
   };
+  // Explicit dismissal: picking a date (or clearing) closes the calendar —
+  // the drawer stays open. Background paints never close it (keepDuePop);
+  // only a pick decision does.
+  const hideDuePop = () => {
+    try { const p = root.querySelector('[data-due-pop]'); if (p) p.hidden = true; } catch {}
+  };
   const commitDue = (plan, sprint, iso) => {
     // Commit state for the due row (paint-detail reads ctx.dueCommit):
     // saving (set by applyDue) → saved (auto-dismissed) | needs-login |
@@ -249,6 +272,13 @@ export function bindChangelogEvents(root, st, helpers) {
     // explicit tap.
     // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
     const gen = ++dueGen;
+    // Supersede: settle any previous flight's hung POST now (its response is
+    // gen-ignored) so this pick's chained flight starts immediately instead
+    // of queueing behind a slow request on flaky radio.
+    try { if (dueFlightCtl) dueFlightCtl.abort(); } catch {}
+    try { dueFlightCtl = typeof AbortController !== 'undefined' ? new AbortController() : null; }
+    catch { dueFlightCtl = null; }
+    const flightSignal = dueFlightCtl ? dueFlightCtl.signal : null;
     const progDetail = { file: plan.file, head: sprint.head, due: iso || null };
     // Head actually sent to /api/due — resolved against the live plans just
     // before the POST (below), so it is always canonical current text.
@@ -319,7 +349,7 @@ export function bindChangelogEvents(root, st, helpers) {
     // ignored; only the network order is enforced. Other files run parallel.
     const flight = async () => {
       try {
-        const r = await postDue('/__ds/due', { file: plan.file, head: sprint.head, due: iso || null });
+        const r = await postDue('/__ds/due', { file: plan.file, head: sprint.head, due: iso || null }, flightSignal);
         if (gen !== dueGen) return;
         if (r && r.ok) {
           st.duePending = null;
@@ -384,9 +414,9 @@ export function bindChangelogEvents(root, st, helpers) {
       const payload = { token, file: plan.file, head: commitHead, due: iso || null };
       let r2 = null;
       try {
-        r2 = await postDue('/api/due', payload);
+        r2 = await postDue('/api/due', payload, flightSignal);
       } catch (e1) {
-        try { r2 = await postDue('/api/due', payload); }
+        try { r2 = await postDue('/api/due', payload, flightSignal); }
         catch (e2) {
           if (gen === dueGen) {
             const timedOut = (e1 && e1.name === 'AbortError') || (e2 && e2.name === 'AbortError');
@@ -579,7 +609,7 @@ export function bindChangelogEvents(root, st, helpers) {
     // — schedules only run today-forward); Clear removes the Due line.
     // Existing overdue Dues still display their flag, they just can't be
     // (re-)picked.
-    if (e.target.closest('[data-due-clear]')) { applyDue(null); return; }
+    if (e.target.closest('[data-due-clear]')) { applyDue(null); hideDuePop(); return; }
     const dopen = e.target.closest('[data-due-open]');
     if (dopen) {
       const pop = root.querySelector('[data-due-pop]');
@@ -598,7 +628,7 @@ export function bindChangelogEvents(root, st, helpers) {
       return;
     }
     const dpick = e.target.closest('[data-due-pick]');
-    if (dpick) { applyDue(dpick.dataset.duePick); return; }
+    if (dpick) { applyDue(dpick.dataset.duePick); hideDuePop(); return; }
     // Commit-status retry: re-runs the full write pipeline (local writer,
     // else /api/due commit) for the date currently shown on the control.
     // needs-login re-opens the gate when there is still no token.
