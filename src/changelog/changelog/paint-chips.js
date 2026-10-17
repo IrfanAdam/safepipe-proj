@@ -39,7 +39,7 @@ export function paintChips(root, ctx){
     `</div>`,
   ].join('') : ''; // [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
   const hasFilters = active.size > 0 || day;
-  // Text-like clear: last in the stack, pushed to the right end via CSS.
+  // Text-like clear: inline in the flow before the timeline button.
   const clearBtn = hasFilters ? [
     `<button class="ds-chip-clear" data-tag-clear aria-label="Clear all filters">`,
     `Clear all</button>`,
@@ -49,7 +49,7 @@ export function paintChips(root, ctx){
     `<span class="ds-chip-timeline__icon" aria-hidden="true">${TIMELINE_TILE_ICON}</span> All ${plans.length} track${plans.length === 1 ? '' : 's'}`,
     `</button>`,
   ].join('');
-  root.querySelector('[data-col="chips"]').innerHTML = filterBtn + tagPills + dayChip + tlBtn + clearBtn;
+  root.querySelector('[data-col="chips"]').innerHTML = filterBtn + tagPills + dayChip + clearBtn + tlBtn;
   const gEl = root.querySelector('[data-col="graph"]');
   // Scheduling (timeline Task 3): the graph paints once for perf, but live
   // Due edits must reflect as ghost dots with no reload — repaint only when

@@ -117,8 +117,8 @@ button.ds-due-status{background:none;border:0;padding:0;cursor:pointer;text-deco
 .ds-due-status.is-warn,.ds-due-status.is-err{color:var(--color-accent);font-weight:700}
 .ds-due-status.is-ok{color:var(--color-ink);font-weight:700}
 /* Due publish progress card (scheduling pipeline): small floating narrator
-   for the background commit (Publishing… → Published ✓ + Updating
-   everywhere… → Live ✓, two stacked slots). Non-modal —
+   for the background commit (Publishing… → Published + Updating
+   everywhere… → Live, two stacked slots). Non-modal —
    pointer-events:none, auto-dismissed, failures hide it. Token-only. */
 .ds-due-progress{position:fixed;left:50%;bottom:var(--cl-22);transform:translateX(-50%);z-index:calc(var(--z-ds-controls) + 10);background:var(--color-surface);border:var(--border-hairline);border-radius:var(--sp-radius-md);box-shadow:var(--sp-elevation-2);padding:var(--cl-12) var(--cl-16);pointer-events:none;max-width:calc(100vw - var(--cl-32))}
 .ds-due-progress[hidden]{display:none}
@@ -128,8 +128,9 @@ button.ds-due-status{background:none;border:0;padding:0;cursor:pointer;text-deco
 .ds-due-progress__label{white-space:nowrap}
 .ds-due-spin{width:var(--cl-12);height:var(--cl-12);flex:none;border-radius:50%;border:var(--cl-1) solid var(--color-border);border-top-color:var(--color-accent);box-sizing:border-box;animation:ds-due-rot 0.8s linear infinite}
 .ds-due-spin[hidden]{display:none}
-.ds-due-tick{flex:none;color:var(--color-accent);font-weight:700}
-.ds-due-tick[hidden]{display:none}
+.ds-due-dot{width:var(--cl-12);height:var(--cl-12);flex:none;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}
+.ds-due-dot::before{content:"";width:var(--cl-7);height:var(--cl-7);border-radius:50%;background:var(--color-accent)}
+.ds-due-dot[hidden]{display:none}
 @keyframes ds-due-rot{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.ds-due-spin{animation:none;border-top-color:var(--color-border)}}
 .ds-due-pop{position:absolute;top:100%;left:0;z-index:2;background:var(--color-bg);border:var(--border-hairline);border-radius:var(--cl-6);box-shadow:var(--sp-elevation-2);padding:var(--cl-8) var(--cl-8) var(--cl-4);margin-top:var(--cl-4);width:max-content}

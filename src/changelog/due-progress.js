@@ -1,17 +1,17 @@
 // safepipe changelog — due publish progress toast (DOM) · [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
 // Two stacked slots in one card, both visible at once once the commit lands:
-// commit slot: Publishing… → Published ✓
-// deploy slot (hidden until commit lands): Updating everywhere… → Live ✓
-// In-progress rows show a spinner; landed rows show a check. The toast stays
+// commit slot: Publishing… → Published
+// deploy slot (hidden until commit lands): Updating everywhere… → Live
+// In-progress rows show a spinner; landed rows show a dot. The toast stays
 // visible for the whole cycle and dismisses only at live (or on failure,
 // when the inline retry takes over), so it never vanishes mid-cycle.
 // Deliberately NOT a modal: it never traps pointer or keyboard
 // (pointer-events:none) and never blocks the page. Keyed per pick so a
 // rapid re-pick never dismisses newer state.
 const CARD_ID = 'ds-due-progress';
-const COMMIT_LABELS = { publishing: 'Publishing…', committed: 'Published ✓' };
-const DEPLOY_LABELS = { deploying: 'Updating everywhere…', live: 'Live ✓' };
-// Spinner while the row is still working; check once it has landed.
+const COMMIT_LABELS = { publishing: 'Publishing…', committed: 'Published' };
+const DEPLOY_LABELS = { deploying: 'Updating everywhere…', live: 'Live' };
+// Spinner while the row is still working; dot once it has landed.
 const COMMIT_BUSY = { publishing: true, committed: false };
 const DEPLOY_BUSY = { deploying: true, live: false };
 // The toast's whole vocabulary — exported so tests can pin it: commit slot
@@ -48,8 +48,8 @@ function paintRow(card, scope, step) {
     if (spin) spin.hidden = !busy[step];
   } catch {}
   try {
-    const tick = card.querySelector(`[data-prog-${scope}-tick]`);
-    if (tick) tick.hidden = !!busy[step];
+    const dot = card.querySelector(`[data-prog-${scope}-dot]`);
+    if (dot) dot.hidden = !!busy[step];
   } catch {}
 }
 
@@ -65,7 +65,7 @@ function paintStep(card, step) {
     paintRow(card, 'commit', step);
     if (step === 'committed') {
       // Commit landed while propagation is still awaited: reveal the second
-      // slot so both read at once (Published ✓ + Updating everywhere…).
+      // slot so both read at once (Published + Updating everywhere…).
       setDeployVisible(card, true);
       paintRow(card, 'deploy', 'deploying');
     } else {
@@ -100,22 +100,21 @@ function buildRow(d, scope) {
   spin.className = 'ds-due-spin';
   spin.setAttribute(`data-prog-${scope}-spin`, '');
   spin.setAttribute('aria-hidden', 'true');
-  const tick = d.createElement('span');
-  tick.className = 'ds-due-tick';
-  tick.setAttribute(`data-prog-${scope}-tick`, '');
-  tick.setAttribute('aria-hidden', 'true');
-  tick.textContent = '✓';
+  const dot = d.createElement('span');
+  dot.className = 'ds-due-dot';
+  dot.setAttribute(`data-prog-${scope}-dot`, '');
+  dot.setAttribute('aria-hidden', 'true');
   const label = d.createElement('span');
   label.className = 'ds-due-progress__label';
   label.setAttribute(`data-prog-${scope}-label`, '');
   row.appendChild(spin);
-  row.appendChild(tick);
+  row.appendChild(dot);
   row.appendChild(label);
   // Legacy single-slot selectors keep resolving (first match = commit row)
   // so any external reader of [data-prog-label] still sees commit state.
   if (scope === 'commit') {
     spin.setAttribute('data-prog-spin', '');
-    tick.setAttribute('data-prog-tick', '');
+    dot.setAttribute('data-prog-dot', '');
     label.setAttribute('data-prog-label', '');
   }
   return row;

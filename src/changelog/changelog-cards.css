@@ -21,8 +21,9 @@
 /* phone stacking — one element per full-width row so the title never shares a cell:
    row1 = num, row2 = title (wraps, no cap), row3 = date, row4 = state, row5 = tags.
    Explicit grid-row on every leaf; grid-column alone left tags/date/state
-   overlapping the title. Padding untouched so .on's 2px accent border +
-   calc(--cl-12 - --cl-2) left padding stays aligned. [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling] */
+   overlapping the title. Padding untouched; .on selected state is neutralized
+   on mobile so all rows look default (no accent border, no bg shift).
+   [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling] */
 @media (max-width:640px){
   .ds-plan-grid{
     width:calc(100% + var(--sp-spacing-xl) * 2);
@@ -36,7 +37,8 @@
     grid-template-columns:auto minmax(0,1fr);
     padding:var(--cl-12) var(--sp-spacing-xl)
   }
-  .ds-plan-grid .ds-pick.on{padding-left:calc(var(--sp-spacing-xl) - var(--cl-2))}
+  .ds-plan-grid .ds-pick.on{background:none;border-left:none;padding-left:var(--sp-spacing-xl);box-shadow:none}
+  .ds-plan-grid .ds-pick.on small{color:var(--color-ink-muted)}
   .ds-plan-grid .ds-num{grid-column:1 / -1;grid-row:1}
   .ds-plan-grid .ds-main b{grid-column:1 / -1;grid-row:2;white-space:normal}
   .ds-plan-grid .ds-date{grid-column:1 / -1;grid-row:3;white-space:normal}

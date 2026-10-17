@@ -52,7 +52,11 @@ button.ds-day.is-future.on{opacity:1;border-color:var(--color-ink);outline:var(-
   .ds-graph-row{position:relative}
   .ds-dows{
     position:sticky;
-    left:0;
+    left:calc(-1 * var(--cl-16));
+    margin-left:calc(-1 * var(--cl-16));
+    padding-left:var(--cl-16);
+    box-sizing:border-box;
+    width:calc(var(--cl-26) + var(--cl-16));
     z-index:2;
     background:color-mix(in srgb, var(--color-bg) 88%, transparent);
     backdrop-filter:blur(6px);
