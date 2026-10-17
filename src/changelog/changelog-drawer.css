@@ -131,27 +131,6 @@ button.ds-due-status{background:none;border:0;padding:0;cursor:pointer;text-deco
 .ds-due-cal__foot{display:flex;justify-content:flex-end;margin-top:var(--cl-4)}
 .ds-due-cal__foot button{background:none;border:0;padding:var(--cl-4) 0;color:var(--color-ink-muted);font-family:var(--font-mono);font-size:calc(var(--text-micro) - 2px);text-decoration:underline;text-underline-offset:var(--cl-2);cursor:pointer}
 .ds-due-cal__foot button:hover{color:var(--color-accent)}
-/* Due freeze overlay (scheduling pipeline): full-screen blocking veil shown
-   while a deadline pick is committed + redeploy-confirmed. Sits above the
-   drawer, user menu and due popover; traps pointer only, never keyboard —
-   hideDueFreeze() always releases it. Token-only, no raw values. */
-.ds-freeze{position:fixed;inset:0;z-index:calc(var(--z-ds-controls) + 100);display:grid;place-items:center;background:var(--color-viewer-shade);pointer-events:all;padding:var(--cl-16)}
-.ds-freeze[hidden]{display:none}
-.ds-freeze-card{background:var(--color-surface);border:var(--border-hairline);border-radius:var(--sp-radius-md);box-shadow:var(--sp-elevation-2);padding:var(--cl-22);max-width:calc(var(--sp-spacing-base) * 85);width:100%;text-align:center}
-.ds-freeze-spinner{width:var(--cl-32);height:var(--cl-32);margin:0 auto var(--cl-12);border-radius:50%;border:var(--cl-2) solid var(--color-border);border-top-color:var(--color-accent);animation:ds-freeze-spin calc(var(--dur-glide) * 3) linear infinite}
-.ds-freeze-eyebrow{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin:0 0 var(--cl-4)}
-.ds-freeze-detail{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);margin:0 0 var(--cl-8);overflow-wrap:anywhere}
-.ds-freeze-detail[hidden]{display:none}
-.ds-freeze-steps{list-style:none;margin:0 0 var(--cl-8);padding:0;display:flex;flex-direction:column;gap:var(--cl-4);text-align:left}
-.ds-freeze-steps li{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding-left:var(--cl-16);position:relative}
-.ds-freeze-steps li::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:var(--cl-7);height:var(--cl-7);border-radius:50%;border:var(--cl-1) solid var(--color-border);background:var(--color-bg);box-sizing:border-box}
-.ds-freeze-steps li.is-on{color:var(--color-ink);font-weight:700}
-.ds-freeze-steps li.is-on::before{background:var(--color-accent);border-color:var(--color-accent)}
-.ds-freeze-note{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-accent);margin:0 0 var(--cl-4)}
-.ds-freeze-note[hidden]{display:none}
-.ds-freeze-live{position:absolute;width:var(--cl-1);height:var(--cl-1);overflow:hidden;clip-path:inset(50%)}
-@keyframes ds-freeze-spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.ds-freeze-spinner{animation:none}}
 /* Phone (≤720px): the rail is full-width here, so a pick title that lost its
    tail to the desktop one-line ellipsis (measured: 57px of "Timeline view —
    button, side panel, tracks, summaries, nav" cut at 390px, i.e. the

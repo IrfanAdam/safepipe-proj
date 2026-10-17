@@ -3,7 +3,7 @@
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
 import { saveDueOverride, dropDueOverride } from '../logic/due-overrides.js';
-import { getSchedToken, setSchedToken } from '../logic/schedule-auth.js';
+import { getSchedToken, clearSchedToken, clearSchedUser } from '../logic/schedule-auth.js';
 import { openScheduleGate } from './schedule-gate.js';
 // Due scheduling (task 3): pure file-text edit — insert/replace/clear the
 // single `*Due: YYYY-MM-DD*` line under the owning head, idempotently (first
@@ -200,45 +200,47 @@ export function bindChangelogEvents(root, st, helpers) {
       // so the pick is stored and re-applied at boot until the file carries it.
       try { saveDueOverride(plan.file, sprint.head, iso || null); } catch {}
     }
-    // Commit the pick to git (dev: local writer; prod: /api/due). Runs even
-    // when the preview is unchanged — a retry after a failed commit must
-    // re-fire the pipeline, not no-op on identical text.
+    // Optimistic save: the date above is already the UI — the git commit runs
+    // in the background and only speaks on failure. Runs even when the
+    // preview is unchanged, so a retry after a failed commit re-fires the
+    // pipeline instead of no-op'ing on identical text.
+    // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
+    try { doPaint(root); } catch {}
     commitDue(plan, sprint, iso || null);
   };
-  const commitDue = (plan, sprint, iso) => {
-    // Commit state for the due row (paint-detail reads ctx.dueCommit):
-    // saving → needs-login | failed | null (live on git). A pick is never
-    // silently local-only: without a token the login gate opens so the
-    // date can be committed to git and reach every device via redeploy.
-    st.dueCommit = { file: plan.file, head: sprint.head, state: 'saving' };
-    try { doPaint(root); } catch {}
-    const gen = ++dueGen;
-    // Watchdog: the 'saving' state must never stick. Every async path below
-    // resolves it — except a hung request or a paint throw — so a 45s guard
-    // fails it visibly. Skipped once the freeze overlay owns the flow (the
-    // repo-confirm poll legitimately runs for minutes, with its own timeout
-    // plus per-attempt abort budgets).
-    let frozen = false;
+  // Bounded POST: a hung request becomes a failed attempt after 20s, never a
+  // stuck state. One retry for network/timeout faults only — 4xx answers are
+  // final (re-sending a rejected token fixes nothing).
+  const postDue = async (url, payload) => {
+    const c = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const t = c ? setTimeout(() => { try { c.abort(); } catch {} }, 20000) : null;
     try {
-      setTimeout(() => {
-        try {
-          if (gen === dueGen && !frozen && st.dueCommit && st.dueCommit.state === 'saving') failDue('failed');
-        } catch {}
-      }, 45000);
-    } catch {}
+      return await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        ...(c ? { signal: c.signal } : {}),
+      });
+    } finally { if (t) clearTimeout(t); }
+  };
+  const commitDue = (plan, sprint, iso) => {
+    // Commit state for the due row (paint-detail reads ctx.dueCommit): null
+    // while the background commit is in flight (the painted date IS the UI),
+    // needs-login | failed only when the commit cannot land. Nothing here
+    // ever opens the login gate — it opens only on an explicit tap.
+    // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
+    const gen = ++dueGen;
     const failDue = (state) => {
       if (gen !== dueGen) return;
       st.dueCommit = { file: plan.file, head: sprint.head, state };
       try { doPaint(root); } catch {}
     };
-    if (typeof fetch === 'function') {
-      fetch('/__ds/due', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: plan.file, head: sprint.head, due: iso || null }),
-      }).then((r) => {
+    if (typeof fetch !== 'function') return;
+    (async () => {
+      try {
+        const r = await postDue('/__ds/due', { file: plan.file, head: sprint.head, due: iso || null });
         if (gen !== dueGen) return;
-        if (r.ok) {
+        if (r && r.ok) {
           st.duePending = null;
           st.dueCommit = null;
           // File now carries the value — the stored override is redundant.
@@ -246,140 +248,62 @@ export function bindChangelogEvents(root, st, helpers) {
           try { doPaint(root); } catch {}
           return;
         }
-        // Static host (production): no file writer — commit through /api/due
-        // (GitHub-backed, lands via deploy). The local override stays until
-        // the redeployed bundle carries the value, so the UI never flickers.
-        let token = null;
-        try { token = getSchedToken(); } catch {}
-        if (!token) {
-          failDue('needs-login');
-          try { openScheduleGate(); } catch {}
-          return;
-        }
-        return fetch('/api/due', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, file: plan.file, head: sprint.head, due: iso || null }),
-        }).then(async (r2) => {
-          if (gen !== dueGen) return;
-          if (r2 && r2.ok) {
-            let body = null;
-            try { body = await r2.json(); } catch {}
-            if (body && body.unchanged) {
-              // Server applied nothing (head not found in the repo file) —
-              // the preview above is NOT live. Surface, don't mark committed.
-              failDue('failed');
-              return;
-            }
-            if (body && body.committed === false) {
-              // Explicit server-side non-commit — same surface as unchanged.
-              failDue('failed');
-              return;
-            }
-            // Server committed it: the repo is now NEWER than this bundle.
-            // Mark the override authoritative so a mid-deploy refresh keeps
-            // showing the confirmed date instead of the stale file value.
+      } catch {
+        if (gen === dueGen) failDue('failed');
+        return;
+      }
+      // Static host (production): no file writer — commit through /api/due
+      // (GitHub-backed). The local override stays until the server truth
+      // lands, so the UI never flickers.
+      let token = null;
+      try { token = getSchedToken(); } catch {}
+      if (!token) { failDue('needs-login'); return; }
+      const payload = { token, file: plan.file, head: sprint.head, due: iso || null };
+      let r2 = null;
+      try {
+        r2 = await postDue('/api/due', payload);
+      } catch {
+        try { r2 = await postDue('/api/due', payload); }
+        catch { if (gen === dueGen) failDue('failed'); return; }
+      }
+      if (gen !== dueGen) return;
+      if (r2 && r2.ok) {
+        let body = null;
+        try { body = await r2.json(); } catch {}
+        if (body && (body.unchanged || body.committed === false)) { failDue('failed'); return; }
+        if (gen !== dueGen) return;
+        // Server truth wins: apply the committed file text directly — no
+        // CDN wait, no confirm poll. Falls back to the painted preview when
+        // the helper is unavailable.
+        let applied = false;
+        if (body && typeof body.content === 'string' && body.content) {
+          try {
+            const live = await import('./pages-changelog.js');
             if (gen !== dueGen) return;
-            try { saveDueOverride(plan.file, sprint.head, iso || null, true); } catch {}
-            st.duePending = null;
-            // Freeze + redeploy-confirm flow. Sibling modules may not exist
-            // yet (parallel work) — both imports are defensive with a
-            // no-freeze fallback to the current status-line behaviour.
-            // Dev-writer and needs-login/failed paths never reach here, so
-            // their behaviour is unchanged.
-            (async () => {
-              let freeze = null;
-              try { freeze = await import('./due-freeze.js'); } catch { freeze = null; }
-              if (gen !== dueGen) return;
-              const show = freeze && freeze.showDueFreeze;
-              const setStep = freeze && freeze.setDueFreezeStep;
-              const hide = freeze && freeze.hideDueFreeze;
-              if (typeof show !== 'function') {
-                st.dueCommit = null;
-                try { doPaint(root); } catch {}
-                return;
-              }
-              try { show(null, { file: plan.file, head: sprint.head, due: iso || null }); frozen = true; } catch {}
-              try { if (typeof setStep === 'function') setStep('committed'); } catch {}
-              let confirmMod = null;
-              try { confirmMod = await import('../logic/due-deploy-confirm.js'); } catch { confirmMod = null; }
-              if (gen !== dueGen) return;
-              const confirmDueLive = confirmMod && confirmMod.confirmDueLive;
-              if (typeof confirmDueLive !== 'function') {
-                // Committed on git but no live poll available — behave as
-                // committed and dismiss the overlay shortly.
-                st.dueCommit = null;
-                try { doPaint(root); } catch {}
-                setTimeout(() => {
-                  if (gen !== dueGen) return;
-                  try { if (typeof hide === 'function') hide(); } catch {}
-                }, 1200);
-                return;
-              }
-              const api = body || {};
-              try { if (typeof setStep === 'function') setStep('deploying'); } catch {}
-              let res = null;
-              try {
-                // Content is dynamic now (live plan refresh): there is no
-                // redeploy to wait for, so skip the asset-hash document poll
-                // — repo proof is live.
-                // [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
-                res = await confirmDueLive({
-                  token,
-                  repo: api.repo,
-                  branch: api.branch,
-                  file: plan.file,
-                  head: sprint.head,
-                  due: iso || null,
-                  fileSha: api.fileSha || api.sha || null,
-                  pageUrl: null,
-                });
-              } catch { res = null; }
-              if (gen !== dueGen) return;
-              if (res && res.repoConfirmed) {
-                // Repo-confirmed IS live: pull the hosted text and repaint
-                // with no reload (selection/filter untouched), then dismiss.
-                // [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
-                try { if (typeof setStep === 'function') setStep('live'); } catch {}
-                st.dueCommit = null;
-                try {
-                  const live = await import('./pages-changelog.js');
-                  if (live && typeof live.refreshLivePlans === 'function') await live.refreshLivePlans(root);
-                  else doPaint(root);
-                } catch {
-                  try { doPaint(root); } catch {}
-                }
-                setTimeout(() => {
-                  if (gen !== dueGen) return;
-                  try { if (typeof hide === 'function') hide(); } catch {}
-                }, 1200);
-                return;
-              }
-              // Timed-out or confirm error: the date is safe on git (the
-              // committed:true override above stays), so clear the commit
-              // state but linger on 'stale' before dismissing.
-              try { if (typeof setStep === 'function') setStep('stale'); } catch {}
-              st.dueCommit = null;
-              try { doPaint(root); } catch {}
-              setTimeout(() => {
-                if (gen !== dueGen) return;
-                try { if (typeof hide === 'function') hide(); } catch {}
-              }, 4000);
-            })();
-            return;
-          }
-          if (r2 && (r2.status === 401 || r2.status === 403)) {
-            // Token rejected or pre-scope grant (needs public_repo) — the
-            // stored user badge outlives the token, so clear it and re-login.
-            try { setSchedToken(null); } catch {}
-            failDue('needs-login');
-            try { openScheduleGate(); } catch {}
-            return;
-          }
-          failDue('failed');
-        }).catch(() => { failDue('failed'); });
-      }).catch(() => { failDue('failed'); });
-    }
+            if (live && typeof live.applyServerFileText === 'function') {
+              try { applied = live.applyServerFileText(root, plan.file, body.content); } catch { applied = false; }
+            }
+          } catch {}
+        }
+        if (gen !== dueGen) return;
+        if (applied) { try { dropDueOverride(plan.file, sprint.head); } catch {} }
+        else { try { saveDueOverride(plan.file, sprint.head, iso || null, true); } catch {} }
+        st.duePending = null;
+        st.dueCommit = null;
+        try { doPaint(root); } catch {}
+        return;
+      }
+      if (r2 && (r2.status === 401 || r2.status === 403)) {
+        // Token rejected or pre-scope grant (needs public_repo): clear the
+        // whole session so the badge never outlives the proof. The inline
+        // sign-in affordance re-opens the gate on tap.
+        try { clearSchedToken(); } catch {}
+        try { clearSchedUser(); } catch {}
+        failDue('needs-login');
+        return;
+      }
+      failDue('failed');
+    })();
   };
   // Themed due datepicker: material-like month grid in Safepipe tokens
   // (surface card, accent select, mono cells). Monday-first like the days

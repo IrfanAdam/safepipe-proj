@@ -103,11 +103,15 @@ export default async function handler(req, res) {
       return;
     }
     const done = await put.json();
+    // Server truth for the caller: the committed text lets the client apply
+    // the value directly with no CDN wait and no confirm poll.
+    // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
     res.status(200).json({
       committed: (done.commit || {}).sha || null,
       repo,
       branch,
       fileSha: (done.content || {}).sha || null,
+      content: next,
     });
   } catch (e) {
     res.status(500).send('Due commit failed');
