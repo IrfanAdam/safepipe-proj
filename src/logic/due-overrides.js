@@ -169,19 +169,13 @@ export function dueFailureReason(body) {
 }
 
 // Publish-indication rules (read-back-verified, never assumed):
-// the progress card earns its live step only when the server-returned file
-// text was actually applied to the visible plans (applied === true); an
-// override-painted commit stops at Published on git. The published row
-// status earns 'saved' only when the date read back from the painted plans
-// equals the pick (or empty on clear) — anything else, including an
-// unreadable paint, is 'mismatch' (retry), never published.
-export function duePublishStep(applied) {
-  // applied=true means server truth is painted on this device — but the
-  // cycle isn't over: the redeploy still has to carry it everywhere. The
-  // card parks at 'deploying' (freeze remains, editing stays allowed) until
-  // the deploy flip advances it to 'live'. applied=false stops earlier.
-  return applied === true ? 'deploying' : 'committed';
-}
+// the progress toast shows one temporally-relevant state at a time —
+// Publishing… while the POST is in flight, Updating everywhere… once the
+// commit has landed and the redeploy is carrying it, Live ✓ when the
+// deploy flip is observed. The published row status earns 'saved' only
+// when the date read back from the painted plans equals the pick (or
+// empty on clear) — anything else, including an unreadable paint, is
+// 'mismatch' (retry), never published.
 
 // Post-commit deploy claim: the update lifecycle ends when the redeployment
 // carrying our commit goes live (observed via /version.json), not when the

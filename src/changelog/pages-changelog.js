@@ -201,11 +201,21 @@ let liveTimer = 0;
 let liveFocusTimer = 0;
 let liveRoot = null;
 let lastSeenPlanSha = null;
+// The newest sha a fetch has CONFIRMED (diff applied). A newer
+// lastSeenPlanSha with no diff yet is CDN lag — keep a slow watch until
+// some fetch confirms it instead of going quiet (mobile stalls forever
+// otherwise: quiet until the NEXT commit, fixed only by a refresh).
+let lastAppliedPlanSha = null;
+let lastShaSlowAt = 0;
+const SHA_SLOW_MS = 60000;
 let lastPlanEtag = null;
 let etagPolling = true;
 let livePollMs = 15000;
 let shaRetryArmed = false;
 let shaRetries = 0;
+// Quick follow-ups after a new sha with no diff yet (CDN lag). Past this,
+// the slow watch (SHA_SLOW_MS) keeps confirming until a fetch lands the
+// diff — the poll never goes quiet on an unconfirmed sha.
 const SHA_RETRY_MAX = 2;
 // Deploy self-update: the open page must never sit on a stale bundle. The
 // boot deploy sha is recorded once; every poll compares the live
@@ -304,7 +314,22 @@ async function pollPlanSha() {
     info = await src.fetchLatestPlanSha(opts);
   } catch { info = null; }
   if (!info) return;
-  if (info.notModified) { shaRetryArmed = false; shaRetries = 0; return; }
+  if (info.notModified) {
+    // No new commit — but an UNCONFIRMED sha (CDN lag on a known-new
+    // commit) still needs its slow watch: refetch the raw texts directly,
+    // since the commits API will keep 304-ing on the same sha forever.
+    if (lastSeenPlanSha !== null && lastAppliedPlanSha !== lastSeenPlanSha) {
+      let now = 0;
+      try { now = Date.now(); } catch {}
+      if (now - lastShaSlowAt >= SHA_SLOW_MS) {
+        lastShaSlowAt = now;
+        let changed = false;
+        try { changed = await refreshLivePlans(liveRoot); } catch { changed = false; }
+        if (changed) { lastAppliedPlanSha = lastSeenPlanSha; shaRetries = 0; }
+      }
+    } else { shaRetryArmed = false; shaRetries = 0; }
+    return;
+  }
   if (info.etag) {
     lastPlanEtag = info.etag;
   } else if (!token) {
@@ -313,18 +338,37 @@ async function pollPlanSha() {
     if (etagPolling) { etagPolling = false; livePollMs = 60000; restartLiveTimer(); }
   }
   if (!info.sha) return;
-  // First sighting: the boot bundle is the baseline — record, don't fetch.
-  if (lastSeenPlanSha === null) { lastSeenPlanSha = info.sha; shaRetryArmed = false; shaRetries = 0; return; }
+  // First sighting: the boot bundle is the baseline — record as seen AND
+  // applied, don't fetch.
+  if (lastSeenPlanSha === null) {
+    lastSeenPlanSha = info.sha;
+    lastAppliedPlanSha = info.sha;
+    shaRetryArmed = false; shaRetries = 0; return;
+  }
   if (info.sha === lastSeenPlanSha && !shaRetryArmed) return;
+  // A brand-new sha gets fresh quick retries (a previous sha's backoff
+  // must not starve it).
+  if (info.sha !== lastSeenPlanSha) shaRetries = 0;
   lastSeenPlanSha = info.sha;
   shaRetryArmed = false;
   let changed = false;
   try { changed = await refreshLivePlans(liveRoot); } catch { changed = false; }
-  // New sha but no diff: the commit is fresher than the raw CDN — a bounded
-  // number of follow-up fetches, then quiet until a NEWER sha. Without the
-  // cap this refetches full texts on every tick forever.
-  if (!changed && shaRetries < SHA_RETRY_MAX) { shaRetryArmed = true; shaRetries++; }
-  else if (changed) shaRetries = 0;
+  if (changed) {
+    // Some fetch confirmed this sha — converged, quiet until a newer one.
+    shaRetries = 0;
+    lastAppliedPlanSha = lastSeenPlanSha;
+  } else if (lastAppliedPlanSha !== lastSeenPlanSha) {
+    // New sha but no diff: the commit is fresher than the raw CDN. A couple
+    // of quick follow-ups, then a slow watch (1/min) until some fetch
+    // confirms it — never go quiet on an unconfirmed sha, or slow devices
+    // stall until the NEXT commit and need a manual refresh.
+    if (shaRetries < SHA_RETRY_MAX) { shaRetryArmed = true; shaRetries++; }
+    else {
+      let now = 0;
+      try { now = Date.now(); } catch {}
+      if (now - lastShaSlowAt >= SHA_SLOW_MS) { shaRetryArmed = true; lastShaSlowAt = now; }
+    }
+  }
 }
 function onLiveFocus() {
   try { window.clearTimeout(liveFocusTimer); } catch {}

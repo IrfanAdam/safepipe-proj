@@ -35,5 +35,36 @@ button.ds-day.is-future.on{opacity:1;border-color:var(--color-ink);outline:var(-
    (var(--cl-16) + var(--cl-4)) in JS, stay aligned. Tints/radius/outlines
    untouched. Must stay after line 2: same specificity, later wins. */
 @media (max-width:640px){
-  .ds-graph{--cl-16:calc(var(--sp-spacing-base) * 4)}
+  .ds-graph{
+    --cl-16:calc(var(--sp-spacing-base) * 4);
+    width:calc(100% + var(--sp-spacing-xl) * 2);
+    margin-left:calc(-1 * var(--sp-spacing-xl));
+    margin-right:calc(-1 * var(--sp-spacing-xl));
+    padding:var(--cl-4) var(--sp-spacing-xl) var(--cl-12) var(--sp-spacing-xl);
+    box-sizing:border-box;
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+    scroll-padding-left:var(--sp-spacing-xl);
+  }
+  .ds-graph-row{position:relative}
+  .ds-dows{
+    position:sticky;
+    left:0;
+    z-index:2;
+    background:var(--color-bg);
+    /* weekday stays pinned while blobs scroll — solid page bg with soft edge */
+    box-shadow:4px 0 8px -6px color-mix(in srgb, var(--color-ink) 10%, transparent);
+  }
+  .ds-dows::after{
+    content:"";
+    position:absolute;
+    top:0;
+    right:calc(-1 * var(--cl-12));
+    bottom:0;
+    width:var(--cl-12);
+    background:linear-gradient(to right, var(--color-bg), transparent);
+    pointer-events:none;
+  }
 }

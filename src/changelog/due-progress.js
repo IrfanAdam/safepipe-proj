@@ -1,6 +1,7 @@
 // safepipe changelog — due publish progress toast (DOM) · [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
-// One compact line that morphs through the FULL update lifecycle:
-// Publishing… → Published on git → Updating everywhere… → Live ✓.
+// One compact line that morphs through the update lifecycle:
+// Publishing… → Updating everywhere… → Live ✓ — one temporally-relevant
+// state at a time, never a checklist.
 // In-progress states (publishing, deploying) show a spinner; rest states
 // (committed, live) show a check. One slot, never a checklist — the toast
 // stays visible for the whole cycle and dismisses only at live (or on
@@ -9,9 +10,12 @@
 // (pointer-events:none) and never blocks the page. Keyed per pick so a
 // rapid re-pick never dismisses newer state.
 const CARD_ID = 'ds-due-progress';
-const STEP_LABELS = { publishing: 'Publishing…', committed: 'Published on git', deploying: 'Updating everywhere…', live: 'Live ✓' };
+const STEP_LABELS = { publishing: 'Publishing…', deploying: 'Updating everywhere…', live: 'Live ✓' };
 // Spinner while the step is still working; check once it has landed.
-const STEP_BUSY = { publishing: true, committed: false, deploying: true, live: false };
+const STEP_BUSY = { publishing: true, deploying: true, live: false };
+// The toast's whole vocabulary — exported so tests can pin it: only these
+// states may ever appear, one at a time.
+export const DUE_PROGRESS_STEPS = ['publishing', 'deploying', 'live'];
 
 const doc = () => (typeof document !== 'undefined' ? document : null);
 

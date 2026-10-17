@@ -24,6 +24,14 @@
    overlapping the title. Padding untouched so .on's 2px accent border +
    calc(--cl-12 - --cl-2) left padding stays aligned. [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling] */
 @media (max-width:640px){
+  .ds-plan-grid{
+    width:calc(100% + var(--sp-spacing-xl) * 2);
+    margin-left:calc(-1 * var(--sp-spacing-xl));
+    margin-right:calc(-1 * var(--sp-spacing-xl));
+    padding-left:var(--sp-spacing-xl);
+    padding-right:var(--sp-spacing-xl);
+    box-sizing:border-box;
+  }
   .ds-plan-grid .ds-pick{grid-template-columns:auto minmax(0,1fr)}
   .ds-plan-grid .ds-num{grid-column:1 / -1;grid-row:1}
   .ds-plan-grid .ds-main b{grid-column:1 / -1;grid-row:2;white-space:normal}

@@ -26,7 +26,6 @@ import {
   overrideVerdict,
   canonicalHead,
   dueFailureReason,
-  duePublishStep,
   confirmPublish,
   saveDueConfirm,
   readDueConfirm,
@@ -395,11 +394,9 @@ describe('canonicalHead (send-time head resolution)', () => {
 });
 
 describe('due progress + published status are read-back-verified, never assumed', () => {
-  it('applied=true parks at deploying (live is earned by the deploy flip); applied=false stops at committed', () => {
-    assert.equal(duePublishStep(true), 'deploying');
-    for (const notApplied of [false, null, undefined, 0, '', 'yes']) {
-      assert.equal(duePublishStep(notApplied), 'committed', String(notApplied));
-    }
+  it('toast vocabulary is pinned: publishing → updating → live, one at a time', async () => {
+    const prog = await import('../src/changelog/due-progress.js?due-prog-steps=1');
+    assert.deepEqual(prog.DUE_PROGRESS_STEPS, ['publishing', 'deploying', 'live']);
   });
   it('read-back mismatch never shows published (saved iff paint equals pick)', () => {
     assert.equal(confirmPublish('2026-11-01', '2026-11-01'), 'saved');
@@ -536,13 +533,10 @@ describe('due progress card (DOM keying, repo stub conventions)', () => {
     assert.equal(label(), 'Publishing…');
     assert.equal(spinning(), true, 'publishing shows the spinner');
     assert.equal(checked(), false);
-    prog.setDueProgressStep(a, 'committed');
-    assert.equal(label(), 'Published on git', 'same slot morphs, no second row');
-    assert.equal(spinning(), false);
-    assert.equal(checked(), true);
     prog.setDueProgressStep(a, 'deploying');
-    assert.equal(label(), 'Updating everywhere…');
+    assert.equal(label(), 'Updating everywhere…', 'same slot morphs, no second row');
     assert.equal(spinning(), true, 'updating shows the spinner');
+    assert.equal(checked(), false);
     prog.setDueProgressStep({ file: 'f.md', head: 'OTHER', due: '2026-11-01' }, 'live');
     assert.equal(label(), 'Updating everywhere…', 'a stale pick never advances newer state');
     prog.setDueProgressStep(a, 'live');
