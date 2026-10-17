@@ -11,6 +11,7 @@ import { goal, split, parseMeta, anchorOf, phash, dueOf } from './changelog-pars
 import { paint } from './changelog-paint.js';
 import { duePreviewEdit } from './changelog-events.js';
 import { loadDueOverrides, dropDueOverride } from '../logic/due-overrides.js';
+import { getSchedToken } from '../logic/schedule-auth.js';
 import { TIMELINE_TILE_ICON } from './changelog/graph.js';
 import { bindChangelogEvents } from './changelog-events.js';
 
@@ -122,15 +123,89 @@ export async function refreshLivePlans(root) {
   } catch { return false; }
   finally { liveRefreshInFlight = false; }
 }
+// Apply server-returned file content directly (own-pick commit response):
+// swaps one file's live text, rebuilds, repaints with selection/filter/sort
+// untouched. Returns true on success, false on bad args/unknown file.
+// [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-3]
+export function applyServerFileText(root, file, text) {
+  if (!root || typeof file !== 'string' || !file || typeof text !== 'string') return false;
+  try {
+    if (!Object.prototype.hasOwnProperty.call(rawTexts, file)) return false;
+    const merged = { ...rawTexts, [file]: text };
+    rebuildPlans(merged);
+    doPaint(root);
+    return true;
+  } catch { return false; }
+}
 // Polling + focus refresh, active only while the changelog root is mounted.
+// The 20s full re-fetch is gone: a ~15s sha poll (commits API, no CDN lag)
+// gates full fetches — raw fetch runs ONLY when the sha changed.
+// [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-3]
 let liveTimer = 0;
 let liveFocusTimer = 0;
 let liveRoot = null;
+let lastSeenPlanSha = null;
+let lastPlanEtag = null;
+let etagPolling = true;
+let livePollMs = 15000;
+let shaRetryArmed = false;
+async function pollPlanSha() {
+  if (!liveRoot) return;
+  try { if (document.hidden) return; } catch {}
+  if (liveRefreshInFlight) return;
+  let src = null;
+  try { src = await import('./plan-source.js'); } catch { return; }
+  if (!src || typeof src.fetchLatestPlanSha !== 'function') return;
+  let token = null;
+  try { token = getSchedToken() || null; } catch { token = null; }
+  let info = null;
+  try {
+    const opts = {};
+    if (token) opts.token = token;
+    else if (etagPolling && lastPlanEtag) opts.etag = lastPlanEtag;
+    info = await src.fetchLatestPlanSha(opts);
+  } catch { info = null; }
+  if (!info) return;
+  if (info.notModified) { shaRetryArmed = false; return; }
+  if (info.etag) {
+    lastPlanEtag = info.etag;
+  } else if (!token) {
+    // No ETag on an unauthenticated response: conditional polling is
+    // unsupported — stretch to 60s so the 60 req/hr cap can't bite.
+    if (etagPolling) { etagPolling = false; livePollMs = 60000; restartLiveTimer(); }
+  }
+  if (!info.sha) return;
+  // First sighting: the boot bundle is the baseline — record, don't fetch.
+  if (lastSeenPlanSha === null) { lastSeenPlanSha = info.sha; shaRetryArmed = false; return; }
+  if (info.sha === lastSeenPlanSha && !shaRetryArmed) return;
+  lastSeenPlanSha = info.sha;
+  shaRetryArmed = false;
+  let changed = false;
+  try { changed = await refreshLivePlans(liveRoot); } catch { changed = false; }
+  // New sha but no diff: the commit is fresher than the raw CDN — one
+  // follow-up fetch next tick, then quiet regardless.
+  if (!changed) shaRetryArmed = true;
+}
 function onLiveFocus() {
   try { window.clearTimeout(liveFocusTimer); } catch {}
   try {
-    liveFocusTimer = window.setTimeout(() => { if (liveRoot) refreshLivePlans(liveRoot); }, 2000);
+    liveFocusTimer = window.setTimeout(() => { if (liveRoot) pollPlanSha(); }, 2000);
   } catch {}
+}
+function onLiveVisible() {
+  try { if (document.hidden) return; } catch {}
+  if (liveRoot) pollPlanSha();
+}
+function onLiveOnline() {
+  if (liveRoot) pollPlanSha();
+}
+const DUE_OVERRIDES_KEY = 'safepipe-due-overrides.v2';
+function onLiveStorage(ev) {
+  try {
+    if (!ev || (ev.key !== DUE_OVERRIDES_KEY && ev.key !== null)) return;
+    if (document.hidden) return;
+  } catch { return; }
+  if (liveRoot) refreshLivePlans(liveRoot);
 }
 function stopLiveRefresh() {
   try { if (liveTimer) window.clearInterval(liveTimer); } catch {}
@@ -138,15 +213,28 @@ function stopLiveRefresh() {
   try { if (liveFocusTimer) window.clearTimeout(liveFocusTimer); } catch {}
   liveFocusTimer = 0;
   try { window.removeEventListener('focus', onLiveFocus); } catch {}
+  try { document.removeEventListener('visibilitychange', onLiveVisible); } catch {}
+  try { window.removeEventListener('online', onLiveOnline); } catch {}
+  try { window.removeEventListener('storage', onLiveStorage); } catch {}
+}
+function restartLiveTimer() {
+  try { if (liveTimer) window.clearInterval(liveTimer); } catch {}
+  liveTimer = 0;
+  try {
+    liveTimer = window.setInterval(() => {
+      try { if (document.hidden) return; } catch {}
+      if (liveRoot) pollPlanSha();
+    }, livePollMs);
+  } catch {}
 }
 function startLiveRefresh() {
   stopLiveRefresh();
   try {
-    liveTimer = window.setInterval(() => {
-      try { if (document.hidden) return; } catch {}
-      if (liveRoot) refreshLivePlans(liveRoot);
-    }, 20000);
+    restartLiveTimer();
     window.addEventListener('focus', onLiveFocus);
+    document.addEventListener('visibilitychange', onLiveVisible);
+    window.addEventListener('online', onLiveOnline);
+    window.addEventListener('storage', onLiveStorage);
   } catch {}
 }
 const st = { active: new Set(), day: '', sel: [0, 0], open: false, stage: 'list',
