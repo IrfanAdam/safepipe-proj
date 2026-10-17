@@ -167,11 +167,29 @@ const gateSuffixOf = (gates, phaseN) => {
   if (disp === 'open') return ' · GATE OPEN' + revSuffix;
   return '';
 };
+// Mobile 2-level drawer nav (mirrors pages-changelog.js isMobile — local copy,
+// no import cycle; the 720px breakpoint is shared).
+const isMobileDetail = () => {
+  try { return typeof matchMedia === 'function' && matchMedia('(max-width: 720px)').matches; }
+  catch { return false; }
+};
 export function paintDetail(root, ctx){
-  const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts, edited, revs, dueCommit } = ctx;
+  const { list, pi, plan, sprints, si, active, day, sel, open, mlevel: mlevelIn, counts, plans, texts, edited, revs, dueCommit } = ctx;
   const scrim = root.querySelector('[data-scrim]'), drawer = root.querySelector('[data-drawer]');
+  const mobile = isMobileDetail();
+  // L1 = rail list only (detail parked), L2 = detail. Desktop ignores levels.
+  const mlevel = mlevelIn === 2 ? 2 : 1;
+  const atL1 = !!(mobile && open && mlevel === 1);
+  // Placeholder whenever nothing is selected (mobile plan pick clears
+  // sel[1] to -1) or whenever mobile sits at L1 — never the first phase.
+  const showPlaceholder = open && (si < 0 || atL1);
   const sprint = sprints[si], sprintDesc = (s) => descOf(s.body);
-  const railHead = `<div class="ds-rail-plan">` + esc([plan.id, plan.title || provenance(plan)].filter(Boolean).join(' · ')) + `</div>`;
+  // L1 rail head owns the '‹ All plans' back button (closes the drawer via
+  // [data-mback]); L2/desktop keep the plain title. tabindex gives the
+  // mobile focus move a target (script-focus only, never in tab order).
+  const railHead = '<div class="ds-rail-plan"' + (atL1 ? ' tabindex="-1" data-mlevel-head="rail"' : '') + '>' +
+    (atL1 ? '<button data-mback data-mlevel="1" aria-label="Back to all plans">‹ All plans</button>' : '') +
+    esc([plan.id, plan.title || provenance(plan)].filter(Boolean).join(' · ')) + '</div>';
   root.querySelector('[data-col="sprint"]').innerHTML = railHead + sprints.map((s, i) => {
     const hsS = hits(plan.file, s.body, plan.sprints.indexOf(s) === 0),
       has = hsS.length ? ' · ' + hsS.length + ' commit' + (hsS.length > 1 ? 's' : '') : '',
@@ -179,7 +197,7 @@ export function paintDetail(root, ctx){
       ed = edited && edited(s) ? ' · edited' : '';
     return [
       `<button class="ds-pick`,
-      i === sel[1] ? ' on' : '',
+      i === sel[1] && !atL1 ? ' on' : '',
       isDone(frac) ? '' : ' is-open',
       `" data-tip="`,
       esc(tipOf(s.head, s.body, 100)),
@@ -195,9 +213,22 @@ export function paintDetail(root, ctx){
     `<p class="ds-commits" data-prov>`,
     esc(provenance(plan)),
     `</p><div class="ds-rail-foot" data-foot>`,
-    esc(plan.goal || sprintDesc(sprint)),
+    esc(plan.goal || (sprint ? sprintDesc(sprint) : '')),
     `</div>`,
   ].join('');
+  // Mobile L1 (or a cleared selection): the detail pane stays parked
+  // off-screen with a quiet placeholder — never the first phase.
+  if (showPlaceholder) {
+    root.querySelector('[data-col="tasks"]').innerHTML = [
+      '<div class="ds-drawer-head"><b></b>',
+      '<button data-close aria-label="Close detail">✕</button></div>',
+      '<p class="ds-empty-detail">Select a phase or task</p>',
+    ].join('');
+    const u0 = unlinked(texts);
+    root.querySelector('[data-col="triage"]').innerHTML = /All tracked/.test(u0) ? '' : `<hr class="ds-hr">${u0}`;
+    syncDrawerChrome();
+    return;
+  }
   const hs = hits(plan.file, sprint.body, plan.sprints.indexOf(sprint) === 0);
   // Gate ownership is by section number (`Task 3` → gate 3), never by
   // position — positional index misattributes verdicts on Task-headed
@@ -283,7 +314,8 @@ export function paintDetail(root, ctx){
     ? `<b data-tip="${esc(tagsFull)}">${esc(tagsTxt)}</b>`
     : `<b></b>`;
   root.querySelector('[data-col="tasks"]').innerHTML = [
-    `<div class="ds-drawer-head">`,
+    '<div class="ds-drawer-head"' + ((mobile && open && mlevel === 2) ? ' tabindex="-1" data-mlevel-head="task"' : '') + '>',
+    (mobile && open && mlevel === 2) ? '<button data-mback data-mlevel="2" aria-label="Back to phases">‹ Phases</button>' : '',
     tagsHead,
     `<button data-close aria-label="Close detail">✕</button></div>`,
     // Due row sits directly under the section title: split the head line
@@ -302,6 +334,49 @@ export function paintDetail(root, ctx){
   ].join('');
   const u = unlinked(texts);
   root.querySelector('[data-col="triage"]').innerHTML = /All tracked/.test(u) ? '' : `<hr class="ds-hr">${u}`;
-  drawer.classList.toggle('is-open', open); drawer.setAttribute('aria-hidden', String(!open)); drawer.toggleAttribute('inert', !open);
-  scrim.classList.toggle('is-open', open); scrim.setAttribute('aria-hidden', String(!open));
+  syncDrawerChrome();
+  // Drawer chrome: open classes (unchanged) + mobile level dataset/classes,
+  // parked-pane a11y, and focus-follows-level (mobile only). Hoisted, so the
+  // L1 placeholder path above shares it.
+  function syncDrawerChrome() {
+    drawer.classList.toggle('is-open', open); drawer.setAttribute('aria-hidden', String(!open)); drawer.toggleAttribute('inert', !open);
+    scrim.classList.toggle('is-open', open); scrim.setAttribute('aria-hidden', String(!open));
+    if (mobile && open) {
+      drawer.dataset.mlevel = String(mlevel);
+      drawer.classList.toggle('is-l1', mlevel === 1);
+      drawer.classList.toggle('is-l2', mlevel === 2);
+    } else {
+      delete drawer.dataset.mlevel;
+      drawer.classList.remove('is-l1'); drawer.classList.remove('is-l2');
+    }
+    // The parked pane is inert + hidden from AT; the visible pane is not.
+    // Desktop (or a closed drawer) leaves both panes untouched.
+    try {
+      const railPane = root.querySelector('[data-col="sprint"]');
+      const taskPane = root.querySelector('[data-col="tasks"]');
+      if (mobile && open && mlevel === 1) {
+        if (railPane) { railPane.toggleAttribute('inert', false); railPane.setAttribute('aria-hidden', 'false'); }
+        if (taskPane) { taskPane.toggleAttribute('inert', true); taskPane.setAttribute('aria-hidden', 'true'); }
+      } else if (mobile && open && mlevel === 2) {
+        if (railPane) { railPane.toggleAttribute('inert', true); railPane.setAttribute('aria-hidden', 'true'); }
+        if (taskPane) { taskPane.toggleAttribute('inert', false); taskPane.setAttribute('aria-hidden', 'false'); }
+      } else {
+        if (railPane) { railPane.toggleAttribute('inert', false); railPane.removeAttribute('aria-hidden'); }
+        if (taskPane) { taskPane.toggleAttribute('inert', false); taskPane.removeAttribute('aria-hidden'); }
+      }
+    } catch {}
+    // Focus moves to the visible pane's head on level change — mobile only,
+    // and only on change (repeat paints at the same level never steal it).
+    try {
+      const prev = drawer._mlevel ?? null;
+      const curLevel = (mobile && open) ? mlevel : null;
+      drawer._mlevel = curLevel;
+      if (curLevel !== null && prev !== curLevel) {
+        const head = curLevel === 1
+          ? root.querySelector('[data-col="sprint"] [data-mlevel-head]')
+          : root.querySelector('[data-col="tasks"] [data-mlevel-head]');
+        if (head && typeof head.focus === 'function') head.focus({ preventScroll: true });
+      }
+    } catch {}
+  }
 }

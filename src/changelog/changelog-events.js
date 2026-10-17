@@ -64,6 +64,17 @@ export function duePreviewEdit(body, head, due) {
 }
 export function bindChangelogEvents(root, st, helpers) {
   const { cur, doPaint } = helpers;
+  // Mobile 2-level drawer nav (mirrors pages-changelog.js isMobile — defined
+  // locally to avoid a circular import; the 720px breakpoint is shared).
+  const isMobile = () => {
+    try { return typeof matchMedia === 'function' && matchMedia('(max-width: 720px)').matches; }
+    catch { return false; }
+  };
+  // L2 → L1 (mobile only). Returns true when it consumed the gesture.
+  const stepBackLevel = () => {
+    if (st.open && isMobile() && st.mlevel === 2) { st.mlevel = 1; doPaint(root); return true; }
+    return false;
+  };
   const tlPop = () => root.querySelector('[data-tl-pop]');
   let popFor = null;
   // Last input device, tracked from pointer/touch events. A tap fires the
@@ -162,6 +173,8 @@ export function bindChangelogEvents(root, st, helpers) {
     const apply = (si) => {
       st.sel = [li, Math.min(Math.max(si, 0), Math.max(plan.sprints.length - 1, 0))];
       st.open = true; st.openFile = file; st.stage = 'tasks'; st.returnView = 'timeline';
+      // Timeline opens land on the detail (L2) with the bout selected.
+      st.mlevel = 2;
       if (boutIdx !== null && boutIdx !== undefined) {
         st.tlSel = { planFile: file, boutIdx };
         st.tlLast = st.tlSel;
@@ -708,9 +721,21 @@ export function bindChangelogEvents(root, st, helpers) {
       }
       return;
     }
+    // Mobile level back buttons (paint-detail renders [data-mback]): L2
+    // '‹ Phases' steps back to the rail (L1); L1 '‹ All plans' closes the
+    // drawer. Desktop never renders these, so it never reaches here.
+    if (e.target.closest('[data-mback]')) {
+      if (stepBackLevel()) return;
+      st.open = false;
+      if (st.view !== 'timeline' && st.returnView !== 'timeline') st.stage = 'list';
+      st.returnView = null; hidePop(); doPaint(root); return;
+    }
     if (e.target.closest('[data-close]')
       || e.target.closest('[data-scrim]')) {
       if (e.target.closest('[data-scrim]') && !st.open && st.view === 'timeline') { closeTimeline(); return; }
+      // Mobile levels: ✕ / scrim at L2 steps back to the rail (L1); at L1
+      // (or desktop) it closes the drawer as before.
+      if (stepBackLevel()) return;
       st.open = false;
       if (st.view !== 'timeline' && st.returnView !== 'timeline') st.stage = 'list';
       st.returnView = null; hidePop(); doPaint(root); return;
@@ -722,12 +747,18 @@ export function bindChangelogEvents(root, st, helpers) {
           c.sprints.length - 1)]; st.open = true; doPaint(root); return; }
     const b = e.target.closest('.ds-pick'); if (!b) return;
     const col = b.closest('[data-col]'), i = [...col.querySelectorAll('.ds-pick')].indexOf(b);
-    if (col.dataset.col === 'plan') { st.sel = [i,
-        st.sel[1]]; st.open = true; st.stage = 'tasks';
+    if (col.dataset.col === 'plan') {
+      // Mobile plan pick lands on L1 with NOTHING pre-selected (sel[1] = -1
+      // → placeholder detail parked off-screen); desktop keeps sel[1].
+      if (isMobile()) { st.sel = [i, -1]; st.mlevel = 1; }
+      else st.sel = [i, st.sel[1]];
+      st.open = true; st.stage = 'tasks';
       // Pin the explicitly opened plan by file so its drawer survives
       // leaving the day filter; the filter keeps applying to lists only.
       try { const c = cur(); if (c.list[i]) st.openFile = c.list[i].file; } catch {} } else { st.sel = [st.sel[0],
-        i]; st.stage = 'tasks'; }
+        i]; st.stage = 'tasks';
+      // Mobile rail pick pushes L2 (detail full-screen); desktop unchanged.
+      if (isMobile() && st.open) st.mlevel = 2; }
     doPaint(root);
   };
   const onKey = (e) => {
@@ -737,6 +768,8 @@ export function bindChangelogEvents(root, st, helpers) {
     const p = tlPop();
     if (p && !p.hidden) { hidePop(); return; }
     if (st.open) {
+      // Mobile Esc chain: L2 → L1 → close. Desktop closes at once, as before.
+      if (stepBackLevel()) return;
       st.open = false;
       if (st.view !== 'timeline' && st.returnView !== 'timeline') st.stage = 'list';
       st.returnView = null; doPaint(root); return;

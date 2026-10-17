@@ -11,7 +11,7 @@
 .ds-rail-plan{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--sp-text-primary);font-weight:600;line-height:var(--leading-prose);padding:var(--cl-8) var(--cl-16) var(--cl-8);margin:0 0 var(--cl-6);border-bottom:var(--border-hairline);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none;height:auto}
 .ds-task{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:var(--cl-18) var(--cl-16) var(--cl-30)}
 @media (prefers-reduced-motion:reduce){.ds-drawer,.ds-scrim{transition:none;animation:none}}
-@media (max-width:720px){.ds-drawer{width:100vw;flex-direction:column}.ds-rail{flex:none;border-right:none;border-bottom:var(--border-hairline);padding:var(--cl-16) 0 var(--cl-12) 0;max-height:38vh}}
+@media (max-width:720px){.ds-drawer{left:0;width:100vw;height:100vh;height:100dvh;max-width:none;flex-direction:column}}
 /* drawer head + picks */
 .ds-drawer-head{display:flex;gap:var(--cl-8);align-items:center;padding-top:var(--cl-6);margin-bottom:var(--cl-4)}
 .ds-drawer-head b{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-mono);font-size:var(--text-micro);text-transform:uppercase;letter-spacing:var(--tracking-mono);color:var(--color-ink-muted)}
@@ -168,4 +168,37 @@ button.ds-due-status{background:none;border:0;padding:0;cursor:pointer;text-deco
   .ds-due-cal__grid{grid-template-columns:repeat(7,var(--cl-36))}
   .ds-due-day{width:var(--cl-36);height:var(--cl-36)}
   .ds-due-cal__foot button{display:inline-flex;align-items:center;min-height:var(--cl-32)}
+}
+/* Mobile multi-level drawer (≤720px): .ds-rail + .ds-task stop stacking and
+   become full-screen panes that glide in from the right — L1 rail, L2 detail
+   over the rail. Level is driven by JS markers on .ds-drawer: data-mlevel
+   "1"|"2" and/or .is-l1/.is-l2 (either works; no marker = level 1).
+   Desktop ≥721px is untouched — every rule below lives in this query. */
+@media (max-width:720px){
+  .ds-rail,.ds-task{position:absolute;inset:0;flex:none;max-width:none;max-height:none;margin:0;background:var(--color-bg);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;transform:translateX(103%);visibility:hidden;transition:transform var(--dur-panel) var(--ease-glide),visibility var(--dur-panel);will-change:transform}
+  .ds-rail{border:0;z-index:0}
+  .ds-task{z-index:1}
+  /* level 1 (default, explicit L1 markers included): rail fills the viewport */
+  .ds-drawer.is-open .ds-rail,
+  .ds-drawer.is-open[data-mlevel="1"] .ds-rail,
+  .ds-drawer.is-open.is-l1 .ds-rail{transform:none;visibility:visible}
+  /* level 2: task slides in from the right over the rail (visibility, never
+     display:none, so the glide transition runs both ways) */
+  .ds-drawer.is-open[data-mlevel="2"] .ds-task,
+  .ds-drawer.is-open.is-l2 .ds-task{transform:none;visibility:visible}
+  /* mobile nav controls reuse the drawer-head button look as ≥44px targets:
+     flush-left back (« Back) + right close (✕) */
+  .ds-drawer-head [data-mback],.ds-drawer-head [data-mclose],[data-mback],[data-mclose]{font-family:var(--font-mono);font-size:var(--text-micro);background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;padding:0 var(--cl-9);cursor:pointer}
+  [data-mback]{margin-right:auto}
+}
+@media (max-width:720px) and (prefers-reduced-motion:reduce){
+  .ds-rail,.ds-task{transition:none;animation:none}
+}
+/* Mobile L1 parked detail: quiet placeholder (nothing pre-selected). */
+.ds-empty-detail{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding:var(--cl-16) 0;margin:0}
+/* Mobile L1 rail head: back button gets its own row so the plan title wraps
+   across the full width instead of colliding on one 390px line. */
+@media (max-width:720px){
+  [data-mlevel-head="rail"]{white-space:normal}
+  [data-mlevel-head="rail"] [data-mback]{display:flex;width:fit-content;margin:0 0 var(--cl-8)}
 }

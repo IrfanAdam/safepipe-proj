@@ -16,6 +16,14 @@ import { TIMELINE_TILE_ICON } from './changelog/graph.js';
 import { bindChangelogEvents } from './changelog-events.js';
 import { setDueProgressStep, hideDueProgress } from './due-progress.js';
 
+// Mobile drawer level (2-level nav; CSS teammate owns the visuals — JS only
+// sets dataset/classes/HTML): L1 = rail list only, L2 = detail. Desktop
+// ignores it entirely.
+export const isMobile = () => {
+  try { return typeof matchMedia === 'function' && matchMedia('(max-width: 720px)').matches; }
+  catch { return false; }
+};
+
 // Plan-iteration revisions: versions append (tracker hook + backfill), oldest first.
 const revOf = (file) => {
   const vs = history[file] || [];
@@ -424,6 +432,7 @@ function startLiveRefresh() {
   } catch {}
 }
 const st = { active: new Set(), day: '', sel: [0, 0], open: false, stage: 'list',
+  mlevel: 1,
   view: 'list', tlSel: null, tlLast: null, tlSort: '', returnView: null, tlDate: '' };
 let tlToken = 0;
 const dueOnDay = (p, day) => (p.sprints || []).some((s) => { try { return dueOf(s) === day; } catch { return false; } });
@@ -478,13 +487,20 @@ const cur = () => {
       const pinned = plans.find((p) => p.file === st.openFile);
       if (pinned) {
         const sprints = visibleSprints(pinned);
-        return { list, pi, plan: pinned, sprints, si: Math.min(Math.max(st.sel[1], 0), Math.max(sprints.length - 1, 0)) };
+        // Mobile L1 parks the detail with sel[1] === -1 (nothing selected):
+        // pass it through so paint renders the placeholder instead of the
+        // first phase. Desktop never sets -1, so its clamp is unchanged.
+        const rawSi = st.sel[1];
+        const si = rawSi < 0 ? -1 : Math.min(Math.max(rawSi, 0), Math.max(sprints.length - 1, 0));
+        return { list, pi, plan: pinned, sprints, si };
       }
       st.openFile = null;
     }
   } else if (st.openFile) st.openFile = null;
   const plan = list[pi], sprints = plan ? visibleSprints(plan) : [];
-  return { list, pi, plan, sprints, si: Math.min(Math.max(st.sel[1], 0), Math.max(sprints.length - 1, 0)) };
+  const rawSi = st.sel[1];
+  const si = rawSi < 0 ? -1 : Math.min(Math.max(rawSi, 0), Math.max(sprints.length - 1, 0));
+  return { list, pi, plan, sprints, si };
 };
 export function render() {
   return [
@@ -513,9 +529,13 @@ function syncTimelineURL() {
 }
 function doPaint(root) {
   const { list, pi, plan, sprints, si } = cur();
-  st.sel = [pi, si];
-  paint(root, { list, pi, plan, sprints, si, active: st.active, day: st.day,
-    sel: st.sel, open: st.open, stage: st.stage, counts, plans, texts,
+  // Mobile L1 keeps sel[1] === -1 (nothing selected) across repaints —
+  // never let the clamp write-back resurrect the first phase. Desktop (and
+  // L2) keep the old write-back exactly.
+  if (isMobile() && st.open && st.mlevel === 1 && st.sel[1] < 0) st.sel = [pi, -1];
+  else st.sel = [pi, Math.max(si, 0)];
+  paint(root, { list, pi, plan, sprints, si: st.sel[1], active: st.active, day: st.day,
+    sel: st.sel, open: st.open, stage: st.stage, mlevel: st.mlevel || 1, counts, plans, texts,
     dueCommit: st.dueCommit || null,
     rev: plan ? revOf(plan.file) : null, revOf, edited: plan ? (s) => sectionEdited(plan.file, s) : () => false,
     revs: plan ? (history[plan.file] || []) : [] });
@@ -558,7 +578,7 @@ function doPaint(root) {
   });
 }
 export function mount(root) {
-  st.open = false; st.stage = 'list';
+  st.open = false; st.stage = 'list'; st.mlevel = 1;
   // Survive file-watch reloads (setting a deadline rewrites the plan file,
   // and the dev server reloads on the .md change): restore the UI snapshot
   // taken at unload so the drawer reopens where the author left it.
@@ -570,6 +590,10 @@ export function mount(root) {
       if (typeof s.open === 'boolean') st.open = s.open;
       if (typeof s.stage === 'string') st.stage = s.stage;
       if (s.view === 'timeline' || s.view === 'list') st.view = s.view;
+      // mlevel compat: old snapshots predate it. An open drawer with a real
+      // section selection restores at L2, otherwise L1 (mobile only matters).
+      if (s.mlevel === 1 || s.mlevel === 2) st.mlevel = s.mlevel;
+      else if (st.open && isMobile()) st.mlevel = (Array.isArray(st.sel) && st.sel[1] >= 0) ? 2 : 1;
       sessionStorage.removeItem('safepipe-ui-snapshot');
     }
   } catch {}
@@ -577,7 +601,7 @@ export function mount(root) {
     window.addEventListener('beforeunload', () => {
       try {
         sessionStorage.setItem('safepipe-ui-snapshot',
-          JSON.stringify({ sel: st.sel, open: st.open, stage: st.stage, view: st.view }));
+          JSON.stringify({ sel: st.sel, open: st.open, stage: st.stage, view: st.view, mlevel: st.mlevel }));
       } catch {}
     });
   } catch {}
@@ -589,6 +613,8 @@ export function mount(root) {
       if (f && plans.some((p) => p.file === f)) {
         const li = visiblePlans().findIndex((p) => p.file === f);
         st.sel = [Math.max(li, 0), 0]; st.open = true; st.openFile = f; st.stage = 'tasks'; st.returnView = 'timeline';
+        // Timeline deep links land on the detail (L2) with the bout selected.
+        st.mlevel = 2;
         if (b !== null && b !== '' && Number.isInteger(Number(b))) {
           st.tlSel = { planFile: f, boutIdx: Number(b) };
           st.tlLast = st.tlSel;
