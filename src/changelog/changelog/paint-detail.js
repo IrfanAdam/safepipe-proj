@@ -167,7 +167,7 @@ const gateSuffixOf = (gates, phaseN) => {
   return '';
 };
 export function paintDetail(root, ctx){
-  const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts, edited, revs } = ctx;
+  const { list, pi, plan, sprints, si, active, day, sel, open, counts, plans, texts, edited, revs, dueCommit } = ctx;
   const scrim = root.querySelector('[data-scrim]'), drawer = root.querySelector('[data-drawer]');
   const sprint = sprints[si], sprintDesc = (s) => descOf(s.body);
   const railHead = `<div class="ds-rail-plan">` + esc([plan.id, plan.title || provenance(plan)].filter(Boolean).join(' · ')) + `</div>`;
@@ -226,6 +226,17 @@ export function paintDetail(root, ctx){
   const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   // Schedule trigger: accent text (or 'Schedule when?') opening the themed
   // month popup. No native date input, no hint line, never a Due n/a.
+  // Commit state for this section's pick (set by applyDue in events):
+  // saving → needs-login | failed. Null/committed shows nothing — the Due
+  // line itself is the proof once git has it. Mismatched file/head never
+  // renders another section's status.
+  const dc = dueCommit && plan && sprint
+    && dueCommit.file === plan.file && dueCommit.head === sprint.head ? dueCommit.state : '';
+  const dueStatusHTML = !dc || secShipped ? '' : dc === 'saving'
+    ? `<span class="ds-due-status" data-due-status="saving">saving…</span>`
+    : dc === 'needs-login'
+      ? `<button class="ds-due-status is-warn" data-due-retry="login">only on this device — sign in again to publish</button>`
+      : `<button class="ds-due-status is-err" data-due-retry="commit">couldn't reach git — tap to retry</button>`;
   const dueHTML = secShipped
     ? ''
     : [
@@ -237,6 +248,7 @@ export function paintDetail(root, ctx){
       // Logged-out readers see the date as plain text (see CSS gate below).
       secDue ? `<span class="ds-due-static">Deadline · ${esc(fmtDate(secDue))}</span>` : '',
       secDue && secDue < todayISO ? `<span class="ds-due-overdue">overdue</span>` : '',
+      dueStatusHTML,
       `<div class="ds-due-pop" data-due-pop hidden role="dialog" aria-label="Pick a due date"></div>`,
       `</div>`,
     ].join('');
@@ -271,5 +283,6 @@ export function paintDetail(root, ctx){
   ].join('');
   const u = unlinked(texts);
   root.querySelector('[data-col="triage"]').innerHTML = /All tracked/.test(u) ? '' : `<hr class="ds-hr">${u}`;
-  if (open) { drawer.hidden = false; scrim.hidden = false; } else { drawer.hidden = true; scrim.hidden = true; }
+  drawer.classList.toggle('is-open', open); drawer.setAttribute('aria-hidden', String(!open)); drawer.toggleAttribute('inert', !open);
+  scrim.classList.toggle('is-open', open); scrim.setAttribute('aria-hidden', String(!open));
 }

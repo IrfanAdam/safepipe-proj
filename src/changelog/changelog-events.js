@@ -3,7 +3,8 @@
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
 import { saveDueOverride, dropDueOverride } from '../logic/due-overrides.js';
-import { getSchedToken } from '../logic/schedule-auth.js';
+import { getSchedToken, setSchedToken } from '../logic/schedule-auth.js';
+import { openScheduleGate } from './schedule-gate.js';
 // Due scheduling (task 3): pure file-text edit — insert/replace/clear the
 // single `*Due: YYYY-MM-DD*` line under the owning head, idempotently (first
 // Due-shaped line wins, extras removed, never duplicated). Head not found →
@@ -172,6 +173,10 @@ export function bindChangelogEvents(root, st, helpers) {
   // st.duePending records the exact file line for the author's commit
   // ([plan:<file>#<anchor>] trailer + tracker regen). Done/cancelled
   // sections render no control, so reaching here with one is a no-op guard.
+  // Generation counter for due commits: rapid re-picks each bump dueGen, so
+  // only the latest pick's async continuations may touch the freeze overlay
+  // or commit state — stale confirmations are ignored.
+  let dueGen = 0;
   const applyDue = (iso) => {
     const c = cur();
     const plan = c.plan, sprint = c.sprints[c.si];
@@ -179,25 +184,44 @@ export function bindChangelogEvents(root, st, helpers) {
     if (/[✓✗]/.test(String(sprint.head || ''))) return;
     if (iso && !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
     const next = duePreviewEdit(sprint.body, sprint.head, iso || null);
-    if (next === sprint.body) {
-      st.duePending = null; return;
+    if (next !== sprint.body) {
+      sprint.body = next;
+      st.duePending = { file: plan.file, due: iso || null, line: iso ? `*Due: ${iso}*` : null };
+      // Same-device persistence: production has no file writer (static 404),
+      // so the pick is stored and re-applied at boot until the file carries it.
+      try { saveDueOverride(plan.file, sprint.head, iso || null); } catch {}
     }
-    sprint.body = next;
-    st.duePending = { file: plan.file, due: iso || null, line: iso ? `*Due: ${iso}*` : null };
-    // Same-device persistence: production has no file writer (static 404),
-    // so the pick is stored and re-applied at boot until the file carries it.
-    try { saveDueOverride(plan.file, sprint.head, iso || null); } catch {}
+    // Commit the pick to git (dev: local writer; prod: /api/due). Runs even
+    // when the preview is unchanged — a retry after a failed commit must
+    // re-fire the pipeline, not no-op on identical text.
+    commitDue(plan, sprint, iso || null);
+  };
+  const commitDue = (plan, sprint, iso) => {
+    // Commit state for the due row (paint-detail reads ctx.dueCommit):
+    // saving → needs-login | failed | null (live on git). A pick is never
+    // silently local-only: without a token the login gate opens so the
+    // date can be committed to git and reach every device via redeploy.
+    st.dueCommit = { file: plan.file, head: sprint.head, state: 'saving' };
     doPaint(root);
+    const gen = ++dueGen;
+    const failDue = (state) => {
+      if (gen !== dueGen) return;
+      st.dueCommit = { file: plan.file, head: sprint.head, state };
+      try { doPaint(root); } catch {}
+    };
     if (typeof fetch === 'function') {
       fetch('/__ds/due', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file: plan.file, head: sprint.head, due: iso || null }),
       }).then((r) => {
+        if (gen !== dueGen) return;
         if (r.ok) {
           st.duePending = null;
+          st.dueCommit = null;
           // File now carries the value — the stored override is redundant.
           try { dropDueOverride(plan.file, sprint.head); } catch {}
+          try { doPaint(root); } catch {}
           return;
         }
         // Static host (production): no file writer — commit through /api/due
@@ -205,21 +229,134 @@ export function bindChangelogEvents(root, st, helpers) {
         // the redeployed bundle carries the value, so the UI never flickers.
         let token = null;
         try { token = getSchedToken(); } catch {}
-        if (!token) return;
+        if (!token) {
+          failDue('needs-login');
+          try { openScheduleGate(); } catch {}
+          return;
+        }
         return fetch('/api/due', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, file: plan.file, head: sprint.head, due: iso || null }),
-        }).then((r2) => {
+        }).then(async (r2) => {
+          if (gen !== dueGen) return;
           if (r2 && r2.ok) {
+            let body = null;
+            try { body = await r2.json(); } catch {}
+            if (body && body.unchanged) {
+              // Server applied nothing (head not found in the repo file) —
+              // the preview above is NOT live. Surface, don't mark committed.
+              failDue('failed');
+              return;
+            }
+            if (body && body.committed === false) {
+              // Explicit server-side non-commit — same surface as unchanged.
+              failDue('failed');
+              return;
+            }
             // Server committed it: the repo is now NEWER than this bundle.
             // Mark the override authoritative so a mid-deploy refresh keeps
             // showing the confirmed date instead of the stale file value.
+            if (gen !== dueGen) return;
             try { saveDueOverride(plan.file, sprint.head, iso || null, true); } catch {}
             st.duePending = null;
+            // Freeze + redeploy-confirm flow. Sibling modules may not exist
+            // yet (parallel work) — both imports are defensive with a
+            // no-freeze fallback to the current status-line behaviour.
+            // Dev-writer and needs-login/failed paths never reach here, so
+            // their behaviour is unchanged.
+            (async () => {
+              let freeze = null;
+              try { freeze = await import('./due-freeze.js'); } catch { freeze = null; }
+              if (gen !== dueGen) return;
+              const show = freeze && freeze.showDueFreeze;
+              const setStep = freeze && freeze.setDueFreezeStep;
+              const hide = freeze && freeze.hideDueFreeze;
+              if (typeof show !== 'function') {
+                st.dueCommit = null;
+                try { doPaint(root); } catch {}
+                return;
+              }
+              try { show(null, { file: plan.file, head: sprint.head, due: iso || null }); } catch {}
+              try { if (typeof setStep === 'function') setStep('committed'); } catch {}
+              let confirmMod = null;
+              try { confirmMod = await import('../logic/due-deploy-confirm.js'); } catch { confirmMod = null; }
+              if (gen !== dueGen) return;
+              const confirmDueLive = confirmMod && confirmMod.confirmDueLive;
+              if (typeof confirmDueLive !== 'function') {
+                // Committed on git but no live poll available — behave as
+                // committed and dismiss the overlay shortly.
+                st.dueCommit = null;
+                try { doPaint(root); } catch {}
+                setTimeout(() => {
+                  if (gen !== dueGen) return;
+                  try { if (typeof hide === 'function') hide(); } catch {}
+                }, 1200);
+                return;
+              }
+              const api = body || {};
+              try { if (typeof setStep === 'function') setStep('deploying'); } catch {}
+              let res = null;
+              try {
+                // Content is dynamic now (live plan refresh): there is no
+                // redeploy to wait for, so skip the asset-hash document poll
+                // — repo proof is live.
+                // [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
+                res = await confirmDueLive({
+                  token,
+                  repo: api.repo,
+                  branch: api.branch,
+                  file: plan.file,
+                  head: sprint.head,
+                  due: iso || null,
+                  fileSha: api.fileSha || api.sha || null,
+                  pageUrl: null,
+                });
+              } catch { res = null; }
+              if (gen !== dueGen) return;
+              if (res && res.repoConfirmed) {
+                // Repo-confirmed IS live: pull the hosted text and repaint
+                // with no reload (selection/filter untouched), then dismiss.
+                // [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
+                try { if (typeof setStep === 'function') setStep('live'); } catch {}
+                st.dueCommit = null;
+                try {
+                  const live = await import('./pages-changelog.js');
+                  if (live && typeof live.refreshLivePlans === 'function') await live.refreshLivePlans(root);
+                  else doPaint(root);
+                } catch {
+                  try { doPaint(root); } catch {}
+                }
+                setTimeout(() => {
+                  if (gen !== dueGen) return;
+                  try { if (typeof hide === 'function') hide(); } catch {}
+                }, 1200);
+                return;
+              }
+              // Timed-out or confirm error: the date is safe on git (the
+              // committed:true override above stays), so clear the commit
+              // state but linger on 'stale' before dismissing.
+              try { if (typeof setStep === 'function') setStep('stale'); } catch {}
+              st.dueCommit = null;
+              try { doPaint(root); } catch {}
+              setTimeout(() => {
+                if (gen !== dueGen) return;
+                try { if (typeof hide === 'function') hide(); } catch {}
+              }, 4000);
+            })();
+            return;
           }
-        }).catch(() => {});
-      }).catch(() => {});
+          if (r2 && (r2.status === 401 || r2.status === 403)) {
+            // Token rejected or pre-scope grant (needs public_repo) — the
+            // stored user badge outlives the token, so clear it and re-login.
+            try { setSchedToken(null); } catch {}
+            failDue('needs-login');
+            try { openScheduleGate(); } catch {}
+            return;
+          }
+          failDue('failed');
+        }).catch(() => { failDue('failed'); });
+      }).catch(() => { failDue('failed'); });
     }
   };
   // Themed due datepicker: material-like month grid in Safepipe tokens
@@ -324,6 +461,18 @@ export function bindChangelogEvents(root, st, helpers) {
     }
     const dpick = e.target.closest('[data-due-pick]');
     if (dpick) { applyDue(dpick.dataset.duePick); return; }
+    // Commit-status retry: re-runs the full write pipeline (local writer,
+    // else /api/due commit) for the date currently shown on the control.
+    // needs-login re-opens the gate when there is still no token.
+    const dretry = e.target.closest('[data-due-retry]');
+    if (dretry) {
+      const open = root.querySelector('[data-due-open]');
+      const iso = open ? String(open.dataset.due || '').trim() : '';
+      if (!open) return;
+      if (dretry.dataset.dueRetry === 'login') { try { openScheduleGate(); } catch {} return; }
+      applyDue(iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null);
+      return;
+    }
     const dd = e.target.closest('[data-day]');
     if (dd) { st.day = st.day === dd.dataset.day ? '' : dd.dataset.day;
       st.sel = [0, 0]; doPaint(root); return; }
@@ -433,6 +582,23 @@ export function bindChangelogEvents(root, st, helpers) {
     }
     // Moving onto the popover itself (reaching the deadline link) keeps it open.
     if (e.target.closest('[data-tl-pop]')) return;
+    // Today line (dotted now) has its own time tooltip — it sits inside the
+    // row/lane, so it must win over the row-bout popover or the time tip
+    // never surfaces (row would claim the hover).
+    const todayEl = e.target.closest ? e.target.closest('.ds-tl-today') : null;
+    if (todayEl && todayEl.dataset.tip && st.view === 'timeline') {
+      hidePop();
+      const tip = root.querySelector('.ds-cursor-tip');
+      if (!tip) return;
+      const inner = tip.querySelector('.ds-cursor-tip__text') || tip;
+      inner.textContent = todayEl.dataset.tip; tip.hidden = false;
+      const pad = 14; let x = e.clientX + pad, y = e.clientY + pad;
+      const r = tip.getBoundingClientRect();
+      if (x + r.width > innerWidth - 8) x = e.clientX - r.width - pad;
+      if (y + r.height > innerHeight - 8) y = e.clientY - r.height - pad;
+      tip.style.left = x + 'px'; tip.style.top = y + 'px';
+      return;
+    }
     // Row hover shows the row's own popover (first bout carries the data),
     // so empty lane space reads the same as the bar — stable while moving
     // across the row via the popFor guard.

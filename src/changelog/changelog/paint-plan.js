@@ -22,7 +22,8 @@ export function paintPlan(root, ctx){
     root
       .querySelector('[data-col="triage"]')
       .innerHTML = unlinked(texts);
-    drawer.hidden = true; scrim.hidden = true; return false;
+    drawer.classList.toggle('is-open', false); drawer.setAttribute('aria-hidden', 'true'); drawer.toggleAttribute('inert', true);
+    scrim.classList.toggle('is-open', false); scrim.setAttribute('aria-hidden', 'true'); return false;
   }
   const sprint = sprints[si];
   root.querySelector('[data-col="plan"]').innerHTML = list.map((p, i) => {
@@ -56,6 +57,7 @@ export function paintPlan(root, ctx){
     const tagCount = Math.min(3, p.tags.length);
     const tagsVisible = p.tags.slice(0, tagCount).join(' · ');
     const tagsOverflow = p.tags.length - tagCount;
+    const tagsFull = p.tags.join(' · ');
     return [
       `<button class="ds-pick`,
       i === sel[0] ? ' on' : '',
@@ -70,7 +72,7 @@ export function paintPlan(root, ctx){
       dateTxt,
       `</span><span class="ds-state">`,
       stateTxt,
-      `</span></small></span><span class="ds-tags">`,
+      `</span></small></span><span class="ds-tags"${tagsOverflow > 0 ? ` data-tip="${esc(tagsFull)}"` : ''}>`,
       esc(tagsVisible),
       tagsOverflow > 0 ? ` <span class="ds-tags-more" role="button" tabindex="0" data-tags-more="${i}" aria-label="Show ${tagsOverflow} more tags">+${tagsOverflow}</span>` : '',
       `</span></button>`,

@@ -18,8 +18,9 @@
   --tracking-heading:-0.02em; --tracking-mono:0.08em; --tracking-label:0.14em;
   --leading-prose:1.6; --leading-mono:1.6; --font-leading-relaxed:1.6;
   --radius-none:0; --radius-xs:var(--sp-spacing-base); --radius-md:var(--sp-radius-md);
-  --dur-soft:0.18s; --dur-glide:0.3s; --motion-duration-sm:0.15s;
+  --dur-soft:0.18s; --dur-glide:0.3s; --dur-panel:0.2s; --motion-duration-sm:0.15s;
   --ease-standard:ease; --ease-signature:cubic-bezier(0.2,0.9,0.25,1.15);
+  --ease-glide:cubic-bezier(0.2,0.8,0.2,1);
   --motion-easing-standard:ease;
 }
 :root{
@@ -69,13 +70,13 @@ body{background:var(--color-bg);color:var(--color-ink);font-family:var(--sp-font
 .ds-hero h1{font-family:var(--font-display);font-weight:700;font-size:clamp(40px,6vw,68px);letter-spacing:-0.02em;line-height:1.02;color:var(--color-ink);margin:0;text-wrap:balance;overflow-wrap:break-word}
 .ds-hero.wide .lede{max-width:none}
 .ds-hr{border:none;border-top:var(--border-hairline);margin:var(--cl-14) 0}
-.ds-chips{display:flex;gap:var(--cl-8);flex-wrap:wrap;margin:0 0 var(--cl-12);position:relative}
+.ds-chips{display:flex;gap:var(--cl-8);flex-wrap:wrap;align-items:center;margin:0 0 var(--cl-12);position:relative}
 .ds-chip-timeline{margin-left:auto;display:inline-flex;align-items:center;gap:var(--cl-8)}
 .ds-chip-timeline__icon{display:inline-flex}
 .ds-chip-timeline__icon svg{display:block;width:var(--cl-14);height:var(--cl-14)}
 /* Text-like clear: no pill chrome, appended to the tag stack. Hover stays
    outline-only per the toggle rule — no fill change. */
-.ds-chip-clear{background:none;border:0;padding:var(--cl-8) var(--cl-4);font-family:var(--font-display);font-weight:600;letter-spacing:0.06em;font-size:var(--sp-text-sm);color:var(--color-ink-muted);cursor:pointer}
+.ds-chip-clear{background:none;border:var(--cl-1) solid transparent;padding:var(--cl-6) var(--cl-4);font-family:var(--font-display);font-weight:600;letter-spacing:0.06em;font-size:var(--sp-text-xs);color:var(--color-ink-muted);cursor:pointer}
 .ds-chip-clear:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-chip-filter{color:var(--color-ink-muted)}
 .ds-tag-dropdown{position:absolute;top:calc(100% + var(--cl-4));left:0;z-index:var(--z-ds-controls);background:var(--color-surface);border:var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-viewer);padding:var(--cl-8);min-width:220px;display:flex;flex-direction:column;gap:var(--cl-4)}

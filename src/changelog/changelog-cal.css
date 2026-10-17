@@ -20,3 +20,7 @@ button.ds-day:focus-visible{outline:var(--cl-1) solid var(--color-accent);outlin
 /* scheduling ghost-dot (timeline Task 3): future Due marker — full-opacity
    accent outline on the dimmed future cell, no new colors. */
 .ds-day.is-due{opacity:1;border-color:var(--color-accent);outline:var(--cl-1) solid var(--color-accent);outline-offset:calc(-1 * var(--cl-1))}
+/* Future dues stay clickable filters but keep the hollow outline look —
+   they are incomplete (nothing logged yet), never solid like history. */
+button.ds-day.is-future{background:var(--color-surface);border-color:var(--color-accent)}
+button.ds-day.is-future:hover{background:var(--color-surface)}

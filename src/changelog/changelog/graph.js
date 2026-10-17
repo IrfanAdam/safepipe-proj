@@ -53,7 +53,7 @@ export function graph({ plans, day }) {
       const k = isoDay(d),
         todayCls = k === isoDay(today) ? ' is-today' : '';
       if (d > today) {
-        if (dues.has(k)) return `<span class="ds-day is-future is-due" data-due-day="${k}" data-tip="${dueCounts.get(k)} Due · ${fmtDate(k)}"></span>`;
+        if (dues.has(k)) return `<button class="ds-day is-future is-due${day === k ? ' on' : ''}" data-day="${k}" data-due-day="${k}" data-tip="${dueCounts.get(k)} Due · ${fmtDate(k)} — filter list" aria-pressed="${day === k}" aria-label="${dueCounts.get(k)} due on ${fmtDate(k)} — filter list"></button>`;
         return `<span class="ds-day is-future" data-tip="${fmtDate(k)}"></span>`;
       }
       const n = dc[k] || 0;

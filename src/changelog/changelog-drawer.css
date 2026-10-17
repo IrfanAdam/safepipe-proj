@@ -1,8 +1,8 @@
 /* safepipe changelog — scrim + two-pane drawer + timeline · [plan:2026-10-07_130000-safepipe-changelog.md#task-3] */
-.ds-scrim{position:fixed;inset:0;z-index:var(--z-ds-scrim);cursor:pointer;background:var(--color-viewer-shade)}
-.ds-scrim[hidden],.ds-drawer[hidden]{display:none}
-.ds-scrim:not([hidden]){animation:ds-scrim-in var(--dur-soft) var(--ease-standard)}
-.ds-drawer{position:fixed;top:0;right:0;bottom:0;width:min(86vw,var(--size-ds-drawer));box-sizing:border-box;background:var(--color-bg);border-left:var(--border-hairline);z-index:var(--z-ds-drawer);overflow:hidden;padding:0;box-shadow:var(--shadow-viewer);display:flex;gap:0;align-items:stretch}
+.ds-scrim{position:fixed;inset:0;z-index:var(--z-ds-scrim);cursor:pointer;background:var(--color-viewer-shade);opacity:0;visibility:hidden;transition:opacity var(--dur-soft) var(--ease-standard),visibility var(--dur-soft)}
+.ds-scrim.is-open{opacity:1;visibility:visible}
+.ds-drawer{position:fixed;top:0;right:0;bottom:0;width:min(86vw,var(--size-ds-drawer));box-sizing:border-box;background:var(--color-bg);border-left:var(--border-hairline);z-index:var(--z-ds-drawer);overflow:hidden;padding:0;box-shadow:var(--shadow-viewer);display:flex;gap:0;align-items:stretch;opacity:0;transform:translateX(103%);visibility:hidden;transition:opacity var(--dur-panel) var(--ease-glide),transform var(--dur-panel) var(--ease-glide),visibility var(--dur-panel);will-change:transform,opacity}
+.ds-drawer.is-open{opacity:1;transform:none;visibility:visible}
 .ds-rail{flex:0 0 38%;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;border-right:var(--border-hairline);padding:var(--cl-18) 0 var(--cl-30) 0;display:flex;flex-direction:column}
 .ds-rail .ds-pick{padding:var(--cl-12) var(--cl-16);font-size:0.86em}
 .ds-rail .ds-pick small{display:block}
@@ -10,10 +10,7 @@
 .ds-rail-foot{padding:var(--cl-10) var(--cl-16) 0; border-top:var(--border-hairline);font-size:var(--text-micro);line-height:var(--leading-prose);color:var(--color-ink-muted)}
 .ds-rail-plan{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--sp-text-primary);font-weight:600;line-height:var(--leading-prose);padding:var(--cl-8) var(--cl-16) var(--cl-8);margin:0 0 var(--cl-6);border-bottom:var(--border-hairline);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none;height:auto}
 .ds-task{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;padding:var(--cl-18) var(--cl-16) var(--cl-30)}
-.ds-drawer:not([hidden]){animation:ds-drawer-in var(--dur-glide) var(--ease-signature)}
-@keyframes ds-drawer-in{from{transform:translateX(var(--cl-30));opacity:0}to{transform:none;opacity:1}}
-@keyframes ds-scrim-in{from{opacity:0}to{opacity:1}}
-@media (prefers-reduced-motion:reduce){.ds-drawer:not([hidden]),.ds-scrim:not([hidden]){animation:none}}
+@media (prefers-reduced-motion:reduce){.ds-drawer,.ds-scrim{transition:none;animation:none}}
 @media (max-width:720px){.ds-drawer{width:100vw;flex-direction:column}.ds-rail{flex:none;border-right:none;border-bottom:var(--border-hairline);padding:var(--cl-16) 0 var(--cl-12) 0;max-height:38vh}}
 /* drawer head + picks */
 .ds-drawer-head{display:flex;gap:var(--cl-8);align-items:center;padding-top:var(--cl-6);margin-bottom:var(--cl-4)}
@@ -113,6 +110,11 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 body:not(.is-sched-auth) .ds-due-static{display:inline}
 body:not(.is-sched-auth) .ds-due:not(:has(.ds-due-static)){display:none}
 .ds-due-overdue{color:var(--color-accent);font-weight:700;text-transform:uppercase;letter-spacing:var(--tracking-label)}
+/* Due commit state (scheduling pipeline): quiet status after the date.
+   Warn/err render as buttons — tap retries the git commit or re-login. */
+.ds-due-status{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
+button.ds-due-status{background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:var(--cl-2)}
+.ds-due-status.is-warn,.ds-due-status.is-err{color:var(--color-accent);font-weight:700}
 .ds-due-pop{position:absolute;top:100%;left:0;z-index:2;background:var(--color-bg);border:var(--border-hairline);border-radius:var(--cl-6);box-shadow:var(--sp-elevation-2);padding:var(--cl-8) var(--cl-8) var(--cl-4);margin-top:var(--cl-4);width:max-content}
 .ds-due-cal__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--cl-4)}
 .ds-due-cal__head b{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink)}
@@ -129,3 +131,24 @@ body:not(.is-sched-auth) .ds-due:not(:has(.ds-due-static)){display:none}
 .ds-due-cal__foot{display:flex;justify-content:flex-end;margin-top:var(--cl-4)}
 .ds-due-cal__foot button{background:none;border:0;padding:var(--cl-4) 0;color:var(--color-ink-muted);font-family:var(--font-mono);font-size:calc(var(--text-micro) - 2px);text-decoration:underline;text-underline-offset:var(--cl-2);cursor:pointer}
 .ds-due-cal__foot button:hover{color:var(--color-accent)}
+/* Due freeze overlay (scheduling pipeline): full-screen blocking veil shown
+   while a deadline pick is committed + redeploy-confirmed. Sits above the
+   drawer, user menu and due popover; traps pointer only, never keyboard —
+   hideDueFreeze() always releases it. Token-only, no raw values. */
+.ds-freeze{position:fixed;inset:0;z-index:calc(var(--z-ds-controls) + 100);display:grid;place-items:center;background:var(--color-viewer-shade);pointer-events:all;padding:var(--cl-16)}
+.ds-freeze[hidden]{display:none}
+.ds-freeze-card{background:var(--color-surface);border:var(--border-hairline);border-radius:var(--sp-radius-md);box-shadow:var(--sp-elevation-2);padding:var(--cl-22);max-width:calc(var(--sp-spacing-base) * 85);width:100%;text-align:center}
+.ds-freeze-spinner{width:var(--cl-32);height:var(--cl-32);margin:0 auto var(--cl-12);border-radius:50%;border:var(--cl-2) solid var(--color-border);border-top-color:var(--color-accent);animation:ds-freeze-spin calc(var(--dur-glide) * 3) linear infinite}
+.ds-freeze-eyebrow{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin:0 0 var(--cl-4)}
+.ds-freeze-detail{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);margin:0 0 var(--cl-8);overflow-wrap:anywhere}
+.ds-freeze-detail[hidden]{display:none}
+.ds-freeze-steps{list-style:none;margin:0 0 var(--cl-8);padding:0;display:flex;flex-direction:column;gap:var(--cl-4);text-align:left}
+.ds-freeze-steps li{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding-left:var(--cl-16);position:relative}
+.ds-freeze-steps li::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:var(--cl-7);height:var(--cl-7);border-radius:50%;border:var(--cl-1) solid var(--color-border);background:var(--color-bg);box-sizing:border-box}
+.ds-freeze-steps li.is-on{color:var(--color-ink);font-weight:700}
+.ds-freeze-steps li.is-on::before{background:var(--color-accent);border-color:var(--color-accent)}
+.ds-freeze-note{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-accent);margin:0 0 var(--cl-4)}
+.ds-freeze-note[hidden]{display:none}
+.ds-freeze-live{position:absolute;width:var(--cl-1);height:var(--cl-1);overflow:hidden;clip-path:inset(50%)}
+@keyframes ds-freeze-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.ds-freeze-spinner{animation:none}}

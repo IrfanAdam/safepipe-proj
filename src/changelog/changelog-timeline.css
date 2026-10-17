@@ -7,7 +7,7 @@
   --cl-16:var(--sp-spacing-lg); --cl-20:calc(var(--sp-spacing-base) * 5);
   --cl-26:calc(var(--sp-spacing-base) * 6.5);
   --cl-32:var(--sp-spacing-2xl);
-  --cl-tl-day:calc(var(--sp-spacing-base) * 8);
+  --cl-tl-day:calc(var(--sp-spacing-base) * 10);
   --cl-tl-row:calc(var(--sp-spacing-base) * 9);
   /* Bar fills: one neutral + one muted accent. Every bar paints its done
      share (--tl-done, set inline per bar) in the accent from the left. */
@@ -24,9 +24,8 @@
 /* margin+padding reset: the in-drawer commit-list rule `.ds-timeline`
    (changelog-drawer.css) leaks onto this aside — zeroed so the panel and
    its rows stay flush with the drawer's left edge. */
-aside.ds-timeline{position:fixed;top:0;right:0;bottom:0;margin:0;padding:0;width:min(86vw,var(--size-ds-drawer));box-sizing:border-box;background:var(--color-bg);border-left:var(--border-hairline);z-index:var(--z-ds-drawer);box-shadow:var(--shadow-viewer);display:flex;flex-direction:column;overflow:hidden}
-aside.ds-timeline[hidden]{display:none}
-aside.ds-timeline:not([hidden]){animation:ds-drawer-in var(--dur-glide) var(--ease-signature)}
+aside.ds-timeline{position:fixed;top:0;right:0;bottom:0;margin:0;padding:0;width:min(86vw,var(--size-ds-drawer));box-sizing:border-box;background:var(--color-bg);border-left:var(--border-hairline);z-index:var(--z-ds-drawer);box-shadow:var(--shadow-viewer);display:flex;flex-direction:column;overflow:hidden;opacity:0;transform:translateX(var(--cl-30));visibility:hidden;transition:opacity var(--dur-panel) var(--ease-signature),transform var(--dur-panel) var(--ease-signature),visibility var(--dur-panel)}
+aside.ds-timeline.is-open{opacity:1;transform:none;visibility:visible}
 .ds-tl-head{display:flex;gap:var(--cl-8);align-items:flex-start;padding:var(--cl-16) var(--cl-16) var(--cl-8) var(--cl-16) !important}
 /* Owner call (2026-10-16): head-date scrub input gone; the title carries
    the cl-16 left inset to mirror the ✕'s cl-16 from the right — the grid
@@ -37,7 +36,7 @@ aside.ds-timeline:not([hidden]){animation:ds-drawer-in var(--dur-glide) var(--ea
 .ds-tl-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding-bottom:var(--cl-16);padding-left:var(--cl-16) !important;margin-left:0 !important}
 .ds-tl-axis{display:flex;position:sticky;top:0;background:var(--color-bg);z-index:2;border-bottom:var(--border-hairline);padding:var(--cl-8) 0 var(--cl-4) !important;margin-left:0 !important}
 .ds-tl-ticks{position:relative;flex:none;height:var(--cl-20)}
-.ds-tl-tick{position:absolute;top:0;height:var(--cl-20);line-height:var(--cl-16);border-left:var(--border-hairline);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding-left:var(--cl-2);white-space:nowrap;overflow:visible}
+.ds-tl-tick{position:absolute;top:0;height:var(--cl-20);line-height:var(--cl-16);border-left:var(--border-hairline);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);width:var(--cl-tl-day);text-align:center;padding-left:0;white-space:nowrap;overflow:visible}
 aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
 .ds-tl-row{display:flex;align-items:stretch;border-bottom:var(--border-hairline);min-height:var(--cl-tl-row)}
 .ds-tl-row.has-track{background:color-mix(in srgb, var(--color-surface) 45%, transparent)}
@@ -56,7 +55,7 @@ aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
 .ds-tl-ghost.is-overdue{border-color:var(--sp-warning);background:color-mix(in srgb, var(--sp-warning) 18%, transparent)}
 .ds-tl-ghost:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-tl-todaycol{position:absolute;top:0;bottom:0;width:var(--cl-tl-day);background:color-mix(in srgb, var(--color-accent) 10%, transparent);pointer-events:none}
-.ds-tl-today{position:absolute;top:0;bottom:0;border-left:var(--cl-2) dotted color-mix(in srgb, var(--color-accent) 55%, transparent);pointer-events:none}
+.ds-tl-today{position:absolute;top:0;bottom:0;border-left:var(--cl-2) dotted color-mix(in srgb, var(--color-accent) 55%, transparent);pointer-events:auto;cursor:default}
 .ds-tl-empty{padding:var(--cl-16);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
 /* Off-screen carets: sticky to the visible lane edge, shown only when the
    row's tracks sit outside the scroll window (see syncTlEdges). Hover stays
@@ -66,8 +65,8 @@ aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
 .ds-tl-edge.is-l{left:var(--cl-8)}
 .ds-tl-edge.is-r{float:right;right:var(--cl-8)}
 .ds-tl-edge:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
-.ds-tl-pop{position:fixed;z-index:var(--z-ds-controls);max-width:min(40ch,70vw);font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.5;color:var(--color-ink);background:var(--color-surface);border:var(--border-hairline);padding:var(--cl-8) var(--cl-12);border-radius:var(--cl-6);box-shadow:var(--sp-elevation-2);pointer-events:none;box-sizing:border-box;white-space:normal}
-.ds-tl-pop[hidden]{display:none}
+.ds-tl-pop{position:fixed;z-index:var(--z-ds-controls);max-width:min(40ch,70vw);font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.5;color:var(--color-ink);background:var(--color-surface);border:var(--border-hairline);padding:var(--cl-8) var(--cl-12);border-radius:var(--cl-6);box-shadow:var(--sp-elevation-2);pointer-events:none;box-sizing:border-box;white-space:normal;opacity:1;visibility:visible;transform:translateY(0);transition:opacity .16s ease,transform .16s ease,visibility .16s ease}
+.ds-tl-pop[hidden]{display:block !important;opacity:0;visibility:hidden;transform:translateY(4px);pointer-events:none}
 .ds-tl-pop__title{display:block;font-family:var(--font-display);font-weight:700;font-size:var(--sp-text-sm);line-height:1.35;color:var(--color-ink);margin-bottom:var(--cl-4)}
 .ds-tl-pop__desc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:var(--text-micro);line-height:1.5;color:var(--color-ink);margin-bottom:var(--cl-4)}
 .ds-tl-pop__tasks{display:block;font-size:var(--text-micro);line-height:1.5;color:var(--color-ink);margin-bottom:var(--cl-2)}
@@ -82,5 +81,6 @@ aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
   .ds-tl-head{flex-wrap:wrap}
 }
 @media (prefers-reduced-motion:reduce){
+  aside.ds-timeline{transition:none}
   .ds-tl-bout:hover,.ds-tl-streak:hover,.ds-tl-ghost:hover{outline:none}
 }

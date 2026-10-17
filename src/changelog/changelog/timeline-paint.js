@@ -141,13 +141,19 @@ export function paintTimeline(root, ctx) {
   const { list, st } = ctx;
   const panel = root.querySelector('[data-timeline]');
   const pop = root.querySelector('[data-tl-pop]');
+  const syncTl = (open) => {
+    if (!panel) return;
+    panel.classList.toggle('is-open', open);
+    panel.setAttribute('aria-hidden', String(!open));
+    panel.toggleAttribute('inert', !open);
+  };
   if (!panel) return;
-  if (st.view !== 'timeline') { panel.hidden = true; if (pop) pop.hidden = true; return; }
+  if (st.view !== 'timeline') { syncTl(false); if (pop) pop.hidden = true; return; }
   // Owner call: a plan opened from the timeline shows the one familiar plan
   // panel, never two panels at once — the timeline hides underneath and its
   // close (✕/scrim/Esc, same drawer path) lands back on the timeline.
-  if (st.open && st.returnView === 'timeline') { panel.hidden = true; if (pop) pop.hidden = true; return; }
-  panel.hidden = false;
+  if (st.open && st.returnView === 'timeline') { syncTl(false); if (pop) pop.hidden = true; return; }
+  syncTl(true);
   const todayRaw = (st.tlDate && /^\d{4}-\d{2}-\d{2}$/.test(st.tlDate)) ? st.tlDate : todayISO();
   const today = todayRaw;
   const dc = {};
@@ -200,8 +206,10 @@ export function paintTimeline(root, ctx) {
     : Date.now();
   const todayFracOff = (effectiveNowMs - pISO(grid.start).getTime()) / DAY;
   const todayOff = Math.floor(todayFracOff);
+  const nowDate = new Date(effectiveNowMs);
+  const nowTip = `Now \u00b7 ${fmtDate(today)} \u00b7 ${String(nowDate.getHours()).padStart(2,'0')}:${String(nowDate.getMinutes()).padStart(2,'0')}`;
   const todayLine = (todayOff >= 0 && todayOff < grid.days)
-    ? `<span class="ds-tl-todaycol" style="left:calc(var(--cl-tl-day) * ${todayOff})"></span><span class="ds-tl-today" style="left:calc(var(--cl-tl-day) * ${todayFracOff.toFixed(4)})"></span>` : '';
+    ? `<span class="ds-tl-todaycol" style="left:calc(var(--cl-tl-day) * ${todayOff})"></span><span class="ds-tl-today" data-tip="${esc(nowTip)}" aria-label="${esc(nowTip)}" style="left:calc(var(--cl-tl-day) * ${todayFracOff.toFixed(4)})"></span>` : '';
   const body = rows.length ? rows.map((r) => {
     // Owner call: the plan name rides its longest bar, not a sidebar label.
     let li = -1, best = -1;
