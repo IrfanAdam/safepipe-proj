@@ -195,7 +195,7 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 - REF GATE 3 · rev 2026-10-14 gesture-journey (owner): the whole zoom-in to twin level and back to global must be entirely gesture-based — no timed/choreographed moves; viewer never notices the map swaps; enclosing matches the twin-map clip; handoff angles coincide; reverse mirrors forward checkpoints (today erratic). Verdict: OPEN — timed→scrubbed conversion lands on this gate as Tasks 34–37, then proceed.
 
 ## Phase 06 — Lock
-*Due: 2026-10-18*
+*Due: 2026-10-19*
 <!-- {#phase-06} -->
 *What the demo gains: it ships clean and stays clean. Spec §9 deliverables land here. (153000 Phase 6.)*
 
