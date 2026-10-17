@@ -2,23 +2,23 @@
 // Exports: bindChangelogEvents — click/key/hover wiring over shared state st
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
-import { saveDueOverride } from '../logic/due-overrides.js';
+import { saveDueOverride, dueFailureReason, duePublishStep, confirmPublish, headingOf, findHeadIndex } from '../logic/due-overrides.js';
 import { getSchedToken, clearSchedToken, clearSchedUser } from '../logic/schedule-auth.js';
 import { openScheduleGate } from './schedule-gate.js';
 import { showDueProgress, setDueProgressStep, hideDueProgress } from './due-progress.js';
 // Due scheduling (task 3): pure file-text edit — insert/replace/clear the
 // single `*Due: YYYY-MM-DD*` line under the owning head, idempotently (first
-// Due-shaped line wins, extras removed, never duplicated). Head not found →
-// text unchanged. Exported for node probes; the browser handler applies the
+// Due-shaped line wins, extras removed, never duplicated). Head matching is
+// shared with the server (findHeadIndex); head not found → text unchanged.
+// Exported for node probes; the browser handler applies the
 // same edit to the live section body so the ghost preview recomputes live.
 const DUE_SHAPE = /^\s*\*Due:\s*[^*\n]*\*\s*$/;
-const escRe = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export function dueEditText(raw, head, due) {
-  const lines = String(raw || '').split('\n');
-  const want = String(head || '').trim();
-  const hi = lines.findIndex((ln) => new RegExp(`^#{2,3}\\s+${escRe(want)}\\s*$`).test(ln));
-  if (hi < 0) return String(raw || '');
-  const lvl = (lines[hi].match(/^#+/) || ['##'])[0].length;
+  const text = String(raw || '').replace(/\r\n?/g, '\n');
+  const lines = text.split('\n');
+  const hi = findHeadIndex(lines, head);
+  if (hi < 0) return text;
+  const lvl = (headingOf(lines[hi]) || {}).lvl || 2;
   let end = lines.length;
   for (let i = hi + 1; i < lines.length; i++) {
     const m = lines[i].match(/^(#{1,3})\s/);
@@ -262,9 +262,6 @@ export function bindChangelogEvents(root, st, helpers) {
     // Gen + file/head guarded so a rapid re-pick never clears newer state.
     const markSaved = () => {
       if (gen !== dueGen) return;
-      // Stamp our own commit time: the deploy self-update must not reload
-      // this page for its own deploy while it is still building.
-      try { localStorage.setItem('safepipe-last-due-commit', String(Date.now())); } catch {}
       st.dueCommit = { file: plan.file, head: commitHead, state: 'saved' };
       keepDuePop();
       try {
@@ -278,6 +275,26 @@ export function bindChangelogEvents(root, st, helpers) {
           } catch {}
         }, 2500);
       } catch {}
+    };
+    // Read-back gate: 'published ✓' appears only after reading the painted
+    // date back from the current plans and confirming it equals the pick
+    // (or empty on clear). Anything else — stale paint, missing section,
+    // unreadable plans — shows retry instead. Never assumed from the POST.
+    const confirmSaved = (reader) => {
+      if (gen !== dueGen) return;
+      // Stamp our own commit time: the deploy self-update must not reload
+      // this page for its own deploy while it is still building. Stamped
+      // for every landed commit — even when the paint still needs a retry.
+      try { localStorage.setItem('safepipe-last-due-commit', String(Date.now())); } catch {}
+      let painted;
+      try {
+        painted = reader && typeof reader.readPaintedDue === 'function'
+          ? reader.readPaintedDue(plan.file, commitHead)
+          : undefined;
+      } catch { painted = undefined; }
+      if (confirmPublish(painted, iso || null) === 'saved') { markSaved(); return; }
+      try { console.error('[due-commit] paint mismatch after publish', plan.file, commitHead); } catch {}
+      failDue('failed', 'mismatch');
     };
     // Safety net: bounded fetches resolve every path, but 'publishing…'
     // must never stick if one somehow doesn't — fail visibly at 60s.
@@ -303,18 +320,23 @@ export function bindChangelogEvents(root, st, helpers) {
           // (the in-memory plans predate this write; the next rebuild
           // confirms the override against file text and self-drops it).
           try { saveDueOverride(plan.file, commitHead, iso || null, true); } catch {}
+          let live0Mod = null;
           try {
-            const live0 = await import('./pages-changelog.js');
-            if (gen !== dueGen) return;
-            if (live0 && typeof live0.reapplyDueOverrides === 'function') {
-              try { live0.reapplyDueOverrides(root); } catch {}
+            live0Mod = await import('./pages-changelog.js');
+          } catch { live0Mod = null; }
+          if (gen !== dueGen) return;
+          try {
+            if (live0Mod && typeof live0Mod.reapplyDueOverrides === 'function') {
+              try { live0Mod.reapplyDueOverrides(root); } catch {}
             }
           } catch {}
           if (gen !== dueGen) return;
+          // Override-painted (no server text applied): the card stops at
+          // Published on git — 'live' is earned only by an applied read.
           try { setDueProgressStep(progDetail, 'committed'); } catch {}
-          try { setDueProgressStep(progDetail, 'live'); } catch {}
           try { hideDueProgress(progDetail, 1800); } catch {}
-          markSaved();
+          // 'published ✓' only after the painted date reads back equal.
+          confirmSaved(live0Mod);
           return;
         }
       } catch {
@@ -328,12 +350,17 @@ export function bindChangelogEvents(root, st, helpers) {
       // rebuild (live refresh / applyServerFileText) or a rename — resolve
       // against the current plans so the server never 200s `unchanged`
       // (head-not-found) for a stale head. progDetail keeps the pick-time
-      // head so the progress card key still matches.
+      // head so the progress card key still matches. The module is imported
+      // once and reused below (a block-scoped re-import would leave the
+      // success path's helper reference undefined and silently skip paint).
+      let liveMod = null;
       try {
-        const live = await import('./pages-changelog.js');
-        if (gen !== dueGen) return;
-        if (live && typeof live.canonicalDueHead === 'function') {
-          const h = live.canonicalDueHead(plan.file, sprint.head);
+        liveMod = await import('./pages-changelog.js');
+      } catch { liveMod = null; }
+      if (gen !== dueGen) return;
+      try {
+        if (liveMod && typeof liveMod.canonicalDueHead === 'function') {
+          const h = liveMod.canonicalDueHead(plan.file, sprint.head);
           if (typeof h === 'string' && h) commitHead = h;
         }
       } catch {}
@@ -369,45 +396,46 @@ export function bindChangelogEvents(root, st, helpers) {
           // head-not-found with headPreview/fileLines for diagnostics). Only
           // the allowlisted code reaches the UI — everything else stays
           // generic, and raw server text is never displayed.
-          let reason = body.unchanged ? 'unchanged' : 'error';
-          try { if (body && body.reason === 'head-not-found') reason = 'head-not-found'; } catch {}
+          const reason = dueFailureReason(body);
           try { console.error('[due-commit] publish left file unchanged', reason, plan.file); } catch {}
           failDue('failed', reason);
           return;
         }
         if (gen !== dueGen) return;
         try { setDueProgressStep(progDetail, 'committed'); } catch {}
+        // Save the confirmed override BEFORE the rebuild: the rebuild's
+        // applier confirms it against the server text (self-drops on match)
+        // or paints it when the server text lacks the value — either way the
+        // painted date equals the pick at the "published" moment, never stale.
+        try { saveDueOverride(plan.file, commitHead, iso || null, true); } catch {}
         // Server truth wins: apply the committed file text directly — no
         // CDN wait, no confirm poll. Falls back to the painted preview when
         // the helper is unavailable.
         let applied = false;
         if (body && typeof body.content === 'string' && body.content) {
           try {
-            const live = await import('./pages-changelog.js');
             if (gen !== dueGen) return;
-            if (live && typeof live.applyServerFileText === 'function') {
-              try { applied = live.applyServerFileText(root, plan.file, body.content); } catch { applied = false; }
+            if (liveMod && typeof liveMod.applyServerFileText === 'function') {
+              try { applied = liveMod.applyServerFileText(root, plan.file, body.content); } catch { applied = false; }
             }
           } catch {}
         }
         if (gen !== dueGen) return;
-        // Save the confirmed override BEFORE the rebuild: the rebuild's
-        // applier confirms it against the server text (self-drops on match)
-        // or paints it when the server text lacks the value — either way the
-        // painted date equals the pick at the "published" moment, never stale.
-        try { saveDueOverride(plan.file, commitHead, iso || null, true); } catch {}
         if (!applied) {
           try {
-            if (live && typeof live.reapplyDueOverrides === 'function') {
-              try { live.reapplyDueOverrides(root); } catch {}
+            if (liveMod && typeof liveMod.reapplyDueOverrides === 'function') {
+              try { liveMod.reapplyDueOverrides(root); } catch {}
             }
           } catch {}
         }
         if (gen !== dueGen) return;
         st.duePending = null;
-        try { setDueProgressStep(progDetail, 'live'); } catch {}
+        // The live step is earned only by an applied server-text read;
+        // override-painted commits stop at Published on git.
+        try { setDueProgressStep(progDetail, duePublishStep(applied)); } catch {}
         try { hideDueProgress(progDetail, 1800); } catch {}
-        markSaved();
+        // 'published ✓' only after the painted date reads back equal.
+        confirmSaved(liveMod);
         return;
       }
       if (r2 && !r2.ok && r2.status !== 401 && r2.status !== 403) {

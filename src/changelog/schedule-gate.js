@@ -158,15 +158,25 @@ export function initScheduleGate() {
       const c = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const t = c ? setTimeout(() => { try { c.abort(); } catch {} }, 10000) : null;
       let ok = false;
+      let status = 0;
       try {
         const r = await fetch('https://api.github.com/user', {
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
           ...(c ? { signal: c.signal } : {}),
         });
         ok = !!(r && r.ok);
+        status = (r && r.status) || 0;
       } catch { return; }
       finally { if (t) clearTimeout(t); }
       if (!ok) {
+        // 401 means the token is dead — log out. Anything else (403 rate
+        // limit, 5xx, abuse flags) is NOT a dead token: keep the session and
+        // revalidate next load, or a healthy login flaps to logged-out and
+        // the next pick fails needs-login for no reason.
+        if (status !== 401) {
+          try { applyScheduleState(); } catch {}
+          return;
+        }
         try { clearSchedUser(); } catch {}
         try { clearSchedToken(); } catch {}
       }

@@ -5,37 +5,36 @@
 // REPO OWNER and commits with that same token. Zero extra env, zero extra
 // secrets: repo coordinates come from Vercel's own system variables and the
 // author is whoever owns the repo.
+import { headingOf, findHeadIndex } from '../src/logic/due-overrides.js';
+// Reason codes the server may report for leaving the file alone. Only
+// allowlisted codes ever reach the UI (client maps anything else generic).
+export const DUE_UNCHANGED_REASONS = ['head-not-found'];
+// Calendar validation for a due value (mirrors parseDue in
+// src/changelog/changelog-parse.js: shape + real calendar day, year ≤ 2099).
+const DUE_DIM = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+export function isValidDue(due) {
+  if (due === null) return true;
+  if (typeof due !== 'string') return false;
+  const m = due.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  if (y < 1 || y > 2099 || mo < 1 || mo > 12 || d < 1 || d > 31) return false;
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  return d <= (mo === 2 && leap ? 29 : DUE_DIM[mo - 1]);
+}
 const DUE_SHAPE = /^\s*\*Due:\s*[^*\n]*\*\s*$/;
-const normHead = (s) => String(s || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
-const headingOf = (ln) => {
-  const m = String(ln || '').match(/^(#{2,3})\s+(.*?)\s*$/);
-  if (!m) return null;
-  return { lvl: m[1].length, text: normHead(m[2]) };
-};
-// Port of dueEditText (src/changelog/changelog-events.js) — keep in sync:
-// insert/replace/clear the single `*Due: YYYY-MM-DD*` line under the owning
-// head, idempotently. Head not found → found false, text unchanged.
-function dueEditText(raw, head, due) {
+// File-text twin of dueEditText (src/changelog/changelog-events.js): head
+// matching is shared via findHeadIndex — only the return shape differs
+// ({text,next,found} here, plain string there). Parity is pinned by
+// tests/due-pipeline.test.js. Inserts/replaces/clears the single
+// `*Due: YYYY-MM-DD*` line under the owning head, idempotently; head not
+// found → found false, text unchanged.
+export function dueEditText(raw, head, due) {
   const text = String(raw || '').replace(/\r\n?/g, '\n');
   const lines = text.split('\n');
-  const want = normHead(head);
-  let hi = lines.findIndex((ln) => {
-    const h = headingOf(ln);
-    return h !== null && h.text === want;
-  });
-  if (hi < 0 && want) {
-    const key = want.slice(0, 40);
-    if (key) {
-      const cand = [];
-      for (let i = 0; i < lines.length; i++) {
-        const h = headingOf(lines[i]);
-        if (h !== null && h.text.includes(key)) cand.push(i);
-      }
-      if (cand.length === 1) hi = cand[0];
-    }
-  }
+  const hi = findHeadIndex(lines, head);
   if (hi < 0) return { text, next: text, found: false, fileLines: lines.length };
-  const lvl = (lines[hi].match(/^#+/) || ['##'])[0].length;
+  const lvl = (headingOf(lines[hi]) || {}).lvl || 2;
   let end = lines.length;
   for (let i = hi + 1; i < lines.length; i++) {
     const m = lines[i].match(/^(#{1,3})\s/);
@@ -77,7 +76,7 @@ export default async function handler(req, res) {
     } catch {}
   }
 }
-async function dueHandler(req, res) {
+export async function dueHandler(req, res) {
   if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
   const { token, file, head, due = null } = req.body || {};
   const owner = process.env.VERCEL_GIT_REPO_OWNER;
@@ -98,7 +97,7 @@ async function dueHandler(req, res) {
     res.status(400).send('Invalid head');
     return;
   }
-  if (due !== null && (typeof due !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(due))) {
+  if (!isValidDue(due)) {
     res.status(400).send('Invalid due');
     return;
   }

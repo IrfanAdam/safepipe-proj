@@ -10,7 +10,7 @@ import history from '../ds/plan-history.json';
 import { goal, split, parseMeta, anchorOf, phash, dueOf } from './changelog-parse.js';
 import { paint } from './changelog-paint.js';
 import { duePreviewEdit } from './changelog-events.js';
-import { loadDueOverrides, dropDueOverride } from '../logic/due-overrides.js';
+import { loadDueOverrides, dropDueOverride, overrideVerdict, canonicalHead } from '../logic/due-overrides.js';
 import { getSchedToken } from '../logic/schedule-auth.js';
 import { TIMELINE_TILE_ICON } from './changelog/graph.js';
 import { bindChangelogEvents } from './changelog-events.js';
@@ -70,30 +70,22 @@ function rebuildPlans(next) {
 // Re-apply same-device due overrides (production has no file writer): stored
 // picks fill sections the FILE leaves dateless; a file-carried Due always
 // wins, so hand edits and dev writes are never clobbered — stale entries drop.
+// Verdicts come from overrideVerdict (src/logic/due-overrides.js): converged
+// entries drop, fresh picks (optimistic or server-confirmed) paint while the
+// file has not converged, and everything expires — a stale clear can never
+// strip a Due committed after it.
 // Factored per rebuild so live text swaps keep the same merge. [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
 function applyDueOverrides() {
   try {
+    const now = Date.now();
     for (const o of loadDueOverrides()) {
       const plan = plans.find((p) => p.file === o.file);
       const sec = plan ? plan.sprints.find((s) => s.head === o.head) : null;
       if (!sec) { dropDueOverride(o.file, o.head); continue; }
       const current = dueOf(sec);
-      if (o.due) {
-        if (current === o.due) { dropDueOverride(o.file, o.head); continue; }
-        // Server-confirmed pick (committed to git): the repo is newer than this
-        // bundle during the deploy window, so it outranks the file. Expires in
-        // a day — by then the redeploy carries the value (or a hand-edit won,
-        // and the file takes over again).
-        if (o.committed && Date.now() - (o.at || 0) < 86400000) {
-          sec.body = duePreviewEdit(sec.body, sec.head, o.due);
-          continue;
-        }
-        if (current) { dropDueOverride(o.file, o.head); continue; }
-        sec.body = duePreviewEdit(sec.body, sec.head, o.due);
-      } else {
-        if (!current) { dropDueOverride(o.file, o.head); continue; }
-        sec.body = duePreviewEdit(sec.body, sec.head, null);
-      }
+      const verdict = overrideVerdict(o, current, now);
+      if (verdict === 'drop') { dropDueOverride(o.file, o.head); continue; }
+      sec.body = duePreviewEdit(sec.body, sec.head, verdict === 'apply' ? o.due : null);
     }
   } catch {}
 }
@@ -102,6 +94,29 @@ rebuildPlans(rawTexts);
 // repaint with selection/filter untouched (no reload).
 // [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
 let liveRefreshInFlight = false;
+// Background repaints rebuild the detail shell, which would slam an open
+// datepicker shut mid-pick. Snapshot an open picker across the repaint and
+// transplant its month grid back (same DOM-delegated handlers, no focus
+// steal) so sync/commit paints never disturb it.
+function snapshotDuePop(root) {
+  try {
+    const p = root.querySelector('[data-due-pop]:not([hidden])');
+    if (!p) return null;
+    return { html: p.innerHTML };
+  } catch { return null; }
+}
+function restoreDuePop(root, snap) {
+  if (!snap) return;
+  try {
+    const p = root.querySelector('[data-due-pop]');
+    if (p) { p.innerHTML = snap.html; p.hidden = false; }
+  } catch {}
+}
+function paintPreservingPicker(root) {
+  const snap = snapshotDuePop(root);
+  doPaint(root);
+  restoreDuePop(root, snap);
+}
 export async function refreshLivePlans(root) {
   if (!root || liveRefreshInFlight) return false;
   let src = null;
@@ -118,7 +133,7 @@ export async function refreshLivePlans(root) {
     const merged = { ...rawTexts };
     for (const k of keys) merged[k] = changed[k];
     rebuildPlans(merged);
-    doPaint(root);
+    paintPreservingPicker(root);
     return true;
   } catch { return false; }
   finally { liveRefreshInFlight = false; }
@@ -128,14 +143,15 @@ export async function refreshLivePlans(root) {
 // untouched. Returns true on success, false on bad args/unknown file.
 // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-3]
 // Re-apply stored overrides to the in-memory plans and repaint (no fetch).
-// The commit success path saves a confirmed override AFTER the last rebuild,
-// so without this the painted date lags the pick until the next poll.
+// The commit success path saves its confirmed override before swapping in
+// the server text, so the rebuild confirms it immediately and the painted
+// date equals the pick at the "published" moment, never stale.
 // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
 export function reapplyDueOverrides(root) {
   if (!root) return false;
   try {
     applyDueOverrides();
-    doPaint(root);
+    paintPreservingPicker(root);
     return true;
   } catch { return false; }
 }
@@ -145,7 +161,7 @@ export function applyServerFileText(root, file, text) {
     if (!Object.prototype.hasOwnProperty.call(rawTexts, file)) return false;
     const merged = { ...rawTexts, [file]: text };
     rebuildPlans(merged);
-    doPaint(root);
+    paintPreservingPicker(root);
     return true;
   } catch { return false; }
 }
@@ -161,6 +177,8 @@ let lastPlanEtag = null;
 let etagPolling = true;
 let livePollMs = 15000;
 let shaRetryArmed = false;
+let shaRetries = 0;
+const SHA_RETRY_MAX = 2;
 // Deploy self-update: the open page must never sit on a stale bundle. The
 // boot deploy sha is recorded once; every poll compares the live
 // /version.json — on mismatch the page reloads itself onto the new deploy
@@ -190,8 +208,11 @@ async function pollAppVersion() {
       if (ss && ss.getItem('safepipe-reloaded-for') === sha) { bootDeploySha = sha; return; }
     } catch {}
     try {
-      // Mid-pick on this device: the datepicker popover is open — wait.
-      if (typeof document !== 'undefined' && document.querySelector('.ds-due-pop')) return;
+      // Mid-pick on this device: the datepicker popover is OPEN — wait.
+      // (The popover shell exists in the DOM whenever detail paints, so the
+      // guard must test openness, not presence — a presence test blocks every
+      // self-update once an incomplete section has painted.)
+      if (typeof document !== 'undefined' && document.querySelector('[data-due-pop]:not([hidden])')) return;
       // A commit is in flight (publishing…): never tear the page down
       // mid-POST — the reload waits for the next quiet tick.
       if (typeof document !== 'undefined' && document.querySelector('[data-due-status="saving"]')) return;
@@ -231,7 +252,7 @@ async function pollPlanSha() {
     info = await src.fetchLatestPlanSha(opts);
   } catch { info = null; }
   if (!info) return;
-  if (info.notModified) { shaRetryArmed = false; return; }
+  if (info.notModified) { shaRetryArmed = false; shaRetries = 0; return; }
   if (info.etag) {
     lastPlanEtag = info.etag;
   } else if (!token) {
@@ -241,15 +262,17 @@ async function pollPlanSha() {
   }
   if (!info.sha) return;
   // First sighting: the boot bundle is the baseline — record, don't fetch.
-  if (lastSeenPlanSha === null) { lastSeenPlanSha = info.sha; shaRetryArmed = false; return; }
+  if (lastSeenPlanSha === null) { lastSeenPlanSha = info.sha; shaRetryArmed = false; shaRetries = 0; return; }
   if (info.sha === lastSeenPlanSha && !shaRetryArmed) return;
   lastSeenPlanSha = info.sha;
   shaRetryArmed = false;
   let changed = false;
   try { changed = await refreshLivePlans(liveRoot); } catch { changed = false; }
-  // New sha but no diff: the commit is fresher than the raw CDN — one
-  // follow-up fetch next tick, then quiet regardless.
-  if (!changed) shaRetryArmed = true;
+  // New sha but no diff: the commit is fresher than the raw CDN — a bounded
+  // number of follow-up fetches, then quiet until a NEWER sha. Without the
+  // cap this refetches full texts on every tick forever.
+  if (!changed && shaRetries < SHA_RETRY_MAX) { shaRetryArmed = true; shaRetries++; }
+  else if (changed) shaRetries = 0;
 }
 function onLiveFocus() {
   try { window.clearTimeout(liveFocusTimer); } catch {}
@@ -270,7 +293,9 @@ function onLiveStorage(ev) {
     if (!ev || (ev.key !== DUE_OVERRIDES_KEY && ev.key !== null)) return;
     if (document.hidden) return;
   } catch { return; }
-  if (liveRoot) refreshLivePlans(liveRoot);
+  // Same-device sibling tab saved an override: re-apply locally (no fetch —
+  // the file did not change, so a full raw re-fetch only churns the DOM).
+  if (liveRoot) reapplyDueOverrides(liveRoot);
 }
 function stopLiveRefresh() {
   try { if (liveTimer) window.clearInterval(liveTimer); } catch {}
@@ -320,25 +345,27 @@ const visibleSprints = (plan) => {
 // Canonical head for a due commit, resolved from the live plans at send
 // time: a pick's closure head goes stale across sync rebuilds (live refresh,
 // applyServerFileText) or renames, and the server 200s `unchanged`
-// (head-not-found) for it. Exact match wins; then server-parity normalized
-// and single-candidate prefix-fuzzy matches (api/due.js); else null.
+// (head-not-found) for it. Matching core is canonicalHead
+// (src/logic/due-overrides.js, server parity with api/due.js); else null.
 export function canonicalDueHead(file, head) {
   try {
     const plan = plans.find((p) => p.file === file);
     if (!plan) return null;
-    const want = String(head || '');
-    if (plan.sprints.some((s) => s.head === want)) return want;
-    const norm = (s) => String(s || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
-    const nw = norm(want);
-    const byNorm = plan.sprints.find((s) => norm(s.head) === nw);
-    if (byNorm) return byNorm.head;
-    const key = nw.slice(0, 40);
-    if (key) {
-      const cand = plan.sprints.filter((s) => norm(s.head).includes(key));
-      if (cand.length === 1) return cand[0].head;
-    }
+    return canonicalHead(plan.sprints.map((s) => s.head), head);
   } catch {}
   return null;
+}
+// Read-back for publish verification: the Due currently painted for one
+// section (string), null when the painted section carries none, undefined
+// when the section (or file) is gone. commitDue confirms 'saved' only when
+// this equals the pick — never assumed from the POST outcome.
+export function readPaintedDue(file, head) {
+  try {
+    const plan = plans.find((p) => p.file === file);
+    const sec = plan ? plan.sprints.find((s) => s.head === head) : null;
+    if (!sec) return undefined;
+    return dueOf(sec);
+  } catch { return undefined; }
 }
 const cur = () => {
   const list = visiblePlans(), pi = Math.min(Math.max(st.sel[0], 0), Math.max(list.length - 1, 0));

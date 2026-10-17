@@ -5,7 +5,7 @@
 // and auto-dismisses. Failures hide it — the inline retry in the due row
 // takes over. Keyed per pick so a rapid re-pick never dismisses newer state.
 const CARD_ID = 'ds-due-progress';
-const STEP_LABELS = { publishing: 'Publishing…', committed: 'Published on git', live: 'Live ✓' };
+const STEP_LABELS = { publishing: 'Publishing…', committed: 'Published on git', live: 'Live on this device ✓' };
 const STEP_ORDER = ['publishing', 'committed', 'live'];
 
 const doc = () => (typeof document !== 'undefined' ? document : null);
