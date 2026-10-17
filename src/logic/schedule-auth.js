@@ -1,16 +1,39 @@
-// safepipe logic — schedule gate state (pure, zero DOM) · [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]
+// safepipe logic — schedule gate state (pure, zero DOM) · [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-1]
 // Real GitHub identity (via /api/auth + /api/callback): the signed-in user
-// is remembered on this device; the OAuth token itself is never persisted.
+// is remembered on this device, and so is the OAuth token — one login per
+// device (owner-approved; single-owner site, token scoped read:user
+// public_repo, revocable under GitHub Settings → Applications). The token
+// travels only in POST bodies to same-origin /api/due — never in a URL.
 const USER_KEY = 'safepipe-schedule-user';
+const TOKEN_KEY = 'safepipe-schedule-token';
 const PENDING_KEY = 'safepipe-oauth-pending';
 let memUser = null;
-let memToken = null; // OAuth token, memory-only: proves identity to /api/due
-// (validated server-side against DUE_AUTHOR; commits as the author).
+let memToken = null; // OAuth token: proves identity to /api/due
+// (validated server-side against the repo owner; commits as the author).
 export function setSchedToken(token) {
   memToken = typeof token === 'string' && token ? token : null;
+  const s = localStore();
+  try {
+    if (s) {
+      if (memToken) s.setItem(TOKEN_KEY, memToken);
+      else s.removeItem(TOKEN_KEY);
+    }
+  } catch {}
 }
 export function getSchedToken() {
-  return memToken;
+  if (memToken) return memToken;
+  const s = localStore();
+  try {
+    if (s) {
+      const t = s.getItem(TOKEN_KEY);
+      if (t) { memToken = t; return t; }
+    }
+  } catch {}
+  return null;
+}
+export function clearSchedToken() {
+  memToken = null;
+  try { const s = localStore(); if (s) s.removeItem(TOKEN_KEY); } catch {}
 }
 const localStore = () => {
   try { return globalThis.localStorage || null; } catch { return null; }

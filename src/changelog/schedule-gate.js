@@ -3,7 +3,7 @@
 // OAuth popup flow (same-window redirect when popups are blocked). Pane CTAs
 // render always but stay hidden by CSS until body.is-sched-auth — login and
 // logout need no repaint.
-import { getSchedUser, isSchedAuthed, setSchedUser, clearSchedUser, takePendingToken, setSchedToken, getSchedToken } from '../logic/schedule-auth.js';
+import { getSchedUser, isSchedAuthed, setSchedUser, clearSchedUser, takePendingToken, setSchedToken, getSchedToken, clearSchedToken } from '../logic/schedule-auth.js';
 const BODY_ON = 'is-sched-auth';
 // Canonical live site — scheduling (OAuth + /api/due) only exists there.
 // Update this if the production domain ever changes.
@@ -51,7 +51,7 @@ function toggleUserMenu() {
     document.body.appendChild(menu);
     menu.querySelector('[data-user-logout]').addEventListener('click', () => {
       clearSchedUser();
-      setSchedToken(null);
+      clearSchedToken();
       applyScheduleState();
     });
   }
@@ -78,7 +78,7 @@ async function completeWithToken(token) {
     const u = await r.json();
     if (!u || !u.login) throw new Error('no login');
     setSchedUser({ login: u.login, provider: 'github' });
-    setSchedToken(token); // memory-only: identity proof for /api/due commits
+    setSchedToken(token); // persisted per-device: identity proof for /api/due commits
   } catch {
     // Token rejected (or offline) — stay logged out, gate stays available.
   }
@@ -140,6 +140,39 @@ export function initScheduleGate() {
     const pending = takePendingToken();
     if (pending) completeWithToken(pending);
   } catch {}
+  // Sticky session check (silent, one attempt): a badge without a token, or
+  // a dead token, resolves to logged-out. A network failure leaves the
+  // session untouched (offline is not logged-out). Never opens the gate —
+  // the gate opens only on an explicit tap.
+  // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-1]
+  (async () => {
+    try {
+      if (!getSchedUser()) return;
+      let token = null;
+      try { token = getSchedToken(); } catch {}
+      if (!token) {
+        try { clearSchedUser(); } catch {}
+        try { applyScheduleState(); } catch {}
+        return;
+      }
+      const c = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const t = c ? setTimeout(() => { try { c.abort(); } catch {} }, 10000) : null;
+      let ok = false;
+      try {
+        const r = await fetch('https://api.github.com/user', {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+          ...(c ? { signal: c.signal } : {}),
+        });
+        ok = !!(r && r.ok);
+      } catch { return; }
+      finally { if (t) clearTimeout(t); }
+      if (!ok) {
+        try { clearSchedUser(); } catch {}
+        try { clearSchedToken(); } catch {}
+      }
+      try { applyScheduleState(); } catch {}
+    } catch {}
+  })();
   // Popup OAuth return: token arrives by postMessage from /api/callback.
   try {
     window.addEventListener('message', (e) => {
