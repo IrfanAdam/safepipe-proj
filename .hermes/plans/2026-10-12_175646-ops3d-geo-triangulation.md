@@ -21,6 +21,7 @@
 - Environment: NO gdal/ogr2ogr, NO postgis/psql on this machine; java present.
 
 ## Lane A — OSM completeness (owns: `scripts/data-pipe/*`, `public/data/sangachal-vectors.json`, `src/ring2/vectors.js`, `tests/ring2-vectors*.test.js`) {#lane-a}
+*Due: 2026-10-28*
 
 - Re-query Overpass for the AOI: building count vs installed, water bodies (Caspian edge + inland), landuse classes, power/barrier deltas vs installed. Triangulate counts; list added/missing with way ids.
 - Integrate deltas through the existing chain (overpass→clip→classify→validate→wire); buildings stay outlines this round (extrusion is a queued lever, not this lane).
