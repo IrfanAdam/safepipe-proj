@@ -280,5 +280,95 @@
   "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
   "anchor": "follow-up",
   "note": "right-align plan tags, add tlDate state — follow-up polish"
+ },
+ {
+  "sha": "04656cb",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plan-doc: corrected Task 1-3 shipped shas — spans all tasks, attaches to first section"
+ },
+ {
+  "sha": "51bb0e3",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plan-doc: closed Tasks 1-3 done lines (same timestamp/diff as e8bb96c)"
+ },
+ {
+  "sha": "e8bb96c",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plan-doc: closed Tasks 1-3 done lines"
+ },
+ {
+  "sha": "1e6d3ce",
+  "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+  "anchor": null,
+  "note": "plumbing: manifest refresh after edge-to-edge mobile fix (follows 616f09e)"
+ },
+ {
+  "sha": "f85c178",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plumbing: manifest regen after two-state toast task-2 work (follows 33e275f)"
+ },
+ {
+  "sha": "842da5b",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plumbing: manifest regen after compact spinner toast task-2 work (follows a52f506)"
+ },
+ {
+  "sha": "1d0d4b3",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plumbing: manifest regen after calendar-pick task-2 work (follows 7f9b709)"
+ },
+ {
+  "sha": "8d665e7",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plumbing: manifest regen after update-lifecycle task-2 work (follows 30693e0)"
+ },
+ {
+  "sha": "beba14e",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plumbing: manifest regen after lagged-fetch task-2 work (follows 885c047)"
+ },
+ {
+  "sha": "424645a",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plumbing: manifest regen after audit-lane task-2 work (follows 6831d47)"
+ },
+ {
+  "sha": "0797970",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plumbing: manifest regen after idempotent-commit task-2 work (follows 0fa5587)"
+ },
+ {
+  "sha": "af58fb5",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plumbing: manifest regen after drawer-survives-filter task-2 work (follows 29ef9ce)"
+ },
+ {
+  "sha": "2685434",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plumbing: manifest regen after datepicker-survives-pick task-2 work (follows f6d8a61)"
+ },
+ {
+  "sha": "1ce8220",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plumbing: manifest regen after neutral-timeline task-3 work (follows 18c4d0c)"
+ },
+ {
+  "sha": "1312d87",
+  "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+  "anchor": null,
+  "note": "plumbing: manifest regen after self-update task-3 work (follows 16e8569)"
  }
 ]

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-17T14:10:15.994Z",
+  "generated": "2026-10-17T14:21:40.134Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -19,6 +19,15 @@
   ],
   "commits": [
     {
+      "sha": "471a05d",
+      "full": "471a05d168891895dfad089eb0f177160b0744c4",
+      "date": "2026-10-17",
+      "time": "19:40",
+      "subject": "fix(changelog): mobile rows default, dot statuses, edge week-bar, timeline right [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
+    {
       "sha": "8008cf0",
       "full": "8008cf029cfb8a57fc62392929787ea24109a7a8",
       "date": "2026-10-17",
@@ -33,7 +42,7 @@
       "date": "2026-10-17",
       "time": "19:24",
       "subject": "chore(manifest): refresh after edge-to-edge mobile fix (plumbing — manifest-only, auto-excluded)",
-      "plan": null,
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
       "anchor": null
     },
     {
@@ -69,7 +78,7 @@
       "date": "2026-10-17",
       "time": "19:06",
       "subject": "docs(plan): regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -87,7 +96,7 @@
       "date": "2026-10-17",
       "time": "19:02",
       "subject": "docs(plan): regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -105,7 +114,7 @@
       "date": "2026-10-17",
       "time": "18:55",
       "subject": "docs(plan): regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -123,7 +132,7 @@
       "date": "2026-10-17",
       "time": "18:48",
       "subject": "docs(plan): regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -141,7 +150,7 @@
       "date": "2026-10-17",
       "time": "18:38",
       "subject": "docs(plan): regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -159,7 +168,7 @@
       "date": "2026-10-17",
       "time": "18:00",
       "subject": "docs(plan): regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -177,7 +186,7 @@
       "date": "2026-10-17",
       "time": "17:54",
       "subject": "docs(plan): regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -195,7 +204,7 @@
       "date": "2026-10-17",
       "time": "17:46",
       "subject": "docs(plan): regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -213,7 +222,7 @@
       "date": "2026-10-17",
       "time": "17:39",
       "subject": "docs(plan): regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -231,7 +240,7 @@
       "date": "2026-10-17",
       "time": "17:36",
       "subject": "docs(plan): regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -249,7 +258,7 @@
       "date": "2026-10-17",
       "time": "17:32",
       "subject": "docs(plan): regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -303,7 +312,7 @@
       "date": "2026-10-17",
       "time": "17:16",
       "subject": "docs(plan): correct smooth-scheduling shipped shas",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -312,7 +321,7 @@
       "date": "2026-10-17",
       "time": "17:15",
       "subject": "docs(plan): close smooth-scheduling tasks + regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -4236,7 +4245,7 @@
       "date": "2026-10-17",
       "time": "17:15",
       "subject": "docs(plan): close smooth-scheduling tasks + regen manifest",
-      "plan": null,
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": null
     },
     {
@@ -4278,11 +4287,6 @@
   ],
   "wip": [
     "public/version.json",
-    "src/changelog/changelog-cal.css",
-    "src/changelog/changelog-cards.css",
-    "src/changelog/changelog-drawer.css",
-    "src/changelog/changelog.css",
-    "src/changelog/changelog/paint-chips.js",
-    "src/changelog/due-progress.js"
+    "src/ds/plan-retro.json"
   ]
 }
