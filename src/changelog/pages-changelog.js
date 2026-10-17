@@ -168,6 +168,10 @@ async function pollAppVersion() {
     if (!sha) return;
     if (bootDeploySha === null) { bootDeploySha = sha; return; }
     if (sha === bootDeploySha) return;
+    // New deploy is live. Never yank an open drawer/detail — reload only
+    // from the neutral timeline view. (A reload from detail reads as the
+    // drawer slamming shut onto a dim scrim.)
+    try { if (st.open || (st.view || 'timeline') !== 'timeline') return; } catch {}
     // New deploy is live. Guards before self-reload:
     try {
       const ss = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
@@ -187,6 +191,10 @@ async function pollAppVersion() {
       if (ss) ss.setItem('safepipe-reloaded-for', sha);
     } catch {}
     deployCheckArmed = false;
+    // Safe reload: prime the HTTP cache with the fresh HTML first — a plain
+    // reload could otherwise re-read a cached shell pointing at pruned
+    // hashed assets and strand the boot. Fall back to plain reload.
+    try { await fetch(location.pathname, { cache: 'reload' }); } catch {}
     try { location.reload(); } catch {}
   } catch {}
 }
