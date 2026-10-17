@@ -2,7 +2,7 @@
 // Exports: bindChangelogEvents — click/key/hover wiring over shared state st
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
-import { saveDueOverride, saveDueConfirm, dueFailureReason, duePublishStep, confirmPublish, headingOf, findHeadIndex } from '../logic/due-overrides.js';
+import { saveDueOverride, saveDueConfirm, saveDuePending, dueFailureReason, duePublishStep, confirmPublish, headingOf, findHeadIndex } from '../logic/due-overrides.js';
 import { getSchedToken, clearSchedToken, clearSchedUser } from '../logic/schedule-auth.js';
 import { openScheduleGate } from './schedule-gate.js';
 import { showDueProgress, setDueProgressStep, hideDueProgress } from './due-progress.js';
@@ -444,8 +444,19 @@ export function bindChangelogEvents(root, st, helpers) {
         st.duePending = null;
         // The live step is earned only by an applied server-text read;
         // override-painted commits stop at Published on git.
-        try { setDueProgressStep(progDetail, duePublishStep(applied)); } catch {}
-        try { hideDueProgress(progDetail, 1800); } catch {}
+        // The card parks at 'deploying' while the redeploy carries the commit
+        // everywhere — the freeze (pending row state) remains, editing stays
+        // allowed, and the toast only dismisses at 'live' (deploy flip) or
+        // on failure (inline retry takes over). Never vanishes mid-cycle.
+        try {
+          const step = duePublishStep(applied);
+          try { setDueProgressStep(progDetail, step); } catch {}
+          if (step === 'deploying') {
+            try { saveDuePending({ file: plan.file, head: commitHead, due: iso || null }); } catch {}
+          } else {
+            try { hideDueProgress(progDetail, 1800); } catch {}
+          }
+        } catch {}
         // 'published ✓' only after the painted date reads back equal.
         confirmSaved(liveMod);
         return;

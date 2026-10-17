@@ -10,10 +10,11 @@ import history from '../ds/plan-history.json';
 import { goal, split, parseMeta, anchorOf, phash, dueOf } from './changelog-parse.js';
 import { paint } from './changelog-paint.js';
 import { duePreviewEdit } from './changelog-events.js';
-import { loadDueOverrides, dropDueOverride, overrideVerdict, canonicalHead, readDueConfirm, clearDueConfirm, dueFetchVerdict, findHeadIndex } from '../logic/due-overrides.js';
+import { loadDueOverrides, dropDueOverride, overrideVerdict, canonicalHead, readDueConfirm, clearDueConfirm, dueFetchVerdict, findHeadIndex, readDuePending, clearDuePending, dueDeployVerdict } from '../logic/due-overrides.js';
 import { getSchedToken } from '../logic/schedule-auth.js';
 import { TIMELINE_TILE_ICON } from './changelog/graph.js';
 import { bindChangelogEvents } from './changelog-events.js';
+import { setDueProgressStep, hideDueProgress } from './due-progress.js';
 
 // Plan-iteration revisions: versions append (tracker hook + backfill), oldest first.
 const revOf = (file) => {
@@ -224,7 +225,31 @@ async function pollAppVersion() {
     const sha = v && typeof v.sha === 'string' ? v.sha : null;
     if (!sha) return;
     if (bootDeploySha === null) { bootDeploySha = sha; return; }
-    if (sha === bootDeploySha) return;
+    if (sha === bootDeploySha) {
+      // No new deploy — but a stale deploy claim still needs healing: if
+      // the redeploy never showed, dismiss the parked card deterministically
+      // instead of leaving the toast up forever.
+      try {
+        const pend = readDuePending();
+        if (pend && dueDeployVerdict(pend, Date.now()) === 'expired') {
+          const key = { file: pend.file, head: pend.head, due: pend.due };
+          try { hideDueProgress(key, 0); } catch {}
+          try { clearDuePending(); } catch {}
+        }
+      } catch {}
+      return;
+    }
+    // New deploy is live. Heal the update lifecycle first (any view): a
+    // fresh deploy claim earns 'Live ✓' and dismisses the parked card.
+    try {
+      const pend = readDuePending();
+      if (pend && dueDeployVerdict(pend, Date.now()) === 'pending') {
+        const key = { file: pend.file, head: pend.head, due: pend.due };
+        try { setDueProgressStep(key, 'live'); } catch {}
+        try { hideDueProgress(key, 1800); } catch {}
+      }
+      try { clearDuePending(); } catch {}
+    } catch {}
     // New deploy is live. Never yank an open drawer/detail — reload only
     // from the neutral timeline view. (A reload from detail reads as the
     // drawer slamming shut onto a dim scrim.)

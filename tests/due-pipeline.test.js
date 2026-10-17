@@ -33,6 +33,11 @@ import {
   clearDueConfirm,
   dueFetchVerdict,
   DUE_CONFIRM_WINDOW_MS,
+  saveDuePending,
+  readDuePending,
+  clearDuePending,
+  dueDeployVerdict,
+  DUE_PENDING_WINDOW_MS,
   normHead,
   headingOf,
   findHeadIndex,
@@ -390,8 +395,8 @@ describe('canonicalHead (send-time head resolution)', () => {
 });
 
 describe('due progress + published status are read-back-verified, never assumed', () => {
-  it('applied=false never reaches live (stops at Published on git)', () => {
-    assert.equal(duePublishStep(true), 'live');
+  it('applied=true parks at deploying (live is earned by the deploy flip); applied=false stops at committed', () => {
+    assert.equal(duePublishStep(true), 'deploying');
     for (const notApplied of [false, null, undefined, 0, '', 'yes']) {
       assert.equal(duePublishStep(notApplied), 'committed', String(notApplied));
     }
@@ -576,5 +581,39 @@ describe('dueFetchVerdict (post-commit lagged-fetch guard)', () => {
     assert.equal(dueFetchVerdict({ file: 'p.md' }, 'p.md', null, 1000000), 'apply');
     saveDueConfirm({ file: 'p.md' });
     assert.equal(readDueConfirm(), null);
+  });
+});
+
+describe('due deploy lifecycle (freeze remains until the redeploy, editing stays allowed)', () => {
+  const now = 2000000;
+  const rec = { file: 'p.md', head: 'H', due: '2026-11-02', at: now };
+  it('fresh claims stay pending (freeze remains, toast parked)', () => {
+    assert.equal(dueDeployVerdict(rec, now + 1000), 'pending');
+    assert.equal(dueDeployVerdict(rec, now + DUE_PENDING_WINDOW_MS - 1), 'pending');
+  });
+  it('unshown deploys expire (toast heals away deterministically)', () => {
+    assert.equal(dueDeployVerdict(rec, now + DUE_PENDING_WINDOW_MS), 'expired');
+    assert.equal(dueDeployVerdict(rec, now + DUE_PENDING_WINDOW_MS + 1), 'expired');
+  });
+  it('missing or malformed claims never freeze anything', () => {
+    assert.equal(dueDeployVerdict(null, now), 'none');
+    assert.equal(dueDeployVerdict({ file: 'p.md' }, now), 'none');
+    assert.equal(dueDeployVerdict({ ...rec, at: NaN }, now), 'none');
+    assert.equal(dueDeployVerdict({ ...rec, at: now + 5000 }, now), 'none');
+  });
+  it('pending store round-trips, supersedes, and clears', () => {
+    saveDuePending({ file: 'p.md', head: 'H', due: '2026-11-02' });
+    let back = readDuePending();
+    assert.equal(back.file, 'p.md');
+    assert.equal(back.due, '2026-11-02');
+    assert.ok(Number.isFinite(back.at));
+    // A re-pick before the redeploy supersedes with a new claim.
+    saveDuePending({ file: 'p.md', head: 'H', due: '2026-11-05' });
+    back = readDuePending();
+    assert.equal(back.due, '2026-11-05');
+    clearDuePending();
+    assert.equal(readDuePending(), null);
+    saveDuePending({ file: 'p.md' });
+    assert.equal(readDuePending(), null);
   });
 });

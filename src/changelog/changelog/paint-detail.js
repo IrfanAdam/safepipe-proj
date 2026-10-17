@@ -138,6 +138,7 @@ import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../ch
 import { isDone, state, parseGates, dueOf, fmtDate, gateNOf } from '../changelog-parse.js';
 import { esc } from './esc.js';
 import { paintRevs } from './paint-revs.js';
+import { readDuePending, dueDeployVerdict } from '../../logic/due-overrides.js';
 // Gate verdict (Task 12, owner refinement): the phase's own REF GATE verdict
 // as plain text appended to the below-title status line — same checkmark
 // treatment as DONE, reusing .ds-status styling (no span, no new colors).
@@ -231,15 +232,26 @@ export function paintDetail(root, ctx){
   // nothing. The status is inline and never blocks — the painted date IS
   // the UI; this only answers "did it publish?". Mismatched file/head
   // never renders another section's status.
+  // Freeze remainder: while a deploy claim for this section is fresh
+  // (commit landed, redeploy still carrying it everywhere), the saved row
+  // keeps a pending state — "published ✓ · updating…" — until the deploy
+  // flip heals it. Editing stays allowed throughout (the Schedule button
+  // never disables); a re-pick supersedes with a new claim.
   // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
   const dc = dueCommit && plan && sprint
     && dueCommit.file === plan.file && dueCommit.head === sprint.head ? dueCommit.state : '';
   const dr = dueCommit && plan && sprint
     && dueCommit.file === plan.file && dueCommit.head === sprint.head ? (dueCommit.reason || '') : '';
+  let pendRow = false;
+  try {
+    const pend = readDuePending();
+    pendRow = !!pend && dueDeployVerdict(pend, Date.now()) === 'pending'
+      && plan && sprint && pend.file === plan.file && pend.head === sprint.head;
+  } catch { pendRow = false; }
   const dueStatusHTML = !dc || secShipped ? '' : dc === 'saving'
     ? `<span class="ds-due-status" data-due-status="saving">publishing…</span>`
     : dc === 'saved'
-      ? `<span class="ds-due-status is-ok" data-due-status="saved">published ✓</span>`
+      ? `<span class="ds-due-status is-ok${pendRow ? ' is-pend' : ''}" data-due-status="saved">published ✓${pendRow ? ' · updating…' : ''}</span>`
       : dc === 'needs-login'
         ? `<button class="ds-due-status is-warn" data-due-retry="login">only on this device — sign in again to publish</button>`
         : `<button class="ds-due-status is-err" data-due-retry="commit">couldn't publish${dr ? ` (${dr})` : ''} — tap to retry</button>`;

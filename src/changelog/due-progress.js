@@ -1,12 +1,14 @@
 // safepipe changelog — due publish progress card (DOM) · [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
-// A small floating card that narrates the background commit:
-// publishing → published → live ✓. Deliberately NOT a modal: it never
-// traps pointer or keyboard (pointer-events:none), never blocks the page,
-// and auto-dismisses. Failures hide it — the inline retry in the due row
-// takes over. Keyed per pick so a rapid re-pick never dismisses newer state.
+// A small floating card that narrates the FULL update lifecycle:
+// publishing → published → updating → live ✓. The card stays visible for
+// the whole cycle and dismisses only at live (or on failure, when the
+// inline retry takes over) — the toast never vanishes mid-cycle.
+// Deliberately NOT a modal: it never traps pointer or keyboard
+// (pointer-events:none) and never blocks the page. Keyed per pick so a
+// rapid re-pick never dismisses newer state.
 const CARD_ID = 'ds-due-progress';
-const STEP_LABELS = { publishing: 'Publishing…', committed: 'Published on git', live: 'Live on this device ✓' };
-const STEP_ORDER = ['publishing', 'committed', 'live'];
+const STEP_LABELS = { publishing: 'Publishing…', committed: 'Published on git', deploying: 'Updating everywhere…', live: 'Live ✓' };
+const STEP_ORDER = ['publishing', 'committed', 'deploying', 'live'];
 
 const doc = () => (typeof document !== 'undefined' ? document : null);
 

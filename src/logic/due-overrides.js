@@ -176,7 +176,55 @@ export function dueFailureReason(body) {
 // equals the pick (or empty on clear) — anything else, including an
 // unreadable paint, is 'mismatch' (retry), never published.
 export function duePublishStep(applied) {
-  return applied === true ? 'live' : 'committed';
+  // applied=true means server truth is painted on this device — but the
+  // cycle isn't over: the redeploy still has to carry it everywhere. The
+  // card parks at 'deploying' (freeze remains, editing stays allowed) until
+  // the deploy flip advances it to 'live'. applied=false stops earlier.
+  return applied === true ? 'deploying' : 'committed';
+}
+
+// Post-commit deploy claim: the update lifecycle ends when the redeployment
+// carrying our commit goes live (observed via /version.json), not when the
+// POST lands. The commit stores {file, head, due, at}; the version poll
+// heals the card to 'live' on the next sha flip while the claim is fresh.
+// Editing stays allowed throughout — a re-pick supersedes (new claim).
+export const DUE_PENDING_WINDOW_MS = 15 * 60 * 1000;
+const PENDING_KEY = 'safepipe-due-pending.v1';
+export function saveDuePending(rec) {
+  try {
+    const s = store();
+    if (!s) return;
+    if (!rec || typeof rec.file !== 'string' || typeof rec.head !== 'string') return;
+    s.setItem(PENDING_KEY, JSON.stringify({
+      file: rec.file, head: rec.head, due: rec.due || null, at: Date.now(),
+    }));
+  } catch {}
+}
+export function readDuePending() {
+  try {
+    const s = store();
+    if (!s) return null;
+    const raw = s.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || typeof o.file !== 'string' || typeof o.head !== 'string') return null;
+    if (!Number.isFinite(o.at)) return null;
+    return { file: o.file, head: o.head, due: o.due || null, at: o.at };
+  } catch { return null; }
+}
+export function clearDuePending() {
+  try { const s = store(); if (s) s.removeItem(PENDING_KEY); } catch {}
+}
+// 'pending' = freeze remains, card waits for the deploy flip; 'expired' =
+// the deploy never showed (heal the card away); 'none' = no claim.
+export function dueDeployVerdict(rec, now = Date.now()) {
+  try {
+    if (!rec) return 'none';
+    const n = Number.isFinite(now) ? now : Date.now();
+    if (!Number.isFinite(rec.at) || (n - rec.at) < 0) return 'none';
+    if ((n - rec.at) >= DUE_PENDING_WINDOW_MS) return 'expired';
+    return 'pending';
+  } catch { return 'none'; }
 }
 export function confirmPublish(painted, want) {
   const w = want || null;
