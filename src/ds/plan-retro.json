@@ -256,5 +256,29 @@
   "plan": "2026-10-12_175646-ops3d-geo-triangulation.md",
   "anchor": "lane-b",
   "note": "elev-*.mjs triangulation scripts — Lane B owns new elevation scripts; trailer said #phase-01"
+ },
+ {
+  "sha": "b0654db",
+  "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+  "anchor": "follow-up",
+  "note": "selected row same height as default — follow-up polish"
+ },
+ {
+  "sha": "689c8ff",
+  "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+  "anchor": "follow-up",
+  "note": "+N inline with tags — follow-up polish"
+ },
+ {
+  "sha": "2e5a895",
+  "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+  "anchor": "follow-up",
+  "note": "filter bar — clear button, tag dropdown, timeline chip, expandable tags — follow-up polish"
+ },
+ {
+  "sha": "4117eb2",
+  "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+  "anchor": "follow-up",
+  "note": "right-align plan tags, add tlDate state — follow-up polish"
  }
 ]

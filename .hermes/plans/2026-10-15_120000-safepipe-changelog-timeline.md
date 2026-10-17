@@ -192,4 +192,4 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 
 ### Follow-up ✓ done ead03a5
 
-### Mobile pass ✓ done
+### Mobile pass ✓ done 21b8959
