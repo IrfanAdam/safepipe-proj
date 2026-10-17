@@ -491,6 +491,18 @@ describe('due progress card (DOM keying, repo stub conventions)', () => {
       setAttribute(k, v) { this.attrs[k] = String(v); },
       getAttribute(k) { return this.attrs[k] ?? null; },
       appendChild(c) { this.children.push(c); return c; },
+      querySelector(sel) {
+        const m = /^\[([^\]]+)\]$/.exec(String(sel).trim());
+        const attr = m && m[1];
+        let found = null;
+        const walk = (n) => {
+          if (found) return;
+          if (attr && n.attrs && n.attrs[attr] !== undefined) { found = n; return; }
+          n.children.forEach(walk);
+        };
+        walk(el);
+        return found;
+      },
       querySelectorAll() {
         const out = [];
         const walk = (n) => {
@@ -512,22 +524,32 @@ describe('due progress card (DOM keying, repo stub conventions)', () => {
     };
     return import('../src/changelog/due-progress.js?due-prog=1');
   };
-  it('shows publishing steps, advances only on a matching pick key', async () => {
+  it('one morphing line: spinner while busy, check when landed, stale keys ignored', async () => {
     const prog = await setup();
     const a = { file: 'f.md', head: 'H', due: '2026-11-01' };
     prog.showDueProgress(a);
-    prog.setDueProgressStep(a, 'committed');
     const card = globalThis.document.getElementById('ds-due-progress');
     assert.ok(card && !card.hidden);
-    const on = (s) => card.querySelectorAll().find((li) => li.getAttribute('data-prog-step') === s)
-      .classList.contains('is-on');
-    assert.equal(on('publishing'), true);
-    assert.equal(on('committed'), true);
-    assert.equal(on('live'), false);
+    const label = () => card.querySelector('[data-prog-label]').textContent;
+    const spinning = () => !card.querySelector('[data-prog-spin]').hidden;
+    const checked = () => !card.querySelector('[data-prog-tick]').hidden;
+    assert.equal(label(), 'Publishing…');
+    assert.equal(spinning(), true, 'publishing shows the spinner');
+    assert.equal(checked(), false);
+    prog.setDueProgressStep(a, 'committed');
+    assert.equal(label(), 'Published on git', 'same slot morphs, no second row');
+    assert.equal(spinning(), false);
+    assert.equal(checked(), true);
+    prog.setDueProgressStep(a, 'deploying');
+    assert.equal(label(), 'Updating everywhere…');
+    assert.equal(spinning(), true, 'updating shows the spinner');
     prog.setDueProgressStep({ file: 'f.md', head: 'OTHER', due: '2026-11-01' }, 'live');
-    assert.equal(on('live'), false, 'a stale pick never advances newer state');
+    assert.equal(label(), 'Updating everywhere…', 'a stale pick never advances newer state');
     prog.setDueProgressStep(a, 'live');
-    assert.equal(on('live'), true);
+    assert.equal(label(), 'Live ✓');
+    assert.equal(checked(), true);
+    prog.setDueProgressStep(a, 'bogus-step');
+    assert.equal(label(), 'Live ✓', 'unknown steps are ignored');
   });
   it('a rapid re-pick protects the new card from the old hide', async () => {
     const prog = await setup();
@@ -545,7 +567,7 @@ describe('due progress card (DOM keying, repo stub conventions)', () => {
 });
 
 describe('dueFetchVerdict (post-commit lagged-fetch guard)', () => {
-  const rec = { file: 'p.md', head: 'H', due: '2026-11-02', at: 1000000 };
+  const rec = { file: 'p.md', head: 'H', due: '2026-11-02', pre: '2026-10-01', at: 1000000 };
   it('no claim takes the fetched text', () => {
     assert.equal(dueFetchVerdict(null, 'p.md', '2026-10-01', 1000000), 'apply');
   });
@@ -554,25 +576,36 @@ describe('dueFetchVerdict (post-commit lagged-fetch guard)', () => {
   });
   it('lagged pre-commit text is held, never painted', () => {
     assert.equal(dueFetchVerdict(rec, 'p.md', '2026-10-01', 1000000 + 5000), 'skip');
-    assert.equal(dueFetchVerdict(rec, 'p.md', null, 1000000 + 5000), 'skip');
   });
   it('file truth carrying our value confirms and settles', () => {
     assert.equal(dueFetchVerdict(rec, 'p.md', '2026-11-02', 1000000 + 5000), 'confirmed');
   });
-  it('clear claims confirm on absence', () => {
-    const clr = { file: 'p.md', head: 'H', due: null, at: 1000000 };
+  it("another device's newer value is taken, never held (no refresh needed)", () => {
+    assert.equal(dueFetchVerdict(rec, 'p.md', '2026-11-05', 1000000 + 5000), 'superseded');
+    assert.equal(dueFetchVerdict(rec, 'p.md', null, 1000000 + 5000), 'superseded');
+  });
+  it('clear claims: absence confirms, pre value holds, third value yields', () => {
+    const clr = { file: 'p.md', head: 'H', due: null, pre: '2026-10-01', at: 1000000 };
     assert.equal(dueFetchVerdict(clr, 'p.md', null, 1000000 + 1000), 'confirmed');
     assert.equal(dueFetchVerdict(clr, 'p.md', '2026-10-01', 1000000 + 1000), 'skip');
+    assert.equal(dueFetchVerdict(clr, 'p.md', '2026-11-05', 1000000 + 1000), 'superseded');
+  });
+  it('first pick from empty: lagged emptiness holds, anything else settles', () => {
+    const first = { file: 'p.md', head: 'H', due: '2026-11-02', pre: null, at: 1000000 };
+    assert.equal(dueFetchVerdict(first, 'p.md', null, 1000000 + 1000), 'skip');
+    assert.equal(dueFetchVerdict(first, 'p.md', '2026-11-02', 1000000 + 1000), 'confirmed');
+    assert.equal(dueFetchVerdict(first, 'p.md', '2026-11-05', 1000000 + 1000), 'superseded');
   });
   it('expired claims accept the fetched text', () => {
     assert.equal(dueFetchVerdict(rec, 'p.md', '2026-10-01', 1000000 + DUE_CONFIRM_WINDOW_MS), 'apply');
     assert.equal(dueFetchVerdict(rec, 'p.md', '2026-10-01', 1000000 + DUE_CONFIRM_WINDOW_MS + 1), 'apply');
   });
-  it('confirm store round-trips and clears', () => {
-    saveDueConfirm({ file: 'p.md', head: 'H', due: '2026-11-02' });
+  it('confirm store round-trips with pre and clears', () => {
+    saveDueConfirm({ file: 'p.md', head: 'H', due: '2026-11-02', pre: '2026-10-01' });
     const back = readDueConfirm();
     assert.equal(back.file, 'p.md');
     assert.equal(back.due, '2026-11-02');
+    assert.equal(back.pre, '2026-10-01');
     assert.ok(Number.isFinite(back.at));
     clearDueConfirm();
     assert.equal(readDueConfirm(), null);

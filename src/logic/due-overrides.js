@@ -233,21 +233,25 @@ export function confirmPublish(painted, want) {
 
 // Post-commit fetch guard: after our own commit lands, a lagged sync fetch
 // (CDN serving the pre-commit file) must not regress the painted date back
-// to the previous value. The commit records {file, head, due, at}; each
-// changed file from a sync fetch is checked against it while fresh
-// (DUE_CONFIRM_WINDOW_MS). Verdicts: 'apply' (no claim or claim settled —
-// take the fetched text), 'skip' (fetched text predates our commit — hold
-// the current paint for this tick), 'confirmed' (fetched text carries our
-// value — take it and clear the claim).
+// to the previous value. The commit records {file, head, due, pre, at} —
+// due is our committed value, pre is the value it replaced. Each changed
+// file from a sync fetch is checked while fresh (DUE_CONFIRM_WINDOW_MS).
+// Verdicts: 'apply' (no claim or claim settled — take the fetched text),
+// 'skip' (fetched text still carries the pre-commit value — hold the
+// current paint for this tick), 'confirmed' (fetched text carries our value
+// — take it and clear the claim), 'superseded' (fetched text carries a
+// THIRD value: another device committed after us — take it and clear our
+// claim, never hold another device's truth).
 export const DUE_CONFIRM_WINDOW_MS = 120000;
 const CONFIRM_KEY = 'safepipe-due-confirm.v1';
+const asDue = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
 export function saveDueConfirm(rec) {
   try {
     const s = store();
     if (!s) return;
     if (!rec || typeof rec.file !== 'string' || typeof rec.head !== 'string') return;
     s.setItem(CONFIRM_KEY, JSON.stringify({
-      file: rec.file, head: rec.head, due: rec.due || null, at: Date.now(),
+      file: rec.file, head: rec.head, due: asDue(rec.due), pre: asDue(rec.pre), at: Date.now(),
     }));
   } catch {}
 }
@@ -260,7 +264,7 @@ export function readDueConfirm() {
     const o = JSON.parse(raw);
     if (!o || typeof o.file !== 'string' || typeof o.head !== 'string') return null;
     if (!Number.isFinite(o.at)) return null;
-    return { file: o.file, head: o.head, due: o.due || null, at: o.at };
+    return { file: o.file, head: o.head, due: asDue(o.due), pre: asDue(o.pre), at: o.at };
   } catch { return null; }
 }
 export function clearDueConfirm() {
@@ -271,7 +275,9 @@ export function dueFetchVerdict(rec, file, currentDue, now = Date.now()) {
     if (!rec || rec.file !== file) return 'apply';
     const n = Number.isFinite(now) ? now : Date.now();
     if (!Number.isFinite(rec.at) || (n - rec.at) < 0 || (n - rec.at) >= DUE_CONFIRM_WINDOW_MS) return 'apply';
-    if ((currentDue || null) === (rec.due || null)) return 'confirmed';
-    return 'skip';
+    const cur = asDue(currentDue);
+    if (cur === rec.due) return 'confirmed';
+    if (cur === rec.pre) return 'skip';
+    return 'superseded';
   } catch { return 'apply'; }
 }

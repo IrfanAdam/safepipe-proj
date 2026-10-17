@@ -3,6 +3,7 @@
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
 import { saveDueOverride, saveDueConfirm, saveDuePending, dueFailureReason, duePublishStep, confirmPublish, headingOf, findHeadIndex } from '../logic/due-overrides.js';
+import { dueOf } from './changelog-parse.js';
 import { getSchedToken, clearSchedToken, clearSchedUser } from '../logic/schedule-auth.js';
 import { openScheduleGate } from './schedule-gate.js';
 import { showDueProgress, setDueProgressStep, hideDueProgress } from './due-progress.js';
@@ -201,6 +202,11 @@ export function bindChangelogEvents(root, st, helpers) {
     if (/[✓✗]/.test(String(sprint.head || ''))) return;
     if (iso && !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
     const next = duePreviewEdit(sprint.body, sprint.head, iso || null);
+    // Pre-commit value for the lag-guard claim: a later sync fetch carrying
+    // THIS value is lagged pre-commit bytes (hold); any third value is
+    // another device's newer truth (take, never hold).
+    let preDue = null;
+    try { preDue = dueOf(sprint) || null; } catch { preDue = null; }
     if (next !== sprint.body) {
       sprint.body = next;
       st.duePending = { file: plan.file, due: iso || null, line: iso ? `*Due: ${iso}*` : null };
@@ -216,7 +222,7 @@ export function bindChangelogEvents(root, st, helpers) {
     // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
     st.dueCommit = { file: plan.file, head: sprint.head, state: 'saving' };
     keepDuePop();
-    commitDue(plan, sprint, iso || null);
+    commitDue(plan, sprint, iso || null, preDue);
   };
   // Bounded POST: a hung request becomes a failed attempt after 20s, never a
   // stuck state. One retry for network/timeout faults only — 4xx answers are
@@ -265,7 +271,7 @@ export function bindChangelogEvents(root, st, helpers) {
   const hideDuePop = () => {
     try { const p = root.querySelector('[data-due-pop]'); if (p) p.hidden = true; } catch {}
   };
-  const commitDue = (plan, sprint, iso) => {
+  const commitDue = (plan, sprint, iso, preDue) => {
     // Commit state for the due row (paint-detail reads ctx.dueCommit):
     // saving (set by applyDue) → saved (auto-dismissed) | needs-login |
     // failed. Nothing here ever opens the login gate — it opens only on an
@@ -449,7 +455,7 @@ export function bindChangelogEvents(root, st, helpers) {
         // Claim this value against lagged sync fetches: for the next 120s a
         // fetched file that predates our commit is held, never painted, so
         // the date can't revert to its previous value on CDN lag.
-        try { saveDueConfirm({ file: plan.file, head: commitHead, due: iso || null }); } catch {}
+        try { saveDueConfirm({ file: plan.file, head: commitHead, due: iso || null, pre: preDue || null }); } catch {}
         // Server truth wins: apply the committed file text directly — no
         // CDN wait, no confirm poll. Falls back to the painted preview when
         // the helper is unavailable.

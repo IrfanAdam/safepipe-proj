@@ -152,7 +152,7 @@ export async function refreshLivePlans(root) {
           } catch { found = false; }
           const v = dueFetchVerdict(rec, k, found ? curDue : undefined, Date.now());
           if (v === 'skip') { delete changed[k]; }
-          else if (v === 'confirmed') { settled = true; }
+          else if (v === 'confirmed' || v === 'superseded') { settled = true; }
         }
         if (settled) { try { clearDueConfirm(); } catch {} }
         if (!Object.keys(changed).length) return false;

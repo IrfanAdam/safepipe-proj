@@ -1,14 +1,17 @@
-// safepipe changelog — due publish progress card (DOM) · [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
-// A small floating card that narrates the FULL update lifecycle:
-// publishing → published → updating → live ✓. The card stays visible for
-// the whole cycle and dismisses only at live (or on failure, when the
-// inline retry takes over) — the toast never vanishes mid-cycle.
-// Deliberately NOT a modal: it never traps pointer or keyboard
+// safepipe changelog — due publish progress toast (DOM) · [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
+// One compact line that morphs through the FULL update lifecycle:
+// Publishing… → Published on git → Updating everywhere… → Live ✓.
+// In-progress states (publishing, deploying) show a spinner; rest states
+// (committed, live) show a check. One slot, never a checklist — the toast
+// stays visible for the whole cycle and dismisses only at live (or on
+// failure, when the inline retry takes over), so it never vanishes
+// mid-cycle. Deliberately NOT a modal: it never traps pointer or keyboard
 // (pointer-events:none) and never blocks the page. Keyed per pick so a
 // rapid re-pick never dismisses newer state.
 const CARD_ID = 'ds-due-progress';
 const STEP_LABELS = { publishing: 'Publishing…', committed: 'Published on git', deploying: 'Updating everywhere…', live: 'Live ✓' };
-const STEP_ORDER = ['publishing', 'committed', 'deploying', 'live'];
+// Spinner while the step is still working; check once it has landed.
+const STEP_BUSY = { publishing: true, committed: false, deploying: true, live: false };
 
 const doc = () => (typeof document !== 'undefined' ? document : null);
 
@@ -24,13 +27,21 @@ function pickKey(detail) {
   return `${f}::${h}::${u}`;
 }
 
-function paintSteps(card, onStep) {
-  const order = STEP_ORDER.indexOf(onStep);
-  const lis = card.querySelectorAll('[data-prog-step]');
-  lis.forEach((li) => {
-    const i = STEP_ORDER.indexOf(li.getAttribute('data-prog-step'));
-    try { li.classList.toggle('is-on', i <= order); } catch {}
-  });
+function paintStep(card, step) {
+  if (!STEP_LABELS[step]) return;
+  try {
+    const label = card.querySelector('[data-prog-label]');
+    if (label) label.textContent = STEP_LABELS[step];
+  } catch {}
+  try {
+    const spin = card.querySelector('[data-prog-spin]');
+    if (spin) spin.hidden = !STEP_BUSY[step];
+  } catch {}
+  try {
+    const tick = card.querySelector('[data-prog-tick]');
+    if (tick) tick.hidden = !!STEP_BUSY[step];
+  } catch {}
+  try { card.dataset.progStep = step; } catch {}
 }
 
 export function showDueProgress(detail) {
@@ -43,21 +54,27 @@ export function showDueProgress(detail) {
     card.className = 'ds-due-progress';
     card.setAttribute('role', 'status');
     card.setAttribute('aria-live', 'polite');
-    const ul = d.createElement('ul');
-    ul.className = 'ds-due-progress__steps';
-    STEP_ORDER.forEach((s) => {
-      const li = d.createElement('li');
-      li.setAttribute('data-prog-step', s);
-      li.textContent = STEP_LABELS[s];
-      ul.appendChild(li);
-    });
-    card.appendChild(ul);
+    const spin = d.createElement('span');
+    spin.className = 'ds-due-spin';
+    spin.setAttribute('data-prog-spin', '');
+    spin.setAttribute('aria-hidden', 'true');
+    const tick = d.createElement('span');
+    tick.className = 'ds-due-tick';
+    tick.setAttribute('data-prog-tick', '');
+    tick.setAttribute('aria-hidden', 'true');
+    tick.textContent = '✓';
+    const label = d.createElement('span');
+    label.className = 'ds-due-progress__label';
+    label.setAttribute('data-prog-label', '');
+    card.appendChild(spin);
+    card.appendChild(tick);
+    card.appendChild(label);
     try { d.body.appendChild(card); } catch { return null; }
   }
   try {
     card.dataset.progKey = pickKey(detail);
     card.hidden = false;
-    paintSteps(card, 'publishing');
+    paintStep(card, 'publishing');
   } catch {}
   return card;
 }
@@ -68,7 +85,7 @@ export function setDueProgressStep(detail, step) {
     if (!card || card.hidden) return;
     if (card.dataset.progKey !== pickKey(detail)) return;
     if (!STEP_LABELS[step]) return;
-    paintSteps(card, step);
+    paintStep(card, step);
   } catch {}
 }
 

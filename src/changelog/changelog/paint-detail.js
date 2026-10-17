@@ -246,7 +246,8 @@ export function paintDetail(root, ctx){
   try {
     const pend = readDuePending();
     pendRow = !!pend && dueDeployVerdict(pend, Date.now()) === 'pending'
-      && plan && sprint && pend.file === plan.file && pend.head === sprint.head;
+      && plan && sprint && pend.file === plan.file && pend.head === sprint.head
+      && (() => { try { return pend.due === (dueOf(sec) || null); } catch { return false; } })();
   } catch { pendRow = false; }
   const dueStatusHTML = !dc || secShipped ? '' : dc === 'saving'
     ? `<span class="ds-due-status" data-due-status="saving">publishing…</span>`
