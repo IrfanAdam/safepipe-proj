@@ -4734,5 +4734,53 @@
     }
    ]
   }
+ ],
+ "2026-10-17_180000-safepipe-smooth-scheduling.md": [
+  {
+   "sha": null,
+   "date": "2026-10-17",
+   "time": "17:15",
+   "hash": "b2abfa9b",
+   "sections": [
+    {
+     "head": "Task 1: Sticky login — log in once per device, never auto-nag {#task-1}",
+     "hash": "3a193fbb",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Optimistic save — Saved instantly, commit in background, no freeze {#tas",
+     "hash": "1603940e",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Fast cross-device sync — no reload, seconds not minutes {#task-3}",
+     "hash": "6b16d500",
+     "state": "1/1"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-17",
+   "time": "17:15",
+   "hash": "12c8709f",
+   "sections": [
+    {
+     "head": "Task 1: Sticky login — log in once per device, never auto-nag {#task-1}",
+     "hash": "055333a2",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Optimistic save — Saved instantly, commit in background, no freeze {#tas",
+     "hash": "a2bc94e5",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Fast cross-device sync — no reload, seconds not minutes {#task-3}",
+     "hash": "6ecba9f8",
+     "state": "1/1"
+    }
+   ]
+  }
  ]
 }

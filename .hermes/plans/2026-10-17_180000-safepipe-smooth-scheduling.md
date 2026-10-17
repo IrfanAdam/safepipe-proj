@@ -24,7 +24,7 @@
 
 - REF GATE 1: cold-load logged-in, refresh, pick — zero gate opens; revocation drill degrades silently.
 
-### Task 1 ✓ done <sha>
+### Task 1 ✓ done ac86a68
 
 ## Task 2: Optimistic save — Saved instantly, commit in background, no freeze {#task-2}
 
@@ -43,7 +43,7 @@
 
 - REF GATE 2: network-throttled (Slow 3G) pick → instant Saved, background commit lands, no freeze, no popup.
 
-### Task 2 ✓ done <sha>
+### Task 2 ✓ done cfb6e18
 
 ## Task 3: Fast cross-device sync — no reload, seconds not minutes {#task-3}
 
@@ -61,7 +61,7 @@
 
 - REF GATE 3 (ship): two-device drill (laptop pick → phone converges, no reload, no login prompt), chromium + webkit screenshots, zero page errors, `npm run build` green.
 
-### Task 3 ✓ done <sha>
+### Task 3 ✓ done 1cdecb2
 
 ---
 
