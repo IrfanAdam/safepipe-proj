@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-17T12:09:44.590Z",
+  "generated": "2026-10-17T12:09:55.912Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -18,6 +18,15 @@
     "2026-10-17_180000-safepipe-smooth-scheduling.md"
   ],
   "commits": [
+    {
+      "sha": "f6d8a61",
+      "full": "f6d8a610765a491e793c150561f431ba3932dc4b",
+      "date": "2026-10-17",
+      "time": "17:39",
+      "subject": "fix(schedule): open datepicker survives pick, commit and status paints [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]",
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+      "anchor": "task-2"
+    },
     {
       "sha": "1ce8220",
       "full": "1ce82204ebdf20432b0ee049e2b1db20c14c8b14",
@@ -4060,7 +4069,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/changelog/changelog-events.js"
-  ]
+  "wip": []
 }
