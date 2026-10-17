@@ -244,6 +244,9 @@ export function bindChangelogEvents(root, st, helpers) {
     // Gen + file/head guarded so a rapid re-pick never clears newer state.
     const markSaved = () => {
       if (gen !== dueGen) return;
+      // Stamp our own commit time: the deploy self-update must not reload
+      // this page for its own deploy while it is still building.
+      try { localStorage.setItem('safepipe-last-due-commit', String(Date.now())); } catch {}
       st.dueCommit = { file: plan.file, head: sprint.head, state: 'saved' };
       try { doPaint(root); } catch {}
       try {

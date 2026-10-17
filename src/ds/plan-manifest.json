@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-17T11:59:33.984Z",
+  "generated": "2026-10-17T12:02:16.956Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -18,6 +18,15 @@
     "2026-10-17_180000-safepipe-smooth-scheduling.md"
   ],
   "commits": [
+    {
+      "sha": "2d6434f",
+      "full": "2d6434f374ffac771adfbef4cafb35a80ff5cede",
+      "date": "2026-10-17",
+      "time": "17:29",
+      "subject": "feat(schedule): name the publish failure inline (timeout/offline/http/unchanged) [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]",
+      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
+      "anchor": "task-2"
+    },
     {
       "sha": "633d6b8",
       "full": "633d6b8c307224c83b017204ba28838bcdf95d71",
@@ -4007,7 +4016,8 @@
     }
   ],
   "wip": [
+    "scripts/plan-track.mjs",
     "src/changelog/changelog-events.js",
-    "src/changelog/changelog/paint-detail.js"
+    "src/changelog/pages-changelog.js"
   ]
 }

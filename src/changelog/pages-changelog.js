@@ -149,10 +149,52 @@ let lastPlanEtag = null;
 let etagPolling = true;
 let livePollMs = 15000;
 let shaRetryArmed = false;
+// Deploy self-update: the open page must never sit on a stale bundle. The
+// boot deploy sha is recorded once; every poll compares the live
+// /version.json — on mismatch the page reloads itself onto the new deploy
+// (guards: once per sha, never mid-pick, never within 2min of our own
+// commit whose deploy is still building). Content sync then converges.
+// [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-3]
+let bootDeploySha = null;
+let deployCheckArmed = true;
+async function pollAppVersion() {
+  if (!deployCheckArmed) return;
+  try {
+    if (typeof fetch !== 'function' || typeof location === 'undefined') return;
+    const r = await fetch('/version.json', { cache: 'no-store' });
+    if (!r || !r.ok) return;
+    const v = await r.json();
+    const sha = v && typeof v.sha === 'string' ? v.sha : null;
+    if (!sha) return;
+    if (bootDeploySha === null) { bootDeploySha = sha; return; }
+    if (sha === bootDeploySha) return;
+    // New deploy is live. Guards before self-reload:
+    try {
+      const ss = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
+      if (ss && ss.getItem('safepipe-reloaded-for') === sha) { bootDeploySha = sha; return; }
+    } catch {}
+    try {
+      // Mid-pick on this device: the datepicker popover is open — wait.
+      if (typeof document !== 'undefined' && document.querySelector('.ds-due-pop')) return;
+    } catch {}
+    try {
+      const ls = typeof localStorage !== 'undefined' ? localStorage : null;
+      const last = ls ? Number(ls.getItem('safepipe-last-due-commit') || 0) : 0;
+      if (last && Date.now() - last < 120000) return;
+    } catch {}
+    try {
+      const ss = typeof sessionStorage !== 'undefined' ? sessionStorage : null;
+      if (ss) ss.setItem('safepipe-reloaded-for', sha);
+    } catch {}
+    deployCheckArmed = false;
+    try { location.reload(); } catch {}
+  } catch {}
+}
 async function pollPlanSha() {
   if (!liveRoot) return;
   try { if (document.hidden) return; } catch {}
   if (liveRefreshInFlight) return;
+  try { await pollAppVersion(); } catch {}
   let src = null;
   try { src = await import('./plan-source.js'); } catch { return; }
   if (!src || typeof src.fetchLatestPlanSha !== 'function') return;

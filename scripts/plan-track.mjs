@@ -103,6 +103,18 @@ for (const f of plans) {
   }
 }
 if (histAdded) writeFileSync(histPath, JSON.stringify(hist, null, 1) + '\n');
+// Deploy version stamp: public/version.json carries the current HEAD sha
+// (sha only — byte-stable per commit, no rebuild churn). The running app
+// polls it and auto-reloads an open page onto a new deploy, so editors and
+// viewers never sit on a stale bundle. Served from /version.json via public/.
+try {
+  const head = git(['rev-parse', 'HEAD']);
+  const verPath = join(root, 'public', 'version.json');
+  const verNext = JSON.stringify({ sha: head || null }) + '\n';
+  let verPrev = null;
+  try { verPrev = readFileSync(verPath, 'utf8'); } catch {}
+  if (verPrev !== verNext) writeFileSync(verPath, verNext);
+} catch { /* version stamp is best-effort — never fail the build */ }
 const next = { generated: prev.generated || new Date().toISOString(), plans, commits, wip };
 const same = (a, b) => JSON.stringify({ ...a, generated: 0 }) === JSON.stringify({ ...b, generated: 0 });
 if (!existsSync(manifestPath) || !same(prev, next)) {
