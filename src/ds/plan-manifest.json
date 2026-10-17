@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-17T12:06:57.174Z",
+  "generated": "2026-10-17T12:09:44.590Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -18,6 +18,15 @@
     "2026-10-17_180000-safepipe-smooth-scheduling.md"
   ],
   "commits": [
+    {
+      "sha": "1ce8220",
+      "full": "1ce82204ebdf20432b0ee049e2b1db20c14c8b14",
+      "date": "2026-10-17",
+      "time": "17:36",
+      "subject": "docs(plan): regen manifest",
+      "plan": null,
+      "anchor": null
+    },
     {
       "sha": "18c4d0c",
       "full": "18c4d0c3480d27f06cc614e0d9690754ad2988e0",
@@ -4051,5 +4060,7 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "src/changelog/changelog-events.js"
+  ]
 }

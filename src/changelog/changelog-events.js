@@ -208,7 +208,7 @@ export function bindChangelogEvents(root, st, helpers) {
     // text.
     // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
     st.dueCommit = { file: plan.file, head: sprint.head, state: 'saving' };
-    try { doPaint(root); } catch {}
+    keepDuePop();
     commitDue(plan, sprint, iso || null);
   };
   // Bounded POST: a hung request becomes a failed attempt after 20s, never a
@@ -226,6 +226,19 @@ export function bindChangelogEvents(root, st, helpers) {
       });
     } finally { if (t) clearTimeout(t); }
   };
+  // The detail repaint rebuilds the datepicker shell — restore an open picker
+  // after paint so background commits never slam it shut. Dismissal stays
+  // explicit (toggle, Esc, outside tap). Background restores never steal
+  // focus; direct opens keep it.
+  const keepDuePop = () => {
+    let open = false;
+    try { const p = root.querySelector('[data-due-pop]'); open = !!(p && !p.hidden); } catch {}
+    try { doPaint(root); } catch {}
+    if (open) {
+      try { renderDueCal(false); } catch {}
+      try { const p2 = root.querySelector('[data-due-pop]'); if (p2) p2.hidden = false; } catch {}
+    }
+  };
   const commitDue = (plan, sprint, iso) => {
     // Commit state for the due row (paint-detail reads ctx.dueCommit):
     // saving (set by applyDue) → saved (auto-dismissed) | needs-login |
@@ -238,7 +251,7 @@ export function bindChangelogEvents(root, st, helpers) {
       if (gen !== dueGen) return;
       try { hideDueProgress(progDetail, 0); } catch {}
       st.dueCommit = { file: plan.file, head: sprint.head, state, reason: reason || null };
-      try { doPaint(root); } catch {}
+      keepDuePop();
     };
     // Success is confirmed, not assumed: flash 'published ✓', then dismiss.
     // Gen + file/head guarded so a rapid re-pick never clears newer state.
@@ -248,14 +261,14 @@ export function bindChangelogEvents(root, st, helpers) {
       // this page for its own deploy while it is still building.
       try { localStorage.setItem('safepipe-last-due-commit', String(Date.now())); } catch {}
       st.dueCommit = { file: plan.file, head: sprint.head, state: 'saved' };
-      try { doPaint(root); } catch {}
+      keepDuePop();
       try {
         setTimeout(() => {
           try {
             if (gen === dueGen && st.dueCommit && st.dueCommit.state === 'saved'
               && st.dueCommit.file === plan.file && st.dueCommit.head === sprint.head) {
               st.dueCommit = null;
-              doPaint(root);
+              keepDuePop();
             }
           } catch {}
         }, 2500);
@@ -372,7 +385,7 @@ export function bindChangelogEvents(root, st, helpers) {
   const pad2 = (n) => String(n).padStart(2, '0');
   const dueToday = () => { const n = new Date(); return `${n.getFullYear()}-${pad2(n.getMonth() + 1)}-${pad2(n.getDate())}`; };
   let dueView = ''; // YYYY-MM shown in the popup
-  const renderDueCal = () => {
+  const renderDueCal = (focusIt = true) => {
     const pop = root.querySelector('[data-due-pop]');
     const btn = root.querySelector('[data-due-open]');
     if (!pop || !btn) return;
@@ -398,7 +411,7 @@ export function bindChangelogEvents(root, st, helpers) {
       `<div class="ds-due-cal__grid">${cells}</div>` +
       `<div class="ds-due-cal__foot"><button data-due-clear>Clear</button></div>`;
     const focus = pop.querySelector('.is-sel') || pop.querySelector('.is-today');
-    if (focus) focus.focus();
+    if (focus && focusIt !== false) focus.focus();
   };
   const onClick = (e) => {
     // Open datepicker popup: clicks outside it just dismiss it and continue
