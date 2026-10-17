@@ -6,15 +6,35 @@
 // secrets: repo coordinates come from Vercel's own system variables and the
 // author is whoever owns the repo.
 const DUE_SHAPE = /^\s*\*Due:\s*[^*\n]*\*\s*$/;
-const escRe = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const normHead = (s) => String(s || '').normalize('NFKC').replace(/\s+/g, ' ').trim();
+const headingOf = (ln) => {
+  const m = String(ln || '').match(/^(#{2,3})\s+(.*?)\s*$/);
+  if (!m) return null;
+  return { lvl: m[1].length, text: normHead(m[2]) };
+};
 // Port of dueEditText (src/changelog/changelog-events.js) — keep in sync:
 // insert/replace/clear the single `*Due: YYYY-MM-DD*` line under the owning
-// head, idempotently. Head not found → text unchanged.
+// head, idempotently. Head not found → found false, text unchanged.
 function dueEditText(raw, head, due) {
-  const lines = String(raw || '').split('\n');
-  const want = String(head || '').trim();
-  const hi = lines.findIndex((ln) => new RegExp(`^#{2,3}\\s+${escRe(want)}\\s*$`).test(ln));
-  if (hi < 0) return String(raw || '');
+  const text = String(raw || '').replace(/\r\n?/g, '\n');
+  const lines = text.split('\n');
+  const want = normHead(head);
+  let hi = lines.findIndex((ln) => {
+    const h = headingOf(ln);
+    return h !== null && h.text === want;
+  });
+  if (hi < 0 && want) {
+    const key = want.slice(0, 40);
+    if (key) {
+      const cand = [];
+      for (let i = 0; i < lines.length; i++) {
+        const h = headingOf(lines[i]);
+        if (h !== null && h.text.includes(key)) cand.push(i);
+      }
+      if (cand.length === 1) hi = cand[0];
+    }
+  }
+  if (hi < 0) return { text, next: text, found: false, fileLines: lines.length };
   const lvl = (lines[hi].match(/^#+/) || ['##'])[0].length;
   let end = lines.length;
   for (let i = hi + 1; i < lines.length; i++) {
@@ -26,18 +46,18 @@ function dueEditText(raw, head, due) {
   const out = lines.slice();
   if (!due) {
     for (let k = shaped.length - 1; k >= 0; k--) out.splice(shaped[k], 1);
-    return out.join('\n');
+    return { text, next: out.join('\n'), found: true, fileLines: lines.length };
   }
   const line = `*Due: ${due}*`;
   if (shaped.length) {
     out[shaped[0]] = line;
     for (let k = shaped.length - 1; k >= 1; k--) out.splice(shaped[k], 1);
-    return out.join('\n');
+    return { text, next: out.join('\n'), found: true, fileLines: lines.length };
   }
   let at = hi + 1;
   if (/^\s*\*Tags:/i.test(lines[hi + 1] || '')) at = hi + 2;
   out.splice(at, 0, line);
-  return out.join('\n');
+  return { text, next: out.join('\n'), found: true, fileLines: lines.length };
 }
 const gh = (token, path, opts = {}) => fetch(`https://api.github.com${path}`, {
   ...opts,
@@ -49,6 +69,15 @@ const gh = (token, path, opts = {}) => fetch(`https://api.github.com${path}`, {
   },
 });
 export default async function handler(req, res) {
+  try {
+    await dueHandler(req, res);
+  } catch (e) {
+    try {
+      if (!res.headersSent) res.status(500).json({ error: 'Due commit failed' });
+    } catch {}
+  }
+}
+async function dueHandler(req, res) {
   if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
   const { token, file, head, due = null } = req.body || {};
   const owner = process.env.VERCEL_GIT_REPO_OWNER;
@@ -85,8 +114,22 @@ export default async function handler(req, res) {
     if (!cur.ok) { res.status(400).send('Plan file not found in repo'); return; }
     const { sha, content } = await cur.json();
     const raw = Buffer.from(content || '', 'base64').toString('utf8');
-    const next = dueEditText(raw, head.trim(), due);
-    if (next === raw) { res.status(200).json({ unchanged: true, repo, branch, fileSha: sha || null }); return; }
+    const edit = dueEditText(raw, head, due);
+    if (!edit.found) {
+      res.status(200).json({
+        committed: null,
+        unchanged: true,
+        reason: 'head-not-found',
+        headPreview: String(head).slice(0, 60),
+        fileLines: edit.fileLines,
+        repo,
+        branch,
+        fileSha: sha || null,
+      });
+      return;
+    }
+    const next = edit.next;
+    if (next === edit.text) { res.status(200).json({ unchanged: true, repo, branch, fileSha: sha || null }); return; }
     const msg = `chore(${file}): ${due ? `set due ${due}` : 'clear due'} [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]`;
     const put = await gh(token, `/repos/${repo}/contents/${encodeURIComponent(path)}`, {
       method: 'PUT',
@@ -114,6 +157,8 @@ export default async function handler(req, res) {
       content: next,
     });
   } catch (e) {
-    res.status(500).send('Due commit failed');
+    try {
+      if (!res.headersSent) res.status(500).json({ error: 'Due commit failed' });
+    } catch {}
   }
 }
