@@ -51,7 +51,7 @@
 | 2 | Apply + prove RLS | Tables present in dashboard, anon SELECT ok, anon INSERT denied |
 | 3 | Due inventory (read-only) | Node probe lists every `*Due*` across `.hermes/plans/*.md`, 0 writes |
 
-### Task 1: Schema + RLS SQL
+### Task 1: Schema + RLS SQL ✓ done `82245ad`
 
 **Objective:** One SQL file defines all scheduling state with safe defaults.
 
@@ -105,9 +105,8 @@ create policy "anon read schedules"
 
 **Verify:** `node -e "console.log(require('fs').readFileSync('supabase/schema.sql','utf8').includes('schedules'))"` prints `true`.
 
-### Task 1 ✓ done `82245ad` — schema + RLS SQL shipped.
 
-### Task 2: Apply + prove RLS
+### Task 2: Apply + prove RLS ✓ done `82245ad`
 
 **Objective:** Schema live in Supabase with access proven, not assumed.
 
@@ -121,13 +120,12 @@ create policy "anon read schedules"
 
 **Verify:** screenshots or curl outputs of allow + deny in `supabase/README.md`. No app code touched.
 
-### Task 2 ✓ done `82245ad` — RLS allow/deny proof pasted in `supabase/README.md`.
 
 - REF GATE 1: open Supabase tables + `supabase/schema.sql` + `README` proof. Pass = 3 tables exist, anon read ok, anon write denied, zero app diffs. Evidence: anon SELECT ok + anon INSERT denied proven in `supabase/README.md` (anon RLS read proof); `82245ad` touches `supabase/` + `scripts/` only — zero app diffs.
 
 ---
 
-### Task 3: Due inventory (read-only probe)
+### Task 3: Due inventory (read-only probe) ✓ done `82245ad`
 
 **Objective:** Baseline every live Due before migration so backfill is exact.
 
@@ -144,7 +142,6 @@ create policy "anon read schedules"
 
 **Verify:** count matches `grep -r "^\*Due:" .hermes/plans | wc -l`. No file modified (`git status --short` clean except new script).
 
-### Task 3 ✓ done `82245ad` — read-only inventory probe shipped.
 
 ---
 
@@ -160,7 +157,7 @@ create policy "anon read schedules"
 | 5 | Service-role upsert + events | Retry with same `idempotency_key` returns same version, no duplicate event |
 | 6 | Node tests green | `tests/schedule-api.test.js` passes, `due-pipeline.test.js` still green |
 
-### Task 4: Validate + owner gate
+### Task 4: Validate + owner gate ✓ done `23e529e`
 
 **Objective:** Same security posture as `api/due.js`, no weaker.
 
@@ -179,9 +176,8 @@ create policy "anon read schedules"
 
 **Verify:** curl with bad file → 400 `Invalid file`; no token → 401; non-owner token → 403.
 
-### Task 4 ✓ done `23e529e` — validation + owner gate shipped.
 
-### Task 5: Upsert + event log
+### Task 5: Upsert + event log ✓ done `23e529e`
 
 **Objective:** One pick = one row version bump + one history event, retry-safe.
 
@@ -196,9 +192,8 @@ create policy "anon read schedules"
 
 **Verify:** POST same body twice with same key → same `version` second time; different key + different due → `version + 1`.
 
-### Task 5 ✓ done `23e529e` — idempotent upsert + event log shipped.
 
-### Task 6: Pin with tests
+### Task 6: Pin with tests ✓ done `23e529e`
 
 **Objective:** Write path locked against regressions.
 
@@ -211,7 +206,6 @@ create policy "anon read schedules"
 
 **Verify:** Run `node --test tests/schedule-api.test.js tests/due-pipeline.test.js` — Expected: all pass.
 
-### Task 6 ✓ done `23e529e` — write-path tests shipped.
 
 - REF GATE 2: POST valid pick in staging → row in `schedules` + event in `schedule_events`; retry same key idempotent; bad inputs rejected; both test files green. Pass = no GitHub commit made by this phase. Evidence: owner-gated idempotent upsert + validation pinned by `tests/schedule-api.test.js` (`23e529e`); no GitHub commit made by Phase 2 — write path stops at Supabase.
 
@@ -229,7 +223,7 @@ create policy "anon read schedules"
 | 8 | Overlay wiring in `pages-changelog.js` | Supabase dues paint over file text; file convergence drops stale |
 | 9 | Foreground refresh + same-tab sync | `visibilitychange`/`focus`/`online` refetch; rapid picks last-wins |
 
-### Task 7: Fetch + subscribe module
+### Task 7: Fetch + subscribe module ✓ done `739ef86`
 
 **Objective:** One module owns all Supabase reads on the client.
 
@@ -247,9 +241,8 @@ create policy "anon read schedules"
 
 **Verify:** block network → module returns null, page still renders from bundled markdown.
 
-### Task 7 ✓ done `739ef86` — fetch + subscribe module shipped (anon-only).
 
-### Task 8: Overlay wiring
+### Task 8: Overlay wiring ✓ done `804c996`
 
 **Objective:** Supabase dues paint exactly where localStorage overrides paint today.
 
@@ -264,9 +257,8 @@ create policy "anon read schedules"
 
 **Verify:** seed one Supabase due → rebuild paints it; clear in Supabase → file value returns after refetch.
 
-### Task 8 ✓ done `804c996` — Supabase overlay wiring shipped.
 
-### Task 9: Foreground + multi-pick behavior
+### Task 9: Foreground + multi-pick behavior ✓ done `804c996`
 
 **Objective:** Slow radio and rapid taps converge, never freeze.
 
@@ -281,7 +273,6 @@ create policy "anon read schedules"
 
 **Verify:** 3 rapid picks → last wins; offline pick → inline Retry, date intact after refresh.
 
-### Task 9 ✓ done `804c996` — foreground refresh + same-tab sync shipped.
 
 - REF GATE 3: laptop pick → second session paints in <30s with zero touches, selection intact, no reload, no login prompt. Backgrounded tab refreshes on foreground. `npm run build` green. Evidence: build green; targeted scheduling tests 74/74 green (`schedule-api` + `sync-due` + `due-pipeline`); overlay + realtime wiring in `804c996`.
 
@@ -299,7 +290,7 @@ create policy "anon read schedules"
 | 11 | Skip-deploy wiring | Due-only pushes skip Vercel; code pushes still deploy |
 | 12 | Sync status in UI | `publishing… → published ✓ / retry` with terse cause, no popup |
 
-### Task 10: Webhook worker
+### Task 10: Webhook worker ✓ done `679ea66`
 
 **Objective:** Server-side Due-line sync with no client secrets.
 
@@ -320,9 +311,8 @@ create policy "anon read schedules"
 
 **Verify:** webhook dry-run on one test key → file diff shows exactly one Due line; rerun same payload → no second commit.
 
-### Task 10 ✓ done `679ea66` — PIVOT: DB-webhook worker (`7623819`) superseded; writer-driven GitHub sync via owner-token dual-auth (Supabase-issued tokens proved read-scoped). Webhook-secret door kept for later.
 
-### Task 11: Skip-deploy wiring
+### Task 11: Skip-deploy wiring ✓ done `d1b512f`
 
 **Objective:** Schedule sync never redeploys; code always does.
 
@@ -342,9 +332,8 @@ create policy "anon read schedules"
 
 **Verify:** push Due-only commit → Vercel dashboard shows skipped; push `src/` change → deploys.
 
-### Task 11 ✓ done `d1b512f` — Due-only skip-deploy wiring shipped.
 
-### Task 12: Status + retries
+### Task 12: Status + retries ✓ done `29665ac`
 
 **Objective:** Failures are quiet, visible, and retryable inline.
 
@@ -359,7 +348,6 @@ create policy "anon read schedules"
 
 **Verify:** revoke PAT in staging → pick shows Retry with cause; restore PAT → retry succeeds.
 
-### Task 12 ✓ done `29665ac` — sync status + silent toast states shipped.
 
 - REF GATE 4: valid pick → Supabase row → GitHub Due line within minutes → Vercel skipped → UI `published ✓`. Kill webhook once → status `error` + inline retry, no popup, no lost pick. Evidence: pivot shipped in `679ea66` — writer-driven GitHub sync via owner-token dual-auth (Supabase-issued tokens proved read-scoped, DB-webhook path dropped); webhook-secret door kept for later; Due-only pushes skip deploy (`d1b512f`).
 
@@ -377,7 +365,7 @@ create policy "anon read schedules"
 | 14 | Flip write path | Picks POST to `/api/schedule`; `/api/due` kept one release as fallback |
 | 15 | Docs + two-device drill | README updated, drill passes, build green, plan closed |
 
-### Task 13: Backfill apply
+### Task 13: Backfill apply ✓ done `dabf50a`
 
 **Objective:** No Due left behind.
 
@@ -391,9 +379,8 @@ create policy "anon read schedules"
 
 **Verify:** `SELECT count(*) FROM schedules` equals inventory count; `schedule_events` has N `backfill` rows.
 
-### Task 13 ✓ done `dabf50a` — backfill apply shipped (live: 6 dues, `source='backfill'`, rerun adds 0).
 
-### Task 14: Flip + deprecate
+### Task 14: Flip + deprecate ✓ done `804c996`
 
 **Objective:** One write path live, old path parked.
 
@@ -408,9 +395,8 @@ create policy "anon read schedules"
 
 **Verify:** pick → Supabase row in <2s → GitHub sync → no Vercel deploy → refresh keeps value.
 
-### Task 14 ✓ done `804c996` — write path flipped to `/api/schedule` (`/api/due` fallback kept).
 
-### Task 15: Docs + drill + close
+### Task 15: Docs + drill + close ✓ done `e15ab5f`
 
 **Objective:** Sustained operation without tribal knowledge.
 
@@ -426,7 +412,6 @@ create policy "anon read schedules"
 
 - REF GATE 5 (ship): drill pass on chromium + webkit, zero page errors, Vercel skip proven, build green. Then append `### Task 15 ✓ done <sha>` and close phase. Evidence: build green; full suite 659 pass + 7 pre-existing corpus/geo fails; live backfill 6 dues (`dabf50a`); anon RLS read proof in `supabase/README.md`. REMAINING USER-RUN AT CUTOVER: two-device drill + Vercel skip-proof.
 
-### Task 15 ✓ done `e15ab5f` — docs + operate notes shipped; two-device drill + Vercel skip-proof remain USER-RUN at cutover.
 
 ## Phase 5 closeout note
 

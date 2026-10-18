@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-18T14:24:05.028Z",
+  "generated": "2026-10-18T14:43:11.869Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -19,6 +19,15 @@
     "2026-10-18_172008-supabase-scheduling-migration.md"
   ],
   "commits": [
+    {
+      "sha": "e15ab5f",
+      "full": "e15ab5fced014de9c7eb2cccc07ae4d26672e10d",
+      "date": "2026-10-18",
+      "time": "19:54",
+      "subject": "docs(plan): refresh manifest after rebase + backfill [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-5"
+    },
     {
       "sha": "c43c9aa",
       "full": "c43c9aac6a8077ff43c8d09ca2e37fc107e4f2f7",
@@ -4457,5 +4466,10 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "public/version.json",
+    "src/changelog/changelog-drawer.css",
+    "src/changelog/changelog/paint-detail.js",
+    "src/changelog/due-progress.js"
+  ]
 }

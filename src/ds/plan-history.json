@@ -5362,6 +5362,44 @@
      "state": "0/3"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-18",
+   "time": "20:06",
+   "hash": "8bd76f5b",
+   "sections": [
+    {
+     "head": "Phase 1 — Foundation: schema, access, inventory {#phase-1}",
+     "hash": "67330908",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Write path: owner-checked Supabase upsert {#phase-2}",
+     "hash": "509a12da",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 3 — Read + Realtime: live overlay, no reload {#phase-3}",
+     "hash": "5caf8726",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Sync worker: Supabase → GitHub without deploys {#phase-4}",
+     "hash": "895f0ad3",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 5 — Cutover: backfill, flip, retire {#phase-5}",
+     "hash": "ee48c793",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 5 closeout note",
+     "hash": "4b151e88",
+     "state": ""
+    }
+   ]
   }
  ]
 }
