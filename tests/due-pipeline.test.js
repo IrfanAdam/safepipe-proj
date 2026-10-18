@@ -660,3 +660,82 @@ describe('due deploy lifecycle (freeze remains until the redeploy, editing stays
     assert.equal(readDuePending(), null);
   });
 });
+
+describe('eventual sync reconciliation (staleSyncTargets + reconcileDueSync)', () => {
+  it('refires only error rows and missing rows; ok/unchanged never refire', async () => {
+    const { staleSyncTargets } = await import('../src/changelog/changelog-events.js');
+    const schedules = [
+      { plan_file: 'a.md', section_key: 'T1' },
+      { plan_file: 'a.md', section_key: 'T2' },
+      { plan_file: 'a.md', section_key: 'T3' },
+      { plan_file: 'a.md', section_key: 'T4' },
+    ];
+    const sync = [
+      { plan_file: 'a.md', section_key: 'T1', status: 'error' },
+      { plan_file: 'a.md', section_key: 'T2', status: 'ok' },
+      { plan_file: 'a.md', section_key: 'T3', status: 'unchanged' },
+    ];
+    const out = staleSyncTargets(schedules, sync).map((r) => r.section_key).sort();
+    assert.deepEqual(out, ['T1', 'T4']);
+  });
+  it('reconcileDueSync heals error/missing rows silently with the server shape', async () => {
+    const { reconcileDueSync } = await import('../src/changelog/changelog-events.js');
+    const posts = [];
+    const fetchImpl = async (url, opts = {}) => {
+      if (String(url).startsWith('/api/schedule?sync=')) {
+        return { ok: true, json: async () => [{ plan_file: 'a.md', section_key: 'T1', status: 'error' }] };
+      }
+      if (String(url) === '/api/sync-due') {
+        posts.push(JSON.parse(opts.body));
+        return { ok: true, json: async () => ({ synced: true }) };
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    };
+    const schedules = [
+      { plan_file: 'a.md', section_key: 'T1' },
+      { plan_file: 'a.md', section_key: 'T2' },
+    ];
+    const syncByFile = {
+      'a.md': [
+        { plan_file: 'a.md', section_key: 'T1', status: 'error' },
+        { plan_file: 'a.md', section_key: 'T2', status: 'ok' },
+      ],
+    };
+    const r = await reconcileDueSync({ token: 'owner-oauth', schedules, syncByFile, fetchImpl });
+    assert.equal(r.checked, 2);
+    assert.equal(r.healed, 1);
+    assert.equal(posts.length, 1);
+    assert.deepEqual(posts[0], { plan_file: 'a.md', section_key: 'T1', token: 'owner-oauth' });
+  });
+  it('logged-out readers never fire', async () => {
+    const { reconcileDueSync } = await import('../src/changelog/changelog-events.js');
+    let calls = 0;
+    const fetchImpl = async () => { calls++; return { ok: true, json: async () => [] }; };
+    const r = await reconcileDueSync({
+      schedules: [{ plan_file: 'a.md', section_key: 'T1' }],
+      syncByFile: { 'a.md': [] },
+      fetchImpl,
+    });
+    assert.equal(r.skipped, 'logged-out');
+    assert.equal(r.healed, 0);
+    assert.equal(calls, 0, 'no network at all without a token');
+  });
+  it('skips sections the toast watch is already polling', async () => {
+    const { reconcileDueSync } = await import('../src/changelog/changelog-events.js');
+    const posts = [];
+    const fetchImpl = async (url, opts = {}) => {
+      if (String(url) === '/api/sync-due') { posts.push(JSON.parse(opts.body)); }
+      return { ok: true, json: async () => ({ synced: true }) };
+    };
+    const r = await reconcileDueSync({
+      token: 't',
+      schedules: [{ plan_file: 'a.md', section_key: 'T1' }],
+      syncByFile: { 'a.md': [{ plan_file: 'a.md', section_key: 'T1', status: 'error' }] },
+      fetchImpl,
+      isWatched: (t) => t.section_key === 'T1',
+    });
+    assert.equal(r.healed, 0);
+    assert.equal(r.skippedWatch, 1);
+    assert.equal(posts.length, 0);
+  });
+});

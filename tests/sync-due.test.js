@@ -195,3 +195,116 @@ test('409 sha race refetches once and retries', async () => {
     globalThis.fetch = real;
   }
 });
+
+test('transient 500 retried with backoff then recorded ok', async () => {
+  await withFetch({
+    raw: '## Task 1\n*Due: 2026-10-20*\n',
+    rows: [{ plan_file: 'a.md', section_key: 'Task 1', due: '2026-10-21' }],
+    githubPut: (n) => n === 1
+      ? { ok: false, status: 500, text: async () => 'boom' }
+      : { ok: true, status: 200, json: async () => ({ commit: { sha: 'c9' }, content: { sha: 'f9' } }) },
+  }, async (seen) => {
+    const res = mockRes();
+    await syncDueHandler(req({ plan_file: 'a.md', section_key: 'Task 1' }), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.synced, true);
+    assert.equal(seen.puts.length, 2, 'one transient retry');
+    assert.equal(seen.syncPosts[0][0].status, 'ok');
+  });
+});
+
+test('persistent 500 retried to budget then recorded verbatim', async () => {
+  await withFetch({
+    raw: '## Task 1\n*Due: 2026-10-20*\n',
+    rows: [{ plan_file: 'a.md', section_key: 'Task 1', due: '2026-10-21' }],
+    githubPut: () => ({ ok: false, status: 500, text: async () => 'boom' }),
+  }, async (seen) => {
+    const res = mockRes();
+    await syncDueHandler(req({ plan_file: 'a.md', section_key: 'Task 1' }), res);
+    assert.equal(res.statusCode, 502);
+    assert.equal(seen.puts.length, 3, 'max 3 PUT attempts');
+    assert.equal(seen.syncPosts[0][0].status, 'error');
+    assert.equal(seen.syncPosts[0][0].last_error, 'github-write-500');
+  });
+});
+
+test('429 rate-limit retried then recorded ok', async () => {
+  await withFetch({
+    raw: '## Task 1\n*Due: 2026-10-20*\n',
+    rows: [{ plan_file: 'a.md', section_key: 'Task 1', due: '2026-10-21' }],
+    githubPut: (n) => n === 1
+      ? { ok: false, status: 429, text: async () => 'rate limited' }
+      : { ok: true, status: 200, json: async () => ({ commit: { sha: 'c8' }, content: { sha: 'f8' } }) },
+  }, async (seen) => {
+    const res = mockRes();
+    await syncDueHandler(req({ plan_file: 'a.md', section_key: 'Task 1' }), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.synced, true);
+    assert.equal(seen.puts.length, 2);
+  });
+});
+
+test('network throw on PUT retried then recorded ok', async () => {
+  let n = 0;
+  const real = globalThis.fetch;
+  const seen = { puts: [] };
+  globalThis.fetch = async (u, o = {}) => {
+    const s = String(u);
+    const method = (o.method || 'GET').toUpperCase();
+    if (s.startsWith('https://api.github.com') && method === 'PUT') {
+      n++;
+      seen.puts.push(n);
+      if (n === 1) throw new Error('socket hang up');
+      return { ok: true, status: 200, json: async () => ({ commit: { sha: 'c7' }, content: { sha: 'f7' } }) };
+    }
+    if (s.startsWith('https://api.github.com')) {
+      return { ok: true, status: 200, json: async () => ({ sha: 'sha0', content: b64('## Task 1\n*Due: 2026-10-20*\n') }) };
+    }
+    if (s.includes('/rest/v1/schedules?')) {
+      return { ok: true, status: 200, json: async () => [{ plan_file: 'a.md', section_key: 'Task 1', due: '2026-10-21' }] };
+    }
+    if (s.includes('/rest/v1/sync_state')) return { ok: true, status: 200, json: async () => [] };
+    if (s.includes('/rest/v1/schedule_events')) return { ok: true, status: 201, json: async () => [] };
+    throw new Error(`unexpected fetch: ${s}`);
+  };
+  try {
+    const res = mockRes();
+    await syncDueHandler(req({ plan_file: 'a.md', section_key: 'Task 1' }), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.synced, true);
+    assert.equal(seen.puts.length, 2, 'throw retried once');
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
+test('403 write recorded once, verbatim, never looped', async () => {
+  await withFetch({
+    raw: '## Task 1\n*Due: 2026-10-20*\n',
+    rows: [{ plan_file: 'a.md', section_key: 'Task 1', due: '2026-10-21' }],
+    githubPut: () => ({ ok: false, status: 403, text: async () => 'read-only token' }),
+  }, async (seen) => {
+    const res = mockRes();
+    await syncDueHandler(req({ plan_file: 'a.md', section_key: 'Task 1' }), res);
+    assert.equal(res.statusCode, 502);
+    assert.equal(res.body.error, 'github-write-403');
+    assert.equal(seen.puts.length, 1, 'permanent failure never retried');
+    assert.equal(seen.syncPosts.length, 1, 'recorded exactly once');
+    assert.equal(seen.syncPosts[0][0].status, 'error');
+    assert.equal(seen.syncPosts[0][0].last_error, 'github-write-403');
+  });
+});
+
+test('404 write recorded once, never looped', async () => {
+  await withFetch({
+    raw: '## Task 1\n*Due: 2026-10-20*\n',
+    rows: [{ plan_file: 'a.md', section_key: 'Task 1', due: '2026-10-21' }],
+    githubPut: () => ({ ok: false, status: 404, text: async () => 'not found' }),
+  }, async (seen) => {
+    const res = mockRes();
+    await syncDueHandler(req({ plan_file: 'a.md', section_key: 'Task 1' }), res);
+    assert.equal(res.statusCode, 502);
+    assert.equal(seen.puts.length, 1, 'permanent failure never retried');
+    assert.equal(seen.syncPosts[0][0].last_error, 'github-write-404');
+  });
+});

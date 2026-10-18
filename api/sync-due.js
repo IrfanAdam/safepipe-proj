@@ -42,9 +42,17 @@ const sbHeaders = (key) => ({
 const sb = (url) => `${String(url || '').replace(/\/$/, '')}/rest/v1`;
 const q2 = (f, k) => `plan_file=eq.${encodeURIComponent(f)}&section_key=eq.${encodeURIComponent(k)}`;
 
-// 3x exponential backoff note, driven by the attempts count:
-// 5s, 15s, 45s, … capped at 15min. Returned on persistent failure so the
-// caller knows when a retry is due.
+// Transient GitHub write faults get retried with backoff; anything else
+// (4xx incl. 403, needs-login shape) is permanent — recorded verbatim,
+// never looped. Max 3 PUT attempts total (the sha-race refetch+retry below
+// consumes attempts from the same budget).
+const isTransientWrite = (status) =>
+  status === 429 || (Number.isInteger(status) && status >= 500 && status <= 599);
+const writeRetryDelayMs = (done) =>
+  Math.min(2000, 500 * (2 ** Math.max(0, Number(done) - 1)));
+const sleepMs = (ms) => new Promise((res) => {
+  try { setTimeout(res, ms); } catch { try { res(); } catch {} }
+});
 const retryAfterMs = (attempts) =>
   Math.min(15 * 60 * 1000, 5000 * (3 ** Math.max(0, Number(attempts || 1) - 1)));
 
@@ -205,34 +213,56 @@ export async function syncDueHandler(req, res) {
       res.status(200).json({ synced: true, noop: true });
       return;
     }
-    let put;
-    try {
-      put = await putFile(cur.sha, edit.next);
-    } catch { await fail(502, 'github-write-failed'); return; }
+    let put = null;
+    let raced = false;
+    let lastWriteStatus = 0;
     let finalSha = cur.sha;
-    if (!put.ok && (put.status === 409 || put.status === 422)) {
-      // Sha race: refetch once, re-apply, retry once.
-      try {
-        cur = await getFile();
-      } catch { await fail(502, 'github-read-failed'); return; }
-      if (!cur.res.ok) { await fail(502, `github-read-${cur.res.status}`); return; }
-      edit = dueEditText(cur.raw, section_key, due);
-      if (!edit.found) {
-        const attempts = await markError('head-not-found');
-        res.status(200).json({ synced: false, reason: 'head-not-found', attempts });
-        return;
-      }
-      if (edit.next === edit.text) {
-        await putStateOk(cur.sha);
-        res.status(200).json({ synced: true, noop: true, converged: true });
-        return;
-      }
+    let puts = 0;
+    for (;;) {
+      if (puts >= 3) { await fail(502, `github-write-${lastWriteStatus || 'failed'}`); return; }
+      puts++;
       try {
         put = await putFile(cur.sha, edit.next);
-      } catch { await fail(502, 'github-write-failed'); return; }
-      finalSha = cur.sha;
+      } catch {
+        // Network throw: transient — backoff and retry while budget remains.
+        if (puts < 3) { await sleepMs(writeRetryDelayMs(puts)); continue; }
+        await fail(502, 'github-write-failed'); return;
+      }
+      if (put.ok) break;
+      lastWriteStatus = (put && Number.isInteger(put.status)) ? put.status : 0;
+      if ((lastWriteStatus === 409 || lastWriteStatus === 422) && !raced) {
+        // Sha race: refetch once, re-apply, retry once (no backoff — the
+        // file moved under us, waiting changes nothing).
+        raced = true;
+        try {
+          cur = await getFile();
+        } catch { await fail(502, 'github-read-failed'); return; }
+        if (!cur.res.ok) { await fail(502, `github-read-${cur.res.status}`); return; }
+        edit = dueEditText(cur.raw, section_key, due);
+        if (!edit.found) {
+          const attempts = await markError('head-not-found');
+          res.status(200).json({ synced: false, reason: 'head-not-found', attempts });
+          return;
+        }
+        if (edit.next === edit.text) {
+          await putStateOk(cur.sha);
+          res.status(200).json({ synced: true, noop: true, converged: true });
+          return;
+        }
+        finalSha = cur.sha;
+        continue;
+      }
+      if (!isTransientWrite(lastWriteStatus)) {
+        // Permanent (4xx incl. 403, needs-login shape): record the verbatim
+        // reason immediately and never loop.
+        await fail(502, `github-write-${lastWriteStatus}`);
+        return;
+      }
+      if (puts < 3) { await sleepMs(writeRetryDelayMs(puts)); continue; }
+      await fail(502, `github-write-${lastWriteStatus}`);
+      return;
     }
-    if (!put.ok) { await fail(502, `github-write-${put.status}`); return; }
+    if (!put.ok) { await fail(502, `github-write-${lastWriteStatus || 'failed'}`); return; }
 
     // 4. Record success: sync_state + history event.
     const done = await readJson(put);

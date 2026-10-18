@@ -6,7 +6,134 @@ import { saveDueOverride, saveDueConfirm, saveDuePending, confirmPublish, headin
 import { dueOf } from './changelog-parse.js';
 import { getSchedToken, clearSchedToken, clearSchedUser } from '../logic/schedule-auth.js';
 import { openScheduleGate } from './schedule-gate.js';
-import { showDueProgress, setDueProgressStep, hideDueProgress } from './due-progress.js';
+import { showDueProgress, setDueProgressStep, hideDueProgress, isSyncWatchActive } from './due-progress.js';
+import { fetchSchedules } from './supabase-schedule.js';
+// Eventual git sync (reconciliation trigger): the pick-time fire-and-forget
+// POST /api/sync-due dies with a closed tab, so on boot and every foreground
+// refetch each Supabase schedule row whose sync_state is missing or errored
+// is silently re-fired. Logged-out readers never fire (no token), rows
+// already ok/unchanged never refire, sections the toast's sync watch is
+// already polling are skipped, and the toast is never touched (no progress
+// UI for background heals — silent by construction).
+export function staleSyncTargets(scheduleRows, syncRows) {
+  const byKey = new Map();
+  try {
+    for (const r of syncRows || []) {
+      if (!r || typeof r !== 'object') continue;
+      const f = typeof r.plan_file === 'string' ? r.plan_file : '';
+      const k = typeof r.section_key === 'string' ? r.section_key : '';
+      if (!f || !k) continue;
+      byKey.set(`${f}\0${k}`, r);
+    }
+  } catch { return []; }
+  const out = [];
+  try {
+    for (const s of scheduleRows || []) {
+      if (!s || typeof s !== 'object') continue;
+      const f = typeof s.plan_file === 'string' ? s.plan_file : '';
+      const k = typeof s.section_key === 'string' ? s.section_key : '';
+      if (!f || !k) continue;
+      const row = byKey.get(`${f}\0${k}`);
+      if (!row) { out.push(s); continue; }
+      if (row.status === 'error') out.push(s);
+    }
+  } catch {}
+  return out;
+}
+// Sections a heal fire is already covering (fire-and-forget: no settle to
+// await, so the entry clears when the POST settles and the next heal pass
+// re-checks sync_state for the verdict).
+const healInFlight = new Set();
+let reconcileWired = false;
+// Silent reconciliation pass. Never throws, never touches progress UI.
+// opts (all optional, for node probes): token, schedules (Map or array),
+// syncByFile ({ [file]: syncRows }), fetchImpl, isWatched(row) → boolean.
+export async function reconcileDueSync(opts = {}) {
+  const o = opts && typeof opts === 'object' ? opts : {};
+  try {
+    let token = null;
+    if (Object.prototype.hasOwnProperty.call(o, 'token')) {
+      token = typeof o.token === 'string' && o.token ? o.token : null;
+    } else {
+      try { token = getSchedToken(); } catch { token = null; }
+    }
+    if (!token) return { checked: 0, healed: 0, skipped: 'logged-out' };
+    const fetchImpl = typeof o.fetchImpl === 'function'
+      ? o.fetchImpl
+      : (typeof fetch === 'function' ? fetch : null);
+    if (!fetchImpl) return { checked: 0, healed: 0, skipped: 'no-fetch' };
+    let sched = Object.prototype.hasOwnProperty.call(o, 'schedules') ? o.schedules : null;
+    if (sched == null) {
+      try { sched = await fetchSchedules(); } catch { sched = null; }
+    }
+    if (!sched) return { checked: 0, healed: 0, skipped: 'no-schedules' };
+    const rows = [];
+    try {
+      if (sched instanceof Map) for (const r of sched.values()) rows.push(r);
+      else if (Array.isArray(sched)) for (const r of sched) rows.push(r);
+    } catch {}
+    const byFile = new Map();
+    for (const r of rows) {
+      if (!r || typeof r.plan_file !== 'string' || !r.plan_file) continue;
+      if (typeof r.section_key !== 'string' || !r.section_key) continue;
+      if (!byFile.has(r.plan_file)) byFile.set(r.plan_file, []);
+      byFile.get(r.plan_file).push(r);
+    }
+    if (!byFile.size) return { checked: 0, healed: 0, skipped: 'empty' };
+    const customWatched = typeof o.isWatched === 'function' ? o.isWatched : null;
+    const isBusy = (t) => {
+      if (customWatched) {
+        try { if (customWatched(t)) return true; } catch {}
+      }
+      try { if (isSyncWatchActive(t.plan_file, t.section_key)) return true; } catch {}
+      return false;
+    };
+    let checked = 0, healed = 0, skippedWatch = 0;
+    for (const [file, list] of byFile) {
+      let syncRows;
+      if (o.syncByFile && typeof o.syncByFile === 'object'
+        && Object.prototype.hasOwnProperty.call(o.syncByFile, file)) {
+        syncRows = o.syncByFile[file];
+      } else {
+        try {
+          const r = await fetchImpl(`/api/schedule?sync=${encodeURIComponent(file)}`, { cache: 'no-store' });
+          if (!r || !r.ok) continue;
+          const j = await r.json().catch(() => null);
+          syncRows = Array.isArray(j) ? j : [];
+        } catch { continue; }
+      }
+      const targets = staleSyncTargets(list, syncRows);
+      checked += list.length;
+      for (const t of targets) {
+        const hk = `${t.plan_file}\0${t.section_key}`;
+        let busy = false;
+        try { busy = healInFlight.has(hk) || isBusy(t); } catch { busy = false; }
+        if (busy) { skippedWatch++; continue; }
+        healInFlight.add(hk);
+        try {
+          const p = fetchImpl('/api/sync-due', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan_file: t.plan_file, section_key: t.section_key, token }),
+          });
+          healed++;
+          if (p && typeof p.then === 'function') {
+            try {
+              const done = () => { try { healInFlight.delete(hk); } catch {} };
+              const q = p.then(done, done);
+              if (q && typeof q.catch === 'function') q.catch(() => {});
+            } catch { try { healInFlight.delete(hk); } catch {} }
+          } else {
+            try { healInFlight.delete(hk); } catch {}
+          }
+        } catch { try { healInFlight.delete(hk); } catch {} }
+      }
+    }
+    return { checked, healed, skippedWatch };
+  } catch {
+    return { checked: 0, healed: 0, skipped: 'failed' };
+  }
+}
 // Due scheduling (task 3): pure file-text edit — insert/replace/clear the
 // single `*Due: YYYY-MM-DD*` line under the owning head, idempotently (first
 // Due-shaped line wins, extras removed, never duplicated). Head matching is
@@ -64,6 +191,35 @@ export function duePreviewEdit(body, head, due) {
 }
 export function bindChangelogEvents(root, st, helpers) {
   const { cur, doPaint } = helpers;
+  // Eventual-sync reconciliation: one silent heal pass on boot, plus heals
+  // on every foreground refetch (focus / visibility / online — the same
+  // hooks the live refresh uses, never a timer loop). Logged-out readers
+  // never fire; the toast is never touched.
+  try {
+    const boot = reconcileDueSync();
+    if (boot && typeof boot.catch === 'function') boot.catch(() => {});
+  } catch {}
+  try {
+    if (!reconcileWired && typeof window !== 'undefined'
+      && typeof window.addEventListener === 'function') {
+      reconcileWired = true;
+      const heal = () => {
+        try {
+          const p = reconcileDueSync();
+          if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch {}
+      };
+      try { window.addEventListener('focus', heal); } catch {}
+      try {
+        if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+          document.addEventListener('visibilitychange', () => {
+            try { if (!document.hidden) heal(); } catch {}
+          });
+        }
+      } catch {}
+      try { window.addEventListener('online', heal); } catch {}
+    }
+  } catch {}
   // Mobile 2-level drawer nav (mirrors pages-changelog.js isMobile — defined
   // locally to avoid a circular import; the 720px breakpoint is shared).
   const isMobile = () => {
@@ -508,7 +664,7 @@ export function bindChangelogEvents(root, st, helpers) {
             fetch('/api/sync-due', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ file: plan.file, section_key: sk, token }),
+              body: JSON.stringify({ plan_file: plan.file, section_key: sk, token }),
             }).catch(() => {});
           }
         } catch {}

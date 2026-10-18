@@ -111,8 +111,12 @@ body:not(.is-sched-auth) .ds-due-static{display:inline}
 body:not(.is-sched-auth) .ds-due:not(:has(.ds-due-static)){display:none}
 .ds-due-overdue{color:var(--color-accent);font-weight:700;text-transform:uppercase;letter-spacing:var(--tracking-label)}
 /* Due commit state (scheduling pipeline): quiet status after the date.
-   Warn/err render as buttons — tap retries the git commit or re-login. */
-.ds-due-status{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
+   Warn/err render as buttons — tap retries the git commit or re-login.
+   The slot is ALWAYS rendered (idle placeholder when empty) and held at a
+   stable min-height via visibility — never display:none — so commit state
+   appearing, clearing, or swapping text never changes the row's height. */
+.ds-due-status{display:inline-flex;align-items:center;min-height:var(--cl-16);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
+.ds-due-status.is-idle{visibility:hidden}
 button.ds-due-status{background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:var(--cl-2)}
 .ds-due-status.is-warn,.ds-due-status.is-err{color:var(--color-accent);font-weight:700}
 .ds-due-status.is-ok{color:var(--color-ink);font-weight:700}

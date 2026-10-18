@@ -45,6 +45,16 @@ const TRACK_LABELS = { saved: 'Saved', syncing: 'Syncing', synced: 'Synced' };
 const SYNC_TTL_MS = 10 * 60 * 1000;
 const syncRegs = new Map();
 const syncSeqs = new Map();
+// Active-watch index keyed by file + section_key (the same key background
+// heal reconciliation uses): lets a silent heal skip a section the toast's
+// watch is already polling, so a heal never double-fires a live watch.
+// Added in startSyncWatch, removed when the poll settles or bails — never
+// read for UI, never painted.
+const syncActive = new Set();
+const syncActiveKey = (file, sectionKey) => `${String(file)}::${String(sectionKey)}`;
+export function isSyncWatchActive(file, sectionKey) {
+  try { return syncActive.has(syncActiveKey(file, sectionKey)); } catch { return false; }
+}
 const syncKeyOf = (detail) => {
   const f = detail && detail.file != null ? String(detail.file) : '';
   const h = detail && detail.head != null ? String(detail.head) : '';
@@ -187,7 +197,7 @@ function parkCard(card, step) {
 
 // Sync watch: after the Supabase write lands, poll the sync_state row for
 // our section_key until it reads ok (Synced) or error (Retry), bounded ~30s.
-// The fire-and-forget POST /api/sync-due sends { file, section_key, token },
+// The fire-and-forget POST /api/sync-due sends { plan_file, section_key, token },
 // and rows are readable via GET /api/schedule?sync=<file> — no token here,
 // no auth handling (the 401-only login rule lives in changelog-events; this
 // poll never touches the session).
@@ -210,6 +220,7 @@ function startSyncWatch(detail, opts) {
   try {
     syncRegs.set(key, { state: 'syncing', due: detail.due ?? null, cause: null, at: Date.now() });
   } catch {}
+  try { syncActive.add(syncActiveKey(detail.file, sectionKey)); } catch {}
   try {
     const card = cardEl();
     if (card && card.dataset.progKey === pickKey(detail)) {
@@ -220,7 +231,10 @@ function startSyncWatch(detail, opts) {
   } catch {}
   // Non-browser runtimes (node probes) paint only — no same-origin API, no
   // network. Browser-only work stays out of unit tests by construction.
-  if (typeof window === 'undefined' || typeof fetch !== 'function') return;
+  if (typeof window === 'undefined' || typeof fetch !== 'function') {
+    try { syncActive.delete(syncActiveKey(detail.file, sectionKey)); } catch {}
+    return;
+  }
   pollDueSync(detail, key, seq, sectionKey);
 }
 
@@ -241,10 +255,12 @@ async function pollDueSync(detail, key, seq, sectionKey) {
     ? sectionKey
     : normHead(detail.head || '');
   const url = `/api/schedule?sync=${encodeURIComponent(file)}`;
+  const activeKey = syncActiveKey(file, matchKey);
   const deadline = Date.now() + SYNC_POLL_BUDGET_MS;
   let sawResponse = false;
   let sawNetworkError = false;
   let lastHttp = 0;
+  try {
   for (;;) {
     try { if ((syncSeqs.get(key) || 0) !== seq) return; } catch { return; }
     try {
@@ -288,6 +304,11 @@ async function pollDueSync(detail, key, seq, sectionKey) {
   if (!sawResponse && sawNetworkError) settleSyncErr(detail, key, seq, 'offline', 'no poll response (offline)');
   else if (lastHttp) settleSyncErr(detail, key, seq, `http ${lastHttp}`, `sync poll http ${lastHttp}`);
   else settleSyncErr(detail, key, seq, 'timeout', 'sync unsettled after ~30s');
+  } finally {
+    // The watch is over (settled, superseded, or bailed) — background heals
+    // may fire for this section again.
+    try { syncActive.delete(activeKey); } catch {}
+  }
 }
 
 function settleSyncOk(detail, key, seq) {

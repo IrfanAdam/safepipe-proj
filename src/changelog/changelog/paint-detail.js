@@ -314,8 +314,12 @@ export function paintDetail(root, ctx){
       && plan && sprint && pend.file === plan.file && pend.head === sprint.head
       && (() => { try { return pend.due === (dueOf(sec) || null); } catch { return false; } })();
   } catch { pendRow = false; }
+  // Idle status slot: always rendered so the due row keeps a stable height
+  // whether the commit state appears, clears, or swaps text. CSS holds it
+  // at min-height via visibility — never display:none, never absent.
+  const dueStatusIdle = `<span class="ds-due-status is-idle" data-due-status="idle" aria-hidden="true"></span>`;
   const dueStatusHTML = syncCause ? dueSyncRetryHTML(syncCause)
-    : !dc || secShipped ? '' : dc === 'saving'
+    : !dc || secShipped ? dueStatusIdle : dc === 'saving'
     ? `<span class="ds-due-status" data-due-status="saving">Saving…</span>`
     : dc === 'saved'
       ? `<span class="ds-due-status is-ok${pendRow ? ' is-pend' : ''}" data-due-status="saved">Saved ✓${pendRow ? ' · syncing…' : ''}</span>`
@@ -323,7 +327,7 @@ export function paintDetail(root, ctx){
         ? `<button class="ds-due-status is-warn" data-due-retry="login">only on this device — sign in again</button>`
         : (dc === 'failed' || dc === 'retry')
           ? dueSyncRetryHTML(dr || 'error')
-          : '';
+          : dueStatusIdle;
   const dueHTML = secShipped
     ? ''
     : [
@@ -355,8 +359,11 @@ export function paintDetail(root, ctx){
     (mobile && open && mlevel === 2) ? '<button data-mback data-mlevel="2" aria-label="Back to phases">‹ Phases</button>' : '',
     tagsHead,
     `<button data-close aria-label="Close detail">✕</button></div>`,
-    // Due row sits directly under the section title: split the head line
-    // off before parsing. Bodies with no head keep the old order.
+    // Due row sits directly under the section title on EVERY paint: it is
+    // always the first flow element INSIDE .ds-md — after the parsed head
+    // when one matches, else before the parsed body. Never outside .ds-md
+    // on one paint and inside on the next (layout jump). Both branches
+    // render identical content; only the head split differs.
     (() => {
       const markOpts = {
         phaseDone: isDone(state(sprint.body)),
@@ -365,7 +372,7 @@ export function paintDetail(root, ctx){
       const revsHTML = paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN })
         + (hs.length ? badges(hs) : '');
       const hm = String(bodySansGates || '').match(/^(#{1,4}\s+[^\n]+)\n([\s\S]*)$/);
-      if (!hm) return [dueHTML, `<div class="ds-md">`, marked.parse(bodySansGates, markOpts) + revsHTML, `</div>`].join('');
+      if (!hm) return [`<div class="ds-md">`, dueHTML + marked.parse(bodySansGates, markOpts) + revsHTML, `</div>`].join('');
       return [`<div class="ds-md">`, marked.parse(hm[1], markOpts) + dueHTML + marked.parse(hm[2], markOpts) + revsHTML, `</div>`].join('');
     })(),
   ].join('');
