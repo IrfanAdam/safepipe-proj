@@ -5234,5 +5234,40 @@
     }
    ]
   }
+ ],
+ "2026-10-18_172008-supabase-scheduling-migration.md": [
+  {
+   "sha": null,
+   "date": "2026-10-18",
+   "time": "19:17",
+   "hash": "599b5c36",
+   "sections": [
+    {
+     "head": "Phase 1 — Foundation: schema, access, inventory {#phase-1}",
+     "hash": "7855f682",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 2 — Write path: owner-checked Supabase upsert {#phase-2}",
+     "hash": "aed89cad",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 3 — Read + Realtime: live overlay, no reload {#phase-3}",
+     "hash": "d1b67784",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 4 — Sync worker: Supabase → GitHub without deploys {#phase-4}",
+     "hash": "bf043431",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 5 — Cutover: backfill, flip, retire {#phase-5}",
+     "hash": "88f54366",
+     "state": "0/3"
+    }
+   ]
+  }
  ]
 }
