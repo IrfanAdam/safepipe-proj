@@ -20,6 +20,13 @@ export const DUE_PROGRESS_COMMIT_STEPS = ['publishing', 'committed'];
 export const DUE_PROGRESS_DEPLOY_STEPS = ['deploying', 'live'];
 // Back-compat union (ordered by lifecycle) for any legacy readers.
 export const DUE_PROGRESS_STEPS = [...DUE_PROGRESS_COMMIT_STEPS, ...DUE_PROGRESS_DEPLOY_STEPS];
+// Sync-path vocabulary (Task 12, Supabase scheduling migration): the fast
+// Supabase write needs no narration, so `saving` is silent (no card) and the
+// toast only confirms `saved` or yields to the inline Retry (`retry` parks
+// the card — paint-detail owns the Retry button). No deploy slot: sync
+// commits carry [skip ci], so there is nothing to await after the save.
+export const DUE_PROGRESS_SYNC_STEPS = ['saving', 'saved', 'retry'];
+const SYNC_STEPS = { saving: true, saved: true, retry: true };
 
 const doc = () => (typeof document !== 'undefined' ? document : null);
 
@@ -61,6 +68,24 @@ function setDeployVisible(card, visible) {
 }
 
 function paintStep(card, step) {
+  if (step === 'saving') {
+    // Silent save: the painted date IS the UI — keep the card parked.
+    try { card.hidden = true; card.dataset.progStep = step; } catch {}
+    return;
+  }
+  if (step === 'saved') {
+    // Brief confirmation with no deploy slot (sync skips deploys) — the
+    // caller hides the card after its own beat.
+    paintRow(card, 'commit', 'committed');
+    setDeployVisible(card, false);
+    try { card.hidden = false; card.dataset.progStep = step; } catch {}
+    return;
+  }
+  if (step === 'retry') {
+    // Inline Retry in the detail owns recovery — park the toast.
+    try { card.hidden = true; card.dataset.progStep = step; } catch {}
+    return;
+  }
   if (step === 'publishing' || step === 'committed') {
     paintRow(card, 'commit', step);
     if (step === 'committed') {
@@ -120,9 +145,10 @@ function buildRow(d, scope) {
   return row;
 }
 
-export function showDueProgress(detail) {
+export function showDueProgress(detail, opts) {
   const d = doc();
   if (!d || !d.body) return null;
+  const silent = !!(opts && opts.silent);
   let card = cardEl();
   if (!card) {
     card = d.createElement('div');
@@ -138,8 +164,9 @@ export function showDueProgress(detail) {
   }
   try {
     card.dataset.progKey = pickKey(detail);
-    card.hidden = false;
-    paintStep(card, 'publishing');
+    card.hidden = silent ? true : false;
+    if (!silent) paintStep(card, 'publishing');
+    else { try { card.dataset.progStep = 'saving'; } catch {} }
   } catch {}
   return card;
 }
@@ -147,9 +174,14 @@ export function showDueProgress(detail) {
 export function setDueProgressStep(detail, step) {
   try {
     const card = cardEl();
-    if (!card || card.hidden) return;
+    if (!card) return;
     if (card.dataset.progKey !== pickKey(detail)) return;
-    if (!COMMIT_LABELS[step] && !DEPLOY_LABELS[step]) return;
+    if (!COMMIT_LABELS[step] && !DEPLOY_LABELS[step] && !SYNC_STEPS[step]) return;
+    // A parked card stays parked — except the sync confirm: `saved` may
+    // reveal a card parked in silent `saving` (the only in-flight state).
+    // Anything else (including a duplicate `saved` after dismissal) is
+    // ignored so a stale step never resurrects a dismissed card.
+    if (card.hidden && !(step === 'saved' && card.dataset.progStep === 'saving')) return;
     paintStep(card, step);
   } catch {}
 }

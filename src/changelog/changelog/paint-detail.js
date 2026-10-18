@@ -259,10 +259,14 @@ export function paintDetail(root, ctx){
   // Schedule trigger: accent text (or 'Schedule when?') opening the themed
   // month popup. No native date input, no hint line, never a Due n/a.
   // Commit state for this section's pick (set by applyDue/commitDue):
-  // saving → saved (auto-dismissed) | needs-login | failed. Null shows
-  // nothing. The status is inline and never blocks — the painted date IS
-  // the UI; this only answers "did it publish?". Mismatched file/head
-  // never renders another section's status.
+  // saving → saved (auto-dismissed) | needs-login | failed | retry. Null
+  // shows nothing. The status is inline and never blocks — the painted date
+  // IS the UI; this only answers "did it publish?". Mismatched file/head
+  // never renders another section's status. `retry` is the sync-path alias
+  // of `failed` (Task 12): same inline Retry with the terse cause, full body
+  // to console.error only (commitDue), never a popup, login cleared on 401
+  // only. Failure causes stay terse: timeout / offline / http <status> /
+  // unchanged / head-not-found.
   // Freeze remainder: while a deploy claim for this section is fresh
   // (commit landed, redeploy still carrying it everywhere), the saved row
   // keeps a pending state — "published ✓ · updating…" — until the deploy
@@ -286,7 +290,9 @@ export function paintDetail(root, ctx){
       ? `<span class="ds-due-status is-ok${pendRow ? ' is-pend' : ''}" data-due-status="saved">published ✓${pendRow ? ' · updating…' : ''}</span>`
       : dc === 'needs-login'
         ? `<button class="ds-due-status is-warn" data-due-retry="login">only on this device — sign in again to publish</button>`
-        : `<button class="ds-due-status is-err" data-due-retry="commit">couldn't publish${dr ? ` (${dr})` : ''} — tap to retry</button>`;
+        : (dc === 'failed' || dc === 'retry')
+          ? `<button class="ds-due-status is-err" data-due-retry="commit">couldn't publish${dr ? ` (${dr})` : ''} — tap to retry</button>`
+          : '';
   const dueHTML = secShipped
     ? ''
     : [

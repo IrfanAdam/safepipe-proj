@@ -95,7 +95,49 @@ export default async function handler(req, res) {
   }
 }
 
+// Task 12: read-only sync-state probe for debugging.
+// GET /api/schedule?sync=<file> returns the sync_state rows for that plan
+// file (one per section_key) via the server service_role key. No token
+// required: rows carry only status fields (no secrets), and the response is
+// field-allowlisted so future columns can never leak keys.
+const SYNC_ROW_FIELDS = 'plan_file,section_key,last_synced_due,status,attempts,last_error,github_sha,updated_at';
+const pickSyncRow = (r) => ({
+  plan_file: r.plan_file ?? null,
+  section_key: r.section_key ?? null,
+  last_synced_due: r.last_synced_due ?? null,
+  status: r.status ?? null,
+  attempts: r.attempts ?? 0,
+  last_error: r.last_error ?? null,
+  github_sha: r.github_sha ?? null,
+  updated_at: r.updated_at ?? null,
+});
+
+export async function scheduleSyncStatus(req, res) {
+  const file = req.query ? req.query.sync : undefined;
+  if (typeof file !== 'string' || !/^[\w][\w\-. ]*\.md$/.test(file) || file.includes('..')) {
+    res.status(400).send('Invalid file');
+    return;
+  }
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) { res.status(500).send('Scheduling backend unavailable'); return; }
+  try {
+    const base = `${String(url).replace(/\/$/, '')}/rest/v1`;
+    const r = await fetch(
+      `${base}/sync_state?plan_file=eq.${encodeURIComponent(file)}&select=${SYNC_ROW_FIELDS}`,
+      { headers: sbHeaders(key) },
+    );
+    if (!r.ok) { res.status(502).send('Sync state unavailable'); return; }
+    const rows = await r.json().catch(() => null);
+    const list = Array.isArray(rows) ? rows.map(pickSyncRow) : [];
+    res.status(200).json(list);
+  } catch {
+    res.status(502).send('Sync state unavailable');
+  }
+}
+
 export async function scheduleHandler(req, res) {
+  if (req.method === 'GET') { await scheduleSyncStatus(req, res); return; }
   if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
   const v = validateScheduleBody(req.body || {});
   if (!v.ok) { res.status(400).send(v.error); return; }
