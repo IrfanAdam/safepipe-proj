@@ -30,6 +30,9 @@ function withFetch(stubs, fn) {
     const s = String(u);
     const method = (o.method || 'GET').toUpperCase();
     if (s.startsWith('https://api.github.com')) {
+      if (s === 'https://api.github.com/user') {
+        return { ok: stubs.userOk === false ? false : true, status: stubs.userOk === false ? 401 : 200, json: async () => ({ login: stubs.userLogin || 'owner' }) };
+      }
       if (method === 'PUT') {
         seen.puts.push(JSON.parse(o.body));
         return stubs.githubPut
@@ -127,6 +130,33 @@ test('success PUTs with [skip ci] and records state + event', async () => {
     const ev = seen.eventPosts[0][0];
     assert.equal(ev.source, 'sync');
     assert.equal(ev.commit_sha, 'c1');
+  });
+});
+
+test('owner token auth syncs without webhook secret', async () => {
+  await withFetch({
+    raw: '## Task 1\n*Due: 2026-10-20*\n',
+    rows: [{ plan_file: 'a.md', section_key: 'Task 1', due: '2026-10-21' }],
+  }, async (seen) => {
+    const res = mockRes();
+    await syncDueHandler({ method: 'POST', body: { plan_file: 'a.md', section_key: 'Task 1', token: 'user-oauth' }, headers: {} }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.synced, true);
+    assert.equal(seen.puts.length, 1);
+    assert.ok(seen.puts[0].message.includes('[skip ci]'));
+  });
+});
+
+test('wrong-login token rejected even with valid shape', async () => {
+  await withFetch({
+    raw: '## Task 1\n*Due: 2026-10-20*\n',
+    rows: [{ plan_file: 'a.md', section_key: 'Task 1', due: '2026-10-21' }],
+    userLogin: 'someone-else',
+  }, async (seen) => {
+    const res = mockRes();
+    await syncDueHandler({ method: 'POST', body: { plan_file: 'a.md', section_key: 'Task 1', token: 'user-oauth' }, headers: {} }, res);
+    assert.equal(res.statusCode, 401);
+    assert.equal(seen.puts.length, 0);
   });
 });
 

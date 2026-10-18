@@ -1,8 +1,12 @@
 // safepipe — Supabase → GitHub Due sync worker (Vercel serverless).
 // Phase 4 of the Supabase scheduling migration:
 // [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-4]
-// Supabase DB webhook on `schedules` insert/update → POST /api/sync-due
-// with the shared webhook secret. The server reads the live row via the
+// Writer-driven sync (pivot 2026-10-18 — Supabase-issued tokens here are
+// read-scoped, so no DB trigger/webhook could be installed from outside):
+// the changelog UI fires POST /api/sync-due right after a confirmed
+// /api/schedule write, authenticating with the writer's owner OAuth token.
+// The Supabase DB-webhook path (x-webhook-secret) is kept as a second
+// door for later — whichever proves identity wins.
 // service_role key, applies dueEditText (imported from api/due.js — never
 // reimplemented; section_key is already normHead(head)) to the GitHub plan
 // file with the server PAT DUE_SYNC_TOKEN, and records the outcome in
@@ -58,12 +62,23 @@ export async function syncDueHandler(req, res) {
   if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
   const secret = req.headers ? req.headers['x-webhook-secret'] : undefined;
   const expected = process.env.SUPABASE_WEBHOOK_SECRET;
-  if (!expected) { res.status(500).send('Webhook not configured'); return; }
-  if (typeof secret !== 'string' || secret !== expected) {
-    res.status(401).send('Bad webhook secret');
-    return;
+  const { plan_file, section_key, token: caller } = req.body || {};
+  // Door 1: Supabase DB-webhook shared secret (for the trigger, if ever installed).
+  let authed = typeof secret === 'string' && !!expected && secret === expected;
+  // Door 2: writer-driven sync — the caller's owner OAuth token, verified
+  // against GitHub identity exactly like api/schedule.js and api/due.js.
+  if (!authed && typeof caller === 'string' && caller) {
+    const owner = process.env.VERCEL_GIT_REPO_OWNER;
+    if (!owner) { res.status(500).send('Repo context unavailable'); return; }
+    try {
+      const me = await gh(caller, '/user');
+      if (me.ok) {
+        const who = await me.json().catch(() => null);
+        authed = !!(who && who.login && who.login === owner);
+      }
+    } catch {}
   }
-  const { plan_file, section_key } = req.body || {};
+  if (!authed) { res.status(401).send('Unauthorized'); return; }
   if (typeof plan_file !== 'string' || !FILE_RE.test(plan_file) || plan_file.includes('..')) {
     res.status(400).send('Invalid file');
     return;

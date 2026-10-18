@@ -493,6 +493,19 @@ export function bindChangelogEvents(root, st, helpers) {
         } catch {}
         // 'published ✓' only after the painted date reads back equal.
         confirmSaved(liveMod);
+        // Writer-driven GitHub sync (pivot — no DB trigger needed): best
+        // effort, never disturbs the saved UI. Failures land in sync_state
+        // and surface via GET /api/schedule?sync=.
+        try {
+          const sk = await r2.clone().json().then((j) => (j && j.section_key) || null).catch(() => null);
+          if (sk && typeof fetch === 'function') {
+            fetch('/api/sync-due', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ file: plan.file, section_key: sk, token }),
+            }).catch(() => {});
+          }
+        } catch {}
         return;
       }
       if (r2 && !r2.ok && r2.status !== 401 && r2.status !== 403) {
