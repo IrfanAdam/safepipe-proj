@@ -138,8 +138,7 @@ import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../ch
 import { isDone, state, parseGates, dueOf, fmtDate, gateNOf } from '../changelog-parse.js';
 import { esc } from './esc.js';
 import { paintRevs } from './paint-revs.js';
-import { readDuePending, dueDeployVerdict } from '../../logic/due-overrides.js';
-import { dueSyncStatus, clearDueSync, dueSyncRetryHTML } from '../due-progress.js';
+import { dueSyncRetryHTML } from '../due-progress.js';
 // Gate verdict (Task 12, owner refinement): the phase's own REF GATE verdict
 // as plain text appended to the below-title status line — same checkmark
 // treatment as DONE, reusing .ds-status styling (no span, no new colors).
@@ -278,51 +277,17 @@ export function paintDetail(root, ctx){
     && dueCommit.file === plan.file && dueCommit.head === sprint.head ? dueCommit.state : '';
   const dr = dueCommit && plan && sprint
     && dueCommit.file === plan.file && dueCommit.head === sprint.head ? (dueCommit.reason || '') : '';
-  // Sync-watch handoff (Supabase migration): the toast's watch parks itself
-  // on sync error/timeout and records the verdict in due-progress's
-  // registry. When this section's save already landed (or its commit state
-  // cleared) but the registry holds an error for the painted date, the
-  // existing inline Retry takes over with the terse cause — same button and
-  // handler as a failed write, never a popup, login cleared on 401 only
-  // (that rule lives in changelog-events, untouched here). A newer
-  // authoritative state (saving/failed/needs-login) supersedes the watch.
-  let syncCause = null;
-  try {
-    if (!secShipped && plan && sprint && plan.file && sprint.head) {
-      const sec = { file: plan.file, head: sprint.head };
-      if (dc === 'failed' || dc === 'needs-login') {
-        try { clearDueSync(sec); } catch {}
-      } else if (dc === 'saving') {
-        // Supersede guard: a new pick drops the previous watch's verdict —
-        // but NOT while its own watch is already syncing this exact date
-        // (the success-path repaint between commit and confirmSaved must not
-        // kill the just-started watch). Due-equality tells them apart.
-        try {
-          const s = dueSyncStatus(sec);
-          if (!s || (s.due ?? null) !== (secDue ?? null)) clearDueSync(sec);
-        } catch {}
-      } else if (dc === 'saved' || !dc) {
-        const s = dueSyncStatus(sec);
-        if (s && s.state === 'error' && (s.due ?? null) === (secDue ?? null)) syncCause = s.cause || 'error';
-      }
-    }
-  } catch { syncCause = null; }
-  let pendRow = false;
-  try {
-    const pend = readDuePending();
-    pendRow = !!pend && dueDeployVerdict(pend, Date.now()) === 'pending'
-      && plan && sprint && pend.file === plan.file && pend.head === sprint.head
-      && (() => { try { return pend.due === (dueOf({ head: sprint.head, body: sprint.body }) || null); } catch { return false; } })();
-  } catch { pendRow = false; }
+  // Git sync never surfaces in the UI (Supabase is the source of truth; the
+  // background worker carries the file to git silently). The row shows only
+  // the save itself: saving → saved. No syncing state, no retry, no error.
   // Idle status slot: always rendered so the due row keeps a stable height
   // whether the commit state appears, clears, or swaps text. CSS holds it
   // at min-height via visibility — never display:none, never absent.
   const dueStatusIdle = `<span class="ds-due-status is-idle" data-due-status="idle" aria-hidden="true"></span>`;
-  const dueStatusHTML = syncCause ? dueSyncRetryHTML(syncCause)
-    : !dc || secShipped ? dueStatusIdle : dc === 'saving'
+  const dueStatusHTML = !dc || secShipped ? dueStatusIdle : dc === 'saving'
     ? `<span class="ds-due-status" data-due-status="saving">Saving…</span>`
     : dc === 'saved'
-      ? `<span class="ds-due-status is-ok${pendRow ? ' is-pend' : ''}" data-due-status="saved">Saved ✓${pendRow ? ' · syncing…' : ''}</span>`
+      ? `<span class="ds-due-status is-ok" data-due-status="saved">Saved ✓</span>`
       : dc === 'needs-login'
         ? `<button class="ds-due-status is-warn" data-due-retry="login" title="only on this device — sign in again">only on this device — sign in again</button>`
         : (dc === 'failed' || dc === 'retry')

@@ -435,9 +435,16 @@ export function setDueProgressStep(detail, step, opts) {
     if (!card) return;
     if (card.dataset.progKey !== pickKey(detail)) return;
     if (!KNOWN_STEPS[step]) return;
-    // Legacy success-path signal: the Supabase write landed — begin the sync
-    // watch (paints Saved → Syncing). The deploy slot is gone.
-    if (step === 'committed') { startSyncWatch(detail, opts); return; }
+    // Supabase is the source of truth: the write landed, the save is final.
+    // Git sync continues silently in the background (fire-and-forget POST in
+    // changelog-events) and never surfaces in the UI — no Syncing state, no
+    // retry, no error. The full track lands done and dismisses.
+    if (step === 'committed') {
+      paintTrack(card, 'synced');
+      try { card.hidden = false; card.dataset.progStep = 'synced'; } catch {}
+      try { hideDueProgress(detail, 1200); } catch {}
+      return;
+    }
     // Deploy narrative dropped: sync commits carry [skip ci], so there is
     // nothing to await. A live deploy flip never drives the toast.
     if (step === 'deploying') return;
