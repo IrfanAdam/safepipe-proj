@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-18T15:39:23.138Z",
+  "generated": "2026-10-18T16:01:01.896Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -19,6 +19,15 @@
     "2026-10-18_172008-supabase-scheduling-migration.md"
   ],
   "commits": [
+    {
+      "sha": "b7a02c0",
+      "full": "b7a02c0e6951cb7a1ff1c433614c900dfd84b6f2",
+      "date": "2026-10-18",
+      "time": "21:09",
+      "subject": "fix(schedule): DOM-read verdict + mismatch self-heal, single-line due row [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-5"
+    },
     {
       "sha": "310a934",
       "full": "310a93461507b2f64abe7f537e5b87da22ea751b",
@@ -4503,9 +4512,8 @@
     }
   ],
   "wip": [
-    "src/changelog/changelog-drawer.css",
     "src/changelog/changelog-events.js",
     "src/changelog/changelog/paint-detail.js",
-    "src/logic/due-overrides.js"
+    "src/changelog/due-progress.js"
   ]
 }
