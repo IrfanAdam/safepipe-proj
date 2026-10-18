@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-18T16:01:01.896Z",
+  "generated": "2026-10-18T16:14:31.765Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -19,6 +19,24 @@
     "2026-10-18_172008-supabase-scheduling-migration.md"
   ],
   "commits": [
+    {
+      "sha": "cce8b01",
+      "full": "cce8b010befbc1404f7afa1aa5df4a3254c09e16",
+      "date": "2026-10-18",
+      "time": "21:32",
+      "subject": "docs(plan): refresh manifest after schedule verdict fixes [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-5"
+    },
+    {
+      "sha": "75e44c1",
+      "full": "75e44c1f7768bab9a1d0830ebbbe6520739f87f6",
+      "date": "2026-10-18",
+      "time": "21:31",
+      "subject": "fix(schedule): stale-verdict guard, verbatim sync cause, stable due-row split [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-5"
+    },
     {
       "sha": "b7a02c0",
       "full": "b7a02c0e6951cb7a1ff1c433614c900dfd84b6f2",
@@ -4512,7 +4530,6 @@
     }
   ],
   "wip": [
-    "src/changelog/changelog-events.js",
     "src/changelog/changelog/paint-detail.js",
     "src/changelog/due-progress.js"
   ]
