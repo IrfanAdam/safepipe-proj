@@ -2,7 +2,7 @@
 // Exports: bindChangelogEvents — click/key/hover wiring over shared state st
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
-import { saveDueOverride, saveDueConfirm, saveDuePending, dueFailureReason, confirmPublish, headingOf, findHeadIndex } from '../logic/due-overrides.js';
+import { saveDueOverride, saveDueConfirm, saveDuePending, confirmPublish, headingOf, findHeadIndex } from '../logic/due-overrides.js';
 import { dueOf } from './changelog-parse.js';
 import { getSchedToken, clearSchedToken, clearSchedUser } from '../logic/schedule-auth.js';
 import { openScheduleGate } from './schedule-gate.js';
@@ -299,7 +299,7 @@ export function bindChangelogEvents(root, st, helpers) {
     catch { dueFlightCtl = null; }
     const flightSignal = dueFlightCtl ? dueFlightCtl.signal : null;
     const progDetail = { file: plan.file, head: sprint.head, due: iso || null };
-    // Head actually sent to /api/due — resolved against the live plans just
+    // Head actually sent to /api/schedule — resolved against the live plans just
     // before the POST (below), so it is always canonical current text.
     // progDetail keeps the pick-time head so the progress card key still
     // matches every step/hide call in this flight.
@@ -400,9 +400,9 @@ export function bindChangelogEvents(root, st, helpers) {
         if (gen === dueGen) failDue('failed', 'offline');
         return;
       }
-      // Static host (production): no file writer — commit through /api/due
-      // (GitHub-backed). The local override stays until the server truth
-      // lands, so the UI never flickers.
+      // Static host (production): no file writer — commit through /api/schedule
+      // (Supabase). The local override stays until the server truth lands,
+      // so the UI never flickers.
       // Send-time canonical head: the pick's closure head may predate a sync
       // rebuild (live refresh / applyServerFileText) or a rename — resolve
       // against the current plans so the server never 200s `unchanged`
@@ -430,12 +430,22 @@ export function bindChangelogEvents(root, st, helpers) {
       let token = null;
       try { token = getSchedToken(); } catch {}
       if (!token) { failDue('needs-login'); return; }
-      const payload = { token, file: plan.file, head: commitHead, due: iso || null };
+      // One pick = one idempotency key: the single retry re-sends the SAME
+      // key so the server dedupes instead of bumping the version. A re-pick
+      // mints a fresh key — a new intent, never a dedupe of the old one.
+      // [plan:2026-10-18_172008-supabase-scheduling-migration.md#task-9]
+      let idem = null;
+      try {
+        idem = (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function')
+          ? globalThis.crypto.randomUUID()
+          : ('pick-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10));
+      } catch { idem = 'pick-' + Date.now(); }
+      const payload = { token, file: plan.file, head: commitHead, due: iso || null, idempotencyKey: idem };
       let r2 = null;
       try {
-        r2 = await postDue('/api/due', payload, flightSignal);
+        r2 = await postDue('/api/schedule', payload, flightSignal);
       } catch (e1) {
-        try { r2 = await postDue('/api/due', payload, flightSignal); }
+        try { r2 = await postDue('/api/schedule', payload, flightSignal); }
         catch (e2) {
           if (gen === dueGen) {
             const timedOut = (e1 && e1.name === 'AbortError') || (e2 && e2.name === 'AbortError');
@@ -446,19 +456,11 @@ export function bindChangelogEvents(root, st, helpers) {
       }
       if (gen !== dueGen) return;
       if (r2 && r2.ok) {
-        let body = null;
-        try { body = await r2.json(); } catch {}
-        if (body && (body.unchanged || body.committed === false)) {
-          // The server reports WHY it left the text alone (body.reason, e.g.
-          // head-not-found with headPreview/fileLines for diagnostics). Only
-          // the allowlisted code reaches the UI — everything else stays
-          // generic, and raw server text is never displayed.
-          const reason = dueFailureReason(body);
-          try { console.error('[due-commit] publish left file unchanged', reason, plan.file); } catch {}
-          failDue('failed', reason);
-          return;
-        }
-        if (gen !== dueGen) return;
+        // /api/schedule answers { due, version, updated_at, section_key } —
+        // live truth, no file text. The confirmed override below paints
+        // immediately; the sha-poll + Supabase overlay converge the file
+        // after the sync worker lands it (file convergence self-drops both).
+        // [plan:2026-10-18_172008-supabase-scheduling-migration.md#task-9]
         try { setDueProgressStep(progDetail, 'committed'); } catch {}
         // Save the confirmed override BEFORE the rebuild: the rebuild's
         // applier confirms it against the server text (self-drops on match)
@@ -469,26 +471,15 @@ export function bindChangelogEvents(root, st, helpers) {
         // fetched file that predates our commit is held, never painted, so
         // the date can't revert to its previous value on CDN lag.
         try { saveDueConfirm({ file: plan.file, head: commitHead, due: iso || null, pre: preDue || null }); } catch {}
-        // Server truth wins: apply the committed file text directly — no
-        // CDN wait, no confirm poll. Falls back to the painted preview when
-        // the helper is unavailable.
-        let applied = false;
-        if (body && typeof body.content === 'string' && body.content) {
-          try {
-            if (gen !== dueGen) return;
-            if (liveMod && typeof liveMod.applyServerFileText === 'function') {
-              try { applied = liveMod.applyServerFileText(root, plan.file, body.content); } catch { applied = false; }
-            }
-          } catch {}
-        }
+        // No file text on this route: re-apply the stored overrides so the
+        // confirmed pick paints immediately (the in-memory plans predate the
+        // write; the rebuild confirms it and later self-drops on convergence).
         if (gen !== dueGen) return;
-        if (!applied) {
-          try {
-            if (liveMod && typeof liveMod.reapplyDueOverrides === 'function') {
-              try { liveMod.reapplyDueOverrides(root); } catch {}
-            }
-          } catch {}
-        }
+        try {
+          if (liveMod && typeof liveMod.reapplyDueOverrides === 'function') {
+            try { liveMod.reapplyDueOverrides(root); } catch {}
+          }
+        } catch {}
         if (gen !== dueGen) return;
         st.duePending = null;
         // The toast parks at 'Updating everywhere…' while the redeploy
@@ -643,7 +634,7 @@ export function bindChangelogEvents(root, st, helpers) {
     const dpick = e.target.closest('[data-due-pick]');
     if (dpick) { applyDue(dpick.dataset.duePick); hideDuePop(); return; }
     // Commit-status retry: re-runs the full write pipeline (local writer,
-    // else /api/due commit) for the date currently shown on the control.
+    // else /api/schedule commit) for the date currently shown on the control.
     // needs-login re-opens the gate when there is still no token.
     const dretry = e.target.closest('[data-due-retry]');
     if (dretry) {

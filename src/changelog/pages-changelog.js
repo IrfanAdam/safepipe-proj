@@ -10,11 +10,12 @@ import history from '../ds/plan-history.json';
 import { goal, split, parseMeta, anchorOf, phash, dueOf } from './changelog-parse.js';
 import { paint } from './changelog-paint.js';
 import { duePreviewEdit } from './changelog-events.js';
-import { loadDueOverrides, dropDueOverride, overrideVerdict, canonicalHead, readDueConfirm, clearDueConfirm, dueFetchVerdict, findHeadIndex, readDuePending, clearDuePending, dueDeployVerdict } from '../logic/due-overrides.js';
+import { loadDueOverrides, dropDueOverride, overrideVerdict, normHead, canonicalHead, readDueConfirm, clearDueConfirm, dueFetchVerdict, findHeadIndex, readDuePending, clearDuePending, dueDeployVerdict } from '../logic/due-overrides.js';
 import { getSchedToken } from '../logic/schedule-auth.js';
 import { TIMELINE_TILE_ICON } from './changelog/graph.js';
 import { bindChangelogEvents } from './changelog-events.js';
 import { setDueProgressStep, hideDueProgress } from './due-progress.js';
+import { fetchSchedules, subscribeSchedules } from './supabase-schedule.js';
 
 // Mobile drawer level (2-level nav; CSS teammate owns the visuals — JS only
 // sets dataset/classes/HTML): L1 = rail list only, L2 = detail. Desktop
@@ -84,9 +85,19 @@ function rebuildPlans(next) {
 // file has not converged, and everything expires — a stale clear can never
 // strip a Due committed after it.
 // Factored per rebuild so live text swaps keep the same merge. [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
+// Live Supabase overlay state: Map keyed plan_file\0section_key (same key as
+// fetchSchedules in supabase-schedule.js) holding { due, atMs }. Swapped on
+// every foreground refetch / Realtime push; painted in applyDueOverrides.
+// [plan:2026-10-18_172008-supabase-scheduling-migration.md#task-8]
+let supaDues = new Map();
+let supaUnsub = null;
+let supaInFlight = false;
 function applyDueOverrides() {
   try {
     const now = Date.now();
+    // Fresh same-device paints, keyed file\0normHead(head) for the Supabase
+    // last-wins check below (a newer local pick shadows an older row).
+    const painted = new Map();
     for (const o of loadDueOverrides()) {
       const plan = plans.find((p) => p.file === o.file);
       const sec = plan ? plan.sprints.find((s) => s.head === o.head) : null;
@@ -94,7 +105,40 @@ function applyDueOverrides() {
       const current = dueOf(sec);
       const verdict = overrideVerdict(o, current, now);
       if (verdict === 'drop') { dropDueOverride(o.file, o.head); continue; }
+      try {
+        const at = Number.isFinite(o.at) ? o.at : 0;
+        painted.set(o.file + '\0' + normHead(o.head), at);
+      } catch {}
       sec.body = duePreviewEdit(sec.body, sec.head, verdict === 'apply' ? o.due : null);
+    }
+    // Live Supabase overlay: server-confirmed dues paint over file text until
+    // the file converges, then the entry drops — same drop rule as above
+    // (overrideVerdict on a synthesized fresh confirmed pick), so Supabase
+    // truth outranks file and optimistic entries, and convergence heals.
+    // [plan:2026-10-18_172008-supabase-scheduling-migration.md#task-8]
+    if (supaDues.size) {
+      for (const [key, row] of supaDues) {
+        const cut = key.indexOf('\0');
+        if (cut < 0) { try { supaDues.delete(key); } catch {} continue; }
+        const file = key.slice(0, cut), skey = key.slice(cut + 1);
+        const plan = plans.find((p) => p.file === file);
+        const sec = plan ? plan.sprints.find((s) => {
+          try { return normHead(s.head) === skey; } catch { return false; }
+        }) : null;
+        if (!sec) { try { supaDues.delete(key); } catch {} continue; }
+        let current = null;
+        try { current = dueOf(sec); } catch { current = null; }
+        const atMs = row && Number.isFinite(row.atMs) ? row.atMs : 0;
+        const synth = { file, head: sec.head, due: row ? row.due || null : null, committed: true, at: atMs || now };
+        let verdict = 'drop';
+        try { verdict = overrideVerdict(synth, current, now); } catch { verdict = 'drop'; }
+        if (verdict === 'drop') { try { supaDues.delete(key); } catch {} continue; }
+        try {
+          const lat = painted.get(key);
+          if (lat != null && lat >= atMs) continue;
+        } catch {}
+        sec.body = duePreviewEdit(sec.body, sec.head, verdict === 'apply' ? (row ? row.due || null : null) : null);
+      }
     }
   } catch {}
 }
@@ -200,6 +244,36 @@ export function applyServerFileText(root, file, text) {
     paintPreservingPicker(root);
     return true;
   } catch { return false; }
+}
+// Supabase foreground refresh: fetch live dues, swap the overlay, rebuild +
+// repaint with selection/filters/datepicker intact (st untouched,
+// paintPreservingPicker transplants an open picker). Null (unconfigured /
+// offline / denied) keeps the current overlay — the sha-poll below stays the
+// Realtime-off fallback. Never throws.
+// [plan:2026-10-18_172008-supabase-scheduling-migration.md#task-9]
+export async function refreshSupaOverlay(root) {
+  if (!root || supaInFlight) return false;
+  supaInFlight = true;
+  try {
+    let map = null;
+    try { map = await fetchSchedules(); } catch { map = null; }
+    if (!map) return false;
+    const next = new Map();
+    try {
+      for (const [k, r] of map) {
+        if (typeof k !== 'string' || !k || !r || typeof r !== 'object') continue;
+        const due = typeof r.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.due) ? r.due : null;
+        let atMs = 0;
+        try { const t = Date.parse(r.updated_at); if (Number.isFinite(t)) atMs = t; } catch {}
+        next.set(k, { due, atMs });
+      }
+    } catch {}
+    supaDues = next;
+    try { rebuildPlans(rawTexts); } catch {}
+    try { paintPreservingPicker(root); } catch {}
+    return true;
+  } catch { return false; }
+  finally { supaInFlight = false; }
 }
 // Polling + focus refresh, active only while the changelog root is mounted.
 // The 20s full re-fetch is gone: a ~15s sha poll (commits API, no CDN lag)
@@ -381,15 +455,26 @@ async function pollPlanSha() {
 function onLiveFocus() {
   try { window.clearTimeout(liveFocusTimer); } catch {}
   try {
-    liveFocusTimer = window.setTimeout(() => { if (liveRoot) pollPlanSha(); }, 2000);
+    liveFocusTimer = window.setTimeout(() => {
+      if (liveRoot) {
+        pollPlanSha();
+        try { if (!document.hidden) refreshSupaOverlay(liveRoot); } catch {}
+      }
+    }, 2000);
   } catch {}
 }
 function onLiveVisible() {
   try { if (document.hidden) return; } catch {}
-  if (liveRoot) pollPlanSha();
+  if (liveRoot) {
+    pollPlanSha();
+    try { refreshSupaOverlay(liveRoot); } catch {}
+  }
 }
 function onLiveOnline() {
-  if (liveRoot) pollPlanSha();
+  if (liveRoot) {
+    pollPlanSha();
+    try { if (typeof document === 'undefined' || !document.hidden) refreshSupaOverlay(liveRoot); } catch {}
+  }
 }
 const DUE_OVERRIDES_KEY = 'safepipe-due-overrides.v2';
 function onLiveStorage(ev) {
@@ -406,6 +491,8 @@ function stopLiveRefresh() {
   liveTimer = 0;
   try { if (liveFocusTimer) window.clearTimeout(liveFocusTimer); } catch {}
   liveFocusTimer = 0;
+  try { if (supaUnsub) supaUnsub(); } catch {}
+  supaUnsub = null;
   try { window.removeEventListener('focus', onLiveFocus); } catch {}
   try { document.removeEventListener('visibilitychange', onLiveVisible); } catch {}
   try { window.removeEventListener('online', onLiveOnline); } catch {}
@@ -429,6 +516,17 @@ function startLiveRefresh() {
     document.addEventListener('visibilitychange', onLiveVisible);
     window.addEventListener('online', onLiveOnline);
     window.addEventListener('storage', onLiveStorage);
+    // Boot overlay fetch + Realtime push: any schedules change refetches and
+    // repaints with selection/filters/datepicker intact. Unconfigured/offline
+    // resolves no-op — the sha-poll above stays the fallback.
+    // [plan:2026-10-18_172008-supabase-scheduling-migration.md#task-9]
+    try { if (liveRoot) refreshSupaOverlay(liveRoot); } catch {}
+    try {
+      supaUnsub = subscribeSchedules(() => {
+        try { if (typeof document !== 'undefined' && document.hidden) return; } catch {}
+        if (liveRoot) refreshSupaOverlay(liveRoot);
+      });
+    } catch { supaUnsub = null; }
   } catch {}
 }
 const st = { active: new Set(), day: '', sel: [0, 0], open: false, stage: 'list',
