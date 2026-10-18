@@ -28,7 +28,7 @@
 - Verify: `node --test tests/ring2-vectors*.test.js` green; counts + ODbL attribution in `docs/source-manifest.json` (report text, parent edits manifest).
 
 ## Lane B — Elevation triangulation (owns: new `scripts/data-pipe/elev-*.mjs` + scratch only) {#lane-b}
-*Due: 2026-11-18*
+*Due: 2026-11-17*
 
 - Fetch Copernicus GLO-30 tile(s) for the AOI from AWS open data (`s3://copernicus-dem-30m`, no auth) + SRTM 1-arcsec void-filled tile for the same bbox; compare vs live Terrarium field: relief ratio, RMSE at control points, shoreline (-24 m) agreement.
 - Verdict rule: integrate (as validation note + manifest entry) only if a source beats Terrarium on measured agreement AND license allows; DEM swap needs parent approval — default is report, not swap.
