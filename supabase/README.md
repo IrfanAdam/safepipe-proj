@@ -23,5 +23,25 @@
 
 ## Webhook
 
-- Supabase → Database Webhooks → `POST https://<site>/api/sync-due`
-- Header: webhook secret. Event: insert+update on `schedules`.
+- Supabase → Database → Webhooks → Create:
+  `POST https://<site>/api/sync-due`, event insert+update on `schedules`,
+  header `x-webhook-secret: <SUPABASE_WEBHOOK_SECRET>`.
+
+## Realtime publication (one line, SQL editor)
+
+```sql
+alter publication supabase_realtime add table schedules;
+```
+
+Without this, Realtime pushes stay silent and clients fall back to sha-poll.
+
+## Operate
+
+- Rotate `DUE_SYNC_TOKEN`: GitHub → Settings → Developer settings → rotate;
+  Vercel → project → Settings → Environment Variables → update → redeploy.
+- Rotate Supabase keys: Dashboard → Settings → API → roll; update the four
+  `SUPABASE_*`/`VITE_*` Vercel envs → redeploy.
+- Rollback: `pages-changelog.js` `SUPABASE_CONFIGURED` false (remove `VITE_*`
+  envs) → site reads Git-only. Supabase tables stay intact.
+- Debug one key: `GET /api/schedule?sync=<file>` → per-key
+  `{status, attempts, last_error, github_sha}`.

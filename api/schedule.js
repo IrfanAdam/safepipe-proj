@@ -35,7 +35,7 @@ const sbHeaders = (key) => ({
 // url = SUPABASE_URL, key = service-role/secret key (bypasses RLS).
 // Returns { row, deduped } where deduped means a retry with the same
 // idempotencyKey (or an already-converged value) caused no new version.
-export async function upsertSchedule({ url, key, file, section_key, due, actor, idempotencyKey }) {
+export async function upsertSchedule({ url, key, file, section_key, due, actor, idempotencyKey, source }) {
   const base = `${String(url || '').replace(/\/$/, '')}/rest/v1`;
   // idempotency_key is uuid-typed: only real UUIDs participate, anything
   // else degrades to null (plain last-write-wins) instead of 500ing.
@@ -75,7 +75,7 @@ export async function upsertSchedule({ url, key, file, section_key, due, actor, 
     headers: sbHeaders(key),
     body: JSON.stringify([{
       plan_file: file, section_key, due: due || null,
-      actor: actor || 'owner', source: 'ui',
+      actor: actor || 'owner', source: source || 'ui',
     }]),
   }).catch(() => {});
   return { row, deduped: false };
