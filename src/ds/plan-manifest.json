@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-18T14:21:52.305Z",
+  "generated": "2026-10-18T14:24:05.028Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,8 +20,26 @@
   ],
   "commits": [
     {
-      "sha": "65a1fbb",
-      "full": "65a1fbb8fa47b2e1673ffd76bd76e41515a5be83",
+      "sha": "c43c9aa",
+      "full": "c43c9aac6a8077ff43c8d09ca2e37fc107e4f2f7",
+      "date": "2026-10-18",
+      "time": "19:52",
+      "subject": "docs(plan): refresh manifest after sync pivot [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-4]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "679ea66",
+      "full": "679ea6676dadf719c59a4d1b3e78012f73330b2d",
+      "date": "2026-10-18",
+      "time": "19:52",
+      "subject": "feat(schedule): writer-driven GitHub sync, dual-auth worker [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-4]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "edad00e",
+      "full": "edad00ef696a6668cec715ba2d7a0b469d584dbe",
       "date": "2026-10-18",
       "time": "19:23",
       "subject": "docs(plan): refresh manifest after backfill [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
@@ -29,8 +47,8 @@
       "anchor": "phase-5"
     },
     {
-      "sha": "492f8f4",
-      "full": "492f8f49a9facdb429918afcee1d16974b01ef25",
+      "sha": "dabf50a",
+      "full": "dabf50a1de8e90a47a62c60adb941080b4ea6b0d",
       "date": "2026-10-18",
       "time": "19:23",
       "subject": "feat(schedule): backfill 3 dues, source provenance, operate docs [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
@@ -38,8 +56,8 @@
       "anchor": "phase-5"
     },
     {
-      "sha": "e410654",
-      "full": "e4106540e641faf860ccdf7826b997012d8134b7",
+      "sha": "c4d6dc2",
+      "full": "c4d6dc207ba9e1253b3f964d65df8d741b1e1617",
       "date": "2026-10-18",
       "time": "19:22",
       "subject": "docs(plan): refresh manifest after scheduling lanes [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-4]",
@@ -47,8 +65,8 @@
       "anchor": "phase-4"
     },
     {
-      "sha": "1aa0f27",
-      "full": "1aa0f276dc46935d8de50685befc4402617a3189",
+      "sha": "29665ac",
+      "full": "29665accd9541baaf1cc585108a51e6675bbc62b",
       "date": "2026-10-18",
       "time": "19:22",
       "subject": "feat(schedule): sync-status read + silent toast states [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-4]",
@@ -56,8 +74,8 @@
       "anchor": "phase-4"
     },
     {
-      "sha": "16d940e",
-      "full": "16d940e792948e526b4ca89ef7f9d24af4bcb7a6",
+      "sha": "804c996",
+      "full": "804c99640145587f8ac1a9acbf8cb09ca8a71e8d",
       "date": "2026-10-18",
       "time": "19:22",
       "subject": "feat(schedule): Supabase overlay + realtime wiring, write path to /api/schedule [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-3]",
@@ -65,8 +83,8 @@
       "anchor": "phase-3"
     },
     {
-      "sha": "ddd5ebe",
-      "full": "ddd5ebefada02a43047f3a3c9b7f4990b19cd8c1",
+      "sha": "739ef86",
+      "full": "739ef86ff16b519a877398b81ca16d86d70bf060",
       "date": "2026-10-18",
       "time": "19:17",
       "subject": "feat(schedule): realtime read module fetch+subscribe, anon-only [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-3]",
@@ -74,8 +92,8 @@
       "anchor": "phase-3"
     },
     {
-      "sha": "80b4402",
-      "full": "80b4402bf828ff38afc67751ce252d61b875c5cc",
+      "sha": "82245ad",
+      "full": "82245ad12fc8a56e8a5d696f160ad273fe5d224c",
       "date": "2026-10-18",
       "time": "19:11",
       "subject": "chore(supabase): Phase 1 foundation — schema, RLS proof, Due inventory [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-1]",
@@ -4313,6 +4331,69 @@
       "anchor": null
     },
     {
+      "sha": "65a1fbb",
+      "full": "65a1fbb8fa47b2e1673ffd76bd76e41515a5be83",
+      "date": "2026-10-18",
+      "time": "19:23",
+      "subject": "docs(plan): refresh manifest after backfill [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-5"
+    },
+    {
+      "sha": "492f8f4",
+      "full": "492f8f49a9facdb429918afcee1d16974b01ef25",
+      "date": "2026-10-18",
+      "time": "19:23",
+      "subject": "feat(schedule): backfill 3 dues, source provenance, operate docs [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-5"
+    },
+    {
+      "sha": "e410654",
+      "full": "e4106540e641faf860ccdf7826b997012d8134b7",
+      "date": "2026-10-18",
+      "time": "19:22",
+      "subject": "docs(plan): refresh manifest after scheduling lanes [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-4]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "1aa0f27",
+      "full": "1aa0f276dc46935d8de50685befc4402617a3189",
+      "date": "2026-10-18",
+      "time": "19:22",
+      "subject": "feat(schedule): sync-status read + silent toast states [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-4]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "16d940e",
+      "full": "16d940e792948e526b4ca89ef7f9d24af4bcb7a6",
+      "date": "2026-10-18",
+      "time": "19:22",
+      "subject": "feat(schedule): Supabase overlay + realtime wiring, write path to /api/schedule [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-3]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-3"
+    },
+    {
+      "sha": "ddd5ebe",
+      "full": "ddd5ebefada02a43047f3a3c9b7f4990b19cd8c1",
+      "date": "2026-10-18",
+      "time": "19:17",
+      "subject": "feat(schedule): realtime read module fetch+subscribe, anon-only [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-3]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-3"
+    },
+    {
+      "sha": "80b4402",
+      "full": "80b4402bf828ff38afc67751ce252d61b875c5cc",
+      "date": "2026-10-18",
+      "time": "19:11",
+      "subject": "chore(supabase): Phase 1 foundation — schema, RLS proof, Due inventory [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-1]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-1"
+    },
+    {
       "sha": "973da4a",
       "full": "973da4ae11317f7445e9a0191f8695e8e15f837b",
       "date": "2026-10-17",
@@ -4376,7 +4457,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/changelog/changelog-events.js"
-  ]
+  "wip": []
 }

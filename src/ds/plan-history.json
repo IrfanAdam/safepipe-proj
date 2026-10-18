@@ -155,6 +155,44 @@
     }
    ],
    "time": "13:00"
+  },
+  {
+   "sha": null,
+   "date": "2026-10-18",
+   "time": "19:54",
+   "hash": "bca8f859",
+   "sections": [
+    {
+     "head": "Step 0 — Live-fig setup + screen-frame locator (copy-paste)",
+     "hash": "157b534b",
+     "state": ""
+    },
+    {
+     "head": "Task 1 — Shell + routing + fixtures",
+     "hash": "4660ab80",
+     "state": ""
+    },
+    {
+     "head": "Task 2 — Operations work-order detail (`#/operations`)",
+     "hash": "54580631",
+     "state": ""
+    },
+    {
+     "head": "Task 3 — Workforce master-detail (`#/workforce`)",
+     "hash": "a739189d",
+     "state": ""
+    },
+    {
+     "head": "Task 4 — PIP fact-sheet record (`#/pip`) + Assets (`#/assets`)",
+     "hash": "e5a9be79",
+     "state": ""
+    },
+    {
+     "head": "Task 5 — Mobile Home (`#/home`) + integration",
+     "hash": "de7fc31f",
+     "state": ""
+    }
+   ]
   }
  ],
  "2026-10-06_003000-ops3d-theatre-style.md": [
@@ -3297,6 +3335,29 @@
      "state": ""
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-18",
+   "time": "19:54",
+   "hash": "b1ce099c",
+   "sections": [
+    {
+     "head": "Lane A — OSM completeness (owns: `scripts/data-pipe/*`, `public/data/sangachal-v",
+     "hash": "998b4760",
+     "state": ""
+    },
+    {
+     "head": "Lane B — Elevation triangulation (owns: new `scripts/data-pipe/elev-*.mjs` + scr",
+     "hash": "e7ddf312",
+     "state": ""
+    },
+    {
+     "head": "Lane C — Source recon: Cesium / OSM2World / GDAL / PostGIS (read-only + scratch ",
+     "hash": "a62ae120",
+     "state": ""
+    }
+   ]
   }
  ],
  "2026-10-13_233337-ops3d-twin-work.md": [
@@ -4315,6 +4376,39 @@
     {
      "head": "Phase 02 — Asset / infrastructure layer",
      "hash": "8116a1a9",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 03 — Time variance",
+     "hash": "9619e562",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 04 — Simulation",
+     "hash": "a9ba8807",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 05 — Operations layer",
+     "hash": "53581ece",
+     "state": "0/7"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-18",
+   "time": "19:54",
+   "hash": "a2918c0e",
+   "sections": [
+    {
+     "head": "Phase 01 — Make it real",
+     "hash": "5e16ae4b",
+     "state": "0/1"
+    },
+    {
+     "head": "Phase 02 — Asset / infrastructure layer",
+     "hash": "acc3e42f",
      "state": "0/1"
     },
     {
