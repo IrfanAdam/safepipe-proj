@@ -461,7 +461,13 @@ export function bindChangelogEvents(root, st, helpers) {
         // immediately; the sha-poll + Supabase overlay converge the file
         // after the sync worker lands it (file convergence self-drops both).
         // [plan:2026-10-18_172008-supabase-scheduling-migration.md#task-9]
-        try { setDueProgressStep(progDetail, 'committed'); } catch {}
+        // Canonical section_key first: the server resolves stale heads, and
+        // both the toast's watch and the sync fire below must use the SAME
+        // key, or the watch never matches its row (bare 'error' on a landed
+        // sync). Extracted once from the write response.
+        let sk = null;
+        try { sk = await r2.clone().json().then((j) => (j && j.section_key) || null).catch(() => null); } catch {}
+        try { setDueProgressStep(progDetail, 'committed', sk ? { sectionKey: sk } : null); } catch {}
         // Save the confirmed override BEFORE the rebuild: the rebuild's
         // applier confirms it against the server text (self-drops on match)
         // or paints it when the server text lacks the value — either way the
@@ -495,9 +501,9 @@ export function bindChangelogEvents(root, st, helpers) {
         confirmSaved(liveMod);
         // Writer-driven GitHub sync (pivot — no DB trigger needed): best
         // effort, never disturbs the saved UI. Failures land in sync_state
-        // and surface via GET /api/schedule?sync=.
+        // and surface via GET /api/schedule?sync=. Reuses the canonical key
+        // extracted above — same key the toast's watch is polling.
         try {
-          const sk = await r2.clone().json().then((j) => (j && j.section_key) || null).catch(() => null);
           if (sk && typeof fetch === 'function') {
             fetch('/api/sync-due', {
               method: 'POST',

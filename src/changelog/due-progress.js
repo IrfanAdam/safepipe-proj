@@ -195,8 +195,15 @@ const SYNC_POLL_BUDGET_MS = 30000;
 const SYNC_POLL_TICK_MS = 3000;
 const SYNC_FETCH_TIMEOUT_MS = 10000;
 
-function startSyncWatch(detail) {
+function startSyncWatch(detail, opts) {
   if (!detail || !detail.file) return;
+  // Canonical key first: the server resolves stale heads on write, so the
+  // writer passes back r2's section_key — the watch must match the SAME key
+  // or it never finds its row (bare 'error' on a landed sync). Falls back
+  // to the pick-time head when the caller has no server answer.
+  const sectionKey = (opts && typeof opts.sectionKey === 'string' && opts.sectionKey)
+    ? opts.sectionKey
+    : normHead(detail.head || '');
   const key = syncKeyOf(detail);
   const seq = (syncSeqs.get(key) || 0) + 1;
   syncSeqs.set(key, seq);
@@ -214,19 +221,25 @@ function startSyncWatch(detail) {
   // Non-browser runtimes (node probes) paint only — no same-origin API, no
   // network. Browser-only work stays out of unit tests by construction.
   if (typeof window === 'undefined' || typeof fetch !== 'function') return;
-  pollDueSync(detail, key, seq);
+  pollDueSync(detail, key, seq, sectionKey);
 }
 
 function terseSyncCause(lastError) {
-  // Inline causes stay terse: head-not-found passes through, everything else
-  // from the sync worker compacts to a bare error (full bodies go to
-  // console.error only).
-  try { return dueFailureReason({ reason: lastError }); } catch { return 'error'; }
+  // Sync-worker reasons pass through verbatim (github-write-403 names the
+  // real failure); anything else compacts to dueFailureReason's bare error.
+  // Full bodies go to console.error only.
+  try {
+    const s = String(lastError == null ? '' : lastError).trim();
+    if (/^(github-write-\d+|row-not-found|head-not-found|unchanged|timeout|offline|http \d+)$/.test(s)) return s;
+    return dueFailureReason({ reason: lastError });
+  } catch { return 'error'; }
 }
 
-async function pollDueSync(detail, key, seq) {
+async function pollDueSync(detail, key, seq, sectionKey) {
   const file = String(detail.file);
-  const sectionKey = normHead(detail.head || '');
+  const matchKey = (typeof sectionKey === 'string' && sectionKey)
+    ? sectionKey
+    : normHead(detail.head || '');
   const url = `/api/schedule?sync=${encodeURIComponent(file)}`;
   const deadline = Date.now() + SYNC_POLL_BUDGET_MS;
   let sawResponse = false;
@@ -246,7 +259,7 @@ async function pollDueSync(detail, key, seq) {
       if (r && r.ok) {
         lastHttp = 0;
         const list = await r.json().catch(() => null);
-        const row = Array.isArray(list) ? list.find((x) => x && x.section_key === sectionKey) : null;
+        const row = Array.isArray(list) ? list.find((x) => x && x.section_key === matchKey) : null;
         if (row) {
           if (row.status === 'ok') { settleSyncOk(detail, key, seq); return; }
           if (row.status === 'error') {
@@ -360,19 +373,22 @@ export function showDueProgress(detail, opts) {
   }
   try {
     card.dataset.progKey = pickKey(detail);
-    // Saving is silent by design — the painted date IS the UI — so every
-    // flight starts parked regardless of the silent flag (kept for API
-    // compat). The watch reveals the track at Syncing once the write lands.
+    // Instant by design: the track reveals the moment the pick fires, Saved
+    // spinning as "Saving…" — the painted date IS the UI, the toast is its
+    // lifecycle. (The silent flag is kept for API compat only.)
     paintTrack(card, 'saved');
-    setNodeState(card, 'saved', 'todo');
-    setNodeState(card, 'syncing', 'todo');
-    setNodeState(card, 'synced', 'todo');
-    parkCard(card, silent ? 'saving' : 'saving');
+    setNodeState(card, 'saved', 'active');
+    try {
+      const node = card.querySelector('[data-prog-node-saved]');
+      const lbl = node && node.querySelector ? node.querySelector('[data-prog-label]') : null;
+      if (lbl) lbl.textContent = 'Saving…';
+    } catch {}
+    try { card.hidden = false; card.dataset.progStep = 'saving'; card.dataset.progStage = 'saving'; } catch {}
   } catch {}
   return card;
 }
 
-export function setDueProgressStep(detail, step) {
+export function setDueProgressStep(detail, step, opts) {
   try {
     const card = cardEl();
     if (!card) return;
@@ -380,7 +396,7 @@ export function setDueProgressStep(detail, step) {
     if (!KNOWN_STEPS[step]) return;
     // Legacy success-path signal: the Supabase write landed — begin the sync
     // watch (paints Saved → Syncing). The deploy slot is gone.
-    if (step === 'committed') { startSyncWatch(detail); return; }
+    if (step === 'committed') { startSyncWatch(detail, opts); return; }
     // Deploy narrative dropped: sync commits carry [skip ci], so there is
     // nothing to await. A live deploy flip never drives the toast.
     if (step === 'deploying') return;

@@ -522,17 +522,20 @@ describe('due progress card (DOM keying, repo stub conventions)', () => {
     };
     return import('../src/changelog/due-progress.js?due-prog=1');
   };
-  it('linear track: Saved lands, Syncing spins, Synced lands with check; stale keys ignored', async () => {
+  it('linear track: Saving at click, Saved lands, Syncing spins, Synced lands with check; stale keys ignored', async () => {
     const prog = await setup();
     const a = { file: 'f.md', head: 'H', due: '2026-11-01' };
     prog.showDueProgress(a);
     const card = globalThis.document.getElementById('ds-due-progress');
-    assert.ok(card && card.hidden, 'saving is silent — the card parks');
+    assert.ok(card && !card.hidden, 'the track reveals the instant the pick fires');
     const node = (n) => card.querySelector(`[data-prog-node-${n}]`);
     const label = (n) => node(n).querySelector('[data-prog-label]').textContent;
     const cls = (n, c) => node(n).classList.contains(c);
+    assert.equal(label('saved'), 'Saving…', 'Saved spins while the write is in flight');
+    assert.ok(cls('saved', 'is-active'));
+    assert.ok(!node('saved').querySelector('[data-prog-spin]').hidden, 'spinner runs on the active stage');
+    assert.ok(cls('syncing', 'is-todo'));
     prog.setDueProgressStep(a, 'saved');
-    assert.equal(card.hidden, false, 'Saved reveals the track');
     assert.equal(label('saved'), 'Saved');
     assert.ok(cls('saved', 'is-done'));
     assert.ok(cls('syncing', 'is-todo'));
@@ -552,7 +555,7 @@ describe('due progress card (DOM keying, repo stub conventions)', () => {
     assert.ok(cls('synced', 'is-done'));
     assert.ok(cls('syncing', 'is-done'));
   });
-  it('a rapid re-pick keeps its own key; stale hide and stale steps never disturb it', async () => {
+  it('a rapid re-pick protects the new card from the old hide', async () => {
     const prog = await setup();
     const a = { file: 'f.md', head: 'H', due: '2026-11-01' };
     const b = { file: 'f.md', head: 'H', due: '2026-11-02' };
@@ -562,10 +565,11 @@ describe('due progress card (DOM keying, repo stub conventions)', () => {
     await new Promise((r) => setTimeout(r, 50));
     const card = globalThis.document.getElementById('ds-due-progress');
     assert.equal(card.dataset.progKey, 'f.md::H::2026-11-02', 're-pick owns the card');
+    assert.equal(card.hidden, false, 'stale hide must not dismiss the re-pick');
     prog.setDueProgressStep(a, 'committed');
-    assert.equal(card.hidden, true, 'a stale pick never reveals the parked card');
+    assert.equal(card.dataset.progStep, 'saving', 'a stale pick never advances newer state');
     prog.setDueProgressStep(b, 'committed');
-    assert.equal(card.hidden, false, 'the watch reveals the track at Syncing');
+    assert.equal(card.hidden, false, 'the watch holds the track at Syncing');
     assert.equal(card.dataset.progStep, 'syncing');
     prog.hideDueProgress(b, 0);
     assert.equal(card.hidden, true);
