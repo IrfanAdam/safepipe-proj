@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-18T14:43:11.869Z",
+  "generated": "2026-10-18T15:03:43.805Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -19,6 +19,15 @@
     "2026-10-18_172008-supabase-scheduling-migration.md"
   ],
   "commits": [
+    {
+      "sha": "c685eb3",
+      "full": "c685eb348327702867993840ca6eeed8e0dc8d1f",
+      "date": "2026-10-18",
+      "time": "20:18",
+      "subject": "feat(schedule): horizontal sync toast, completion markers in-heading, parked-gate fix [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-5"
+    },
     {
       "sha": "e15ab5f",
       "full": "e15ab5fced014de9c7eb2cccc07ae4d26672e10d",
@@ -4467,9 +4476,6 @@
     }
   ],
   "wip": [
-    "public/version.json",
-    "src/changelog/changelog-drawer.css",
-    "src/changelog/changelog/paint-detail.js",
-    "src/changelog/due-progress.js"
+    "src/changelog/changelog/paint-detail.js"
   ]
 }

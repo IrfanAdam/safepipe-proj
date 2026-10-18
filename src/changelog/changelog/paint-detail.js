@@ -262,18 +262,18 @@ export function paintDetail(root, ctx){
   // Commit state for this section's pick (set by applyDue/commitDue):
   // saving → saved (auto-dismissed) | needs-login | failed | retry. Null
   // shows nothing. The status is inline and never blocks — the painted date
-  // IS the UI; this only answers "did it publish?". Mismatched file/head
-  // never renders another section's status. `retry` is the sync-path alias
-  // of `failed` (Task 12): same inline Retry with the terse cause, full body
-  // to console.error only (commitDue), never a popup, login cleared on 401
-  // only. Failure causes stay terse: timeout / offline / http <status> /
-  // unchanged / head-not-found.
-  // Freeze remainder: while a deploy claim for this section is fresh
-  // (commit landed, redeploy still carrying it everywhere), the saved row
-  // keeps a pending state — "published ✓ · updating…" — until the deploy
-  // flip heals it. Editing stays allowed throughout (the Schedule button
+  // IS the UI; this only answers "did it save and sync?". Mismatched
+  // file/head never renders another section's status. `retry` is the
+  // sync-path alias of `failed`: same inline Retry with the terse cause,
+  // full body to console.error only (commitDue), never a popup, login
+  // cleared on 401 only. Failure causes stay terse: timeout / offline /
+  // http <status> / unchanged / head-not-found / sync http <status>.
+  // Freeze remainder: while a sync claim for this section is fresh
+  // (save landed, sync worker still carrying it to git), the saved row
+  // keeps a pending state — "Saved ✓ · syncing…" — until the sync state
+  // settles it. Editing stays allowed throughout (the Schedule button
   // never disables); a re-pick supersedes with a new claim.
-  // [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]
+  // [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]
   const dc = dueCommit && plan && sprint
     && dueCommit.file === plan.file && dueCommit.head === sprint.head ? dueCommit.state : '';
   const dr = dueCommit && plan && sprint
@@ -316,13 +316,13 @@ export function paintDetail(root, ctx){
   } catch { pendRow = false; }
   const dueStatusHTML = syncCause ? dueSyncRetryHTML(syncCause)
     : !dc || secShipped ? '' : dc === 'saving'
-    ? `<span class="ds-due-status" data-due-status="saving">publishing…</span>`
+    ? `<span class="ds-due-status" data-due-status="saving">Saving…</span>`
     : dc === 'saved'
-      ? `<span class="ds-due-status is-ok${pendRow ? ' is-pend' : ''}" data-due-status="saved">published ✓${pendRow ? ' · updating…' : ''}</span>`
+      ? `<span class="ds-due-status is-ok${pendRow ? ' is-pend' : ''}" data-due-status="saved">Saved ✓${pendRow ? ' · syncing…' : ''}</span>`
       : dc === 'needs-login'
-        ? `<button class="ds-due-status is-warn" data-due-retry="login">only on this device — sign in again to publish</button>`
+        ? `<button class="ds-due-status is-warn" data-due-retry="login">only on this device — sign in again</button>`
         : (dc === 'failed' || dc === 'retry')
-          ? `<button class="ds-due-status is-err" data-due-retry="commit">couldn't publish${dr ? ` (${dr})` : ''} — tap to retry</button>`
+          ? dueSyncRetryHTML(dr || 'error')
           : '';
   const dueHTML = secShipped
     ? ''
