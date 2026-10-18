@@ -2,7 +2,7 @@
 // Exports: bindChangelogEvents — click/key/hover wiring over shared state st
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
-import { saveDueOverride, saveDueConfirm, saveDuePending, confirmPublish, headingOf, findHeadIndex, dueStuckHealed } from '../logic/due-overrides.js';
+import { saveDueOverride, saveDueConfirm, saveDuePending, confirmPublish, headingOf, findHeadIndex, dueStuckHealed, normHead } from '../logic/due-overrides.js';
 import { dueOf, split } from './changelog-parse.js';
 import { getSchedToken, clearSchedToken, clearSchedUser } from '../logic/schedule-auth.js';
 import { openScheduleGate } from './schedule-gate.js';
@@ -39,6 +39,25 @@ export function staleSyncTargets(scheduleRows, syncRows) {
     }
   } catch {}
   return out;
+}
+// Silent-heal backoff, server parity (api/sync-due.js retryAfterMs: 5s·3^(n-1),
+// capped 15m): a just-failed sync is re-fired at most on that budget, so a
+// persistently failing section (e.g. a rejected PAT write → github-write-403)
+// quiets instead of burning one GitHub write per foreground event. Rows
+// without timing data stay eligible (previous behavior). Never throws, never
+// touches progress UI.
+export function healDueAfterMs(attempts) {
+  return Math.min(15 * 60 * 1000, 5000 * (3 ** Math.max(0, Number(attempts || 1) - 1)));
+}
+export function healEligible(syncRow, nowMs) {
+  try {
+    if (!syncRow || typeof syncRow !== 'object') return true;
+    const at = Date.parse(syncRow.updated_at);
+    const n = Number(syncRow.attempts);
+    if (!Number.isFinite(at) || !Number.isFinite(n) || n <= 0) return true;
+    const now = typeof nowMs === 'number' ? nowMs : Date.now();
+    return now >= at + healDueAfterMs(n);
+  } catch { return true; }
 }
 // Sections a heal fire is already covering (fire-and-forget: no settle to
 // await, so the entry clears when the POST settles and the next heal pass
@@ -88,7 +107,7 @@ export async function reconcileDueSync(opts = {}) {
       try { if (isSyncWatchActive(t.plan_file, t.section_key)) return true; } catch {}
       return false;
     };
-    let checked = 0, healed = 0, skippedWatch = 0;
+    let checked = 0, healed = 0, skippedWatch = 0, skippedBackoff = 0;
     for (const [file, list] of byFile) {
       let syncRows;
       if (o.syncByFile && typeof o.syncByFile === 'object'
@@ -102,6 +121,14 @@ export async function reconcileDueSync(opts = {}) {
           syncRows = Array.isArray(j) ? j : [];
         } catch { continue; }
       }
+      const syncByKey = new Map();
+      try {
+        for (const r of syncRows || []) {
+          if (!r || typeof r !== 'object') continue;
+          if (typeof r.plan_file !== 'string' || typeof r.section_key !== 'string') continue;
+          syncByKey.set(`${r.plan_file}\0${r.section_key}`, r);
+        }
+      } catch {}
       const targets = staleSyncTargets(list, syncRows);
       checked += list.length;
       for (const t of targets) {
@@ -109,6 +136,10 @@ export async function reconcileDueSync(opts = {}) {
         let busy = false;
         try { busy = healInFlight.has(hk) || isBusy(t); } catch { busy = false; }
         if (busy) { skippedWatch++; continue; }
+        try {
+          const sr = syncByKey.get(hk);
+          if (sr && !healEligible(sr)) { skippedBackoff++; continue; }
+        } catch {}
         healInFlight.add(hk);
         try {
           const p = fetchImpl('/api/sync-due', {
@@ -129,7 +160,7 @@ export async function reconcileDueSync(opts = {}) {
         } catch { try { healInFlight.delete(hk); } catch {} }
       }
     }
-    return { checked, healed, skippedWatch };
+    return { checked, healed, skippedWatch, skippedBackoff };
   } catch {
     return { checked: 0, healed: 0, skipped: 'failed' };
   }
@@ -727,10 +758,14 @@ export function bindChangelogEvents(root, st, helpers) {
         // Canonical section_key first: the server resolves stale heads, and
         // both the toast's watch and the sync fire below must use the SAME
         // key, or the watch never matches its row (bare 'error' on a landed
-        // sync). Extracted once from the write response.
+        // sync). Extracted once from the write response, with a local
+        // fallback: the server computes normHead(commitHead), so an
+        // unparsed response still yields the exact row key — the fire below
+        // and the watch above can never miss their row on a lost body.
         let sk = null;
         try { sk = await r2.clone().json().then((j) => (j && j.section_key) || null).catch(() => null); } catch {}
-        try { setDueProgressStep(progDetail, 'committed', sk ? { sectionKey: sk } : null); } catch {}
+        const fireKey = (typeof sk === 'string' && sk) ? sk : normHead(commitHead);
+        try { setDueProgressStep(progDetail, 'committed', fireKey ? { sectionKey: fireKey } : null); } catch {}
         // Save the confirmed override BEFORE the rebuild: the rebuild's
         // applier confirms it against the server text (self-drops on match)
         // or paints it when the server text lacks the value — either way the
@@ -765,13 +800,13 @@ export function bindChangelogEvents(root, st, helpers) {
         // Writer-driven GitHub sync (pivot — no DB trigger needed): best
         // effort, never disturbs the saved UI. Failures land in sync_state
         // and surface via GET /api/schedule?sync=. Reuses the canonical key
-        // extracted above — same key the toast's watch is polling.
+        // above — same key the toast's watch is polling.
         try {
-          if (sk && typeof fetch === 'function') {
+          if (fireKey && typeof fetch === 'function') {
             fetch('/api/sync-due', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ plan_file: plan.file, section_key: sk, token }),
+              body: JSON.stringify({ plan_file: plan.file, section_key: fireKey, token }),
             }).catch(() => {});
           }
         } catch {}

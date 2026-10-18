@@ -360,10 +360,15 @@ export function paintDetail(root, ctx){
     tagsHead,
     `<button data-close aria-label="Close detail">✕</button></div>`,
     // Due row sits directly under the section title on EVERY paint: it is
-    // always the first flow element INSIDE .ds-md — after the parsed head
-    // when one matches, else before the parsed body. Never outside .ds-md
-    // on one paint and inside on the next (layout jump). Both branches
-    // render identical content; only the head split differs.
+    // always the first flow element after the title INSIDE .ds-md. The split
+    // skips render-neutral preamble lines (blank lines, anchor-only lines,
+    // and Due metadata) so bodies that open with a non-heading line — notably
+    // the ghost-preview prepend (`*Due: …*` ahead of the head, see
+    // duePreviewEdit) — split at the SAME title line as file-shaped bodies
+    // (Due under head). Without the skip those paints fell into the no-head
+    // branch and put the row ABOVE the title, then below it once the file
+    // text landed: the position jump. Only the head split differs; when no
+    // heading line exists at all the row stays first (the only stable slot).
     (() => {
       const markOpts = {
         phaseDone: isDone(state(sprint.body)),
@@ -371,9 +376,19 @@ export function paintDetail(root, ctx){
       };
       const revsHTML = paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN })
         + (hs.length ? badges(hs) : '');
-      const hm = String(bodySansGates || '').match(/^(#{1,4}\s+[^\n]+)\n([\s\S]*)$/);
-      if (!hm) return [`<div class="ds-md">`, dueHTML + marked.parse(bodySansGates, markOpts) + revsHTML, `</div>`].join('');
-      return [`<div class="ds-md">`, marked.parse(hm[1], markOpts) + dueHTML + marked.parse(hm[2], markOpts) + revsHTML, `</div>`].join('');
+      const rawLines = String(bodySansGates || '').split('\n');
+      let titleIdx = -1;
+      for (let i = 0; i < rawLines.length; i++) {
+        const ln = rawLines[i];
+        if (/^\s*$/.test(ln)) continue;
+        if (/^\s*\{#[^}]*\}\s*$/.test(ln)) continue;
+        if (/^\s*\*Due:[^*]*\*\s*$/.test(ln)) continue;
+        if (/^#{1,4}\s+[^\n]+$/.test(ln)) titleIdx = i;
+        break;
+      }
+      if (titleIdx < 0) return [`<div class="ds-md">`, dueHTML + marked.parse(bodySansGates, markOpts) + revsHTML, `</div>`].join('');
+      const restSrc = rawLines.slice(titleIdx + 1).join('\n');
+      return [`<div class="ds-md">`, marked.parse(rawLines[titleIdx], markOpts) + dueHTML + marked.parse(restSrc, markOpts) + revsHTML, `</div>`].join('');
     })(),
   ].join('');
   const u = unlinked(texts);

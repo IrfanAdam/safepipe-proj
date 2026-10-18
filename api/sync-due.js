@@ -102,7 +102,11 @@ export async function syncDueHandler(req, res) {
   const slug = process.env.VERCEL_GIT_REPO_SLUG;
   const branch = process.env.VERCEL_GIT_COMMIT_REF || 'main';
   if (!url || !key) { res.status(500).send('Scheduling backend unavailable'); return; }
-  if (!token || !owner || !slug) { res.status(500).send('Sync not configured'); return; }
+  // NOTE: token/owner/slug are checked inside the main try below, AFTER the
+  // state helpers are defined — an owner-verified caller whose server PAT is
+  // missing still gets a verbatim sync_state error row (fail(502,
+  // 'sync-not-configured')) so the toast's watch settles on truth instead of
+  // hanging to timeout on a row that never comes.
   const repo = `${owner}/${slug}`;
   const base = sb(url);
   const ghPath = `.hermes/plans/${plan_file}`;
@@ -148,6 +152,10 @@ export async function syncDueHandler(req, res) {
   };
 
   try {
+    // Owner-verified above, but the server PAT/repo context is missing: record
+    // the verbatim cause so the toast's watch settles on truth immediately
+    // instead of hanging to timeout on a row that never comes.
+    if (!token || !owner || !slug) { await fail(502, 'sync-not-configured'); return; }
     // 1. Live row via service_role PostgREST (bypasses RLS, server only).
     let row = null;
     try {

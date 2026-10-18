@@ -204,6 +204,12 @@ function parkCard(card, step) {
 const SYNC_POLL_BUDGET_MS = 30000;
 const SYNC_POLL_TICK_MS = 3000;
 const SYNC_FETCH_TIMEOUT_MS = 10000;
+// Stale-verdict grace: an error row recorded just before this watch started
+// (rapid re-pick after a failure) still belongs to the previous pick's story
+// in wall-clock terms, but the new worker hasn't had time to overwrite it —
+// treat rows fresher than this as the new verdict, older ones as stale.
+// Server/client clocks both run UTC; 10s dwarfs real skew.
+const SYNC_STALE_GRACE_MS = 10000;
 
 function startSyncWatch(detail, opts) {
   if (!detail || !detail.file) return;
@@ -244,7 +250,7 @@ function terseSyncCause(lastError) {
   // Full bodies go to console.error only.
   try {
     const s = String(lastError == null ? '' : lastError).trim();
-    if (/^(github-write-\d+|row-not-found|head-not-found|unchanged|timeout|offline|http \d+)$/.test(s)) return s;
+    if (/^(github-(write|read)-(\d+|failed)|schedule-read-(\d+|failed)|sync-not-configured|row-not-found|head-not-found|unchanged|timeout|offline|http \d+)$/.test(s)) return s;
     return dueFailureReason({ reason: lastError });
   } catch { return 'error'; }
 }
@@ -254,6 +260,8 @@ async function pollDueSync(detail, key, seq, sectionKey) {
   const matchKey = (typeof sectionKey === 'string' && sectionKey)
     ? sectionKey
     : normHead(detail.head || '');
+  const wantDue = detail.due ?? null;
+  const watchStart = Date.now();
   const url = `/api/schedule?sync=${encodeURIComponent(file)}`;
   const activeKey = syncActiveKey(file, matchKey);
   const deadline = Date.now() + SYNC_POLL_BUDGET_MS;
@@ -277,13 +285,25 @@ async function pollDueSync(detail, key, seq, sectionKey) {
         const list = await r.json().catch(() => null);
         const row = Array.isArray(list) ? list.find((x) => x && x.section_key === matchKey) : null;
         if (row) {
-          if (row.status === 'ok') { settleSyncOk(detail, key, seq); return; }
-          if (row.status === 'error') {
-            settleSyncErr(detail, key, seq, terseSyncCause(row.last_error),
-              `last_error=${row.last_error ?? null} attempts=${row.attempts ?? 0}`);
-            return;
+          // Stale-verdict guard: a row left by an EARLIER pick must never
+          // settle this watch. ok settles only when the synced value IS this
+          // pick's due (an identical earlier value already converged reads
+          // Synced truthfully); error settles only when recorded after this
+          // watch started (a fresh verdict for this pick). Anything else
+          // keeps polling for the worker's fresh row — never a false Synced
+          // on a landed-then-changed section, never a stale retry that
+          // preempts the in-flight sync.
+          if (row.status === 'ok') {
+            if ((row.last_synced_due ?? null) === wantDue) { settleSyncOk(detail, key, seq); return; }
+          } else if (row.status === 'error') {
+            const ts = Date.parse(row.updated_at);
+            if (!Number.isFinite(ts) || ts > watchStart - SYNC_STALE_GRACE_MS) {
+              settleSyncErr(detail, key, seq, terseSyncCause(row.last_error),
+                `last_error=${row.last_error ?? null} attempts=${row.attempts ?? 0}`);
+              return;
+            }
           }
-          // Row exists but unsettled — the sync worker is still carrying it.
+          // Row exists but unsettled (or stale) — the sync worker is still carrying it.
         }
       } else if (r) {
         lastHttp = r.status || 0;
