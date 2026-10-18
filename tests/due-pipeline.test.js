@@ -17,7 +17,7 @@ import {
   dueHandler,
 } from '../api/due.js';
 // --- client matcher parity (must stay a port of the server algorithm) ---
-import { dueEditText as clientEdit, duePreviewEdit } from '../src/changelog/changelog-events.js';
+import { dueEditText as clientEdit, duePreviewEdit, readDomPaintedDue, fileSideDue } from '../src/changelog/changelog-events.js';
 // --- pure scheduling helpers (zero DOM) ---
 import {
   loadDueOverrides,
@@ -37,6 +37,7 @@ import {
   clearDuePending,
   dueDeployVerdict,
   DUE_PENDING_WINDOW_MS,
+  dueStuckHealed,
   normHead,
   headingOf,
   findHeadIndex,
@@ -737,5 +738,67 @@ describe('eventual sync reconciliation (staleSyncTargets + reconcileDueSync)', (
     assert.equal(r.healed, 0);
     assert.equal(r.skippedWatch, 1);
     assert.equal(posts.length, 0);
+  });
+});
+
+describe('readDomPaintedDue (verdict reads the visitor paint first)', () => {
+  const row = (file, head, due) => ({
+    getAttribute: (k) => (k === 'data-due-file' ? file : k === 'data-due-head' ? head : null),
+    querySelector: (s) => (s === '[data-due-open]'
+      ? { getAttribute: (k) => (k === 'data-due' ? due : null) }
+      : null),
+  });
+  const rootOf = (rows) => ({ querySelectorAll: (sel) => (sel === '[data-due-row]' ? rows : []) });
+  it('reads the painted date from the matching row (set + clear)', () => {
+    assert.deepEqual(readDomPaintedDue(rootOf([row('f.md', 'H', '2026-11-27')]), 'f.md', 'H'), { found: true, due: '2026-11-27' });
+    assert.deepEqual(readDomPaintedDue(rootOf([row('f.md', 'H', '')]), 'f.md', 'H'), { found: true, due: null });
+    assert.deepEqual(readDomPaintedDue(rootOf([row('f.md', 'H', null)]), 'f.md', 'H'), { found: true, due: null });
+  });
+  it('ignores neighboring sections and misses cleanly when the row is absent', () => {
+    const root = rootOf([row('f.md', 'Other', '2026-10-01'), row('f.md', 'H', '2026-11-27')]);
+    assert.deepEqual(readDomPaintedDue(root, 'f.md', 'H'), { found: true, due: '2026-11-27' });
+    assert.deepEqual(readDomPaintedDue(root, 'f.md', 'Gone'), { found: false, due: null });
+    assert.deepEqual(readDomPaintedDue(rootOf([]), 'f.md', 'H'), { found: false, due: null });
+    assert.deepEqual(readDomPaintedDue(null, 'f.md', 'H'), { found: false, due: null });
+  });
+});
+
+describe('fileSideDue (lag-guard pre is file truth, never override paint)', () => {
+  const FRESH = '## Task 1 — Head\n*Tags: A*\n\nBody\n';
+  const DATED = '## Task 1 — Head\n*Tags: A*\n\n*Due: 2026-11-01*\n\nBody\n';
+  it('reads the file value, not a painted-over pick', () => {
+    // stacked pick: the live body carries P1 but the file is still dateless
+    const liveBody = duePreviewEdit(FRESH, 'Task 1 — Head', '2026-11-01');
+    assert.ok(liveBody.includes('*Due: 2026-11-01*'), 'live body paints the pick');
+    assert.equal(fileSideDue(FRESH, 'Task 1 — Head'), null, 'file truth is dateless');
+    assert.equal(fileSideDue(DATED, 'Task 1 — Head'), '2026-11-01', 'file truth carries the date');
+  });
+  it('is undefined when unresolvable (caller keeps its fallback)', () => {
+    assert.equal(fileSideDue(FRESH, 'No such head'), undefined);
+    assert.equal(fileSideDue('', 'Task 1 — Head'), undefined);
+    assert.equal(fileSideDue(null, 'Task 1 — Head'), undefined);
+  });
+});
+
+describe('dueStuckHealed (stuck mismatch flips only on convergence)', () => {
+  const rec = (over) => ({ file: 'p.md', head: 'H', state: 'failed', reason: 'mismatch', due: '2026-11-27', ...over });
+  it('heals a set pick and a clear once the paint converges', () => {
+    assert.equal(dueStuckHealed(rec({}), '2026-11-27'), true);
+    assert.equal(dueStuckHealed(rec({ due: null }), null), true);
+    assert.equal(dueStuckHealed(rec({}), '2026-10-01'), false, 'stale paint stays failed');
+    assert.equal(dueStuckHealed(rec({}), null), false, 'missing paint stays failed');
+    assert.equal(dueStuckHealed(rec({}), undefined), false, 'unreadable paint stays failed');
+  });
+  it('never flips other states, reasons, or pick-less records', () => {
+    assert.equal(dueStuckHealed(rec({ state: 'saving' }), '2026-11-27'), false);
+    assert.equal(dueStuckHealed(rec({ state: 'saved' }), '2026-11-27'), false);
+    assert.equal(dueStuckHealed(rec({ reason: 'offline' }), '2026-11-27'), false);
+    assert.equal(dueStuckHealed(rec({ reason: 'timeout' }), '2026-11-27'), false);
+    assert.equal(dueStuckHealed(rec({ reason: 'http 500' }), '2026-11-27'), false);
+    assert.equal(dueStuckHealed(rec({ reason: 'needs-login' }), '2026-11-27'), false);
+    const { due, ...pickless } = rec({});
+    assert.equal(dueStuckHealed(pickless, '2026-11-27'), false, 'pre-fix records never auto-flip');
+    assert.equal(dueStuckHealed(null, '2026-11-27'), false);
+    assert.equal(dueStuckHealed({ file: 'p.md' }, '2026-11-27'), false);
   });
 });

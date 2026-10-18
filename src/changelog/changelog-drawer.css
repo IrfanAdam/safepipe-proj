@@ -101,23 +101,26 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-gate-tag[data-gate-tag="failed"]{color:var(--color-ink)}
 /* Due scheduling row (timeline Task 3): quiet inline control under the drawer
    head — drawer density, token-only. */
-.ds-due{position:relative;display:flex;align-items:center;gap:var(--cl-8);flex-wrap:wrap;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);margin-bottom:var(--cl-12)}
-.ds-due-sched{background:none;border:0;padding:0;font-family:var(--font-mono);font-size:var(--text-micro);font-weight:700;color:var(--color-accent);cursor:pointer}
+.ds-due{position:relative;display:flex;align-items:center;gap:var(--cl-8);flex-wrap:nowrap;font-family:var(--font-mono);font-size:var(--text-micro);line-height:var(--leading-mono);color:var(--color-ink-muted);margin-bottom:var(--cl-12)}
+.ds-due-sched{background:none;border:0;padding:0;font-family:var(--font-mono);font-size:var(--text-micro);line-height:var(--leading-mono);font-weight:700;color:var(--color-accent);cursor:pointer;flex:none;white-space:nowrap}
 .ds-due-sched:hover{text-decoration:underline;text-underline-offset:var(--cl-2)}
 /* Logged-out due display: a set date shows as plain text, and dateless rows
    hide entirely. Setter buttons hide via the generic data-requires-auth gate. */
-.ds-due-static{display:none}
+.ds-due-static{display:none;white-space:nowrap;line-height:var(--leading-mono)}
 body:not(.is-sched-auth) .ds-due-static{display:inline}
 body:not(.is-sched-auth) .ds-due:not(:has(.ds-due-static)){display:none}
-.ds-due-overdue{color:var(--color-accent);font-weight:700;text-transform:uppercase;letter-spacing:var(--tracking-label)}
+.ds-due-overdue{flex:none;white-space:nowrap;line-height:var(--leading-mono);color:var(--color-accent);font-weight:700;text-transform:uppercase;letter-spacing:var(--tracking-label)}
 /* Due commit state (scheduling pipeline): quiet status after the date.
    Warn/err render as buttons — tap retries the git commit or re-login.
-   The slot is ALWAYS rendered (idle placeholder when empty) and held at a
-   stable min-height via visibility — never display:none — so commit state
-   appearing, clearing, or swapping text never changes the row's height. */
-.ds-due-status{display:inline-flex;align-items:center;min-height:var(--cl-16);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
+   The row NEVER wraps: one line always, the status takes leftover width
+   and ellipsizes (still focusable and tappable — never clipped out of
+   layout). The slot is ALWAYS rendered (idle placeholder when empty) at
+   a full one-line min-height, and every child shares one line-height
+   (span/button parity), so commit state appearing, clearing, or swapping
+   text — short Saving… or the longest retry — never changes the height. */
+.ds-due-status{display:block;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:var(--leading-mono);min-height:calc(var(--text-micro) * var(--leading-mono));font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
 .ds-due-status.is-idle{visibility:hidden}
-button.ds-due-status{background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:var(--cl-2)}
+button.ds-due-status{background:none;border:0;padding:0;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:var(--cl-2)}
 .ds-due-status.is-warn,.ds-due-status.is-err{color:var(--color-accent);font-weight:700}
 .ds-due-status.is-ok{color:var(--color-ink);font-weight:700}
 /* Due publish progress card (scheduling pipeline): small floating narrator

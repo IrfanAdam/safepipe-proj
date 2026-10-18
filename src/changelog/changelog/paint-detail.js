@@ -312,7 +312,7 @@ export function paintDetail(root, ctx){
     const pend = readDuePending();
     pendRow = !!pend && dueDeployVerdict(pend, Date.now()) === 'pending'
       && plan && sprint && pend.file === plan.file && pend.head === sprint.head
-      && (() => { try { return pend.due === (dueOf(sec) || null); } catch { return false; } })();
+      && (() => { try { return pend.due === (dueOf({ head: sprint.head, body: sprint.body }) || null); } catch { return false; } })();
   } catch { pendRow = false; }
   // Idle status slot: always rendered so the due row keeps a stable height
   // whether the commit state appears, clears, or swaps text. CSS holds it
@@ -324,7 +324,7 @@ export function paintDetail(root, ctx){
     : dc === 'saved'
       ? `<span class="ds-due-status is-ok${pendRow ? ' is-pend' : ''}" data-due-status="saved">Saved ✓${pendRow ? ' · syncing…' : ''}</span>`
       : dc === 'needs-login'
-        ? `<button class="ds-due-status is-warn" data-due-retry="login">only on this device — sign in again</button>`
+        ? `<button class="ds-due-status is-warn" data-due-retry="login" title="only on this device — sign in again">only on this device — sign in again</button>`
         : (dc === 'failed' || dc === 'retry')
           ? dueSyncRetryHTML(dr || 'error')
           : dueStatusIdle;

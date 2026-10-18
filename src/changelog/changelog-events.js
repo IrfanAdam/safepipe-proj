@@ -2,8 +2,8 @@
 // Exports: bindChangelogEvents — click/key/hover wiring over shared state st
 // Timeline (task 2): view toggle, track/bout/ghost open, bout popover, Esc chain.
 // — Events —
-import { saveDueOverride, saveDueConfirm, saveDuePending, confirmPublish, headingOf, findHeadIndex } from '../logic/due-overrides.js';
-import { dueOf } from './changelog-parse.js';
+import { saveDueOverride, saveDueConfirm, saveDuePending, confirmPublish, headingOf, findHeadIndex, dueStuckHealed } from '../logic/due-overrides.js';
+import { dueOf, split } from './changelog-parse.js';
 import { getSchedToken, clearSchedToken, clearSchedUser } from '../logic/schedule-auth.js';
 import { openScheduleGate } from './schedule-gate.js';
 import { showDueProgress, setDueProgressStep, hideDueProgress, isSyncWatchActive } from './due-progress.js';
@@ -189,8 +189,88 @@ export function duePreviewEdit(body, head, due) {
   }
   return `*Due: ${due}*\n${src}`;
 }
+// DOM-anchored read-back for publish verification (exported for node probes):
+// the Due currently painted in the open row for (file, head) — null when the
+// row paints dateless, { found:false } when the row is absent (drawer closed,
+// rebuilt away). This is the SAME source the visitor sees; the plans model is
+// the fallback, never the primary — a landed write that painted correctly
+// must verify, never downgrade on a torn model read. Never throws.
+export function readDomPaintedDue(root, file, head) {
+  try {
+    const rows = root && root.querySelectorAll ? root.querySelectorAll('[data-due-row]') : [];
+    for (const row of rows) {
+      let f = null, h = null;
+      try {
+        f = row.getAttribute ? row.getAttribute('data-due-file') : null;
+        h = row.getAttribute ? row.getAttribute('data-due-head') : null;
+      } catch { continue; }
+      if (f !== file || h !== head) continue;
+      let dv = null, hasOpen = false;
+      try {
+        const open = row.querySelector ? row.querySelector('[data-due-open]') : null;
+        if (open && open.getAttribute) { hasOpen = true; dv = open.getAttribute('data-due'); }
+      } catch { hasOpen = false; }
+      if (!hasOpen) continue;
+      return { found: true, due: (dv == null || dv === '') ? null : dv };
+    }
+  } catch {}
+  return { found: false, due: null };
+}
+// File-side Due for the lag-guard claim (exported for node probes): what the
+// FILE text carries for head — never override paint. A later sync fetch
+// carrying THIS value is lagged pre-commit bytes (hold); anything else is
+// judged on its own. Returns undefined when unresolvable (caller keeps its
+// own fallback); null means the file genuinely carries no Due.
+export function fileSideDue(rawText, head) {
+  try {
+    const secs = split(String(rawText || ''));
+    const sec = secs.find((s) => s && s.head === head);
+    if (!sec) return undefined;
+    return dueOf(sec);
+  } catch { return undefined; }
+}
 export function bindChangelogEvents(root, st, helpers) {
   const { cur, doPaint } = helpers;
+  // Stuck-mismatch heal: a landed write whose read-back raced a torn plans
+  // state (rename/rebuild skew between paint and confirm) shows retry even
+  // after convergence heals the painted date — nothing re-runs the verdict.
+  // On every foreground heal (boot/focus/visible/online — the same hooks as
+  // the sync reconciliation, never a timer loop), a failed/mismatch record
+  // whose painted date now equals its pick flips to saved (auto-dismissed).
+  // Only failed/mismatch records carrying their pick heal — offline,
+  // timeout, http and login failures plus genuinely divergent paints keep
+  // their retry. No network, no login impact, never throws.
+  const healDueMismatch = async () => {
+    try {
+      const rec = st.dueCommit;
+      if (!rec || rec.state !== 'failed' || rec.reason !== 'mismatch' || !('due' in rec)) return;
+      let painted = null, seen = false;
+      try {
+        const d = readDomPaintedDue(root, rec.file, rec.head);
+        if (d && d.found) { painted = d.due; seen = true; }
+      } catch { seen = false; }
+      if (!seen) {
+        try {
+          const liveMod = await import('./pages-changelog.js');
+          if (!liveMod || typeof liveMod.readPaintedDue !== 'function') return;
+          painted = liveMod.readPaintedDue(rec.file, rec.head);
+          seen = true;
+        } catch { return; }
+      }
+      if (!seen) return;
+      if (!dueStuckHealed(rec, painted)) return;
+      // A newer pick replaces the record — never overwrite a live flight.
+      if (st.dueCommit !== rec) return;
+      const flipped = { file: rec.file, head: rec.head, state: 'saved', due: rec.due ?? null };
+      st.dueCommit = flipped;
+      try { doPaint(root); } catch {}
+      try {
+        setTimeout(() => {
+          try { if (st.dueCommit === flipped) { st.dueCommit = null; doPaint(root); } } catch {}
+        }, 2500);
+      } catch {}
+    } catch {}
+  };
   // Eventual-sync reconciliation: one silent heal pass on boot, plus heals
   // on every foreground refetch (focus / visibility / online — the same
   // hooks the live refresh uses, never a timer loop). Logged-out readers
@@ -198,6 +278,10 @@ export function bindChangelogEvents(root, st, helpers) {
   try {
     const boot = reconcileDueSync();
     if (boot && typeof boot.catch === 'function') boot.catch(() => {});
+    try {
+      const hb = healDueMismatch();
+      if (hb && typeof hb.catch === 'function') hb.catch(() => {});
+    } catch {}
   } catch {}
   try {
     if (!reconcileWired && typeof window !== 'undefined'
@@ -207,6 +291,10 @@ export function bindChangelogEvents(root, st, helpers) {
         try {
           const p = reconcileDueSync();
           if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch {}
+        try {
+          const q = healDueMismatch();
+          if (q && typeof q.catch === 'function') q.catch(() => {});
         } catch {}
       };
       try { window.addEventListener('focus', heal); } catch {}
@@ -371,11 +459,16 @@ export function bindChangelogEvents(root, st, helpers) {
     if (/[✓✗]/.test(String(sprint.head || ''))) return;
     if (iso && !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
     const next = duePreviewEdit(sprint.body, sprint.head, iso || null);
-    // Pre-commit value for the lag-guard claim: a later sync fetch carrying
-    // THIS value is lagged pre-commit bytes (hold); any third value is
-    // another device's newer truth (take, never hold).
-    let preDue = null;
-    try { preDue = dueOf(sprint) || null; } catch { preDue = null; }
+    // Pre-commit value for the lag-guard claim: what the FILE carries (never
+    // override paint) — a later sync fetch carrying THIS value is lagged
+    // pre-commit bytes (hold); any third value is another device's newer
+    // truth (take, never hold). Painted-pre would mislabel lagged bytes as a
+    // third value on stacked picks and clobber the new pick on arrival.
+    let preDue;
+    try { preDue = fileSideDue(plan.raw, sprint.head); } catch { preDue = undefined; }
+    if (preDue === undefined) {
+      try { preDue = dueOf(sprint) || null; } catch { preDue = null; }
+    }
     if (next !== sprint.body) {
       sprint.body = next;
       st.duePending = { file: plan.file, due: iso || null, line: iso ? `*Due: ${iso}*` : null };
@@ -463,7 +556,10 @@ export function bindChangelogEvents(root, st, helpers) {
     const failDue = (state, reason) => {
       if (gen !== dueGen) return;
       try { hideDueProgress(progDetail, 0); } catch {}
-      st.dueCommit = { file: plan.file, head: commitHead, state, reason: reason || null };
+      // The pick travels with the record so a later foreground heal can
+      // verify convergence (failed/mismatch + paint now equals pick → saved)
+      // without re-firing the pipeline. Consumers read state/reason only.
+      st.dueCommit = { file: plan.file, head: commitHead, state, reason: reason || null, due: iso || null };
       keepDuePop();
     };
     // Success is confirmed, not assumed: flash 'published ✓', then dismiss.
@@ -484,23 +580,34 @@ export function bindChangelogEvents(root, st, helpers) {
         }, 2500);
       } catch {}
     };
-    // Read-back gate: 'published ✓' appears only after reading the painted
-    // date back from the current plans and confirming it equals the pick
-    // (or empty on clear). Anything else — stale paint, missing section,
-    // unreadable plans — shows retry instead. Never assumed from the POST.
+    // Read-back gate: 'published ✓' appears only after the pick reads back
+    // equal from the painted UI (or empty on clear). Anything else — stale
+    // paint, missing section, unreadable paint — shows retry instead. The
+    // verdict is computed against the SAME source the visitor sees: the
+    // freshly painted DOM row first, the in-memory plans as fallback (drawer
+    // closed or the row rebuilt away) — never downgrade a landed write on a
+    // torn model read. Genuinely divergent paint still fails 'mismatch'.
     const confirmSaved = (reader) => {
       if (gen !== dueGen) return;
       // Stamp our own commit time: the deploy self-update must not reload
       // this page for its own deploy while it is still building. Stamped
       // for every landed commit — even when the paint still needs a retry.
       try { localStorage.setItem('safepipe-last-due-commit', String(Date.now())); } catch {}
+      const want = iso || null;
       let painted;
+      let domHit = false;
       try {
-        painted = reader && typeof reader.readPaintedDue === 'function'
-          ? reader.readPaintedDue(plan.file, commitHead)
-          : undefined;
-      } catch { painted = undefined; }
-      if (confirmPublish(painted, iso || null) === 'saved') { markSaved(); return; }
+        const d = readDomPaintedDue(root, plan.file, commitHead);
+        if (d && d.found) { painted = d.due; domHit = true; }
+      } catch { domHit = false; }
+      if (!domHit) {
+        try {
+          painted = reader && typeof reader.readPaintedDue === 'function'
+            ? reader.readPaintedDue(plan.file, commitHead)
+            : undefined;
+        } catch { painted = undefined; }
+      }
+      if (confirmPublish(painted, want) === 'saved') { markSaved(); return; }
       try { console.error('[due-commit] paint mismatch after publish', plan.file, commitHead); } catch {}
       failDue('failed', 'mismatch');
     };

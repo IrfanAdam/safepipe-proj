@@ -225,6 +225,23 @@ export function confirmPublish(painted, want) {
   return painted === w ? 'saved' : 'mismatch';
 }
 
+// Stuck-mismatch heal predicate (pure, node-testable): a failed/mismatch
+// record whose pick the current paint now carries has converged — flipping
+// it to saved states the truth. Records predating pick-storing failDue (no
+// due field) never flip; any other state or reason never flips, so offline,
+// timeout, http and login failures plus genuinely divergent paints keep
+// their retry.
+export function dueStuckHealed(rec, paintedDue) {
+  try {
+    if (!rec || rec.state !== 'failed' || rec.reason !== 'mismatch') return false;
+    if (typeof rec.file !== 'string' || !rec.file) return false;
+    if (typeof rec.head !== 'string' || !rec.head) return false;
+    if (!('due' in rec)) return false;
+    const want = rec.due ?? null;
+    return (paintedDue ?? null) === want;
+  } catch { return false; }
+}
+
 // Post-commit fetch guard: after our own commit lands, a lagged sync fetch
 // (CDN serving the pre-commit file) must not regress the painted date back
 // to the previous value. The commit records {file, head, due, pre, at} —
