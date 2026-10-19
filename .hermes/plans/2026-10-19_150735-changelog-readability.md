@@ -175,7 +175,7 @@
 |---|---|---|
 | 9 | Ship-gate plan status | 172008 + smooth cards read open (ship gates open); timeline card unchanged (ship passed); no other card flips |
 
-### Task 9: Ship-gate plan status
+### Task 9: Ship-gate plan status ✓ done `2b6f5ae`
 
 **Objective:** The plan card is the plan's seal — an open `(ship)` gate keeps it open no matter the task fractions.
 
@@ -192,3 +192,5 @@
 **Verify:** unit tests + 172008/smooth/open-ship corpus asserts; timeline ship-passed assert; list screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-4]`; close with `✓ done` + sha.
 
 - REF GATE 4 (ship): 172008 card open, smooth card open, every other card unchanged. Evidence: list screenshots + green suite.
+
+*Shipped in 2b6f5ae · Task 9 · phase-4.*
