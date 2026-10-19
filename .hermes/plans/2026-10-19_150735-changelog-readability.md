@@ -334,7 +334,7 @@
 |---|---|---|
 | 14 | Lone-task promotion | terrain Task 6 pane shows h2 + DONE + divider + flowing body, no fold, no `<h3-task>` |
 
-### Task 14: Lone-task promotion ✓ done
+### Task 14: Lone-task promotion ✓ done `c3cd09d`
 
 **Objective:** A section that IS one task behaves like a phase.
 
@@ -349,3 +349,5 @@
 **Verify:** 5 new unit tests; corpus sweep green; terrain Task 6 screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-9]`; close with `✓ done` + sha.
 
 - REF GATE 9 (ship): Task 6 title + status + divider + flowing STEPs. Evidence: screenshots + green suite.
+
+*Shipped in c3cd09d · Task 14 · phase-9.*
