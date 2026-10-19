@@ -364,7 +364,7 @@
 |---|---|---|
 | 15 | Reconcile sibling worktree | green suite, both intents observable, every hunk decision recorded |
 
-### Task 15: Reconcile sibling worktree ✓ done
+### Task 15: Reconcile sibling worktree ✓ done `02be9ce`
 
 **Objective:** A sibling session shipped an uncommitted lane (ontology, engine invariant, frac fallbacks, skill docs) on top of Phases 1–9. Merge it impartially per hunk.
 
@@ -379,3 +379,5 @@
 **Verify:** detail suite 60/60 (3 new fraction tests); full suite green except pre-existing geo + honestly-pinned counts; build green; 172008 P5 head shows no DONE; chromium + webkit zero page errors; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-10]`; close with `✓ done` + sha.
 
 - REF GATE 10 (ship): reconciled tree renders honest heads, hollow boxes, unchanged rails/cards. Evidence: screenshots + green suite.
+
+*Shipped in 02be9ce · Task 15 · phase-10.*
