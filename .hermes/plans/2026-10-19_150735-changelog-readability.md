@@ -116,7 +116,7 @@
 | 7 | Metadata accordions | multi-line/list/code fields fold into closed native `<details>` with count preview; single-line fields stay rows; canonical order kept |
 | 8 | Compact metadata CSS + verify | token-only tightening of field type/spacing; chromium + webkit screenshots, zero page errors, suite green |
 
-### Task 6: Task headers incl. task-led plans ✓ done
+### Task 6: Task headers incl. task-led plans ✓ done `97ca963`
 
 **Objective:** Tasks stop being bare bold lines — each gets the phase treatment (header + status).
 
@@ -131,7 +131,7 @@
 
 **Verify:** new tests for all three head shapes + unmarked; smooth-scheduling `###` items render headed in the corpus sweep; no `<input>` in any detail body.
 
-### Task 7: Metadata accordions ✓ done
+### Task 7: Metadata accordions ✓ done `97ca963`
 
 **Objective:** Long metadata folds shut — drawers scan as headers first, detail on demand.
 
@@ -145,7 +145,7 @@
 
 **Verify:** tests for list-field accordion (preview count), long-text accordion, single-line row (no `details`), order across mixed rows; corpus sweep balances the new tags and asserts zero `dt`/`input` leaks.
 
-### Task 8: Compact metadata CSS + verify ✓ done
+### Task 8: Compact metadata CSS + verify ✓ done `97ca963`
 
 **Objective:** Metadata reads as fine print under task headers — smaller type, tighter rhythm, token-only.
 
@@ -160,3 +160,4 @@
 **Verify:** screenshots (172008 P1 task headers + accordions, smooth-scheduling Task 1, domain Task 4, twin Phase 05) on chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-3]`; close tasks with `✓ done` + sha.
 
 - REF GATE 3 (ship): the 4 sample drawers show headed tasks, closed accordions, compact metadata; no visual regression on Evals/rails/cards. Evidence: screenshots + green suite.
+*Shipped in 97ca963 · Tasks 6–8 · phase-3.*
