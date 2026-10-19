@@ -350,6 +350,52 @@ describe('task-only sections', () => {
   });
 });
 
+describe('title notes', () => {
+  const noteTask = (head) => renderSection(['## Phase 1 — X {#phase-1}', '', head, '', '**Objective:** Do it well.', '', '**Files:**', '- Create: `a.js`.'].join('\n'), {}).body;
+  it('prose paren leaves the header, leads the body', () => {
+    const body = noteTask('### Task 1: Pre-flight — prove the gap ✓ done (docs/audit.md + 8 captures — see audit)');
+    assert.ok(body.includes('<h3>Task 1 · Pre-flight — prove the gap</h3>'), body);
+    assert.ok(!body.includes('docs/audit.md + 8 captures</h3>'), body);
+    assert.ok(body.includes('<p>docs/audit.md + 8 captures — see audit</p>'), body);
+    assert.ok(body.indexOf('<p>docs/audit.md') < body.indexOf('Do it well.'), `note first: ${body}`);
+  });
+  it('paren sha still ships (no note, status carries it)', () => {
+    const body = noteTask('### Task 2: Terrain field v2 ✓ done (167a614)');
+    assert.ok(body.includes('<h3>Task 2 · Terrain field v2</h3>'), body);
+    assert.ok(body.includes('✓ DONE (167a614)'), body);
+  });
+  it('mixed paren becomes a note, status stays plain', () => {
+    const body = noteTask('### Task 4: Elevation language ✓ done (167a614, scene-side; legend left for Task 8)');
+    assert.ok(body.includes('<h3>Task 4 · Elevation language</h3>'), body);
+    assert.ok(body.includes('<p>167a614, scene-side; legend left for Task 8</p>'), body);
+    assert.ok(body.includes('✓ DONE</span>'), body);
+  });
+  it('note-only task flows unfolded, never dropped or folded solo', () => {
+    const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 8: Verification, docs, close-out ✓ done (wrap-up commit, see log)'].join('\n'), {});
+    assert.ok(!body.includes('<details'), body);
+    assert.ok(body.includes('<p>wrap-up commit, see log</p>'), body);
+  });
+  it('bold step heads open their own field, never glue into Files', () => {
+    const raw = ['## Phase 1 — X {#phase-1}', '', '### Task 1: Pre-flight ✓ done', '',
+      '**Files:**', '- Create: `a.js`.', '',
+      '**Step 1: Capture before**', '', 'Run it.', '',
+      '**Step 2: Module API** — wire these to views.'].join('\n');
+    const { body } = renderSection(raw, {});
+    assert.ok(body.includes('ds-f-t">Step 1<'), body);
+    assert.ok(body.includes('ds-f-t">Step 2<'), body);
+    assert.ok(body.includes('Capture before'), body);
+    assert.ok(body.includes('wire these to views.'), body);
+    const filesInline = body.slice(body.indexOf('ds-f-t">Files<'), body.indexOf('ds-f-t">Step 1<'));
+    assert.ok(!filesInline.includes('Step 1:'), `no run-on: ${filesInline}`);
+  });
+  it('terrain-topo Task 1 steps stand apart (corpus)', () => {
+    const raw = readFileSync(join(plansDir, '2026-10-06_153000-ops3d-terrain-topo.md'), 'utf8');
+    const chunk = raw.slice(raw.indexOf('### Task 1: Pre-flight'), raw.indexOf('### Task 2:'));
+    const { body } = renderSection(chunk, {});
+    for (const n of [1, 2, 3, 4]) assert.ok(body.includes(`ds-f-t">Step ${n}<`), `Step ${n}: ${body.slice(0, 400)}`);
+  });
+});
+
 describe('ship-gate seal', () => {
   it('gateless plans keep the old rule', () => {
     assert.equal(shipGatesShut([]), true);

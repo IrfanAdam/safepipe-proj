@@ -226,3 +226,32 @@
 - REF GATE 5 (ship): smooth Task 1 head DONE with Files/Rules/Verify in order and no nested task; timeline Task 2 contract-before-steps. Evidence: screenshots + green suite.
 
 *Shipped in 50d70b4 · Task 10 · phase-5.*
+
+---
+
+## Phase 6 — Task title notes {#phase-6}
+
+*Tags: changelog, renderer*
+
+*What the build gains:* fold headers stay one line — trailing prose parens move into the body instead of inflating the title.
+
+| # | Task | Done when |
+|---|---|---|
+| 11 | Title-note split | terrain Task 1 header is one line, note leads the open fold; paren shas still ship |
+
+### Task 11: Title-note split ✓ done
+
+**Objective:** A trailing `(...)` on a task title is the ship sha or a prose note — never header material.
+
+**Files:**
+- Modify: `src/changelog/changelog/raw-detail.js`
+- Modify: `tests/changelog-detail.test.js`
+
+**Changes:**
+- `taskTitleOf` colon branch: pure-sha paren → `shipped` (as before); any other trailing paren → `note`, stripped from the name.
+- `renderTask`: note renders as the fold's first paragraph (before objective); note-only tasks flow unfolded (header + note, never dropped, never folded solo).
+- Fully-bolded step heads (`**Step 1: X**`, no `:**`) open their own procedural field instead of gluing into the open field's inline — terrain/theatre convention.
+
+**Verify:** 6 new unit tests (4 note + 2 step-head, incl. 1 terrain corpus); corpus sweep green; terrain Task 1 closed+open screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-6]`; close with `✓ done` + sha.
+
+- REF GATE 6 (ship): terrain Task 1 header one line, note first inside, Tasks 2–7 shas in statuses. Evidence: screenshots + green suite.

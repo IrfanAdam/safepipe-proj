@@ -121,9 +121,20 @@ const taskTitleOf = (title) => {
   if (m) {
     let name = m[2].trim();
     let shipped = '';
+    let note = '';
     const sm = name.match(new RegExp(`\`?(${SHA_RE})\`?\\s*$`));
     if (sm) { shipped = sm[1]; name = name.slice(0, sm.index).trim().replace(/\.+$/, '.'); }
-    return { num: m[1], name, shipped };
+    // A trailing paren is either the ship sha — or a prose note. The note
+    // is NOT header material (it inflates fold headers to 4 lines); it
+    // renders as the fold's first body paragraph instead.
+    const pm = name.match(/\(([^()]*)\)\s*$/);
+    if (pm) {
+      const inner = pm[1].trim().replace(/^`|`$/g, '');
+      if (new RegExp(`^${SHA_RE}$`, 'i').test(inner)) shipped = shipped || inner;
+      else note = pm[1].trim();
+      name = name.slice(0, pm.index).trim().replace(/\.+$/, '.');
+    }
+    return { num: m[1], name, shipped, note };
   }
   m = s.match(/^Task\s+([\d-]+)\s+([0-9a-f]{7,40})\s*$/);
   if (m) return { num: m[1], name: '', shipped: m[2] };
@@ -274,12 +285,21 @@ const renderTask = (task) => {
   // The task itself is the fold: summary = its own header + status (no
   // FILES line, no previews), body = everything unfolded. Content-less
   // tasks render the header alone — nothing to fold.
-  const { num, name, shipped } = taskTitleOf(task.title);
+  const { num, name, shipped, note } = taskTitleOf(task.title);
   const h3 = num ? `Task ${num}${name ? ` · ${name}` : ''}` : (name || 'Task');
   const trig = `<span class="ds-caret">›</span><h3>${fmtInline(h3)}</h3>${taskStatus(task, shipped)}`;
   const obj = task.fields.find((f) => isObjective(f.label));
   const rest = task.fields.filter((f) => !isObjective(f.label));
-  let inner = '';
+  const hasContent = !!note || !!obj || task.lead.length > 0
+    || rest.some((f) => fieldText(f) || (f.parts || []).length)
+    || (task.loose || []).length > 0;
+  // Content-less tasks render the header alone — but a title note is
+  // content: it flows unfolded, never dropped, never folded solo.
+  if (!hasContent) return `<section class="ds-subtask"><h3>${fmtInline(h3)}</h3>${taskStatus(task, shipped)}</section>`;
+  let inner = note ? `<p>${fmtInline(note)}</p>` : '';
+  if (!rest.length && !obj && !task.lead.length && !(task.loose || []).length) {
+    return `<section class="ds-subtask"><h3>${fmtInline(h3)}</h3>${taskStatus(task, shipped)}${inner}</section>`;
+  }
   if (obj) {
     const otext = [...obj.inline, ...obj.parts.filter((p) => p.t === 'para').map((p) => p.text)]
       .filter(Boolean).join(' ').trim();
@@ -462,6 +482,12 @@ export const renderSection = (raw, opts) => {
     if ((m = ln.match(/^\d+[.)]\s+(.*)$/))) { listItem(true, m[1]); continue; }
     const lm = LABEL_LINE(ln);
     if (lm) { flushList(); startField(lm[1].trim(), (lm[2] || '').trim()); continue; }
+    // Fully-bolded step heads ("**Step 1: Capture before**", at most two
+    // plans) never match LABEL_LINE (no `:**`) and used to glue into the
+    // open field's inline — a run-on FILES paragraph. They open their own
+    // procedural field instead; trailing prose after the stars joins it.
+    const bm = ln.match(/^\*\*\s*((?:Steps?|Drill|Procedure)(?:\s+[\d-]+)?)\s*:\s*(.+?)\s*\*\*\s?(.*)$/i);
+    if (bm) { flushList(); startField(bm[1].trim(), `${bm[2].trim()}${bm[3].trim() ? ` ${bm[3].trim()}` : ''}`); continue; }
     // An indented line continues the open list item (lazy continuation) —
     // flushing first would orphan it into the field (the 1,1,2 split).
     if (!(openList && /^\s+\S/.test(ln))) flushList();
