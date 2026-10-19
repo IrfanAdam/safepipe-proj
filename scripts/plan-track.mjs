@@ -51,7 +51,7 @@ for (const c of prev.commits || []) if (!seen.has(c.sha)) { commits.push(c); see
 
 // Plumbing exclusion: commits touching only generated files are tracker output,
 // not work — drop them so triage can reach empty (skill: GENERATED filter).
-const GENERATED = new Set(['src/ds/plan-manifest.json', 'src/ds/plan-history.json']);
+const GENERATED = new Set(['src/ds/plan-manifest.json', 'src/ds/plan-history.json', 'public/version.json']);
 const filesOf = (sha) => {
   try { return execFileSync('git', ['show', '--name-only', '--format=', sha], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean); }
   catch { return ['unknown']; }

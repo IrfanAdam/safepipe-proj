@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-19T14:10:53.084Z",
+  "generated": "2026-10-19T14:29:54.323Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -325,15 +325,6 @@
       "subject": "feat(changelog): task headers, metadata accordions, compact fields [plan:2026-10-19_150735-changelog-readability.md#phase-3]",
       "plan": "2026-10-19_150735-changelog-readability.md",
       "anchor": "phase-3"
-    },
-    {
-      "sha": "966ad12",
-      "full": "966ad121efa7b332bb62be9168f387275d452d2a",
-      "date": "2026-10-19",
-      "time": "15:24",
-      "subject": "chore(ds): sync plan manifest (plumbing — manifest-only, auto-excluded)",
-      "plan": null,
-      "anchor": null
     },
     {
       "sha": "8ece275",
@@ -669,15 +660,6 @@
       "anchor": "scheduling"
     },
     {
-      "sha": "1e6d3ce",
-      "full": "1e6d3ce78aa7c9820c104050c28587510dce441c",
-      "date": "2026-10-17",
-      "time": "19:24",
-      "subject": "chore(manifest): refresh after edge-to-edge mobile fix (plumbing — manifest-only, auto-excluded)",
-      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
-      "anchor": null
-    },
-    {
       "sha": "616f09e",
       "full": "616f09e009ce59607a54dbafdca4de5e7dd0969a",
       "date": "2026-10-17",
@@ -723,15 +705,6 @@
       "anchor": "follow-up"
     },
     {
-      "sha": "f85c178",
-      "full": "f85c1783baf2d4e291c8448d77d8df4daf3a3e5e",
-      "date": "2026-10-17",
-      "time": "19:06",
-      "subject": "docs(plan): regen manifest",
-      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
-      "anchor": null
-    },
-    {
       "sha": "33e275f",
       "full": "33e275fc45fd438648f8b8348ec1188b6148f04d",
       "date": "2026-10-17",
@@ -757,15 +730,6 @@
       "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
       "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
       "anchor": "scheduling"
-    },
-    {
-      "sha": "842da5b",
-      "full": "842da5b61940598379d87eadb83147cb9ba857bc",
-      "date": "2026-10-17",
-      "time": "19:02",
-      "subject": "docs(plan): regen manifest",
-      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
-      "anchor": null
     },
     {
       "sha": "a52f506",
@@ -804,15 +768,6 @@
       "anchor": "scheduling"
     },
     {
-      "sha": "1d0d4b3",
-      "full": "1d0d4b3723ee201f3a80570a46a61bb565d72d8d",
-      "date": "2026-10-17",
-      "time": "18:55",
-      "subject": "docs(plan): regen manifest",
-      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
-      "anchor": null
-    },
-    {
       "sha": "7f9b709",
       "full": "7f9b7097d6e38ecc93fc301bdffd99dfed494cbe",
       "date": "2026-10-17",
@@ -838,15 +793,6 @@
       "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-29 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
       "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
       "anchor": "scheduling"
-    },
-    {
-      "sha": "8d665e7",
-      "full": "8d665e7d4c2dcf06d124595dfed0c91d969e05d4",
-      "date": "2026-10-17",
-      "time": "18:48",
-      "subject": "docs(plan): regen manifest",
-      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
-      "anchor": null
     },
     {
       "sha": "30693e0",
@@ -894,15 +840,6 @@
       "anchor": "scheduling"
     },
     {
-      "sha": "beba14e",
-      "full": "beba14ee341e66725d6cd11fad67f27b22dc3107",
-      "date": "2026-10-17",
-      "time": "18:38",
-      "subject": "docs(plan): regen manifest",
-      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
-      "anchor": null
-    },
-    {
       "sha": "885c047",
       "full": "885c047509f0ae3f4f149bf4d048394c0f215a27",
       "date": "2026-10-17",
@@ -939,15 +876,6 @@
       "anchor": "scheduling"
     },
     {
-      "sha": "424645a",
-      "full": "424645a60f54c1d8ed04386007ca4ab80d55fff6",
-      "date": "2026-10-17",
-      "time": "18:00",
-      "subject": "docs(plan): regen manifest",
-      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
-      "anchor": null
-    },
-    {
       "sha": "6831d47",
       "full": "6831d47206a9e152ab1dac1b34c6d250862ce1d0",
       "date": "2026-10-17",
@@ -955,15 +883,6 @@
       "subject": "fix(schedule): audit lane — 10 races fixed, regression suite, hygiene pass [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]",
       "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": "task-2"
-    },
-    {
-      "sha": "0797970",
-      "full": "0797970a618769484b157b66ace8422b9db42a2e",
-      "date": "2026-10-17",
-      "time": "17:54",
-      "subject": "docs(plan): regen manifest",
-      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
-      "anchor": null
     },
     {
       "sha": "0fa5587",
@@ -1047,15 +966,6 @@
       "anchor": "scheduling"
     },
     {
-      "sha": "af58fb5",
-      "full": "af58fb53c92fd50733c04901c14b9e77dea4e9ff",
-      "date": "2026-10-17",
-      "time": "17:46",
-      "subject": "docs(plan): regen manifest",
-      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
-      "anchor": null
-    },
-    {
       "sha": "29ef9ce",
       "full": "29ef9ce42bfa46a8be565ac35f4621f73b97249c",
       "date": "2026-10-17",
@@ -1072,15 +982,6 @@
       "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
       "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
       "anchor": "scheduling"
-    },
-    {
-      "sha": "2685434",
-      "full": "2685434000b6b815c75ac1748e3a589804b20d62",
-      "date": "2026-10-17",
-      "time": "17:39",
-      "subject": "docs(plan): regen manifest",
-      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
-      "anchor": null
     },
     {
       "sha": "f6d8a61",
@@ -1101,15 +1002,6 @@
       "anchor": "scheduling"
     },
     {
-      "sha": "1ce8220",
-      "full": "1ce82204ebdf20432b0ee049e2b1db20c14c8b14",
-      "date": "2026-10-17",
-      "time": "17:36",
-      "subject": "docs(plan): regen manifest",
-      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
-      "anchor": null
-    },
-    {
       "sha": "18c4d0c",
       "full": "18c4d0c3480d27f06cc614e0d9690754ad2988e0",
       "date": "2026-10-17",
@@ -1126,15 +1018,6 @@
       "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-11-10 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
       "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
       "anchor": "scheduling"
-    },
-    {
-      "sha": "1312d87",
-      "full": "1312d878a3ae4db62df792a539178e45936ba5b6",
-      "date": "2026-10-17",
-      "time": "17:32",
-      "subject": "docs(plan): regen manifest",
-      "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
-      "anchor": null
     },
     {
       "sha": "16e8569",
@@ -5538,5 +5421,7 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "scripts/plan-track.mjs"
+  ]
 }
