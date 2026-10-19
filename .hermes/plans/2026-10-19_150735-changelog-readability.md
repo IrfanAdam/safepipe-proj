@@ -100,6 +100,37 @@
 | 4 | Gate lines to `REF GATE N (STATUS):` + Evidence | Every corpus gate parses to a non-open state or an explicit OPEN with reviewer |
 | 5 | Task labels to canonical set | No `Contract`/`Rules`-led blocks remain; order Files → Changes → Steps → Verify |
 
+### Task 4: Gate lines to REF GATE N (STATUS) + Evidence
+
+**Objective:** Every `REF GATE` line in the corpus states its verdict in the paren and carries its evidence, so the drawer never has to guess open-vs-closed.
+
+**Files:**
+- Modify: `.hermes/plans/*.md` — gate lines and their evidence line only; task bodies untouched.
+- Modify: `tests/changelog-gates.test.js` — corpus assertion over `parseGates()` output.
+
+**Changes:**
+- Rewrite each `- REF GATE N …` head to `- REF GATE N (PASSED|WAIVER|OPEN|FAILED): …`, keeping the existing date and reviewer prose verbatim; a human call keeps `owner` in the line so `parseGates()` reads the reviewer.
+- Open gates say `OPEN` and name the decision still owed — never a bare gate line that parses as open with no reviewer.
+- Append `- Evidence: …` directly under a gate head that has none (screenshots, suite counts, grep output); no gate body reflowed, no verdict invented.
+- Edit history plans in place; `norm()`/anchors stay put, so a plan hash only moves where its gate line moved.
+
+**Verify:** Pending. Baseline recorded at authoring (2026-10-19): `parseGates()` over the 17 plans returns 39 gate lines — 32 open / 6 passed / 1 waiver — with **19 open gates carrying no reviewer and 22 gate lines with no `(STATUS)` paren** (realworld-twin 1–5, smooth-scheduling 1–2, 172008 1 + 3, this plan 1 + 4). Closes when a `REF GATE [0-9]` grep finds no line missing its paren status, every remaining OPEN names its reviewer, and the gates suite is green.
+
+### Task 5: Task labels to canonical set
+
+**Objective:** Field labels collapse to the canonical set so the renderer's canonical-order path is the only path a body can take.
+
+**Files:**
+- Modify: `.hermes/plans/*.md` — non-canonical label lines and the bullets under them only.
+- Modify: `tests/changelog-detail.test.js` — corpus sweep asserts zero non-canonical field heads.
+
+**Changes:**
+- Fold `**Contract:**` / `**Rules:**` / `**Scope:**` blocks into `**Changes:**` — bullets move under the canonical label, wording stays verbatim, no prose rewritten to fit.
+- Order the surviving fields Files → Changes → Steps → Verify in every touched task; `Steps:` stays numbered, every other field stays bullets.
+- Shipped task bodies keep their own prose (AGENTS.md grandfather clause): only the label and its position move, never the claim.
+
+**Verify:** Pending. Baseline recorded at authoring (2026-10-19): **13 non-canonical field blocks remain** — `172008` 6 `Contract` + 3 `Rules`, `smooth-scheduling` 3 `Rules`, `changelog-timeline` 1 `Rules`. Closes when that grep returns 0, every touched task reads Files → Changes → Steps → Verify, and the detail suite is green.
+
 - REF GATE 2 (ship): corpus-wide grep shows zero non-canonical gate/label lines; build green; screenshots unchanged-or-better.
 
 ---
