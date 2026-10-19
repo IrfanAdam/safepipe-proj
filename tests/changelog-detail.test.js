@@ -435,6 +435,11 @@ describe('gate verdict language (l3-engine fold-in)', () => {
     assert.ok(open.includes('ds-is-gate'), open);
     assert.ok(open.includes('0/1 · GATE OPEN'), open);
   });
+  it('trailing --- never becomes task body (no duplicate stamp fold)', () => {
+    const { head, body } = sec(['## Task 3: Fast cross-device sync', '', '**Verify:** okay.', '', '### Task 3 ✓ done d65bcdb', '', '---']);
+    assert.ok(!body.includes('<details'), `stamp rolls up, no fold: ${body.slice(-200)}`);
+    assert.ok(head.includes('✓ DONE'), head);
+  });
   it('unmarked all-done + passed gate reads DONE (open-gate rule repro)', () => {
     const { head } = sec(['## Phase 1 — X', '', '### Task 1: A ✓ done', '', '### Task 2: B ✓ done'],
       { gateSuffix: ' ✓ GATE PASSED' });

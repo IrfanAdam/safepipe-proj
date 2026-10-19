@@ -98,6 +98,7 @@ const DROP_LINE = (ln) => {
     || /^<!--[\s\S]*-->$/.test(t)
     || /^\{#[^}]*\}$/.test(t)
     || /^\*Due:[^*]*\*$/.test(t)
+    || /^---\s*$/.test(t) // thematic breaks are separators, never task body
     || /^\*{1,2}Tags:\s*[^*]*\*{1,2}$/.test(t);
 };
 const LABEL_LINE = (ln) => ln.match(/^\*\*([^*]{1,80}?):\*\*\s?(.*)$/);
