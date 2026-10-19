@@ -207,7 +207,7 @@ const joinStatus = (lead, suffix) => {
 };
 // A passed/waived gate is a done verdict — it must not wear the muted
 // open-gate colour.
-const gatePassed = (suffix) => /^\s*✓/.test(String(suffix || ''));
+const gatePassed = (suffix) => /^\s*✓/.test(String(suffix || '')) || /waiv/i.test(String(suffix || ''));
 
 const gateOnlyLine = (suffix) => {
   const t = String(suffix || '').replace(/^[✓·\s]+/, '').trim();
@@ -560,21 +560,33 @@ export const renderSection = (raw, opts) => {
       }
     }
   }
-  // ── Phase status fraction (ontology: phases contain tasks; never "items") ──
-  // A phase head that would otherwise render entirely bare (no verdict, no
-  // gate line) shows its task fraction so no phase scans title-only. Counts
-  // only — verdicts are NEVER synthesized: DONE/cancelled come from the
-  // author's head mark alone (an all-checked phase with an open gate, e.g.
-  // 172008 Phase 5 with remaining cutover work, must not claim DONE).
-  // Existing gate lines are left byte-identical; the rail already fractions
-  // every row, so heads gain nothing by restating them.
+  // ── Phase status synthesis (ontology: phases contain tasks; never "items") ──
+  // Every h2 *Phase* that owns tasks shows a consistent status line: tasks
+  // fraction (or DONE when all done) plus gate verdict when a gate exists.
+  // Owner ruling 17:32 — task counts are the display truth for phase heads;
+  // author marks remain provenance. Guard to Phase heads only: Task-headed
+  // h2 sections are not phases (task-only test: mismatched numbers stay bare).
+  // Render rule: DONE only when all tasks done AND gate is passed/waived or absent;
+  // for an open gate use fraction + gate (e.g. 3/3 · GATE OPEN), never gate-only.
   const isPhaseHead = /^Phase\b/i.test(cleanHead(htextRaw));
-  if (isPhaseHead && htag === 'h2' && real.length && !/✓ DONE|✗ cancelled|ds-status/.test(head)) {
+  if (isPhaseHead && htag === 'h2' && real.length && !/✓ DONE|✗ cancelled/.test(head)) {
     const total = real.length;
     const done = real.filter(t => t.done || t.cancelled).length;
     const frac = `${done}/${total}`;
-    if (head.includes('</h2>')) head = head.replace(/<\/h2>.*/, `</h2><p class="ds-status ds-is-gate">${esc(frac)}</p>`);
-    else head = `<h2>${fmtInline(cleanHead(htextRaw))}</h2><p class="ds-status ds-is-gate">${esc(frac)}</p>`;
+    const allDone = done === total;
+    const hasGate = !!String(suffix || '').trim();
+    const gateIsPassed = gatePassed(suffix);
+    let statusText, cls;
+    if (allDone && (!hasGate || gateIsPassed)) {
+      statusText = joinStatus('✓ DONE', suffix);
+      cls = 'ds-is-done';
+    } else {
+      statusText = suffix ? joinStatus(frac, suffix) : frac;
+      cls = 'ds-is-gate';
+    }
+    const line = `<p class="ds-status ${cls}">${statusText}</p>`;
+    if (head.includes('</h2>')) head = head.replace(/<\/h2>.*/, `</h2>${line}`);
+    else head = `<h2>${fmtInline(cleanHead(htextRaw))}</h2>${line}`;
   }
   // Lone-task promotion: a ###-led chunk that IS one task (no usable
   // section title) reads as a phase — the task name becomes the h2, its

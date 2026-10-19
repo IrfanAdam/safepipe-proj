@@ -396,7 +396,7 @@ describe('title notes', () => {
   });
 });
 
-describe('phase fraction (never synthesized verdicts)', () => {
+describe('phase status synthesis (owner rule)', () => {
   const sec = (lines, opts) => renderSection(lines.join('\n'), opts || {});
   it('bare phase heads gain a fraction, never DONE', () => {
     const { head } = sec(['## Phase 2 — Assets', '', '### Task 1: A ✓ done', '', '**Files:**', '- Create: `a.js`.', '', '### Task 2: B', '', '**Verify:** green.']);
@@ -404,17 +404,16 @@ describe('phase fraction (never synthesized verdicts)', () => {
     assert.ok(head.includes('1/2'), head);
     assert.ok(!head.includes('DONE') && !head.includes('cancelled'), head);
   });
-  it('all-checked phases with no verdict stay verdict-free', () => {
+  it('all-checked phases claim DONE (owner rule: counts are display truth)', () => {
     const { head } = sec(['## Phase 5 — Cutover', '', '### Task 1: A ✓ done', '', '**Files:**', '- Create: `a.js`.']);
-    assert.ok(!head.includes('✓ DONE'), `no invented verdict: ${head}`);
-    assert.ok(head.includes('1/1'), head);
+    assert.ok(head.includes('✓ DONE'), head);
   });
   it('marked and gated heads pass through untouched', () => {
     const marked = sec(['## Phase 1 — X ✓ done', '', '### Task 1: A ✓ done', '', '**Files:**', '- Create: `a.js`.']).head;
     assert.ok(marked.includes('✓ DONE'), marked);
     const gated = sec(['## Phase 5 — Y', '', '### Task 1: A', '', '**Files:**', '- Create: `a.js`.'], { gateSuffix: ' · GATE OPEN' }).head;
     assert.ok(gated.includes('GATE OPEN'), gated);
-    assert.ok(!gated.includes('0/1'), `gate lines byte-identical: ${gated}`);
+    assert.ok(gated.includes('0/1 · GATE OPEN'), `fraction joins the gate line: ${gated}`);
   });
 });
 
@@ -426,14 +425,26 @@ describe('gate verdict language (l3-engine fold-in)', () => {
     assert.ok(head.includes('✓ DONE · GATE PASSED'), head);
     assert.ok(!head.includes('✓ DONE ✓'), head);
   });
-  it('passed gates wear done colour, open gates muted', () => {
+  it('partial + passed gate stays muted with fraction lead', () => {
     const passed = sec(['## Phase 2 — Y', '', '### Task 1: A', '', '**Files:**', '- Create: `a.js`.'],
       { gateSuffix: '✓ GATE PASSED' }).head;
-    assert.ok(passed.includes('ds-is-done'), passed);
+    assert.ok(passed.includes('ds-is-gate'), passed);
+    assert.ok(passed.includes('0/1 · GATE PASSED'), passed);
     const open = sec(['## Phase 5 — Z', '', '### Task 1: A', '', '**Files:**', '- Create: `a.js`.'],
       { gateSuffix: ' · GATE OPEN' }).head;
     assert.ok(open.includes('ds-is-gate'), open);
-    assert.ok(!open.includes('0/1'), `gate lines byte-identical: ${open}`);
+    assert.ok(open.includes('0/1 · GATE OPEN'), open);
+  });
+  it('unmarked all-done + passed gate reads DONE (open-gate rule repro)', () => {
+    const { head } = sec(['## Phase 1 — X', '', '### Task 1: A ✓ done', '', '### Task 2: B ✓ done'],
+      { gateSuffix: ' ✓ GATE PASSED' });
+    assert.ok(head.includes('✓ DONE · GATE PASSED'), head);
+  });
+  it('all-done + open gate keeps the fraction, never DONE', () => {
+    const { head } = sec(['## Phase 5 — Cutover', '', '### Task 13: A ✓ done', '', '### Task 14: B ✓ done', '', '### Task 15: C ✓ done'],
+      { gateSuffix: ' · GATE OPEN' });
+    assert.ok(head.includes('3/3 · GATE OPEN'), head);
+    assert.ok(!head.includes('✓ DONE'), head);
   });
 });
 
