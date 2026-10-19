@@ -82,7 +82,7 @@ describe('block structure', () => {
     ].join('\n');
     const { body } = renderSection(raw, {});
     assert.equal((body.match(/<details/g) || []).length, 1, body);
-    assert.ok(body.includes('<summary class="ds-acc-head"><h3>A</h3><span class="ds-caret">›</span>'), body);
+    assert.ok(body.includes('<summary class="ds-acc-head"><span class="ds-box is-open"></span><h3>A</h3>'), body);
     assert.ok(!body.includes('ds-acc-prev'), `no trigger previews: ${body}`);
     assert.ok(body.includes('<ol><li>First step</li><li>Second step</li></ol>'), body);
     assert.ok(body.indexOf('<div class="ds-acc-body">') < body.indexOf('<ol>'), 'steps belong inside the fold: ' + body);
@@ -126,31 +126,31 @@ describe('block structure', () => {
 
 describe('task headers', () => {
   const taskBody = (head) => renderSection(['## Phase 1 — X {#phase-1}', '', head, '', '**Verify:** green.'].join('\n'), {}).body;
-  it('colon heads render h3 + DONE in the summary, no checkbox', () => {
+  it('colon heads render box + name + inline caret, no accent', () => {
     const body = taskBody('### Task 1: A ✓ done `abc1234`');
-    assert.ok(body.includes('<summary class="ds-acc-head"><h3>A</h3><span class="ds-status ds-is-done">✓ DONE (abc1234)</span><span class="ds-caret">›</span>'), body);
-    assert.ok(body.includes('✓ DONE (abc1234)'), body);
+    assert.ok(body.includes('<summary class="ds-acc-head"><span class="ds-box">✓</span><h3>A</h3><span class="ds-caret">›</span>'), body);
+    assert.ok(!body.includes('ds-status') && !body.includes('DONE'), body);
     assert.equal(count(body, 'input'), 0, body);
     assert.ok(!body.includes('<strong>'), body);
   });
-  it('twin heads fold the shipped sha into DONE', () => {
+  it('twin heads check the box without showing the shipped sha', () => {
     const body = taskBody('### Task 4 ✓ done — shipped c557479 · Semantic zoom');
-    assert.ok(body.includes('<h3>Semantic zoom</h3>'), body);
-    assert.ok(body.includes('✓ DONE (c557479)'), body);
+    assert.ok(body.includes('<span class="ds-box">✓</span><h3>Semantic zoom</h3>'), body);
+    assert.ok(!body.includes('(c557479)') && !body.includes('DONE'), body);
   });
-  it('smooth heads show the bare-sha provenance', () => {
+  it('smooth heads check the box without showing the bare sha', () => {
     const body = taskBody('### Task 1 ✓ done d27f94c');
-    assert.ok(body.includes('<h3>Task 1</h3>'), body);
-    assert.ok(body.includes('✓ DONE (d27f94c)'), body);
+    assert.ok(body.includes('<span class="ds-box">✓</span><h3>Task 1</h3>'), body);
+    assert.ok(!body.includes('(d27f94c)') && !body.includes('DONE'), body);
   });
-  it('unmarked tasks show h3 with no status line', () => {
+  it('unmarked tasks show empty box + name + caret', () => {
     const body = taskBody('### Task 4: Skill sync + ship');
-    assert.ok(body.includes('<h3>Skill sync + ship</h3>'), body);
+    assert.ok(body.includes('<summary class="ds-acc-head"><span class="ds-box is-open"></span><h3>Skill sync + ship</h3><span class="ds-caret">›</span>'), body);
     assert.ok(!body.includes('ds-status'), body);
   });
-  it('cancelled tasks show the cancelled line', () => {
+  it('cancelled tasks box muted, no DONE word', () => {
     const body = taskBody('### Task 9: Old thing ✗ cancelled');
-    assert.ok(body.includes('✗ cancelled'), body);
+    assert.ok(body.includes('<span class="ds-box ds-is-cancelled">✗</span><h3>Old thing</h3>'), body);
     assert.ok(!body.includes('DONE'), body);
   });
   it('tasks share one ds-tasks container, in order', () => {
@@ -359,16 +359,16 @@ describe('title notes', () => {
     assert.ok(body.includes('<p>docs/audit.md + 8 captures — see audit</p>'), body);
     assert.ok(body.indexOf('<p>docs/audit.md') < body.indexOf('Do it well.'), `note first: ${body}`);
   });
-  it('paren sha still ships (no note, status carries it)', () => {
+  it('paren sha parses silently, never shown inline', () => {
     const body = noteTask('### Task 2: Terrain field v2 ✓ done (167a614)');
-    assert.ok(body.includes('<h3>Terrain field v2</h3>'), body);
-    assert.ok(body.includes('✓ DONE (167a614)'), body);
+    assert.ok(body.includes('<span class="ds-box">✓</span><h3>Terrain field v2</h3>'), body);
+    assert.ok(!body.includes('(167a614)'), body);
   });
-  it('mixed paren becomes a note, status stays plain', () => {
+  it('mixed paren becomes a note, box stays plain', () => {
     const body = noteTask('### Task 4: Elevation language ✓ done (167a614, scene-side; legend left for Task 8)');
     assert.ok(body.includes('<h3>Elevation language</h3>'), body);
     assert.ok(body.includes('<p>167a614, scene-side; legend left for Task 8</p>'), body);
-    assert.ok(body.includes('✓ DONE</span>'), body);
+    assert.ok(body.includes('<span class="ds-box">✓</span>'), body);
   });
   it('note-only task flows unfolded, never dropped or folded solo', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 8: Verification, docs, close-out ✓ done (wrap-up commit, see log)'].join('\n'), {});

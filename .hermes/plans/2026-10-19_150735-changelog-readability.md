@@ -289,3 +289,32 @@
 - REF GATE 7 (ship): ring2 Phase 4 divider + suffix carets, no ids. Evidence: screenshots + green suite.
 
 *Shipped in ac91418 · Task 12 · phase-7.*
+
+---
+
+## Phase 8 — Task tick {#phase-8}
+
+*Tags: changelog, renderer*
+
+*What the build gains:* task folds read as one quiet line — checkbox, name, inline caret, zero accent.
+
+| # | Task | Done when |
+|---|---|---|
+| 13 | Checkbox summaries | 172008 Phase 4 folds read `☑ name ›` in ink, no DONE/sha/accent |
+
+### Task 13: Checkbox summaries ✓ done
+
+**Objective:** The black checkbox-like mark leads; nothing accent-colored sits inline.
+
+**Files:**
+- Modify: `src/changelog/changelog/raw-detail.js` (`taskTick` renders `ds-box`: checked / muted-✗ / empty; summary = box + name + inline caret; bare headers box too)
+- Modify: `src/changelog/changelog-drawer.css` (box: ink bordered, check inside, token sizes only; bare flex row, caret in flow)
+- Modify: `tests/changelog-detail.test.js`
+
+**Changes:**
+- Done → checked ink box; cancelled → muted `✗` box; open → empty box. DONE word, ship sha, and accent color leave the summary (provenance lives in COMMITS).
+- Caret sits inline after the name (never pushed); bare headers get box + name with no caret.
+
+**Verify:** suite updated (52 green); 172008 Phase 4 screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-8]`; close with `✓ done` + sha.
+
+- REF GATE 8 (ship): Phase 4 folds box-first, ink-only, caret inline. Evidence: screenshots + green suite.

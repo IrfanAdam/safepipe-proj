@@ -140,13 +140,13 @@ const taskTitleOf = (title) => {
   if (m) return { num: m[1], name: '', shipped: m[2] };
   return { num: '', name: s, shipped: '' };
 };
-// A task's own status — the phase treatment, minus gates (tasks own
-// no gate verdict; DONE/cancelled come from the head mark only). A span:
-// block outside a summary, inline inside one (see drawer CSS).
-const taskStatus = (task, shipped) => {
-  if (task.cancelled) return '<span class="ds-status ds-is-cancelled">✗ cancelled</span>';
-  if (task.done) return `<span class="ds-status ds-is-done">✓ DONE${shipped ? ` (${shipped})` : ''}</span>`;
-  return '';
+// A task's checkbox — a real box, ink bordered, check inside. Done and
+// cancelled differ by glyph alone; open tasks show the empty box. No DONE
+// word, no sha, no accent inline: the summary stays a single quiet line.
+const taskTick = (task) => {
+  if (task.done) return '<span class="ds-box">✓</span>';
+  if (task.cancelled) return '<span class="ds-box ds-is-cancelled">✗</span>';
+  return '<span class="ds-box is-open"></span>';
 };
 
 // Own-verdict gate suffix for a section number. Every judged phase shows its
@@ -289,19 +289,21 @@ const renderTask = (task) => {
   // except as fallback when a bare marker carries no name at all.
   const { num, name, shipped, note } = taskTitleOf(task.title);
   const h3 = name || (num ? `Task ${num}` : 'Task');
-  // Summary order: name, status (checkmark untouched), caret as suffix.
-  const trig = `<h3>${fmtInline(h3)}</h3>${taskStatus(task, shipped)}<span class="ds-caret">›</span>`;
+  // Summary order: ink tick, name, caret inline (in flow, never pushed).
+  const trig = `${taskTick(task)}<h3>${fmtInline(h3)}</h3><span class="ds-caret">›</span>`;
   const obj = task.fields.find((f) => isObjective(f.label));
   const rest = task.fields.filter((f) => !isObjective(f.label));
   const hasContent = !!note || !!obj || task.lead.length > 0
     || rest.some((f) => fieldText(f) || (f.parts || []).length)
     || (task.loose || []).length > 0;
   // Content-less tasks render the header alone — but a title note is
-  // content: it flows unfolded, never dropped, never folded solo.
-  if (!hasContent) return `<section class="ds-subtask"><h3>${fmtInline(h3)}</h3>${taskStatus(task, shipped)}</section>`;
+  // content: it flows unfolded, never dropped, never folded solo. Bare
+  // headers carry the tick too (no caret: nothing to fold).
+  const bare = (extra) => `<section class="ds-subtask"><div class="ds-task-bare">${taskTick(task)}<h3>${fmtInline(h3)}</h3></div>${extra || ''}</section>`;
+  if (!hasContent) return bare();
   let inner = note ? `<p>${fmtInline(note)}</p>` : '';
   if (!rest.length && !obj && !task.lead.length && !(task.loose || []).length) {
-    return `<section class="ds-subtask"><h3>${fmtInline(h3)}</h3>${taskStatus(task, shipped)}${inner}</section>`;
+    return bare(inner);
   }
   if (obj) {
     const otext = [...obj.inline, ...obj.parts.filter((p) => p.t === 'para').map((p) => p.text)]
@@ -313,7 +315,7 @@ const renderTask = (task) => {
   rest.sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
   inner += renderFieldsOpen(rest);
   inner += renderParts(task.loose);
-  if (!inner) return `<section class="ds-subtask"><h3>${fmtInline(h3)}</h3>${taskStatus(task, shipped)}</section>`;
+  if (!inner) return bare();
   return `<section class="ds-subtask"><details class="ds-task-fold"><summary class="ds-acc-head">${trig}</summary><div class="ds-acc-body">${inner}</div></details></section>`;
 };
 
