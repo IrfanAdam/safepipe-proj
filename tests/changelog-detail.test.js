@@ -277,6 +277,79 @@ describe('gates + anchors', () => {
   });
 });
 
+describe('task-only sections', () => {
+  const smoothish = ['## Task 1: Sticky login — log in once {#task-1}', '',
+    '**Files:**', '- Modify: `a.js`.', '',
+    '**Rules:**', '- No auto-open.', '',
+    '**Verify:** refresh keeps session.', '',
+    '### Task 1 ✓ done d27f94c'].join('\n');
+  it('bare matching stamp rolls up: head DONE, no nested task', () => {
+    const { head, body } = renderSection(smoothish, {});
+    assert.ok(head.includes('✓ DONE'), head);
+    assert.ok(!body.includes('ds-task-fold'), `no task-in-task: ${body}`);
+    assert.ok(!body.includes('<h3>'), body);
+  });
+  it('stamp verdict cancelled rolls up too', () => {
+    const raw = smoothish.replace('### Task 1 ✓ done d27f94c', '### Task 1 ✗ cancelled');
+    const { head, body } = renderSection(raw, {});
+    assert.ok(head.includes('✗ cancelled'), head);
+    assert.ok(!body.includes('<h3>'), body);
+  });
+  it('same-name stamp rolls up, mismatched numbers stay bare', () => {
+    const same = smoothish.replace('### Task 1 ✓ done d27f94c', '### Task 1: Sticky login ✓ done d27f94c');
+    assert.ok(!renderSection(same, {}).body.includes('<h3>'), same);
+    const other = smoothish.replace('### Task 1 ✓ done d27f94c', '### Task 9 ✓ done abc1234');
+    const r = renderSection(other, {});
+    assert.ok(r.body.includes('<h3>Task 9</h3>'), r.body);
+    assert.ok(!r.head.includes('✓ DONE'), r.head);
+  });
+  it('orphan fields keep source order: Rules before Verify', () => {
+    const { body } = renderSection(smoothish, {});
+    const ri = body.indexOf('ds-f-t">Rules<');
+    const vi = body.indexOf('ds-f-t">Verify<');
+    assert.ok(ri !== -1 && vi !== -1 && ri < vi, body);
+  });
+  it('unknown labels keep authored position (contract before steps)', () => {
+    const raw = ['## Task 2 — V', '',
+      '**Files:**', '- Modify: `a.js`.', '',
+      '**Behavior contract:**', '- Button behaves.', '',
+      '**Steps:**', '1. First', '2. Second', '',
+      '**Verify:** green.'].join('\n');
+    const { body } = renderSection(raw, {});
+    const fi = body.indexOf('ds-f-t">Files<');
+    const ci = body.indexOf('ds-f-t">Behavior contract<');
+    const si = body.indexOf('ds-f-t">Steps<');
+    const vi = body.indexOf('ds-f-t">Verify<');
+    assert.ok(fi !== -1 && ci !== -1 && si !== -1 && vi !== -1, body);
+    assert.ok(fi < ci && ci < si && si < vi, `source order: ${body}`);
+  });
+  it('loose steps stay where written, not trailed after every field', () => {
+    const raw = ['## Task 9 — Q', '',
+      '**Files:**', '- Modify: `a.js`.', '',
+      '1. First loose step', '2. Second loose step', '',
+      '**Verify:** green.'].join('\n');
+    const { body } = renderSection(raw, {});
+    const fi = body.indexOf('ds-f-t">Files<');
+    const oli = body.indexOf('<ol><li>First loose step</li>');
+    const vi = body.indexOf('ds-f-t">Verify<');
+    assert.ok(fi !== -1 && oli !== -1 && vi !== -1, body);
+    assert.ok(fi < oli && oli < vi, `interleaved: ${body}`);
+  });
+  it('rollup skips gate lines: DONE joins the gate verdict', () => {
+    const raw = ['## Task 1: A {#task-1}', '', '**Files:**', '- Modify: `a.js`.', '',
+      '### Task 1 ✓ done abc1234'].join('\n');
+    const suffix = ' · <span class="ds-gate">GATE OPEN</span>';
+    const { head } = renderSection(raw, { gateSuffix: suffix });
+    assert.ok(head.includes('✓ DONE'), head);
+    assert.ok(head.includes('GATE OPEN'), head);
+  });
+  it('source order wins over canonical rank at section level', () => {
+    const raw = ['## Task 9 — Q', '', '**Verify:** green.', '', '**Files:**', '- Create: `a.js`.'].join('\n');
+    const { body } = renderSection(raw, {});
+    assert.ok(body.indexOf('ds-f-t">Verify<') < body.indexOf('ds-f-t">Files<'), body);
+  });
+});
+
 describe('ship-gate seal', () => {
   it('gateless plans keep the old rule', () => {
     assert.equal(shipGatesShut([]), true);

@@ -195,3 +195,32 @@
 - REF GATE 4 (ship): 172008 card open, smooth card open, every other card unchanged. Evidence: list screenshots + green suite.
 
 *Shipped in 2b6f5ae · Task 9 · phase-4.*
+
+---
+
+## Phase 5 — Task-only sections: stamp rollup + source order {#phase-5}
+
+*Tags: changelog, renderer*
+
+*What the build gains:* `## Task` plans stop nesting nameless tasks and scrambling field order — the section reads as one unit, in the author's words, in the author's order.
+
+| # | Task | Done when |
+|---|---|---|
+| 10 | Stamp rollup + section source order | smooth/timeline `## Task` heads show DONE, no nested `Task N`; Behavior contract sits before Steps; loose steps stay written-position |
+
+### Task 10: Stamp rollup + section source order ✓ done
+
+**Objective:** A bare `### Task N ✓ done` stamp is the section's seal, not a sub-task; and an open section keeps its narrative.
+
+**Files:**
+- Modify: `src/changelog/changelog/raw-detail.js`
+- Modify: `src/changelog/changelog-drawer.css` (base field margin; drop dead wrapper)
+- Modify: `tests/changelog-detail.test.js`
+
+**Changes:**
+- Bare `###` (no content) whose number matches the `##` section rolls up: nested render suppressed, unanimous verdict re-renders the head (author-mark shape, suffix inside). Other numbers still render bare.
+- `##` orphan/implicit bodies render fields + loose blocks interleaved by parse sequence (objective as lede at its position in `###`-less bodies). Canonical sort stays inside `###` folds only.
+
+**Verify:** 7 new unit tests; corpus sweep green; smooth + timeline drawer screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-5]`; close with `✓ done` + sha.
+
+- REF GATE 5 (ship): smooth Task 1 head DONE with Files/Rules/Verify in order and no nested task; timeline Task 2 contract-before-steps. Evidence: screenshots + green suite.

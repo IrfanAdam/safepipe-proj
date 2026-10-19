@@ -226,9 +226,32 @@ const renderFieldOpen = (f) => {
   if (!inline && !blocks) return '';
   return `<div class="ds-field"><span class="ds-f-t">${fmtInline(f.label)}</span>${inline ? `<span class="ds-f-v">${fmtInline(inline)}</span>` : ''}${blocks}</div>`;
 };
-const renderFieldsOpen = (fields) => {
-  const html = (fields || []).map(renderFieldOpen).filter(Boolean).join('');
-  return html ? `<div class="ds-fields">${html}</div>` : '';
+const renderFieldsOpen = (fields) => (fields || []).map(renderFieldOpen).filter(Boolean).join('');
+// ## bodies flow in authored order: fields and loose blocks interleaved by
+// parse sequence. No canonical sort here — that normalization belongs to
+// folds, where authors write freeform. The open section keeps the narrative.
+const renderFlow = (t, ledeObj) => {
+  const units = [];
+  for (const f of (t.fields || [])) {
+    // In a ###-less body the objective reads as the lede paragraph (no
+    // label), at its authored position — the domain-task treatment.
+    if (ledeObj && isObjective(f.label)) {
+      const otext = [...f.inline, ...f.parts.filter((p) => p.t === 'para').map((p) => p.text)]
+        .filter(Boolean).join(' ').trim();
+      let html = otext ? `<p>${fmtInline(otext)}</p>` : '';
+      html += renderParts(f.parts.filter((p) => p.t !== 'para'));
+      if (html) units.push({ seq: f.seq ?? 0, html });
+    } else {
+      const html = renderFieldOpen(f);
+      if (html) units.push({ seq: f.seq ?? 0, html });
+    }
+  }
+  for (const p of (t.loose || [])) {
+    const html = renderParts([p]);
+    if (html) units.push({ seq: p.seq ?? 0, html });
+  }
+  units.sort((a, b) => a.seq - b.seq);
+  return units.map((u) => u.html).join('');
 };
 
 // Split a flattened `- [x] **Title** ... **Label:** ...` line (fallback path
@@ -293,6 +316,11 @@ export const renderSection = (raw, opts) => {
   let blocks = [];
   let openList = null;
   let fieldIdx = 0;
+  // Authored sequence across fields AND loose blocks: ## bodies render in
+  // source order (an unknown label like "Behavior contract" must not sink
+  // below Verify, a Tags line must not trail after every field). Folds keep
+  // canonical order; the open section keeps the author's narrative.
+  let seq = 0;
   const flushList = () => {
     // The open list object already lives in its parent array (appended at
     // creation) — closing only nulls the cursor. Re-pushing here duplicates
@@ -322,12 +350,12 @@ export const renderSection = (raw, opts) => {
     else if (!cur && last && last.t === 'para') last.text += ' ' + text.trim();
     else if (cur && cur.field) cur.field.inline.push(text.trim());
     else if (cur) cur.lead.push(text.trim());
-    else into.push({ t: 'para', text: text.trim() });
+    else into.push({ t: 'para', text: text.trim(), seq: seq++ });
   };
   const startField = (label, val) => {
     if (!cur) { cur = { title: '', fields: [], lead: [], loose: [], field: null }; tasks.push(cur); }
     flushList();
-    cur.field = { label, inline: val ? [val] : [], parts: [], idx: fieldIdx++ };
+    cur.field = { label, inline: val ? [val] : [], parts: [], idx: fieldIdx++, seq: seq++ };
     cur.fields.push(cur.field);
   };
   const closeTask = () => {
@@ -349,20 +377,24 @@ export const renderSection = (raw, opts) => {
     }
     if (!openList || openList.ordered !== ordered || openList.home !== into) {
       flushList();
-      openList = { t: 'list', ordered, items: [], home: into };
+      openList = { t: 'list', ordered, items: [], home: into, seq: seq++ };
       into.push(openList);
     }
     openList.items.push(text.trim());
   };
   let fence = null;
   let start = 0;
+  let htextRaw = '';
+  const makeHead = (htext) => {
+    const hclean = cleanHead(htext).replace(/\s*([✓✗])\s*(done|cancelled)(\s*\([^)]*\))?\s*$/i, '').trim();
+    return `<${htag}>${fmtInline(hclean)}</${htag}>` + headStatus(htext, suffix);
+  };
   if (hi >= 0) {
-    const htext = lines[hi].replace(/^#{1,4}\s+/, '');
+    htextRaw = lines[hi].replace(/^#{1,4}\s+/, '');
     if (htag === 'h2' || htag === 'h3') {
-      const hclean = cleanHead(htext).replace(/\s*([✓✗])\s*(done|cancelled)(\s*\([^)]*\))?\s*$/i, '').trim();
-      head = `<${htag}>${fmtInline(hclean)}</${htag}>` + headStatus(htext, suffix);
+      head = makeHead(htextRaw);
     } else {
-      const title = htext;
+      const title = htextRaw;
       cur = {
         title,
         done: /✓/i.test(title),
@@ -381,7 +413,7 @@ export const renderSection = (raw, opts) => {
     if (fence) {
       if (/^\s*```\s*$/.test(ln)) {
         const code = fence.lines.join('\n');
-        if (code.trim()) curParts().push({ t: 'pre', lang: fence.lang, code });
+        if (code.trim()) curParts().push({ t: 'pre', lang: fence.lang, code, seq: seq++ });
         flushList();
         fence = null;
       } else fence.lines.push(ln);
@@ -439,32 +471,56 @@ export const renderSection = (raw, opts) => {
   closeTask();
   const renderBlock = (b) => (b.t === 'raw' ? b.html : renderParts([b]));
   let body = blocks.map(renderBlock).join('');
-  const real = tasks.filter((t) => t.title);
+  let real = tasks.filter((t) => t.title);
+  if (htag === 'h2' && real.length) {
+    // Bare ### stamps ("### Task 1 ✓ done <sha>") carry no content: when
+    // their number matches the section, they ARE the section's stamp — not
+    // a sub-task. Suppress the nested render and roll the unanimous verdict
+    // up into the head; otherwise the section title goes missing and a task
+    // nests inside a task. Other numbers still render bare.
+    const secNum = (taskTitleOf(cleanHead(htextRaw)).num || '').toLowerCase();
+    const stampNum = (title) => {
+      // taskTitleOf covers colon/shipped/sha shapes; a bare "Task 1" stamp
+      // (verdict, no sha) needs its own branch.
+      const t = taskTitleOf(title);
+      if (t.num) return t.num.toLowerCase();
+      const bare = cleanHead(title).replace(/✓\s*done\s*—?/i, '').replace(/✗\s*cancelled\s*—?/i, '').replace(/[✓✗]/g, '').trim();
+      const m = bare.match(/^(Task|Step|Phase)\s+([\d-]+)\s*$/i);
+      return m ? m[2].toLowerCase() : '';
+    };
+    const isStamp = (t) => {
+      if (t.lead.length || t.loose.length) return false;
+      if (t.fields.some((f) => fieldText(f) || (f.parts || []).length)) return false;
+      const n = stampNum(t.title);
+      return !!n && !!secNum && n === secNum;
+    };
+    const stamps = real.filter(isStamp);
+    if (stamps.length) {
+      real = real.filter((t) => !isStamp(t));
+      // A gate line (ds-is-gate) is not a verdict — only DONE/cancelled
+      // blocks the rollup.
+      if (!/✓ DONE|✗ cancelled/.test(head)) {
+        if (stamps.every((t) => t.done)) head = makeHead(`${htextRaw} ✓ done`);
+        else if (stamps.every((t) => t.cancelled)) head = makeHead(`${htextRaw} ✗ cancelled`);
+      }
+    }
+  }
   if (real.length) {
     // Label lines outside any ### (e.g. a phase-level note) keep author
     // order after the known set — they have no task to belong to.
     for (const t of tasks.filter((t) => !t.title)) {
-      const sorted = [...t.fields].sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-      body += renderFieldsOpen(sorted);
-      body += renderParts(t.loose);
+      if (t.lead.length) body += `<p>${fmtInline(t.lead.join(' ').trim())}</p>`;
+      body += renderFlow(t);
     }
     body += '<div class="ds-tasks">' + real.map(renderTask).join('') + '</div>';
   } else if (tasks.length) {
     // ###-less section: the body is one implicit task owned by the head —
-    // it flows expanded (objective first, then fields, then steps), never
-    // folded: the open section IS the detail.
-    const all = tasks.flatMap((t) => t.fields);
-    const obj = all.find((f) => isObjective(f.label));
-    if (obj) {
-      const otext = [...obj.inline, ...obj.parts.filter((p) => p.t === 'para').map((p) => p.text)]
-        .filter(Boolean).join(' ').trim();
-      if (otext) body += `<p>${fmtInline(otext)}</p>`;
-      body += renderParts(obj.parts.filter((p) => p.t !== 'para'));
+    // it flows in authored order (lead, then fields + loose interleaved),
+    // never folded: the open section IS the detail.
+    for (const t of tasks) {
+      if (t.lead.length) body += `<p>${fmtInline(t.lead.join(' ').trim())}</p>`;
+      body += renderFlow(t, true);
     }
-    const rest = all.filter((f) => f !== obj)
-      .sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-    body += renderFieldsOpen(rest);
-    body += renderParts(tasks.flatMap((t) => t.loose));
   }
   return { head, body };
 };

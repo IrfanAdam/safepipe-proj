@@ -47,8 +47,7 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-md .ds-is-done{color:var(--color-accent)}
 .ds-md .ds-is-cancelled{color:var(--color-ink-muted)}
 .ds-md h2 + .ds-status,.ds-md h3 + .ds-status{margin-top:var(--cl-2)}
-.ds-md .ds-fields{display:flex;flex-direction:column;gap:var(--cl-1);margin:var(--cl-1) 0 var(--cl-2)}
-.ds-md .ds-field{font-size:var(--sp-text-sm);color:var(--color-ink);line-height:1.5;overflow-wrap:anywhere}
+.ds-md .ds-field{font-size:var(--sp-text-sm);color:var(--color-ink);line-height:1.5;overflow-wrap:anywhere;margin:var(--cl-1) 0}
 .ds-md .ds-field .ds-f-t{display:inline;font-family:var(--font-mono);font-size:var(--text-micro);font-weight:700;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted)}
 .ds-md .ds-field .ds-f-t::after{content:": ";letter-spacing:0}
 .ds-md .ds-field .ds-f-v{display:inline}
