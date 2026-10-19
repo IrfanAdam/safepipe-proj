@@ -418,6 +418,25 @@ describe('phase fraction (never synthesized verdicts)', () => {
   });
 });
 
+describe('gate verdict language (l3-engine fold-in)', () => {
+  const sec = (lines, opts) => renderSection(lines.join('\n'), opts || {});
+  it('no doubled tick: DONE joins the passed gate with ·', () => {
+    const { head } = sec(['## Phase 2 — X ✓ done', '', '### Task 1: A ✓ done', '', '**Files:**', '- Create: `a.js`.'],
+      { gateSuffix: '✓ GATE PASSED · abc1234' });
+    assert.ok(head.includes('✓ DONE · GATE PASSED'), head);
+    assert.ok(!head.includes('✓ DONE ✓'), head);
+  });
+  it('passed gates wear done colour, open gates muted', () => {
+    const passed = sec(['## Phase 2 — Y', '', '### Task 1: A', '', '**Files:**', '- Create: `a.js`.'],
+      { gateSuffix: '✓ GATE PASSED' }).head;
+    assert.ok(passed.includes('ds-is-done'), passed);
+    const open = sec(['## Phase 5 — Z', '', '### Task 1: A', '', '**Files:**', '- Create: `a.js`.'],
+      { gateSuffix: ' · GATE OPEN' }).head;
+    assert.ok(open.includes('ds-is-gate'), open);
+    assert.ok(!open.includes('0/1'), `gate lines byte-identical: ${open}`);
+  });
+});
+
 describe('lone-task promotion', () => {
   const chunk = (lines) => renderSection(lines.join('\n'), {});
   it('a ###-led single task reads as a phase: h2, status, flowing body', () => {
@@ -444,6 +463,14 @@ describe('lone-task promotion', () => {
     assert.ok(head.includes('<h2>Old thing</h2>'), head);
     assert.ok(head.includes('✗ cancelled'), head);
     assert.ok(!body.includes('<details'), body);
+  });
+  it('headless single-task chunks still gain h2 + status (fold kept)', () => {
+    const raw = ['Some intro prose.', '', '### Task 10: Full verification ✓ done', '', '**Files:** none.'].join('\n');
+    const { head, body } = renderSection(raw, {});
+    assert.ok(head.includes('<h2>Full verification</h2>'), head);
+    assert.ok(head.includes('✓ DONE'), head);
+    assert.ok(body.includes('Some intro prose.'), body);
+    assert.ok(body.includes('<details class="ds-task-fold">'), `fold kept under the restored title: ${body}`);
   });
   it('two tasks in one chunk keep their folds', () => {
     const { head, body } = chunk(['### Task 1: A ✓ done', '', '**Files:**', '- Create: `a.js`.', '', '### Task 2: B', '', '**Verify:** green.']);

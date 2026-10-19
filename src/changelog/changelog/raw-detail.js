@@ -195,9 +195,23 @@ export const anchorOwners = (sprints) => {
   return { owners, dup };
 };
 
+// A verdict suffix is " ✓ GATE PASSED" / " · GATE OPEN" / " · GATE FAILED".
+// Its ✓ marks the gate verdict, not a second DONE — so the join drops the
+// leading glyph and always separates with " · ". One rule for every head, or
+// a head-marked phase reads "✓ DONE ✓ GATE PASSED" while every other line
+// spells the same verdict "· GATE PASSED" (owner: GATE PASSED is inconsistent).
+// Escaping happens here, once, at the single injection point.
+const joinStatus = (lead, suffix) => {
+  const gate = String(suffix || '').replace(/^\s*[✓·]\s*/, '').trim();
+  return gate ? `${lead} · ${esc(gate)}` : lead;
+};
+// A passed/waived gate is a done verdict — it must not wear the muted
+// open-gate colour.
+const gatePassed = (suffix) => /^\s*✓/.test(String(suffix || ''));
+
 const gateOnlyLine = (suffix) => {
   const t = String(suffix || '').replace(/^[✓·\s]+/, '').trim();
-  return t ? `<p class="ds-status ds-is-gate">${esc(t)}</p>` : '';
+  return t ? `<p class="ds-status ${gatePassed(suffix) ? 'ds-is-done' : 'ds-is-gate'}">${esc(t)}</p>` : '';
 };
 
 const headStatus = (headText, suffix) => {
@@ -205,8 +219,8 @@ const headStatus = (headText, suffix) => {
   const m = clean.match(/\s*([✓✗])\s*(done|cancelled)(\s*\([^)]*\))?\s*$/i);
   if (!m) return gateOnlyLine(suffix);
   const paren = m[3] || '';
-  if (m[1] === '✗') return `<p class="ds-status ds-is-cancelled">✗ cancelled${esc(paren)}${suffix || ''}</p>`;
-  return `<p class="ds-status ds-is-done">✓ DONE${esc(paren)}${suffix || ''}</p>`;
+  if (m[1] === '✗') return `<p class="ds-status ds-is-cancelled">${joinStatus(`✗ cancelled${esc(paren)}`, suffix)}</p>`;
+  return `<p class="ds-status ds-is-done">${joinStatus(`✓ DONE${esc(paren)}`, suffix)}</p>`;
 };
 
 const renderParts = (parts) => parts.map((p) => {
@@ -555,7 +569,7 @@ export const renderSection = (raw, opts) => {
   // Existing gate lines are left byte-identical; the rail already fractions
   // every row, so heads gain nothing by restating them.
   const isPhaseHead = /^Phase\b/i.test(cleanHead(htextRaw));
-  if (isPhaseHead && htag === 'h2' && real.length && !/✓ DONE|✗ cancelled/.test(head) && !/ds-is-gate/.test(head)) {
+  if (isPhaseHead && htag === 'h2' && real.length && !/✓ DONE|✗ cancelled|ds-status/.test(head)) {
     const total = real.length;
     const done = real.filter(t => t.done || t.cancelled).length;
     const frac = `${done}/${total}`;
@@ -569,6 +583,17 @@ export const renderSection = (raw, opts) => {
   const orphans = tasks.filter((t) => !t.title);
   const orphanContent = orphans.some((t) => t.lead.length || (t.loose || []).length
     || t.fields.some((f) => fieldText(f) || (f.parts || []).length));
+  // A single-task ###-led chunk still owns a title when promotion is blocked
+  // by another heading inside the chunk (e.g. a trailing `## Files likely to
+  // change`): it reached here with head === '' and rendered its task under
+  // nothing — title AND status missing. Name it after the task. (Multi-task
+  // chunks keep folds and stay headless by contract — see "two tasks in one
+  // chunk keep their folds".)
+  if (!head && real.length === 1) {
+    const ft = taskTitleOf(real[0].title);
+    head = `<h2>${fmtInline(ft.name || (ft.num ? `Task ${ft.num}` : 'Task'))}</h2>`
+      + headStatus(real[0].done ? '✓ done' : real[0].cancelled ? '✗ cancelled' : '', suffix);
+  }
   if (htag === 'h3-task' && real.length === 1 && !orphanContent && !blocks.length) {
     const lone = real[0];
     const lt = taskTitleOf(lone.title);
@@ -581,7 +606,7 @@ export const renderSection = (raw, opts) => {
     const shipParen = lt.shipped ? ` (${lt.shipped})` : '';
     if (lone.done) status = `<p class="ds-status ds-is-done">✓ DONE${esc(shipParen)}${gatePart}</p>`;
     else if (lone.cancelled) status = `<p class="ds-status ds-is-cancelled">✗ cancelled${shipParen ? esc(shipParen) : ''}${gatePart}</p>`;
-    else if (suffix) status = `<p class="ds-status ds-is-gate">${esc(suffix.trim())}</p>`;
+    else if (suffix) status = gateOnlyLine(suffix);
     else status = `<p class="ds-status ds-is-gate">0/1</p>`;
     head = `<h2>${fmtInline(lt.name || (lt.num ? `Task ${lt.num}` : 'Task'))}</h2>` + status;
     body += taskInner(lone);

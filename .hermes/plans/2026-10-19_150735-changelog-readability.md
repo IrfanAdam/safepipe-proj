@@ -381,3 +381,41 @@
 - REF GATE 10 (ship): reconciled tree renders honest heads, hollow boxes, unchanged rails/cards. Evidence: screenshots + green suite.
 
 *Shipped in 02be9ce · Task 15 · phase-10.*
+
+---
+
+## Phase 11 — Audit fold-in (helper lanes) {#phase-11}
+
+*Tags: changelog, renderer*
+
+*What the build gains:* helper-audit engine fixes land with pins; audit constraints (anchors untouched) hold.
+
+| # | Task | Done when |
+|---|---|---|
+| 16 | Fold in l3-engine + audit reports | D1–D4 applied + pinned, suite green, anchors intact |
+
+### Task 16: Fold in l3-engine + audit reports ✓ done
+
+**Objective:** Apply the helper session's verified engine patch; resolve the corpus notes without rewriting anchors.
+
+**Files:**
+- Modify: `src/changelog/changelog/raw-detail.js`, `src/changelog/changelog/paint-detail.js` (applied `sib-fa0a79/l3-engine/proposed.diff` verbatim — `git apply --check` clean)
+- Modify: `tests/changelog-detail.test.js` (D1/D2/D3 pins), `.agents/skills/changelog-kit/references/plan-shapes.md` (`Item NN` → `Task NN`)
+
+**Changes (applied):**
+- D1 doubled tick → `✓ DONE · GATE PASSED` via `joinStatus` (one rule for every head).
+- D2 passed gates wear `ds-is-done`, open stays muted (hunk-3 guard widening is load-bearing with D2 — applied together).
+- D3 headless single-task chunks gain h2 + status (fold kept under the restored title).
+- D4 duplicate-anchor closeout rows suppress repeated gate badge + eval rows.
+- `plan-shapes.md` fallback wording matches `unitLabel`.
+
+**Deferred with reason:**
+- Test SyntaxError @451: not present at read time — transient mid-edit breaks, all repaired before runs.
+- 150735 Phase 2 Tasks 4/5 bodies: declined — authoring them means corpus-wide plan rewrites, explicitly out of scope (Phase 1 steer); the open ship gate already holds the card honest, fractions count authored units by contract.
+- `plan-track.mjs` TRACKED omission: different lane (tracker/scheduling ownership) + manifest-regen blast radius — flagged, untouched.
+- 150735 gate verdicts + Gate 1 `(ship)`: self-judging — yours to call.
+- Global-skills wording: upstream skills out of write scope; vendored snapshots fixed.
+
+**Verify:** detail 63/63 (D-pins + fraction tests); full suite 744/745 (geo pre-existing); build green; 202541 `✓ DONE · GATE PASSED` + closeout dedupe screenshots chromium + webkit, zero page errors; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-11]`; close with `✓ done` + sha.
+
+- REF GATE 11 (ship): audit items applied/pinned, anchors intact (20 refs held, 0 orphans). Evidence: screenshots + green suite.

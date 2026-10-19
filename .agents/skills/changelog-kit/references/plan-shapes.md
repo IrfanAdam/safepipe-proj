@@ -37,7 +37,7 @@ grep -c '^### Task' <plansDir>/*.md
   mark so `state()`/`buildState()` still report progress. Sections with no
   mark anywhere honestly report empty (open), not done.
 - Labels: generalize rail/drawer labels (`Task 01`, `Step 00`, fallback
-  `Item NN`) and the card unit word (`N tasks` vs `N phases`, decided per
+  `Task NN`) and the card unit word (`N tasks` vs `N phases`, decided per
   plan by whether any section head starts with `Phase`).
 - Tip text: `descOf` skips `- ` lines, so a `norm()`-synthesized `- [ ]
   **Title** …` checkbox body describes as empty and the tooltip renders as

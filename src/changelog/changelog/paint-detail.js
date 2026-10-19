@@ -182,10 +182,15 @@ export function paintDetail(root, ctx){
     // nothing when gateless). Fallback to the flattened body when raw text
     // is unavailable — same shape, degraded.
     (() => {
-      const revsHTML = paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN })
+      // A duplicate anchor (a prose `## Phase 5 closeout note` claiming
+      // `phase-5`) owns neither the phase's evals nor its verdict — it used to
+      // repeat the gate badge and the eval rows under a second rail row while
+      // anchorOwners suppressed only the commits.
+      const dupSec = dupAnchor.has(si);
+      const revsHTML = (dupSec ? '' : paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN }))
         + (hs.length ? badges(hs) : '');
       const raw = sectionRaw(plan.raw || '', sprint.head) || String(sprint.body || '');
-      const rendered = renderSection(raw, { gateSuffix: gateSuffix(gates, phaseN) });
+      const rendered = renderSection(raw, { gateSuffix: dupSec ? '' : gateSuffix(gates, phaseN) });
       // The status sits under the title, then a rule: every phase head
       // block scans the same (title / status / divider / body).
       const headRule = rendered.head && rendered.body ? '<hr class="ds-hr ds-head-rule">' : '';
