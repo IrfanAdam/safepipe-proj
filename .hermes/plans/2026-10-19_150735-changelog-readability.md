@@ -270,7 +270,7 @@
 |---|---|---|
 | 12 | Head consistency | ring2 Phase 4 shows divider under DONE, folds read `name ✓ DONE ›` with no id |
 
-### Task 12: Head consistency ✓ done
+### Task 12: Head consistency ✓ done `ac91418`
 
 **Objective:** Status under the title, a rule after it, tasks name-first.
 
@@ -287,3 +287,5 @@
 **Verify:** suite updated (52 green); ring2 Phase 4 screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-7]`; close with `✓ done` + sha.
 
 - REF GATE 7 (ship): ring2 Phase 4 divider + suffix carets, no ids. Evidence: screenshots + green suite.
+
+*Shipped in ac91418 · Task 12 · phase-7.*
