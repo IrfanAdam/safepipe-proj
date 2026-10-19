@@ -30,8 +30,8 @@ describe('block structure', () => {
     const { body } = renderSection(raw, {});
     assert.ok(body.includes('<ul><li>Create: <code>a.js</code></li><li>Modify: <code>b.js</code></li></ul>'), body);
     assert.equal((body.match(/<ul>/g) || []).length, 1, `duplicated list: ${body}`);
-    assert.ok(body.includes('<details'), `Files list should fold: ${body}`);
-    assert.ok(body.includes('2 items'), body);
+    assert.ok(body.includes('<details class="ds-task-fold">'), body);
+    assert.ok(!body.includes('ds-acc-prev') && !body.includes('is-acc'), `no FILES chrome: ${body}`);
   });
   it('numbered steps render as an ordered list', () => {
     const raw = [
@@ -73,7 +73,7 @@ describe('block structure', () => {
     assert.ok(body.indexOf('ds-f-t">Files<') < body.indexOf('ds-f-t">Verify<'), body);
   });
 });
-  it('a task with fields folds into one FILES accordion, loose steps inside', () => {
+  it('the task itself is the fold: header + status in, everything unfolded', () => {
     const raw = [
       '## Phase 1 — X {#phase-1}', '',
       '### Task 1: A', '',
@@ -82,7 +82,8 @@ describe('block structure', () => {
     ].join('\n');
     const { body } = renderSection(raw, {});
     assert.equal((body.match(/<details/g) || []).length, 1, body);
-    assert.ok(body.includes('ds-f-t">Files<'), body);
+    assert.ok(body.includes('<summary class="ds-acc-head"><span class="ds-caret">›</span><h3>Task 1 · A</h3>'), body);
+    assert.ok(!body.includes('ds-acc-prev'), `no trigger previews: ${body}`);
     assert.ok(body.includes('<ol><li>First step</li><li>Second step</li></ol>'), body);
     assert.ok(body.indexOf('<div class="ds-acc-body">') < body.indexOf('<ol>'), 'steps belong inside the fold: ' + body);
   });
@@ -106,7 +107,7 @@ describe('block structure', () => {
     const { body } = renderSection(raw, {});
     assert.ok(body.includes('<li>Mine all labels wrapped continuation here</li>'), body);
   });
-  it('task-less sections fold with Objective first, then Files, then steps', () => {
+  it('task-less sections flow expanded: Objective, then Files, then steps', () => {
     const raw = [
       '## Task 4 — Q ✓ done', '',
       '*Shipped in abc.*', '',
@@ -115,19 +116,19 @@ describe('block structure', () => {
     ].join('\n');
     const { head, body } = renderSection(raw, {});
     assert.ok(head.includes('✓ DONE'), head);
-    const fold = body.slice(body.indexOf('<div class="ds-acc-body">'));
-    const oi = fold.indexOf('Do things well.');
-    const fi = fold.indexOf('ds-f-t">Files<');
-    const oli = fold.indexOf('<ol>');
+    assert.ok(!body.includes('<details'), 'section bodies flow, never fold: ' + body);
+    const oi = body.indexOf('Do things well.');
+    const fi = body.indexOf('ds-f-t">Files<');
+    const oli = body.indexOf('<ol>');
     assert.ok(oi !== -1 && fi !== -1 && oli !== -1, body);
     assert.ok(oi < fi && fi < oli, 'order: objective, files, steps: ' + body);
   });
 
 describe('task headers', () => {
   const taskBody = (head) => renderSection(['## Phase 1 — X {#phase-1}', '', head, '', '**Verify:** green.'].join('\n'), {}).body;
-  it('colon heads render h3 + DONE, no checkbox', () => {
+  it('colon heads render h3 + DONE in the summary, no checkbox', () => {
     const body = taskBody('### Task 1: A ✓ done `abc1234`');
-    assert.ok(body.includes('<section class="ds-subtask"><h3>Task 1 · A</h3>'), body);
+    assert.ok(body.includes('<summary class="ds-acc-head"><span class="ds-caret">›</span><h3>Task 1 · A</h3>'), body);
     assert.ok(body.includes('✓ DONE (abc1234)'), body);
     assert.equal(count(body, 'input'), 0, body);
     assert.ok(!body.includes('<strong>'), body);
@@ -156,29 +157,29 @@ describe('task headers', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '', '### Task 2: B'].join('\n'), {});
     assert.ok(body.includes('<div class="ds-tasks">'), body);
     assert.equal(count(body, 'section'), 2, body);
+    assert.ok(!body.includes('<details'), 'content-less tasks render bare headers');
     assert.ok(body.indexOf('Task 1 · A') < body.indexOf('Task 2 · B'), body);
   });
 });
 
-describe('accordions', () => {
-  it('long inline text folds with a truncated preview', () => {
+describe('task folds', () => {
+  it('long text unfolds inside the task fold, no preview chrome', () => {
     const long = 'word '.repeat(40).trim();
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '', `**Verify:** ${long}`].join('\n'), {});
-    assert.ok(body.includes('<details class="ds-field is-acc">'), body);
-    assert.ok(body.includes('…'), body);
-    assert.equal(body.split(long).length - 1, 1, 'full text once (folded body), never in preview');
+    assert.equal((body.match(/<details/g) || []).length, 1, body);
+    assert.ok(!body.includes('ds-acc-prev'), `no preview chrome: ${body}`);
+    assert.ok(body.includes(long), body);
   });
-  it('code blocks fold with a code preview', () => {
+  it('code blocks unfold inside the task fold', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '', '**Contract:**', '```sql', 'select 1;', '```'].join('\n'), {});
-    assert.ok(body.includes('ds-acc-prev">code<'), body);
     assert.ok(body.includes('<pre><code class="language-sql">select 1;</code></pre>'), body);
+    assert.ok(!body.includes('ds-acc-prev'), body);
   });
-  it('one fold per task: mixed fields share it in canonical order', () => {
+  it('one fold per task: fields share it unfolded in canonical order', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '',
       '**Verify:** green.', '**Changes:** tweaked the thing.', '**Files:**', '- Create: `a.js`', '- Modify: `b.js`'].join('\n'), {});
     assert.equal((body.match(/<details/g) || []).length, 1, body);
-    assert.ok(body.includes('ds-f-t">Files<'), 'FILES triggers: ' + body);
-    assert.ok(body.includes('+2'), 'two more fields inside: ' + body);
+    assert.ok(body.includes('<h3>Task 1 · A</h3>'), body);
     const fi = body.indexOf('ds-f-t">Files<');
     const ci = body.indexOf('ds-f-t">Changes<');
     const vi = body.indexOf('ds-f-t">Verify<');
@@ -189,17 +190,19 @@ describe('accordions', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '', '**Files:**', '- Create: `a.js`'].join('\n'), {});
     assert.ok(!/<details[^>]*open/.test(body), body);
   });
-  it('without Files the first field triggers', () => {
+  it('without Files there is no trigger line — steps unfold inside', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '',
       '**Steps:**', '1. First', '2. Second', '**Verify:** green.'].join('\n'), {});
     assert.equal((body.match(/<details/g) || []).length, 1, body);
-    assert.ok(body.includes('ds-f-t">Steps<'), body);
-    assert.ok(body.includes('2 items · +1'), body);
+    assert.ok(body.includes('<h3>Task 1 · A</h3>'), body);
+    assert.ok(!body.includes('ds-acc-prev'), body);
+    assert.ok(body.includes('<ol><li>First</li><li>Second</li></ol>'), body);
   });
-  it('a task with no fields renders expanded, never folded', () => {
+  it('a task with content folds under its own header, fields or not', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '',
       'Just a lead line.', '', '1. First', '2. Second'].join('\n'), {});
-    assert.ok(!body.includes('<details'), body);
+    assert.equal((body.match(/<details/g) || []).length, 1, body);
+    assert.ok(body.includes('<h3>Task 1 · A</h3>'), body);
     assert.ok(body.includes('<p>Just a lead line.</p>'), body);
     assert.ok(body.includes('<ol>'), body);
   });
@@ -324,6 +327,7 @@ describe('corpus sweep', () => {
         assert.ok(!prose.includes('*Due:'), `${f} · due leak`);
         assert.ok(!html.includes('<dt>') && !html.includes('<dd>'), `${f} · dl leak`);
         assert.ok(!html.includes('<input'), `${f} · checkbox leak`);
+        assert.ok(!html.includes('ds-acc-prev') && !html.includes('is-acc'), `${f} · FILES chrome leak`);
         for (const t of ['ul', 'ol', 'dl', 'p', 'pre', 'code', 'li', 'details', 'summary', 'section', 'div', 'span', 'h2', 'h3']) {
           assert.equal(count(html, t), count(html, '/' + t), `${f} · <${t}> imbalance`);
         }

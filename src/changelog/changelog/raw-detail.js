@@ -129,11 +129,12 @@ const taskTitleOf = (title) => {
   if (m) return { num: m[1], name: '', shipped: m[2] };
   return { num: '', name: s, shipped: '' };
 };
-// A task's own status line — the phase treatment, minus gates (tasks own
-// no gate verdict; DONE/cancelled come from the head mark only).
+// A task's own status — the phase treatment, minus gates (tasks own
+// no gate verdict; DONE/cancelled come from the head mark only). A span:
+// block outside a summary, inline inside one (see drawer CSS).
 const taskStatus = (task, shipped) => {
-  if (task.cancelled) return '<p class="ds-status ds-is-cancelled">✗ cancelled</p>';
-  if (task.done) return `<p class="ds-status ds-is-done">✓ DONE${shipped ? ` (${shipped})` : ''}</p>`;
+  if (task.cancelled) return '<span class="ds-status ds-is-cancelled">✗ cancelled</span>';
+  if (task.done) return `<span class="ds-status ds-is-done">✓ DONE${shipped ? ` (${shipped})` : ''}</span>`;
   return '';
 };
 
@@ -210,36 +211,24 @@ const renderParts = (parts) => parts.map((p) => {
 }).join('');
 
 // Field rows use spans (never dt/dd — details cannot live inside a dl).
-// A task's fields fold into ONE accordion via renderFold below; rows only
-// ever render unfolded inside that fold.
+// Rows only ever render unfolded: inside a task fold, or flowing in a
+// ## body.
 const fieldText = (f) => (f.inline || []).filter(Boolean).join(' ').trim();
-const accPreview = (f) => {
-  const n = (f.parts || []).filter((p) => p.t === 'list').reduce((a, l) => a + l.items.length, 0);
-  if (n) return `${n} item${n > 1 ? 's' : ''}`;
-  if ((f.parts || []).some((p) => p.t === 'pre')) return 'code';
-  const t = fieldText(f).replace(/`/g, '');
-  return t.length > 64 ? `${t.slice(0, 64).trimEnd()}…` : (t || 'detail');
-};
-// One accordion per task, triggered by the FILES line: the summary shows
-// the trigger label + preview, the body holds ALL of the task's content
-// (objective first, then every field unfolded, then loose blocks). A task
-// with no fields renders its content expanded — there is nothing to fold.
-// Single-fold keeps drawers to headers-first scanning; per-field folds
-// multiplied disclosure arrows without adding signal (steer 2026-10-20).
-const isFilesLabel = (f) => /^files?$/i.test(String((f && f.label) || '').trim());
+// The TASK is the accordion — never a FILES line (a FILES summary opening
+// onto a second FILES label is redundant chrome). Each ### item folds into
+// one <details> whose summary is the task's own header + status; the body
+// holds everything unfolded. ## bodies always flow expanded: the detail
+// pane's job is detail, folding it would hide the one open section for no
+// scanning gain. (Steer 2026-10-20: tasks fold, FILES line goes away.)
 const renderFieldOpen = (f) => {
   const inline = fieldText(f);
   const blocks = renderParts(f.parts || []);
   if (!inline && !blocks) return '';
   return `<div class="ds-field"><span class="ds-f-t">${fmtInline(f.label)}</span>${inline ? `<span class="ds-f-v">${fmtInline(inline)}</span>` : ''}${blocks}</div>`;
 };
-const renderFold = (objHTML, fields, tailHTML) => {
-  const full = (fields || []).filter((f) => fieldText(f) || (f.parts || []).length);
-  if (!full.length) return `${objHTML || ''}${tailHTML || ''}`;
-  const trigger = full.find(isFilesLabel) || full[0];
-  const others = full.length - 1;
-  const prev = esc(accPreview(trigger)) + (others > 0 ? ` · +${others}` : '');
-  return `<details class="ds-field is-acc"><summary class="ds-acc-head"><span class="ds-caret">›</span><span class="ds-f-t">${fmtInline(trigger.label)}</span><span class="ds-acc-prev">${prev}</span></summary><div class="ds-acc-body">${objHTML || ''}${full.map(renderFieldOpen).join('')}${tailHTML || ''}</div></details>`;
+const renderFieldsOpen = (fields) => {
+  const html = (fields || []).map(renderFieldOpen).filter(Boolean).join('');
+  return html ? `<div class="ds-fields">${html}</div>` : '';
 };
 
 // Split a flattened `- [x] **Title** ... **Label:** ...` line (fallback path
@@ -259,27 +248,27 @@ export const splitItemContent = (content) => {
 };
 
 const renderTask = (task) => {
-  // The phase treatment at task scale: h3 + own status line, never a bare
-  // bold line and never a checkbox (the status line owns done, as sections
-  // already do). Tasks own no gate verdict — DONE/cancelled come from the
-  // head mark only.
+  // The task itself is the fold: summary = its own header + status (no
+  // FILES line, no previews), body = everything unfolded. Content-less
+  // tasks render the header alone — nothing to fold.
   const { num, name, shipped } = taskTitleOf(task.title);
   const h3 = num ? `Task ${num}${name ? ` · ${name}` : ''}` : (name || 'Task');
-  let html = `<h3>${fmtInline(h3)}</h3>` + taskStatus(task, shipped);
+  const trig = `<span class="ds-caret">›</span><h3>${fmtInline(h3)}</h3>${taskStatus(task, shipped)}`;
   const obj = task.fields.find((f) => isObjective(f.label));
   const rest = task.fields.filter((f) => !isObjective(f.label));
-  let objHTML = '';
+  let inner = '';
   if (obj) {
     const otext = [...obj.inline, ...obj.parts.filter((p) => p.t === 'para').map((p) => p.text)]
       .filter(Boolean).join(' ').trim();
-    if (otext) objHTML += `<p>${fmtInline(otext)}</p>`;
-    objHTML += renderParts(obj.parts.filter((p) => p.t !== 'para'));
+    if (otext) inner += `<p>${fmtInline(otext)}</p>`;
+    inner += renderParts(obj.parts.filter((p) => p.t !== 'para'));
   }
-  const tailHTML = (task.lead.length ? `<p>${fmtInline(task.lead.join(' ').trim())}</p>` : '')
-    + renderParts(task.loose);
+  if (task.lead.length) inner += `<p>${fmtInline(task.lead.join(' ').trim())}</p>`;
   rest.sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-  html += renderFold(objHTML, rest, tailHTML);
-  return `<section class="ds-subtask">${html}</section>`;
+  inner += renderFieldsOpen(rest);
+  inner += renderParts(task.loose);
+  if (!inner) return `<section class="ds-subtask"><h3>${fmtInline(h3)}</h3>${taskStatus(task, shipped)}</section>`;
+  return `<section class="ds-subtask"><details class="ds-task-fold"><summary class="ds-acc-head">${trig}</summary><div class="ds-acc-body">${inner}</div></details></section>`;
 };
 
 // Render a raw section chunk → {head, body}. head is the h2/h3 + status line;
@@ -456,25 +445,26 @@ export const renderSection = (raw, opts) => {
     // order after the known set — they have no task to belong to.
     for (const t of tasks.filter((t) => !t.title)) {
       const sorted = [...t.fields].sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-      body += renderFold('', sorted, renderParts(t.loose));
+      body += renderFieldsOpen(sorted);
+      body += renderParts(t.loose);
     }
     body += '<div class="ds-tasks">' + real.map(renderTask).join('') + '</div>';
   } else if (tasks.length) {
     // ###-less section: the body is one implicit task owned by the head —
-    // same single fold (objective first, everything inside). Pure prose
-    // (no fields at all) stays expanded — nothing to fold.
+    // it flows expanded (objective first, then fields, then steps), never
+    // folded: the open section IS the detail.
     const all = tasks.flatMap((t) => t.fields);
     const obj = all.find((f) => isObjective(f.label));
-    let objHTML = '';
     if (obj) {
       const otext = [...obj.inline, ...obj.parts.filter((p) => p.t === 'para').map((p) => p.text)]
         .filter(Boolean).join(' ').trim();
-      if (otext) objHTML += `<p>${fmtInline(otext)}</p>`;
-      objHTML += renderParts(obj.parts.filter((p) => p.t !== 'para'));
+      if (otext) body += `<p>${fmtInline(otext)}</p>`;
+      body += renderParts(obj.parts.filter((p) => p.t !== 'para'));
     }
     const rest = all.filter((f) => f !== obj)
       .sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-    body += renderFold(objHTML, rest, renderParts(tasks.flatMap((t) => t.loose)));
+    body += renderFieldsOpen(rest);
+    body += renderParts(tasks.flatMap((t) => t.loose));
   }
   return { head, body };
 };

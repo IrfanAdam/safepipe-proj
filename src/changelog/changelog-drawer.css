@@ -56,13 +56,15 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-md .ds-tasks{display:flex;flex-direction:column;gap:var(--cl-12);margin:var(--cl-4) 0}
 .ds-md .ds-subtask > h3{font-size:var(--sp-text-sm);font-weight:700;margin:var(--cl-8) 0 var(--cl-2)}
 .ds-md .ds-subtask > h3 + .ds-status{margin-top:0}
+/* the task IS the fold: summary carries its header + status, no FILES line */
+.ds-md .ds-task-fold{margin:0}
+.ds-md .ds-task-fold > summary h3{font-size:var(--sp-text-sm);font-weight:700;margin:0;flex:0 1 auto;min-width:0}
+.ds-md summary.ds-acc-head > .ds-status{display:inline-block;margin:0;flex:none}
+.ds-md details.ds-task-fold:not([open]) .ds-caret{transform:rotate(0deg)}
 /* metadata accordions reuse the Evals details/caret language, tightened */
-.ds-md details.ds-field{margin:0}
 .ds-md .ds-acc-head{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:var(--cl-4)}
 .ds-md .ds-acc-head::-webkit-details-marker{display:none}
 .ds-md .ds-acc-head::marker{content:""}
-.ds-md details.ds-field:not([open]) .ds-caret{transform:rotate(0deg)}
-.ds-md .ds-acc-prev{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ds-md .ds-acc-body{padding:var(--cl-2) 0 var(--cl-1) calc(var(--cl-12) + var(--cl-2))}
 .ds-md .ds-acc-body > .ds-field{margin:var(--cl-2) 0}
 .ds-md .ds-acc-body ul,.ds-md .ds-acc-body ol{padding-left:var(--cl-16);margin:var(--cl-2) 0}

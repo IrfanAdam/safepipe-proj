@@ -140,8 +140,8 @@
 - Modify: `tests/changelog-detail.test.js`
 
 **Changes:**
-- One accordion per task, triggered by the FILES line (first field when no Files): summary = caret + label + preview (`N items` / `code` / truncated lead, plus `· +N` for more fields inside); the body holds ALL task content unfolded (objective first, every field, loose blocks).
-- Tasks / prose sections with no fields render expanded — nothing to fold. (Steer 2026-10-20: single FILES fold per task, not per-field folds.)
+- The task itself is the fold (steer 2026-10-20 #2 — replaces the FILES trigger, which duplicated its own label inside): each `###` item is one closed `<details>`, summary = caret + its own `h3` + status, body = everything unfolded (objective, all fields, steps/code). No FILES line, no previews.
+- `##` bodies always flow expanded — the open section is the detail. Content-less tasks render the bare header.
 
 **Verify:** tests for list-field accordion (preview count), long-text accordion, single-line row (no `details`), order across mixed rows; corpus sweep balances the new tags and asserts zero `dt`/`input` leaks.
 
