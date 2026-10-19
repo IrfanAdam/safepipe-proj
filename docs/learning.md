@@ -22,6 +22,7 @@ Recorded 2026-10-19 after repeated phase-per-request drift on `2026-10-19_150735
 - `src/changelog/changelog/paint-detail.js`: derivedFrac fallback so rail never bare.
 - `src/changelog/changelog/paint-plan.js`: dispFrac for card consistency.
 - `src/changelog/changelog-drawer.css`: checkbox filled `var(--color-ink)` + white `✓` (matches `input:checked`).
+- **FROZEN (owner ruling 2026-10-19, never drift):** task ticks are the native glyphs alone — `☑` done, `☐` open, `☒` cancelled. No drawn box, no `ds-box` spans or rules. Pinned by test `ticks are frozen` (glyphs present, `ds-box` absent); any change must fail that test first and get explicit owner approval.
 
 ## Verification
 

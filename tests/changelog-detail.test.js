@@ -435,6 +435,11 @@ describe('gate verdict language (l3-engine fold-in)', () => {
     assert.ok(open.includes('ds-is-gate'), open);
     assert.ok(open.includes('0/1 · GATE OPEN'), open);
   });
+  it('ticks are frozen: native glyphs only, no drawn box ever', () => {
+    const { body } = sec(['## Phase 9 — Freeze', '', '### Task 1: A ✓ done', '', '### Task 2: B', '', '### Task 3: C ✗ cancelled']);
+    assert.ok(body.includes('☑') && body.includes('☐') && body.includes('☒'), body);
+    assert.ok(!body.includes('ds-box'), `no drawn box ever: ${body.slice(0, 300)}`);
+  });
   it('trailing --- never becomes task body (no duplicate stamp fold)', () => {
     const { head, body } = sec(['## Task 3: Fast cross-device sync', '', '**Verify:** okay.', '', '### Task 3 ✓ done d65bcdb', '', '---']);
     assert.ok(!body.includes('<details'), `stamp rolls up, no fold: ${body.slice(-200)}`);
