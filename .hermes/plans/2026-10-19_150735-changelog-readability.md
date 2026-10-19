@@ -239,7 +239,7 @@
 |---|---|---|
 | 11 | Title-note split | terrain Task 1 header is one line, note leads the open fold; paren shas still ship |
 
-### Task 11: Title-note split ✓ done
+### Task 11: Title-note split ✓ done `0f674fe`
 
 **Objective:** A trailing `(...)` on a task title is the ship sha or a prose note — never header material.
 
@@ -255,3 +255,5 @@
 **Verify:** 6 new unit tests (4 note + 2 step-head, incl. 1 terrain corpus); corpus sweep green; terrain Task 1 closed+open screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-6]`; close with `✓ done` + sha.
 
 - REF GATE 6 (ship): terrain Task 1 header one line, note first inside, Tasks 2–7 shas in statuses. Evidence: screenshots + green suite.
+
+*Shipped in 0f674fe · Task 11 · phase-6.*
