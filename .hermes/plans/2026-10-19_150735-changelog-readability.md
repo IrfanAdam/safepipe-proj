@@ -112,7 +112,7 @@
 
 | # | Task | Done when |
 |---|---|---|
-| 6 | Task headers incl. task-led plans | every `###` task renders `h3` + own DONE/cancelled line (no gate, no checkbox); smooth-scheduling `###` items verified |
+| 6 | Task headers incl. task-led plans | every `###` task renders `h3` + own DONE/cancelled line (no gate, no checkbox); smooth-scheduling `###` tasks verified |
 | 7 | Metadata accordions | multi-line/list/code fields fold into closed native `<details>` with count preview; single-line fields stay rows; canonical order kept |
 | 8 | Compact metadata CSS + verify | token-only tightening of field type/spacing; chromium + webkit screenshots, zero page errors, suite green |
 
@@ -129,7 +129,7 @@
 - Parse all three corpus head shapes: `Task N: name ✓ done \`sha\``, `Task N ✓ done — shipped <sha> · name`, `Task N ✓ done <sha>`.
 - Drop the synthesized checkbox (status line owns done, as sections already do); fallback `- [ ]` tasks take the same header path.
 
-**Verify:** new tests for all three head shapes + unmarked; smooth-scheduling `###` items render headed in the corpus sweep; no `<input>` in any detail body.
+**Verify:** new tests for all three head shapes + unmarked; smooth-scheduling `###` tasks render headed in the corpus sweep; no `<input>` in any detail body.
 
 ### Task 7: Metadata accordions ✓ done `97ca963` → single-fold `a7e2a37` → task-fold `08ad967`
 
@@ -140,7 +140,7 @@
 - Modify: `tests/changelog-detail.test.js`
 
 **Changes:**
-- The task itself is the fold (steer 2026-10-20 #2 — replaces the FILES trigger, which duplicated its own label inside): each `###` item is one closed `<details>`, summary = caret + its own `h3` + status, body = everything unfolded (objective, all fields, steps/code). No FILES line, no previews.
+- The task itself is the fold (steer 2026-10-20 #2 — replaces the FILES trigger, which duplicated its own label inside): each `###` task is one closed `<details>`, summary = caret + its own `h3` + status, body = everything unfolded (objective, all fields, steps/code). No FILES line, no previews.
 - `##` bodies always flow expanded — the open section is the detail. Content-less tasks render the bare header.
 
 **Verify:** tests for list-field accordion (preview count), long-text accordion, single-line row (no `details`), order across mixed rows; corpus sweep balances the new tags and asserts zero `dt`/`input` leaks.
@@ -166,17 +166,23 @@
 
 ---
 
-## Phase 4 — Plan-level done honors the ship gate {#phase-4}
+## Phase 4 — Polish: ship-gate, stamps, titles, heads, ticks, lone-task, reconciliation {#phase-4}
 
-*Tags: changelog, renderer*
+*Tags: changelog, renderer, process*
 
-*What the build gains:* a plan card stops claiming done while its ship gate is still open — tasks-done and shipped are different facts, and the card tells them apart.
+*What the build gains:* post-verify polish lands without new phases — every follow-up is an eval on this phase (tasks 9–15), not a new `## Phase`. The drawer shows `4 phases`, this phase shows `7/7`.
 
 | # | Task | Done when |
 |---|---|---|
 | 9 | Ship-gate plan status | 172008 + smooth cards read open (ship gates open); timeline card unchanged (ship passed); no other card flips |
+| 10 | Stamp rollup + section source order | smooth/timeline `## Task` heads show DONE, no nested `Task N`; Behavior contract sits before Steps; loose steps stay written-position |
+| 11 | Title-note split | terrain Task 1 header is one line, note leads the open fold; paren shas still ship |
+| 12 | Head consistency | ring2 Phase 4 shows divider under DONE, folds read `name ✓ DONE ›` with no id |
+| 13 | Checkbox summaries | 172008 Phase 4 folds read `☑ name ›` in ink, no DONE/sha/accent |
+| 14 | Lone-task promotion | terrain Task 6 pane shows h2 + DONE + divider + flowing body, no fold, no `<h3-task>` |
+| 15 | Reconcile sibling worktree | green suite, both intents observable, every hunk decision recorded |
 
-### Task 9: Ship-gate plan status ✓ done `2b6f5ae`
+### Task 9: Ship-gate plan status ✓ done `2b6f5ae` {#phase-4}
 
 **Objective:** The plan card is the plan's seal — an open `(ship)` gate keeps it open no matter the task fractions.
 
@@ -192,23 +198,7 @@
 
 **Verify:** unit tests + 172008/smooth/open-ship corpus asserts; timeline ship-passed assert; list screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-4]`; close with `✓ done` + sha.
 
-- REF GATE 4 (ship): 172008 card open, smooth card open, every other card unchanged. Evidence: list screenshots + green suite.
-
-*Shipped in 2b6f5ae · Task 9 · phase-4.*
-
----
-
-## Phase 5 — Task-only sections: stamp rollup + source order {#phase-5}
-
-*Tags: changelog, renderer*
-
-*What the build gains:* `## Task` plans stop nesting nameless tasks and scrambling field order — the section reads as one unit, in the author's words, in the author's order.
-
-| # | Task | Done when |
-|---|---|---|
-| 10 | Stamp rollup + section source order | smooth/timeline `## Task` heads show DONE, no nested `Task N`; Behavior contract sits before Steps; loose steps stay written-position |
-
-### Task 10: Stamp rollup + section source order ✓ done `50d70b4`
+### Task 10: Stamp rollup + section source order ✓ done `50d70b4` {#phase-5}
 
 **Objective:** A bare `### Task N ✓ done` stamp is the section's seal, not a sub-task; and an open section keeps its narrative.
 
@@ -223,23 +213,7 @@
 
 **Verify:** 7 new unit tests; corpus sweep green; smooth + timeline drawer screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-5]`; close with `✓ done` + sha.
 
-- REF GATE 5 (ship): smooth Task 1 head DONE with Files/Rules/Verify in order and no nested task; timeline Task 2 contract-before-steps. Evidence: screenshots + green suite.
-
-*Shipped in 50d70b4 · Task 10 · phase-5.*
-
----
-
-## Phase 6 — Task title notes {#phase-6}
-
-*Tags: changelog, renderer*
-
-*What the build gains:* fold headers stay one line — trailing prose parens move into the body instead of inflating the title.
-
-| # | Task | Done when |
-|---|---|---|
-| 11 | Title-note split | terrain Task 1 header is one line, note leads the open fold; paren shas still ship |
-
-### Task 11: Title-note split ✓ done `0f674fe`
+### Task 11: Title-note split ✓ done `0f674fe` {#phase-6}
 
 **Objective:** A trailing `(...)` on a task title is the ship sha or a prose note — never header material.
 
@@ -254,23 +228,7 @@
 
 **Verify:** 6 new unit tests (4 note + 2 step-head, incl. 1 terrain corpus); corpus sweep green; terrain Task 1 closed+open screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-6]`; close with `✓ done` + sha.
 
-- REF GATE 6 (ship): terrain Task 1 header one line, note first inside, Tasks 2–7 shas in statuses. Evidence: screenshots + green suite.
-
-*Shipped in 0f674fe · Task 11 · phase-6.*
-
----
-
-## Phase 7 — Head consistency {#phase-7}
-
-*Tags: changelog, renderer*
-
-*What the build gains:* every phase head scans the same (title / status / divider / body); task folds read name-first with the caret as suffix and no id.
-
-| # | Task | Done when |
-|---|---|---|
-| 12 | Head consistency | ring2 Phase 4 shows divider under DONE, folds read `name ✓ DONE ›` with no id |
-
-### Task 12: Head consistency ✓ done `ac91418`
+### Task 12: Head consistency ✓ done `ac91418` {#phase-7}
 
 **Objective:** Status under the title, a rule after it, tasks name-first.
 
@@ -286,23 +244,7 @@
 
 **Verify:** suite updated (52 green); ring2 Phase 4 screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-7]`; close with `✓ done` + sha.
 
-- REF GATE 7 (ship): ring2 Phase 4 divider + suffix carets, no ids. Evidence: screenshots + green suite.
-
-*Shipped in ac91418 · Task 12 · phase-7.*
-
----
-
-## Phase 8 — Task tick {#phase-8}
-
-*Tags: changelog, renderer*
-
-*What the build gains:* task folds read as one quiet line — checkbox, name, inline caret, zero accent.
-
-| # | Task | Done when |
-|---|---|---|
-| 13 | Checkbox summaries | 172008 Phase 4 folds read `☑ name ›` in ink, no DONE/sha/accent |
-
-### Task 13: Checkbox summaries ✓ done `95e6902` → flush fold bodies `b2d6506`
+### Task 13: Checkbox summaries ✓ done `95e6902` → flush fold bodies `b2d6506` {#phase-8}
 
 **Objective:** The black checkbox-like mark leads; nothing accent-colored sits inline.
 
@@ -317,24 +259,7 @@
 
 **Verify:** suite updated (52 green); 172008 Phase 4 screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-8]`; close with `✓ done` + sha.
 
-- REF GATE 8 (ship): Phase 4 folds box-first, ink-only, caret inline. Evidence: screenshots + green suite.
-
-*Shipped in 95e6902 · Task 13 · phase-8.*
-*Follow-up flush fold bodies in b2d6506 · Task 13 · phase-8.*
-
----
-
-## Phase 9 — Lone-task promotion {#phase-9}
-
-*Tags: changelog, renderer*
-
-*What the build gains:* task-only right panes read as phases — the task is the title, status under it, body flowing, no fold.
-
-| # | Task | Done when |
-|---|---|---|
-| 14 | Lone-task promotion | terrain Task 6 pane shows h2 + DONE + divider + flowing body, no fold, no `<h3-task>` |
-
-### Task 14: Lone-task promotion ✓ done `c3cd09d`
+### Task 14: Lone-task promotion ✓ done `c3cd09d` {#phase-9}
 
 **Objective:** A section that IS one task behaves like a phase.
 
@@ -348,23 +273,7 @@
 
 **Verify:** 5 new unit tests; corpus sweep green; terrain Task 6 screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-9]`; close with `✓ done` + sha.
 
-- REF GATE 9 (ship): Task 6 title + status + divider + flowing STEPs. Evidence: screenshots + green suite.
-
-*Shipped in c3cd09d · Task 14 · phase-9.*
-
----
-
-## Phase 10 — Reconciliation (sibling lane) {#phase-10}
-
-*Tags: changelog, process*
-
-*What the build gains:* two same-tree lanes merge without losing either intent — honest verdicts stand, forward ontology adopted.
-
-| # | Task | Done when |
-|---|---|---|
-| 15 | Reconcile sibling worktree | green suite, both intents observable, every hunk decision recorded |
-
-### Task 15: Reconcile sibling worktree ✓ done `02be9ce`
+### Task 15: Reconcile sibling worktree ✓ done `02be9ce` {#phase-10} {#phase-11}
 
 **Objective:** A sibling session shipped an uncommitted lane (ontology, engine invariant, frac fallbacks, skill docs) on top of Phases 1–9. Merge it impartially per hunk.
 
@@ -378,44 +287,7 @@
 
 **Verify:** detail suite 60/60 (3 new fraction tests); full suite green except pre-existing geo + honestly-pinned counts; build green; 172008 P5 head shows no DONE; chromium + webkit zero page errors; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-10]`; close with `✓ done` + sha.
 
-- REF GATE 10 (ship): reconciled tree renders honest heads, hollow boxes, unchanged rails/cards. Evidence: screenshots + green suite.
+- REF GATE 4 (ship): 172008 card open, smooth card open, every other card unchanged. Evidence: list screenshots + green suite.
+- REF GATE 4 · rev (Tasks 10–15): subsequent polish — stamp rollup, title-note, head consistency, checkbox, lone-task, reconciliation — each verified screenshots + green suite.
 
-*Shipped in 02be9ce · Task 15 · phase-10.*
-
----
-
-## Phase 11 — Audit fold-in (helper lanes) {#phase-11}
-
-*Tags: changelog, renderer*
-
-*What the build gains:* helper-audit engine fixes land with pins; audit constraints (anchors untouched) hold.
-
-| # | Task | Done when |
-|---|---|---|
-| 16 | Fold in l3-engine + audit reports | D1–D4 applied + pinned, suite green, anchors intact |
-
-### Task 16: Fold in l3-engine + audit reports ✓ done
-
-**Objective:** Apply the helper session's verified engine patch; resolve the corpus notes without rewriting anchors.
-
-**Files:**
-- Modify: `src/changelog/changelog/raw-detail.js`, `src/changelog/changelog/paint-detail.js` (applied `sib-fa0a79/l3-engine/proposed.diff` verbatim — `git apply --check` clean)
-- Modify: `tests/changelog-detail.test.js` (D1/D2/D3 pins), `.agents/skills/changelog-kit/references/plan-shapes.md` (`Item NN` → `Task NN`)
-
-**Changes (applied):**
-- D1 doubled tick → `✓ DONE · GATE PASSED` via `joinStatus` (one rule for every head).
-- D2 passed gates wear `ds-is-done`, open stays muted (hunk-3 guard widening is load-bearing with D2 — applied together).
-- D3 headless single-task chunks gain h2 + status (fold kept under the restored title).
-- D4 duplicate-anchor closeout rows suppress repeated gate badge + eval rows.
-- `plan-shapes.md` fallback wording matches `unitLabel`.
-
-**Deferred with reason:**
-- Test SyntaxError @451: not present at read time — transient mid-edit breaks, all repaired before runs.
-- 150735 Phase 2 Tasks 4/5 bodies: declined — authoring them means corpus-wide plan rewrites, explicitly out of scope (Phase 1 steer); the open ship gate already holds the card honest, fractions count authored units by contract.
-- `plan-track.mjs` TRACKED omission: different lane (tracker/scheduling ownership) + manifest-regen blast radius — flagged, untouched.
-- 150735 gate verdicts + Gate 1 `(ship)`: self-judging — yours to call.
-- Global-skills wording: upstream skills out of write scope; vendored snapshots fixed.
-
-**Verify:** detail 63/63 (D-pins + fraction tests); full suite 744/745 (geo pre-existing); build green; 202541 `✓ DONE · GATE PASSED` + closeout dedupe screenshots chromium + webkit, zero page errors; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-11]`; close with `✓ done` + sha.
-
-- REF GATE 11 (ship): audit items applied/pinned, anchors intact (20 refs held, 0 orphans). Evidence: screenshots + green suite.
+*Shipped in 2b6f5ae · Tasks 9–15 · phase-4 · anchors {#phase-4} {#phase-5} {#phase-6} {#phase-7} {#phase-8} {#phase-9} {#phase-10} {#phase-11} retained for history.*

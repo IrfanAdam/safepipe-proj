@@ -23,7 +23,10 @@ Read this file first; it replaces hallway knowledge.
 - Active + historical plans: `.hermes/plans/` (tracked in git).
 - Commits that execute a plan carry `[plan:<file>#<anchor>]` in the subject.
 - A phase is done only at its REF GATE with the stated evidence
-  (screenshots, zero page errors); then append `### Task N ✓ done` + sha.
+  (screenshots, zero page errors); then mark each real `### Task N` heading
+  `✓ done` + sha in place — never append a duplicate `### Task N ✓ done`
+  heading, which `split()` reads as a new section and parks the phase at a
+  fraction.
 - Never invent files, coverage, coordinates, or findings — name the exact
   missing file + its official download page instead.
 
@@ -46,8 +49,12 @@ Read this file first; it replaces hallway knowledge.
 - `.agents/skills/<name>/SKILL.md` + references + scripts are snapshots of
   the Hermes skills this project depends on. Any agent: read the SKILL.md
   directly and follow it. See `docs/agent-skills.md` for which skill covers
-  what. Snapshots taken 2026-10-12; if your harness has a newer upstream
-  version of the same skill, prefer upstream and note it in your commit.
+  what. Snapshots taken 2026-10-12, re-synced 2026-10-19 with the Plan Anatomy
+  rules; if your harness holds a higher `version:` for the same skill in its
+  frontmatter, prefer that copy and note it in your commit — never assume a
+  copy is newer because it sits in the global skills dir (the global
+  `changelog-kit` is 0.3.1 and predates the vendored 0.4.0, so following it
+  would revert the ontology rules).
 
 ## Binding references
 

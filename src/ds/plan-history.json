@@ -5461,6 +5461,62 @@
      "state": ""
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-19",
+   "time": "17:38",
+   "hash": "9fad6e2d",
+   "sections": [
+    {
+     "head": "Phase 1 — Renderer: block structure, honest done, owned gates {#phase-1}",
+     "hash": "934744d5",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Grammar rollout: normalize gates + labels across plans {#phase-2}",
+     "hash": "a994f47f",
+     "state": ""
+    },
+    {
+     "head": "Phase 3 — Task headers, accordions, compact metadata {#phase-3}",
+     "hash": "b7d2a447",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Polish: ship-gate, stamps, titles, heads, ticks, lone-task, reconcilia",
+     "hash": "6cbc3f6b",
+     "state": "7/7"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-19",
+   "time": "17:41",
+   "hash": "5dc69d73",
+   "sections": [
+    {
+     "head": "Phase 1 — Renderer: block structure, honest done, owned gates {#phase-1}",
+     "hash": "934744d5",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Grammar rollout: normalize gates + labels across plans {#phase-2}",
+     "hash": "a994f47f",
+     "state": ""
+    },
+    {
+     "head": "Phase 3 — Task headers, accordions, compact metadata {#phase-3}",
+     "hash": "9fb453a9",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Polish: ship-gate, stamps, titles, heads, ticks, lone-task, reconcilia",
+     "hash": "6cbc3f6b",
+     "state": "7/7"
+    }
+   ]
   }
  ]
 }

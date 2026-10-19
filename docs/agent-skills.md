@@ -6,12 +6,12 @@ in each folder is self-contained — read it, follow it.
 
 | Skill | Covers in this project | Used by |
 | --- | --- | --- |
-| `plan-traceability` | Plan ↔ commit linking, phase-shipped marking, changelog rendering (`src/ds/plan-manifest.json` via `scripts/plan-track.mjs`) | every phase close |
+| `plan-traceability` | Plan ↔ commit linking, phase-shipped marking, changelog rendering (`src/ds/plan-manifest.json` via `scripts/plan-track.mjs`), **Plan Anatomy** (tasks-not-items, iterations are evals, consistent status + gate line) | every phase close |
 | `pixel-proof` | Screenshot verification (chromium + webkit probes, scroll probes) for REF GATEs | every REF GATE |
 | `map-twin-crossfade` | MapLibre satellite ↔ 3D twin crossfade + headless verify | ops3d terrain phases |
 | `crisp-webgl` | Sharp Three.js rendering (no-zoom-blur) | ops3d scene work |
 | `interactive-3d-views` | Orbit sweeps, registration probes for twin alignment | twin geometry phases |
-| `changelog-kit` | Changelog lanes + plan shapes for `changelog.html`, incl. timeline tracks + scheduling (v0.4.0) | changelog updates |
+| `changelog-kit` | Changelog lanes + plan shapes for `changelog.html`, incl. timeline tracks + scheduling (v0.4.0), **Plan Anatomy** rules and the consistent phase status + gate line | changelog updates |
 
 ## Without Hermes
 

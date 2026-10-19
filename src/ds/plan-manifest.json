@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-19T09:54:54.959Z",
+  "generated": "2026-10-19T12:11:49.165Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,132 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "d5c63c8",
+      "full": "d5c63c889c8276f7e21e14d15e0acd78c136e221",
+      "date": "2026-10-19",
+      "time": "17:37",
+      "subject": "fix(changelog): synthesis covers gated heads, open-gate fraction lead [plan:2026-10-19_150735-changelog-readability.md#phase-10]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-10"
+    },
+    {
+      "sha": "36c1ee5",
+      "full": "36c1ee5d0572250871b04ac780f3b9b38164d229",
+      "date": "2026-10-19",
+      "time": "17:31",
+      "subject": "feat(changelog): audit fold-in D1-D4, honest heads stand [plan:2026-10-19_150735-changelog-readability.md#phase-11]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-11"
+    },
+    {
+      "sha": "02be9ce",
+      "full": "02be9ceee39c9099ff2f83d7fd955971475ea441",
+      "date": "2026-10-19",
+      "time": "17:24",
+      "subject": "feat(changelog): reconcile sibling lane, honest heads stand [plan:2026-10-19_150735-changelog-readability.md#phase-10]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-10"
+    },
+    {
+      "sha": "c3cd09d",
+      "full": "c3cd09dc2f688d7fed4ca0ab288b6749b09a104a",
+      "date": "2026-10-19",
+      "time": "16:41",
+      "subject": "feat(changelog): lone task sections read as phases [plan:2026-10-19_150735-changelog-readability.md#phase-9]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-9"
+    },
+    {
+      "sha": "b2d6506",
+      "full": "b2d6506911567f6ad8a22dff3ef38b1eec667002",
+      "date": "2026-10-19",
+      "time": "16:30",
+      "subject": "feat(changelog): flush fold bodies, no indent [plan:2026-10-19_150735-changelog-readability.md#phase-8]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-8"
+    },
+    {
+      "sha": "95e6902",
+      "full": "95e69029e1aaf46a9105dd9ecfc592952dd56e75",
+      "date": "2026-10-19",
+      "time": "16:28",
+      "subject": "feat(changelog): task checkbox summaries, ink only [plan:2026-10-19_150735-changelog-readability.md#phase-8]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-8"
+    },
+    {
+      "sha": "ac91418",
+      "full": "ac91418083eedc24b9fdd138e834df6df397662f",
+      "date": "2026-10-19",
+      "time": "16:12",
+      "subject": "feat(changelog): head divider, suffix caret, no task ids [plan:2026-10-19_150735-changelog-readability.md#phase-7]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-7"
+    },
+    {
+      "sha": "0f674fe",
+      "full": "0f674fe7eec5bbfb3296f1b64d6b280e12fbe66b",
+      "date": "2026-10-19",
+      "time": "16:08",
+      "subject": "feat(changelog): title notes to body, bold step heads fold [plan:2026-10-19_150735-changelog-readability.md#phase-6]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-6"
+    },
+    {
+      "sha": "50d70b4",
+      "full": "50d70b4efedf0c0b1f69f1998922100a71685653",
+      "date": "2026-10-19",
+      "time": "15:59",
+      "subject": "feat(changelog): stamp rollup, section source order [plan:2026-10-19_150735-changelog-readability.md#phase-5]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-5"
+    },
+    {
+      "sha": "08ad967",
+      "full": "08ad967802b94c3f5f46daae9d263f203c9d1e5b",
+      "date": "2026-10-19",
+      "time": "15:47",
+      "subject": "feat(changelog): task itself folds, FILES trigger line removed [plan:2026-10-19_150735-changelog-readability.md#phase-3]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-3"
+    },
+    {
+      "sha": "2b6f5ae",
+      "full": "2b6f5ae0ba0f30ab57e6fcef04305def028605e7",
+      "date": "2026-10-19",
+      "time": "15:44",
+      "subject": "feat(changelog): plan card honors open ship gate [plan:2026-10-19_150735-changelog-readability.md#phase-4]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "a7e2a37",
+      "full": "a7e2a37dc6aeb6733dea30cb5b10d94171ebf833",
+      "date": "2026-10-19",
+      "time": "15:41",
+      "subject": "feat(changelog): single FILES fold per task holds all content [plan:2026-10-19_150735-changelog-readability.md#phase-3]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-3"
+    },
+    {
+      "sha": "97ca963",
+      "full": "97ca9637f2c821d6bd6739afd45bfce47ceaceb2",
+      "date": "2026-10-19",
+      "time": "15:37",
+      "subject": "feat(changelog): task headers, metadata accordions, compact fields [plan:2026-10-19_150735-changelog-readability.md#phase-3]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-3"
+    },
+    {
+      "sha": "966ad12",
+      "full": "966ad121efa7b332bb62be9168f387275d452d2a",
+      "date": "2026-10-19",
+      "time": "15:24",
+      "subject": "chore(ds): sync plan manifest (plumbing — manifest-only, auto-excluded)",
+      "plan": null,
+      "anchor": null
+    },
     {
       "sha": "8ece275",
       "full": "8ece2756752dd41a82ead09ceef17505f0a279bf",
@@ -4566,5 +4692,11 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    ".agents/skills/changelog-kit/SKILL.md",
+    ".agents/skills/plan-traceability/SKILL.md",
+    "AGENTS.md",
+    "docs/agent-skills.md",
+    "public/version.json"
+  ]
 }
