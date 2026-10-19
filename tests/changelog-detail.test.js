@@ -73,7 +73,7 @@ describe('block structure', () => {
     assert.ok(body.indexOf('ds-f-t">Files<') < body.indexOf('ds-f-t">Verify<'), body);
   });
 });
-  it('numbered lists stay loose under non-procedural fields', () => {
+  it('a task with fields folds into one FILES accordion, loose steps inside', () => {
     const raw = [
       '## Phase 1 — X {#phase-1}', '',
       '### Task 1: A', '',
@@ -81,9 +81,10 @@ describe('block structure', () => {
       '1. First step', '2. Second step',
     ].join('\n');
     const { body } = renderSection(raw, {});
-    assert.ok(body.includes('<span class="ds-f-t">Files</span>'), body);
+    assert.equal((body.match(/<details/g) || []).length, 1, body);
+    assert.ok(body.includes('ds-f-t">Files<'), body);
     assert.ok(body.includes('<ol><li>First step</li><li>Second step</li></ol>'), body);
-    assert.ok(!body.includes('<details'), 'short row must not fold: ' + body);
+    assert.ok(body.indexOf('<div class="ds-acc-body">') < body.indexOf('<ol>'), 'steps belong inside the fold: ' + body);
   });
   it('wrapped steps stay one list (domain Task 4 shape)', () => {
     const raw = [
@@ -105,7 +106,7 @@ describe('block structure', () => {
     const { body } = renderSection(raw, {});
     assert.ok(body.includes('<li>Mine all labels wrapped continuation here</li>'), body);
   });
-  it('task-less sections lead with Objective, then Files, then steps', () => {
+  it('task-less sections fold with Objective first, then Files, then steps', () => {
     const raw = [
       '## Task 4 — Q ✓ done', '',
       '*Shipped in abc.*', '',
@@ -114,9 +115,10 @@ describe('block structure', () => {
     ].join('\n');
     const { head, body } = renderSection(raw, {});
     assert.ok(head.includes('✓ DONE'), head);
-    const oi = body.indexOf('Do things well.');
-    const fi = body.indexOf('ds-f-t">Files<');
-    const oli = body.indexOf('<ol>');
+    const fold = body.slice(body.indexOf('<div class="ds-acc-body">'));
+    const oi = fold.indexOf('Do things well.');
+    const fi = fold.indexOf('ds-f-t">Files<');
+    const oli = fold.indexOf('<ol>');
     assert.ok(oi !== -1 && fi !== -1 && oli !== -1, body);
     assert.ok(oi < fi && fi < oli, 'order: objective, files, steps: ' + body);
   });
@@ -171,9 +173,12 @@ describe('accordions', () => {
     assert.ok(body.includes('ds-acc-prev">code<'), body);
     assert.ok(body.includes('<pre><code class="language-sql">select 1;</code></pre>'), body);
   });
-  it('mixed rows and accordions keep canonical order', () => {
+  it('one fold per task: mixed fields share it in canonical order', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '',
       '**Verify:** green.', '**Changes:** tweaked the thing.', '**Files:**', '- Create: `a.js`', '- Modify: `b.js`'].join('\n'), {});
+    assert.equal((body.match(/<details/g) || []).length, 1, body);
+    assert.ok(body.includes('ds-f-t">Files<'), 'FILES triggers: ' + body);
+    assert.ok(body.includes('+2'), 'two more fields inside: ' + body);
     const fi = body.indexOf('ds-f-t">Files<');
     const ci = body.indexOf('ds-f-t">Changes<');
     const vi = body.indexOf('ds-f-t">Verify<');
@@ -183,6 +188,26 @@ describe('accordions', () => {
   it('accordions start closed', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '', '**Files:**', '- Create: `a.js`'].join('\n'), {});
     assert.ok(!/<details[^>]*open/.test(body), body);
+  });
+  it('without Files the first field triggers', () => {
+    const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '',
+      '**Steps:**', '1. First', '2. Second', '**Verify:** green.'].join('\n'), {});
+    assert.equal((body.match(/<details/g) || []).length, 1, body);
+    assert.ok(body.includes('ds-f-t">Steps<'), body);
+    assert.ok(body.includes('2 items · +1'), body);
+  });
+  it('a task with no fields renders expanded, never folded', () => {
+    const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '',
+      'Just a lead line.', '', '1. First', '2. Second'].join('\n'), {});
+    assert.ok(!body.includes('<details'), body);
+    assert.ok(body.includes('<p>Just a lead line.</p>'), body);
+    assert.ok(body.includes('<ol>'), body);
+  });
+  it('prose sections with no fields stay expanded', () => {
+    const { body } = renderSection(['## Current context', '', 'Plain para one.', '', '- a bullet', '- another'].join('\n'), {});
+    assert.ok(!body.includes('<details'), body);
+    assert.ok(body.includes('<p>Plain para one.</p>'), body);
+    assert.ok(body.includes('<ul><li>a bullet</li><li>another</li></ul>'), body);
   });
 });
 

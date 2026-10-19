@@ -140,8 +140,8 @@
 - Modify: `tests/changelog-detail.test.js`
 
 **Changes:**
-- A field with block parts (list/pre) or inline text over ~140 chars renders closed `<details class="ds-field is-acc">`: summary = caret + label + preview (`N items` / `code` / truncated lead); body holds the full value.
-- Single-line fields stay plain rows. Rows and accordions interleave in canonical order inside `<div class="ds-fields">` (valid HTML — no `details` inside `dl`; rows switch `dt`/`dd` to spans).
+- One accordion per task, triggered by the FILES line (first field when no Files): summary = caret + label + preview (`N items` / `code` / truncated lead, plus `· +N` for more fields inside); the body holds ALL task content unfolded (objective first, every field, loose blocks).
+- Tasks / prose sections with no fields render expanded — nothing to fold. (Steer 2026-10-20: single FILES fold per task, not per-field folds.)
 
 **Verify:** tests for list-field accordion (preview count), long-text accordion, single-line row (no `details`), order across mixed rows; corpus sweep balances the new tags and asserts zero `dt`/`input` leaks.
 

@@ -197,38 +197,37 @@ const renderParts = (parts) => parts.map((p) => {
   return `<p>${fmtInline(p.text)}</p>`;
 }).join('');
 
-// Fields render two ways, always in canonical order: a single short line
-// stays a plain row; a field with block parts (list/pre) or long text
-// folds into a closed native accordion (summary = label + preview) so
-// drawers scan as headers first, detail on demand. Rows use spans —
-// details cannot live inside a dl, so the container is a div throughout.
-const ACC_TEXT_LIMIT = 140;
+// Field rows use spans (never dt/dd — details cannot live inside a dl).
+// A task's fields fold into ONE accordion via renderFold below; rows only
+// ever render unfolded inside that fold.
 const fieldText = (f) => (f.inline || []).filter(Boolean).join(' ').trim();
 const accPreview = (f) => {
   const n = (f.parts || []).filter((p) => p.t === 'list').reduce((a, l) => a + l.items.length, 0);
   if (n) return `${n} item${n > 1 ? 's' : ''}`;
   if ((f.parts || []).some((p) => p.t === 'pre')) return 'code';
-  const t = fieldText(f);
+  const t = fieldText(f).replace(/`/g, '');
   return t.length > 64 ? `${t.slice(0, 64).trimEnd()}…` : (t || 'detail');
 };
-const renderFieldRow = (f) => {
-  const inline = fieldText(f);
-  if (!inline) return '';
-  return `<div class="ds-field"><span class="ds-f-t">${fmtInline(f.label)}</span><span class="ds-f-v">${fmtInline(inline)}</span></div>`;
-};
-const renderFieldAcc = (f) => {
+// One accordion per task, triggered by the FILES line: the summary shows
+// the trigger label + preview, the body holds ALL of the task's content
+// (objective first, then every field unfolded, then loose blocks). A task
+// with no fields renders its content expanded — there is nothing to fold.
+// Single-fold keeps drawers to headers-first scanning; per-field folds
+// multiplied disclosure arrows without adding signal (steer 2026-10-20).
+const isFilesLabel = (f) => /^files?$/i.test(String((f && f.label) || '').trim());
+const renderFieldOpen = (f) => {
   const inline = fieldText(f);
   const blocks = renderParts(f.parts || []);
   if (!inline && !blocks) return '';
-  return `<details class="ds-field is-acc"><summary class="ds-acc-head"><span class="ds-caret">›</span><span class="ds-f-t">${fmtInline(f.label)}</span><span class="ds-acc-prev">${esc(accPreview(f))}</span></summary><div class="ds-acc-body">${inline ? `<p>${fmtInline(inline)}</p>` : ''}${blocks}</div></details>`;
+  return `<div class="ds-field"><span class="ds-f-t">${fmtInline(f.label)}</span>${inline ? `<span class="ds-f-v">${fmtInline(inline)}</span>` : ''}${blocks}</div>`;
 };
-const renderField = (f) => (
-  (f.parts && f.parts.length) || fieldText(f).length > ACC_TEXT_LIMIT
-    ? renderFieldAcc(f) : renderFieldRow(f)
-);
-const renderFields = (fields) => {
-  const html = (fields || []).map(renderField).filter(Boolean).join('');
-  return html ? `<div class="ds-fields">${html}</div>` : '';
+const renderFold = (objHTML, fields, tailHTML) => {
+  const full = (fields || []).filter((f) => fieldText(f) || (f.parts || []).length);
+  if (!full.length) return `${objHTML || ''}${tailHTML || ''}`;
+  const trigger = full.find(isFilesLabel) || full[0];
+  const others = full.length - 1;
+  const prev = esc(accPreview(trigger)) + (others > 0 ? ` · +${others}` : '');
+  return `<details class="ds-field is-acc"><summary class="ds-acc-head"><span class="ds-caret">›</span><span class="ds-f-t">${fmtInline(trigger.label)}</span><span class="ds-acc-prev">${prev}</span></summary><div class="ds-acc-body">${objHTML || ''}${full.map(renderFieldOpen).join('')}${tailHTML || ''}</div></details>`;
 };
 
 // Split a flattened `- [x] **Title** ... **Label:** ...` line (fallback path
@@ -257,16 +256,17 @@ const renderTask = (task) => {
   let html = `<h3>${fmtInline(h3)}</h3>` + taskStatus(task, shipped);
   const obj = task.fields.find((f) => isObjective(f.label));
   const rest = task.fields.filter((f) => !isObjective(f.label));
+  let objHTML = '';
   if (obj) {
     const otext = [...obj.inline, ...obj.parts.filter((p) => p.t === 'para').map((p) => p.text)]
       .filter(Boolean).join(' ').trim();
-    if (otext) html += `<p>${fmtInline(otext)}</p>`;
-    html += renderParts(obj.parts.filter((p) => p.t !== 'para'));
+    if (otext) objHTML += `<p>${fmtInline(otext)}</p>`;
+    objHTML += renderParts(obj.parts.filter((p) => p.t !== 'para'));
   }
-  if (task.lead.length) html += `<p>${fmtInline(task.lead.join(' ').trim())}</p>`;
+  const tailHTML = (task.lead.length ? `<p>${fmtInline(task.lead.join(' ').trim())}</p>` : '')
+    + renderParts(task.loose);
   rest.sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-  html += renderFields(rest);
-  html += renderParts(task.loose);
+  html += renderFold(objHTML, rest, tailHTML);
   return `<section class="ds-subtask">${html}</section>`;
 };
 
@@ -444,25 +444,25 @@ export const renderSection = (raw, opts) => {
     // order after the known set — they have no task to belong to.
     for (const t of tasks.filter((t) => !t.title)) {
       const sorted = [...t.fields].sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-      body += renderFields(sorted);
-      body += renderParts(t.loose);
+      body += renderFold('', sorted, renderParts(t.loose));
     }
     body += '<div class="ds-tasks">' + real.map(renderTask).join('') + '</div>';
   } else if (tasks.length) {
     // ###-less section: the body is one implicit task owned by the head —
-    // Objective leads (it is the summary), the rest follow canonically.
+    // same single fold (objective first, everything inside). Pure prose
+    // (no fields at all) stays expanded — nothing to fold.
     const all = tasks.flatMap((t) => t.fields);
     const obj = all.find((f) => isObjective(f.label));
+    let objHTML = '';
     if (obj) {
       const otext = [...obj.inline, ...obj.parts.filter((p) => p.t === 'para').map((p) => p.text)]
         .filter(Boolean).join(' ').trim();
-      if (otext) body += `<p>${fmtInline(otext)}</p>`;
-      body += renderParts(obj.parts.filter((p) => p.t !== 'para'));
+      if (otext) objHTML += `<p>${fmtInline(otext)}</p>`;
+      objHTML += renderParts(obj.parts.filter((p) => p.t !== 'para'));
     }
     const rest = all.filter((f) => f !== obj)
       .sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-    body += renderFields(rest);
-    body += renderParts(tasks.flatMap((t) => t.loose));
+    body += renderFold(objHTML, rest, renderParts(tasks.flatMap((t) => t.loose)));
   }
   return { head, body };
 };
