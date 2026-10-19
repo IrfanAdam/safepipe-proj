@@ -52,6 +52,11 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-md .ds-field dt{display:inline;font-family:var(--font-mono);font-size:var(--text-micro);font-weight:700;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin:0}
 .ds-md .ds-field dt::after{content:": ";letter-spacing:0}
 .ds-md .ds-field dd{display:inline;margin:0}
+/* block-aware detail (raw-detail.js): field values can hold real lists and
+   code — block values drop below the label line, never run on. */
+.ds-md .ds-field dd:has(ul,ol,pre){display:block;margin-top:var(--cl-2)}
+/* gate-only status (unmarked head with a verdict): quiet like cancelled. */
+.ds-md .ds-is-gate{color:var(--color-ink-muted)}
 .ds-md table{width:100%;table-layout:fixed;border-collapse:collapse}
 .ds-md th,.ds-md td{overflow-wrap:anywhere;vertical-align:top}
 .ds-md pre{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:visible}

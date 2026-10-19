@@ -3358,6 +3358,29 @@
      "state": ""
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-19",
+   "time": "15:11",
+   "hash": "33330b39",
+   "sections": [
+    {
+     "head": "Lane A — OSM completeness (owns: `scripts/data-pipe/*`, `public/data/sangachal-v",
+     "hash": "998b4760",
+     "state": ""
+    },
+    {
+     "head": "Lane B — Elevation triangulation (owns: new `scripts/data-pipe/elev-*.mjs` + scr",
+     "hash": "3ac3fef5",
+     "state": ""
+    },
+    {
+     "head": "Lane C — Source recon: Cesium / OSM2World / GDAL / PostGIS (read-only + scratch ",
+     "hash": "a62ae120",
+     "state": ""
+    }
+   ]
   }
  ],
  "2026-10-13_233337-ops3d-twin-work.md": [
@@ -5397,6 +5420,26 @@
     {
      "head": "Phase 5 closeout note",
      "hash": "4b151e88",
+     "state": ""
+    }
+   ]
+  }
+ ],
+ "2026-10-19_150735-changelog-readability.md": [
+  {
+   "sha": null,
+   "date": "2026-10-19",
+   "time": "15:11",
+   "hash": "8487118d",
+   "sections": [
+    {
+     "head": "Phase 1 — Renderer: block structure, honest done, owned gates {#phase-1}",
+     "hash": "e4a2e774",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 2 — Grammar rollout: normalize gates + labels across plans {#phase-2}",
+     "hash": "6983843e",
      "state": ""
     }
    ]

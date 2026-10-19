@@ -93,6 +93,7 @@ a.ds-gate-primary{text-decoration:none;display:inline-block}
 .ds-md h2{font-size:var(--text-h2);font-weight:700;letter-spacing:var(--tracking-heading);margin:var(--cl-22) 0 var(--cl-8)}
 .ds-md h3{font-size:var(--text-h3);font-weight:600;margin:var(--cl-16) 0 var(--cl-6)}
 .ds-md ul{padding-left:var(--cl-18);margin:var(--cl-8) 0}
+.ds-md ol{padding-left:var(--cl-18);margin:var(--cl-8) 0}
 .ds-md li{margin-bottom:var(--cl-4)}
 .ds-md code{font-family:var(--font-mono);font-size:var(--text-micro);background:var(--color-panel);border:var(--border-hairline);padding:var(--cl-1) var(--cl-5)}
 .ds-md pre{background:var(--color-surface);border:var(--border-hairline);padding:var(--cl-10) var(--cl-12);overflow-x:auto}

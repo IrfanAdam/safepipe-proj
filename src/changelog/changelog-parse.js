@@ -195,7 +195,10 @@ export const parseGates = (md) => {
     let st = 'open';
     if (/PASSED by owner waiver/i.test(line)) st = 'waiver';
     else if (/✓\s*PASSED/i.test(line)) st = 'passed';
-    else if (/FAIL/i.test(line.replace(/`[^`]*`/g, ''))) st = 'failed';
+    // FAIL is case-sensitive uppercase only: lowercase evidence prose inside
+    // a gate line ("7 pre-existing … fails") is not a verdict — an explicit
+    // FAIL / FAILED is. (Readability audit: own-verdict display exposed this.)
+    else if (/\bFAIL(ED)?\b/.test(line.replace(/`[^`]*`/g, ''))) st = 'failed';
     const dm = `${paren} ${rest}`.match(/(\d{4}-\d{2}-\d{2})/);
     const reviewer = /owner/i.test(line) ? 'owner' : '';
     let evidence = '';

@@ -1,172 +1,13 @@
 // safepipe changelog — rail + detail · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
-const marked = {
-  parse(s, opts){
-    const { phaseDone = false, gateSuffix = '' } = opts || {};
-    let phaseHeadSeen = false;
-    let src = String(s||'')
-      .replace(/<!--[\s\S]*?-->/g, ' ')
-      .replace(/^\s*\{#[^}]*\}\s*$/gm, '')
-      .replace(/\{#[^}]*\}/g, ' ')
-      // Due lines are scheduling metadata, not prose — strip at render like
-      // {#anchors} (Task 3: the Due control owns display of the date).
-      .replace(/^\s*\*Due:\s*[^*\n]*\*\s*$/gm, '')
-      // Section `*Tags: …*` / `**Tags: …**` lines are metadata, not prose —
-      // the drawer head owns tag display, so strip at render like Due/anchors.
-      .replace(/^\s*\*{1,2}Tags:\s*[^*\n]*\*{1,2}\s*$/gm, '');
-    const esc = (t)=> t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    // block-first: split on blank lines so <ul> never spans paragraphs and
-    // no stray </p> lands after headings (Task-1 record: Modify/Create <li>s
-    // swallowed the Verify paragraph into one <ul>).
-    const liOf = (ln) => {
-      const t0 = ln
-        .replace(/^- \[x\] /i, '<input type="checkbox" checked disabled> ')
-        .replace(/^- \[ \] /, '<input type="checkbox" disabled> ')
-        .replace(/^- /, '');
-      // Plain bullets (no checkbox) are sub-points, not tasks — leave untouched.
-      if (!/^<input/.test(t0)) return '<li>' + t0 + '</li>';
-      // Task item: the inline `✓ done —` / `✗ cancelled —` is redundant (the
-      // checkbox already carries it) — strip it and re-emit as its own line.
-      let t = t0, status = '';
-      t = t.replace(/\*\*(.+?)\*\* ✓ done( — )?/, (m, ti) => { status = 'done'; return '**' + ti + '** '; });
-      if (!status) t = t.replace(/\*\*(.+?)\*\* &lt;span class="ds-cancelled"&gt;✗ cancelled&lt;\/span&gt;( — )?/, (m, ti) => { status = 'cancelled'; return '**' + ti + '** '; });
-      const hm = t.match(/^(<input[^>]*> \*\*.+?\*\*)\s*([\s\S]*)$/);
-      let head = t, rest = '';
-      if (hm) { head = hm[1]; rest = hm[2]; }
-      let html = head;
-      // Done needs no line (the checked box already says it); cancelled does
-      // (its box is checked too, so without the line it reads as done).
-      if (status === 'cancelled') html += `<span class="ds-status ds-is-cancelled">✗ cancelled</span>`;
-      // Box `**Label:**` segments (Files, Verify, Accuracy…) as compact rows;
-      // the Objective flows inline right after the bold title instead.
-      if (rest && /\*\*([^*]{1,160}?):\*\*/.test(rest)) {
-        const parts = rest.split(/\*\*([^*]{1,160}?):\*\*/);
-        const lead = (parts[0] || '').trim();
-        let i = 1;
-        if ((parts[1] || '').trim().toLowerCase() === 'objective' && (parts[2] || '').trim()) {
-          html += ' — ' + (parts[2] || '').trim();
-          i = 3;
-        }
-        let fields = '';
-        for (; i + 1 < parts.length; i += 2) {
-          const label = (parts[i] || '').trim(), val = (parts[i + 1] || '').trim();
-          if (!label && !val) continue;
-          fields += `<div class="ds-field"><dt>${label}</dt><dd>${val}</dd></div>`;
-        }
-        if (fields) {
-          if (lead) html += ' ' + lead;
-          html += `<dl class="ds-fields">${fields}</dl>`;
-        } else if (lead && i !== 1) html += ' ' + lead;
-        else if (i === 1) html += ' ' + rest;
-      } else if (rest) html += ' ' + rest;
-      return '<li>' + html + '</li>';
-    };
-    // Headings carrying a trailing `✓ done (date)` / `✗ cancelled` mark get
-    // the mark stripped and re-emitted as its own status line (no checkbox
-    // exists on a heading, so the line preserves the information).
-    // Owner refinement: the FIRST h2 (the phase title) also carries the
-    // phase gate verdict on that same line (gateSuffix, '' when locked or
-    // gateless); a fully-done phase whose heading lacks the mark still gets
-    // its DONE line so the verdict has a line to sit on. Task headings
-    // (h3/h1, later h2s) are never touched by either.
-    const headOf = (tag, text) => {
-      const isPhaseHead = tag === 'h2' && !phaseHeadSeen;
-      if (isPhaseHead) phaseHeadSeen = true;
-      const m = text.match(/\s*([✓✗])\s*(done|cancelled)(\s*\([^)]*\))?\s*$/i);
-      if (!m) {
-        if (isPhaseHead && phaseDone)
-          return `<h2>` + text + `</h2>` +
-            `<p class="ds-status ds-is-done">✓ DONE${gateSuffix}</p>`;
-        return `<${tag}>` + text + `</${tag}>`;
-      }
-      const st = m[1] === '✗' ? 'cancelled' : 'done';
-      let label = `${m[1]} ${m[2]}${m[3] || ''}`;
-      if (isPhaseHead && st === 'done') label = `${m[1]} DONE${m[3] || ''}`;
-      if (isPhaseHead) label += gateSuffix;
-      return `<${tag}>` + text.slice(0, m.index) + `</${tag}>` +
-        `<p class="ds-status ds-is-${st}">${label}</p>`;
-    };
-    const out = [];
-    let fence = null;
-    for (const block of esc(src).split(/\n\n+/)) {
-      if (!block.trim() || /^\s*\|/.test(block)) continue;
-      // fenced block: single block that starts with ``` — render as <pre> and skip para/list splitting
-      if (/^\s*```/.test(block)) {
-        const lines = block.split('\n');
-        const open = lines[0] || '';
-        const lang = open.replace(/^\s*```\s*/, '').trim();
-        let closeIdx = lines.length - 1;
-        while (closeIdx > 0 && !/^\s*```\s*$/.test(lines[closeIdx])) closeIdx--;
-        const code = lines.slice(1, closeIdx).join('\n');
-        if (code.trim()) {
-          const cls = lang ? ` class="language-${lang}"` : '';
-          out.push(`<pre><code${cls}>${code}</code></pre>`);
-        }
-        continue;
-      }
-      let para = [];
-      let list = [];
-      const flushP = () => {
-        const txt = para.join('\n').trim();
-        if (txt) out.push('<p>' + para.join('\n') + '</p>');
-        para = [];
-      };
-      const flushL = () => { if (list.length) { out.push('<ul>' + list.join('') + '</ul>'); list = []; } };
-      for (const ln of block.split('\n')) {
-        let m;
-        if ((m = ln.match(/^### (.+)$/))) { flushP(); flushL(); out.push(headOf('h3', m[1])); }
-        else if ((m = ln.match(/^## (.+)$/))) { flushP(); flushL(); out.push(headOf('h2', m[1])); }
-        else if ((m = ln.match(/^# (.+)$/))) { flushP(); flushL(); out.push(headOf('h1', m[1])); }
-        else if (/^- /.test(ln)) { flushP(); list.push(liOf(ln)); }
-        else if (ln.trim() === '') { flushP(); flushL(); }
-        else { flushL(); para.push(ln); }
-      }
-      flushP(); flushL();
-    }
-    let html = out.join('');
-    html = html.replace(/\*Shipped in [^*]*\*/g, (m)=> '<em>'+m.slice(1,-1)+'</em>');
-    html = html.replace(/\*\*Tags:[^*]*\*\*/g, '');
-    if (!html) return '';
-    // inline bold
-    html = html.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-    html = html.replace(/\*(.+?)\*/g,'<em>$1</em>');
-    html = html.replace(/\[([^\]]+)\]\([^)]+\)/g,'$1');
-    return html;
-  }
-};
 import { hits, badges, unlinked } from '../changelog-links.js';
 import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../changelog-titles.js';
 import { isDone, state, parseGates, dueOf, fmtDate, gateNOf } from '../changelog-parse.js';
+import { sectionRaw, renderSection, anchorOwners, gateSuffix } from './raw-detail.js';
 import { esc } from './esc.js';
 import { paintRevs } from './paint-revs.js';
 import { dueSyncRetryHTML } from '../due-progress.js';
-// Gate verdict (Task 12, owner refinement): the phase's own REF GATE verdict
-// as plain text appended to the below-title status line — same checkmark
-// treatment as DONE, reusing .ds-status styling (no span, no new colors).
-// Locked or gateless phases contribute no gate part.
-// Rev count (Task 13, owner): when the gate has appended `· rev …` iterations
-// while OPEN, surface that count inline — e.g. `· GATE OPEN · 4 revs`.
-const gateSuffixOf = (gates, phaseN) => {
-  if (!gates || !gates.length) return '';
-  const gs = [...gates].sort((a, b) => a.n - b.n);
-  let idx = gs.findIndex((g) => g.n === phaseN);
-  if (idx < 0 && Number.isInteger(phaseN)) idx = Math.min(Math.max(phaseN, 0), gs.length - 1);
-  if (idx < 0) return '';
-  const g = gs[idx];
-  const isRev = (x) => /·\s*rev\b/i.test(x.note);
-  const revs = gs.filter((x) => x.n === g.n && isRev(x)).length;
-  const revSuffix = revs ? ` · ${revs} rev${revs > 1 ? 's' : ''}` : '';
-  const baseCandidates = gs.filter((x) => x.n === g.n && !isRev(x));
-  const eff = baseCandidates.length ? baseCandidates[baseCandidates.length - 1] : g;
-  const bases = gs.filter((x) => !isRev(x));
-  const effPos = bases.indexOf(eff);
-  const firstOpenPos = bases.findIndex((x) => x.state === 'open' || x.state === 'failed');
-  const disp = (eff.state === 'passed' || eff.state === 'waiver') ? eff.state
-    : (effPos === firstOpenPos && effPos !== -1 ? eff.state : 'locked');
-  if (disp === 'passed' || disp === 'waiver') return ' ✓ GATE PASSED' + revSuffix;
-  if (disp === 'failed') return ' · GATE FAILED' + revSuffix;
-  if (disp === 'open') return ' · GATE OPEN' + revSuffix;
-  return '';
-};
+// Gate verdict + rev-count suffix live in raw-detail.js (own-verdict per
+// phase). Locked or gateless phases contribute no gate part.
 // Mobile 2-level drawer nav (mirrors pages-changelog.js isMobile — local copy,
 // no import cycle; the 720px breakpoint is shared).
 const isMobileDetail = () => {
@@ -190,8 +31,11 @@ export function paintDetail(root, ctx){
   const railHead = '<div class="ds-rail-plan"' + (atL1 ? ' tabindex="-1" data-mlevel-head="rail"' : '') + '>' +
     (atL1 ? '<button data-mback data-mlevel="1" aria-label="Back to all plans">‹ All plans</button>' : '') +
     esc([plan.id, plan.title || provenance(plan)].filter(Boolean).join(' · ')) + '</div>';
+  // First section per anchor owns its commits — a repeated anchor (prose head
+  // claiming another phase's token) renders none, never a duplicate list.
+  const dupAnchor = anchorOwners(sprints).dup;
   root.querySelector('[data-col="sprint"]').innerHTML = railHead + sprints.map((s, i) => {
-    const hsS = hits(plan.file, s.body, plan.sprints.indexOf(s) === 0),
+    const hsS = dupAnchor.has(i) ? [] : hits(plan.file, s.body, plan.sprints.indexOf(s) === 0),
       has = hsS.length ? ' · ' + hsS.length + ' commit' + (hsS.length > 1 ? 's' : '') : '',
       frac = state(s.body),
       ed = edited && edited(s) ? ' · edited' : '';
@@ -229,27 +73,12 @@ export function paintDetail(root, ctx){
     syncDrawerChrome();
     return;
   }
-  const hs = hits(plan.file, sprint.body, plan.sprints.indexOf(sprint) === 0);
+  const hs = dupAnchor.has(si) ? [] : hits(plan.file, sprint.body, plan.sprints.indexOf(sprint) === 0);
   // Gate ownership is by section number (`Task 3` → gate 3), never by
   // position — positional index misattributes verdicts on Task-headed
   // plans (gateNOf · [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]).
   const phaseN = gateNOf(sprint.head, si);
   const gates = parseGates(plan.raw || '');
-  // Evals now owns the REF GATE feedback — strip the raw gate thread from the
-  // phase body so Verify doesn't duplicate the same verbatim thread. Collapse
-  // from first "- REF GATE" through to the phase's {#phase-N} anchor.
-  let bodySansGates = String(sprint.body || '');
-  const gateAnchorIdx = bodySansGates.indexOf('- REF GATE');
-  if (gateAnchorIdx !== -1) {
-    const anchorMatch = bodySansGates.slice(gateAnchorIdx).match(/\{#phase[^}]*\}/);
-    if (anchorMatch) {
-      const anchorPos = bodySansGates.indexOf(anchorMatch[0], gateAnchorIdx);
-      bodySansGates = bodySansGates.slice(0, gateAnchorIdx).trimEnd() + '\n' + bodySansGates.slice(anchorPos);
-    } else {
-      // fallback: strip each gate line individually (inline, not newline-anchored)
-      bodySansGates = bodySansGates.replace(/\s*-\s*REF GATE[^\n]*/g, '');
-    }
-  }
   // Due control (Task 3, scheduling): incomplete sections only. Complete /
   // cancelled sections render no Due line at all — never a Due n/a.
   const secShipped = /[✓✗]/.test(String(sprint.head || '')) || isDone(state(sprint.body));
@@ -325,35 +154,26 @@ export function paintDetail(root, ctx){
     tagsHead,
     `<button data-close aria-label="Close detail">✕</button></div>`,
     // Due row sits directly under the section title on EVERY paint: it is
-    // always the first flow element after the title INSIDE .ds-md. The split
-    // skips render-neutral preamble lines (blank lines, anchor-only lines,
-    // and Due metadata) so bodies that open with a non-heading line — notably
-    // the ghost-preview prepend (`*Due: …*` ahead of the head, see
-    // duePreviewEdit) — split at the SAME title line as file-shaped bodies
-    // (Due under head). Without the skip those paints fell into the no-head
-    // branch and put the row ABOVE the title, then below it once the file
-    // text landed: the position jump. Only the head split differs; when no
-    // heading line exists at all the row stays first (the only stable slot).
+    // always the first flow element after the title INSIDE .ds-md. The head
+    // comes from the raw chunk, so ghost-preview paints (Due ahead of the
+    // head, see duePreviewEdit) split at the SAME title line as file-shaped
+    // bodies — no position jump. When no heading exists at all the row stays
+    // first (the only stable slot).
+    // Body paints from the RAW section chunk (same md the sprints came
+    // from), not the flattened norm() body — block structure (nested lists,
+    // ordered steps, fences) survives. renderSection also owns the status
+    // line: DONE iff the head carries ✓, else the gate tag alone (or
+    // nothing when gateless). Fallback to the flattened body when raw text
+    // is unavailable — same shape, degraded.
     (() => {
-      const markOpts = {
-        phaseDone: isDone(state(sprint.body)),
-        gateSuffix: gateSuffixOf(gates, phaseN),
-      };
       const revsHTML = paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN })
         + (hs.length ? badges(hs) : '');
-      const rawLines = String(bodySansGates || '').split('\n');
-      let titleIdx = -1;
-      for (let i = 0; i < rawLines.length; i++) {
-        const ln = rawLines[i];
-        if (/^\s*$/.test(ln)) continue;
-        if (/^\s*\{#[^}]*\}\s*$/.test(ln)) continue;
-        if (/^\s*\*Due:[^*]*\*\s*$/.test(ln)) continue;
-        if (/^#{1,4}\s+[^\n]+$/.test(ln)) titleIdx = i;
-        break;
-      }
-      if (titleIdx < 0) return [`<div class="ds-md">`, dueHTML + marked.parse(bodySansGates, markOpts) + revsHTML, `</div>`].join('');
-      const restSrc = rawLines.slice(titleIdx + 1).join('\n');
-      return [`<div class="ds-md">`, marked.parse(rawLines[titleIdx], markOpts) + dueHTML + marked.parse(restSrc, markOpts) + revsHTML, `</div>`].join('');
+      const raw = sectionRaw(plan.raw || '', sprint.head) || String(sprint.body || '');
+      const rendered = renderSection(raw, { gateSuffix: gateSuffix(gates, phaseN) });
+      const mdHTML = rendered.head
+        ? [rendered.head, dueHTML, rendered.body].join('')
+        : [dueHTML, rendered.body].join('');
+      return [`<div class="ds-md">`, mdHTML + revsHTML, `</div>`].join('');
     })(),
   ].join('');
   const u = unlinked(texts);
