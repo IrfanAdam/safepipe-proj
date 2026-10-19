@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const plansDir = join(root, '.hermes', 'plans');
 const manifestPath = join(root, 'src', 'ds', 'plan-manifest.json');
-const TRACKED = ['src', 'design-system', 'docs', 'scripts', 'public', '.agents', 'AGENTS.md', '*.html', 'vite.config.js', 'package.json'];
+const TRACKED = ['src', 'design-system', 'docs', 'scripts', 'public', '.agents', '.hermes', 'AGENTS.md', '*.html', 'vite.config.js', 'package.json'];
 const TAG = /\[plan:([^\]#\s]+)(?:#([^\]]+))?\]/;
 
 const git = (args) => {

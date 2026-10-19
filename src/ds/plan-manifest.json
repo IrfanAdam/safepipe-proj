@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-19T12:11:49.165Z",
+  "generated": "2026-10-19T12:34:03.841Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -21,6 +21,51 @@
   ],
   "commits": [
     {
+      "sha": "50922c3",
+      "full": "50922c31870957ab7e5edbef3b7b9c12005e3fe2",
+      "date": "2026-10-19",
+      "time": "18:02",
+      "subject": "test(changelog): freeze native tick glyphs, no drawn box ever [plan:2026-10-19_150735-changelog-readability.md#phase-4]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "7f17fe8",
+      "full": "7f17fe81f614bbe639cc1f81bf725e76bf5a314d",
+      "date": "2026-10-19",
+      "time": "18:01",
+      "subject": "fix(changelog): native ballot glyphs for task ticks, drop drawn box [plan:2026-10-19_150735-changelog-readability.md#phase-4]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "cff0500",
+      "full": "cff0500a6a2e2b69e7753bf52ad57f58de4eff68",
+      "date": "2026-10-19",
+      "time": "17:54",
+      "subject": "fix(changelog): thematic breaks are separators, stamp rolls up [plan:2026-10-19_150735-changelog-readability.md#phase-4]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "cd56182",
+      "full": "cd5618233d6bb0de47fba31f4ebf469c3957297d",
+      "date": "2026-10-19",
+      "time": "17:51",
+      "subject": "fix(changelog): filled task checkbox per owner ruling [plan:2026-10-19_150735-changelog-readability.md#phase-4]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "d3bde3f",
+      "full": "d3bde3f01539190f47640f288fe058bcfd276598",
+      "date": "2026-10-19",
+      "time": "17:42",
+      "subject": "docs(plan): consolidate 150735 to 4 phases, eval anchors + audit rules [plan:2026-10-19_150735-changelog-readability.md#phase-10]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-10"
+    },
+    {
       "sha": "d5c63c8",
       "full": "d5c63c889c8276f7e21e14d15e0acd78c136e221",
       "date": "2026-10-19",
@@ -39,6 +84,15 @@
       "anchor": "phase-11"
     },
     {
+      "sha": "74b8a7a",
+      "full": "74b8a7aedcfc91f28003946d0fdea19b309f44d5",
+      "date": "2026-10-19",
+      "time": "17:24",
+      "subject": "docs(plan): close readability Phase 10, Task 15 done 02be9ce [plan:2026-10-19_150735-changelog-readability.md#phase-10]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-10"
+    },
+    {
       "sha": "02be9ce",
       "full": "02be9ceee39c9099ff2f83d7fd955971475ea441",
       "date": "2026-10-19",
@@ -46,6 +100,15 @@
       "subject": "feat(changelog): reconcile sibling lane, honest heads stand [plan:2026-10-19_150735-changelog-readability.md#phase-10]",
       "plan": "2026-10-19_150735-changelog-readability.md",
       "anchor": "phase-10"
+    },
+    {
+      "sha": "efc410b",
+      "full": "efc410b0e3ba485ff41cd552cdec896ce720b7ca",
+      "date": "2026-10-19",
+      "time": "16:41",
+      "subject": "docs(plan): close readability Phase 9, Task 14 done c3cd09d [plan:2026-10-19_150735-changelog-readability.md#phase-9]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-9"
     },
     {
       "sha": "c3cd09d",
@@ -57,11 +120,29 @@
       "anchor": "phase-9"
     },
     {
+      "sha": "3aff8a6",
+      "full": "3aff8a62eb25d0d83507300edbd413a78bc91341",
+      "date": "2026-10-19",
+      "time": "16:30",
+      "subject": "docs(plan): Task 13 flush-bodies follow-up b2d6506 [plan:2026-10-19_150735-changelog-readability.md#phase-8]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-8"
+    },
+    {
       "sha": "b2d6506",
       "full": "b2d6506911567f6ad8a22dff3ef38b1eec667002",
       "date": "2026-10-19",
       "time": "16:30",
       "subject": "feat(changelog): flush fold bodies, no indent [plan:2026-10-19_150735-changelog-readability.md#phase-8]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-8"
+    },
+    {
+      "sha": "32595c9",
+      "full": "32595c9f7c677fcff05f9cd1089707dc66f6f7c4",
+      "date": "2026-10-19",
+      "time": "16:29",
+      "subject": "docs(plan): close readability Phase 8, Task 13 done 95e6902 [plan:2026-10-19_150735-changelog-readability.md#phase-8]",
       "plan": "2026-10-19_150735-changelog-readability.md",
       "anchor": "phase-8"
     },
@@ -75,6 +156,15 @@
       "anchor": "phase-8"
     },
     {
+      "sha": "a33787e",
+      "full": "a33787ecb192373c46c70c6f8d6126946b10c96f",
+      "date": "2026-10-19",
+      "time": "16:12",
+      "subject": "docs(plan): close readability Phase 7, Task 12 done ac91418 [plan:2026-10-19_150735-changelog-readability.md#phase-7]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-7"
+    },
+    {
       "sha": "ac91418",
       "full": "ac91418083eedc24b9fdd138e834df6df397662f",
       "date": "2026-10-19",
@@ -82,6 +172,15 @@
       "subject": "feat(changelog): head divider, suffix caret, no task ids [plan:2026-10-19_150735-changelog-readability.md#phase-7]",
       "plan": "2026-10-19_150735-changelog-readability.md",
       "anchor": "phase-7"
+    },
+    {
+      "sha": "c8db88d",
+      "full": "c8db88dfdcbeac7ef70f32b92870df12a4dabf36",
+      "date": "2026-10-19",
+      "time": "16:08",
+      "subject": "docs(plan): close readability Phase 6, Task 11 done 0f674fe [plan:2026-10-19_150735-changelog-readability.md#phase-6]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-6"
     },
     {
       "sha": "0f674fe",
@@ -93,6 +192,15 @@
       "anchor": "phase-6"
     },
     {
+      "sha": "a629200",
+      "full": "a629200e42c277a2665a5a03035bc6e3ed7e34a2",
+      "date": "2026-10-19",
+      "time": "16:00",
+      "subject": "docs(plan): close readability Phase 5, Task 10 done 50d70b4 [plan:2026-10-19_150735-changelog-readability.md#phase-5]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-5"
+    },
+    {
       "sha": "50d70b4",
       "full": "50d70b4efedf0c0b1f69f1998922100a71685653",
       "date": "2026-10-19",
@@ -100,6 +208,15 @@
       "subject": "feat(changelog): stamp rollup, section source order [plan:2026-10-19_150735-changelog-readability.md#phase-5]",
       "plan": "2026-10-19_150735-changelog-readability.md",
       "anchor": "phase-5"
+    },
+    {
+      "sha": "a4dc754",
+      "full": "a4dc7540dfec7f49a25871e8b41c20e4c3d249b2",
+      "date": "2026-10-19",
+      "time": "15:47",
+      "subject": "docs(plan): Task 7 task-fold follow-up 08ad967 [plan:2026-10-19_150735-changelog-readability.md#phase-3]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-3"
     },
     {
       "sha": "08ad967",
@@ -111,6 +228,15 @@
       "anchor": "phase-3"
     },
     {
+      "sha": "cc1b36c",
+      "full": "cc1b36c4f042c664578b593eb6127586b7ed5410",
+      "date": "2026-10-19",
+      "time": "15:44",
+      "subject": "docs(plan): close readability Phase 4, Task 9 done 2b6f5ae [plan:2026-10-19_150735-changelog-readability.md#phase-4]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-4"
+    },
+    {
       "sha": "2b6f5ae",
       "full": "2b6f5ae0ba0f30ab57e6fcef04305def028605e7",
       "date": "2026-10-19",
@@ -120,11 +246,29 @@
       "anchor": "phase-4"
     },
     {
+      "sha": "e9881b6",
+      "full": "e9881b6ecbd6ad34c44cd85b17c4119eec7d0f87",
+      "date": "2026-10-19",
+      "time": "15:41",
+      "subject": "docs(plan): Task 7 single-fold follow-up a7e2a37 [plan:2026-10-19_150735-changelog-readability.md#phase-3]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-3"
+    },
+    {
       "sha": "a7e2a37",
       "full": "a7e2a37dc6aeb6733dea30cb5b10d94171ebf833",
       "date": "2026-10-19",
       "time": "15:41",
       "subject": "feat(changelog): single FILES fold per task holds all content [plan:2026-10-19_150735-changelog-readability.md#phase-3]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-3"
+    },
+    {
+      "sha": "3a3e20c",
+      "full": "3a3e20c5b0bc2dc3d445ac194791844e01c22f95",
+      "date": "2026-10-19",
+      "time": "15:37",
+      "subject": "docs(plan): close readability Phase 3, Tasks 6-8 done 97ca963 [plan:2026-10-19_150735-changelog-readability.md#phase-3]",
       "plan": "2026-10-19_150735-changelog-readability.md",
       "anchor": "phase-3"
     },
@@ -163,6 +307,15 @@
       "subject": "feat(changelog): block-aware drawer body, head-mark done, owned gates [plan:2026-10-19_150735-changelog-readability.md#phase-1]",
       "plan": "2026-10-19_150735-changelog-readability.md",
       "anchor": "phase-1"
+    },
+    {
+      "sha": "2bea9c7",
+      "full": "2bea9c7444d95c33696a11a1dbda772f1bc81338",
+      "date": "2026-10-18",
+      "time": "22:19",
+      "subject": "chore(sync): due 2026-10-12_175646-ops3d-geo-triangulation.md Lane B — Elevation triangulation (owns: new `scripts/data-pipe/elev-*.mjs` + scratch only) {#lane-b} [skip ci] [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
     },
     {
       "sha": "7ee12eb",
@@ -242,6 +395,15 @@
       "date": "2026-10-18",
       "time": "20:18",
       "subject": "feat(schedule): horizontal sync toast, completion markers in-heading, parked-gate fix [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-5"
+    },
+    {
+      "sha": "dc5ba02",
+      "full": "dc5ba02a449128dcf7b3143ab17b849d1692519a",
+      "date": "2026-10-18",
+      "time": "19:57",
+      "subject": "docs(plan): close out Supabase migration, 15 tasks + 5 gates [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
       "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
       "anchor": "phase-5"
     },
@@ -327,6 +489,15 @@
       "anchor": "phase-3"
     },
     {
+      "sha": "a3afbfd",
+      "full": "a3afbfd41c552c2a8b8f0e395cc9bf647500a4b5",
+      "date": "2026-10-18",
+      "time": "19:17",
+      "subject": "docs(plan): Supabase scheduling migration plan, changelog format [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-1]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-1"
+    },
+    {
       "sha": "82245ad",
       "full": "82245ad12fc8a56e8a5d696f160ad273fe5d224c",
       "date": "2026-10-18",
@@ -334,6 +505,51 @@
       "subject": "chore(supabase): Phase 1 foundation — schema, RLS proof, Due inventory [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-1]",
       "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
       "anchor": "phase-1"
+    },
+    {
+      "sha": "fd74228",
+      "full": "fd74228d23f9647123b2962805f71890d6c0bac3",
+      "date": "2026-10-17",
+      "time": "23:49",
+      "subject": "chore(2026-10-12_175646-ops3d-geo-triangulation.md): set due 2026-11-18 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "39c88e1",
+      "full": "39c88e1a05a06e5c6e60db0976ade77de478b4c5",
+      "date": "2026-10-17",
+      "time": "21:53",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-11-08 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "0326f9a",
+      "full": "0326f9adb984469c9b10f2ea333a5bd5e9f44f65",
+      "date": "2026-10-17",
+      "time": "21:53",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-11-10 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "92a75ab",
+      "full": "92a75ab2876d4368781307c4d9f696bd9a52623d",
+      "date": "2026-10-17",
+      "time": "21:52",
+      "subject": "chore(2026-10-05_150017-safepipe-prototype-screens.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "0bd7c5a",
+      "full": "0bd7c5a2c6b037c94a4cd5f86286d7ef56689c5a",
+      "date": "2026-10-17",
+      "time": "21:42",
+      "subject": "chore(2026-10-12_175646-ops3d-geo-triangulation.md): set due 2026-10-28 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
     },
     {
       "sha": "f1d8b0f",
@@ -363,6 +579,15 @@
       "anchor": "follow-up"
     },
     {
+      "sha": "a10f73b",
+      "full": "a10f73ba55f45494fe04eba4be867c2d0c15c1a2",
+      "date": "2026-10-17",
+      "time": "19:47",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-30 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
       "sha": "471a05d",
       "full": "471a05d168891895dfad089eb0f177160b0744c4",
       "date": "2026-10-17",
@@ -372,6 +597,15 @@
       "anchor": "follow-up"
     },
     {
+      "sha": "b16c2df",
+      "full": "b16c2df99fc0a5277011f94cbdf10164d390d508",
+      "date": "2026-10-17",
+      "time": "19:34",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-31 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
       "sha": "8008cf0",
       "full": "8008cf029cfb8a57fc62392929787ea24109a7a8",
       "date": "2026-10-17",
@@ -379,6 +613,15 @@
       "subject": "fix(changelog): filter left/clear right, dropdown commas, mobile gutters, neutral week-bar fade [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
       "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
       "anchor": "follow-up"
+    },
+    {
+      "sha": "fcbecef",
+      "full": "fcbeceff4cfc8072a8eb0810523e2b7baa48c581",
+      "date": "2026-10-17",
+      "time": "19:26",
+      "subject": "chore(2026-10-11_202541-ops3d-v3-realworld-iteration.md): set due 2026-10-20 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
     },
     {
       "sha": "1e6d3ce",
@@ -408,6 +651,24 @@
       "anchor": "task-2"
     },
     {
+      "sha": "6f77685",
+      "full": "6f776859073377358173478763ada00a80dfda2c",
+      "date": "2026-10-17",
+      "time": "19:12",
+      "subject": "chore(2026-10-11_202541-ops3d-v3-realworld-iteration.md): set due 2026-10-19 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "e46f5f8",
+      "full": "e46f5f8a9d1b91f5fafb9524ac169b1591bcab1a",
+      "date": "2026-10-17",
+      "time": "19:11",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-30 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
       "sha": "856c079",
       "full": "856c0797fe55738fe12d760e78d8ea990189f5bb",
       "date": "2026-10-17",
@@ -435,6 +696,24 @@
       "anchor": "task-2"
     },
     {
+      "sha": "b0bb316",
+      "full": "b0bb3166898ea1a54ccd6b59dd553cab60221bef",
+      "date": "2026-10-17",
+      "time": "19:05",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-31 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "42add71",
+      "full": "42add71b95ffc2f66c739198bc6c0b61f99727cb",
+      "date": "2026-10-17",
+      "time": "19:03",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
       "sha": "842da5b",
       "full": "842da5b61940598379d87eadb83147cb9ba857bc",
       "date": "2026-10-17",
@@ -451,6 +730,33 @@
       "subject": "fix(schedule): supersede-aware lag guard, compact spinner toast [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]",
       "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": "task-2"
+    },
+    {
+      "sha": "770664d",
+      "full": "770664d5d7c1d41309b6530fb3494efe200d52f1",
+      "date": "2026-10-17",
+      "time": "18:58",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-26 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "626923b",
+      "full": "626923b5dd144c7e185b0d2b6f83f34cd7508d50",
+      "date": "2026-10-17",
+      "time": "18:58",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "13c4f26",
+      "full": "13c4f26426acee412de098d9d3ed9c92deb00213",
+      "date": "2026-10-17",
+      "time": "18:57",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-30 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
     },
     {
       "sha": "1d0d4b3",
@@ -471,6 +777,24 @@
       "anchor": "task-2"
     },
     {
+      "sha": "ffc8907",
+      "full": "ffc890762e2cbd408f2107ff603ffa5802f2c8d4",
+      "date": "2026-10-17",
+      "time": "18:52",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-31 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "c914ba6",
+      "full": "c914ba660ed337d267b48df25a9602c16e08541a",
+      "date": "2026-10-17",
+      "time": "18:52",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-29 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
       "sha": "8d665e7",
       "full": "8d665e7d4c2dcf06d124595dfed0c91d969e05d4",
       "date": "2026-10-17",
@@ -489,6 +813,42 @@
       "anchor": "task-2"
     },
     {
+      "sha": "f484bbc",
+      "full": "f484bbc05955617d913d7bb67084648b3650bf01",
+      "date": "2026-10-17",
+      "time": "18:43",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-30 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "1c20517",
+      "full": "1c20517bb6f745c391366676a77d2fec123f8dbe",
+      "date": "2026-10-17",
+      "time": "18:41",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-26 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "beaf755",
+      "full": "beaf755c7481cb3e7db40bf1905318c45070e4a7",
+      "date": "2026-10-17",
+      "time": "18:40",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "86fea5d",
+      "full": "86fea5dd458e2552e12b374d0d82b191351f48cf",
+      "date": "2026-10-17",
+      "time": "18:40",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-28 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
       "sha": "beba14e",
       "full": "beba14ee341e66725d6cd11fad67f27b22dc3107",
       "date": "2026-10-17",
@@ -505,6 +865,33 @@
       "subject": "fix(schedule): hold lagged fetches after commit, serialize re-picks per file [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]",
       "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": "task-2"
+    },
+    {
+      "sha": "e7015e6",
+      "full": "e7015e6f15b61ba9bdc45c9258e105bf0bcf0fc6",
+      "date": "2026-10-17",
+      "time": "18:03",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-29 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "ba88de7",
+      "full": "ba88de792601d555ad109dc81fff08be961cedc2",
+      "date": "2026-10-17",
+      "time": "18:02",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-28 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "4cae414",
+      "full": "4cae41418951db61007c889dffdf12e3cf8d2905",
+      "date": "2026-10-17",
+      "time": "18:02",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
     },
     {
       "sha": "424645a",
@@ -543,6 +930,78 @@
       "anchor": "task-2"
     },
     {
+      "sha": "ba3467b",
+      "full": "ba3467b8bd6b1a2c52f01cd771298eaaf99bfea0",
+      "date": "2026-10-17",
+      "time": "17:49",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-26 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "71a516a",
+      "full": "71a516acc572dc8fc2ca3ddf8a12a328bdc994d5",
+      "date": "2026-10-17",
+      "time": "17:49",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-30 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "9488f2f",
+      "full": "9488f2f3a8bb7eb163a722239d549b4203049f90",
+      "date": "2026-10-17",
+      "time": "17:48",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-31 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "fa47330",
+      "full": "fa473301d963a740d2bcf07ec785cb4e23d332d4",
+      "date": "2026-10-17",
+      "time": "17:48",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "8744490",
+      "full": "8744490779e4649b6a01f75ac89319f0ab7992e0",
+      "date": "2026-10-17",
+      "time": "17:48",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-30 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "7f0a030",
+      "full": "7f0a030cc7f7957086e0697bb43988745c80ca9f",
+      "date": "2026-10-17",
+      "time": "17:48",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-28 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "9291266",
+      "full": "9291266a467614044c56824cc6a2e8c1e6e4d5ad",
+      "date": "2026-10-17",
+      "time": "17:47",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "071c95a",
+      "full": "071c95a389b6fb55b4e2dc85b3e1e2f0785786ff",
+      "date": "2026-10-17",
+      "time": "17:47",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-26 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
       "sha": "af58fb5",
       "full": "af58fb53c92fd50733c04901c14b9e77dea4e9ff",
       "date": "2026-10-17",
@@ -559,6 +1018,15 @@
       "subject": "fix(schedule): drawer survives day filter, canonical head at send time [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]",
       "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": "task-2"
+    },
+    {
+      "sha": "bee684a",
+      "full": "bee684ab969ac3dca37506cbc4f7ac0283a36bb9",
+      "date": "2026-10-17",
+      "time": "17:41",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
     },
     {
       "sha": "2685434",
@@ -579,6 +1047,15 @@
       "anchor": "task-2"
     },
     {
+      "sha": "e1c1d39",
+      "full": "e1c1d39052cc7e8276052d62783139783c5adba7",
+      "date": "2026-10-17",
+      "time": "17:38",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-11-11 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
       "sha": "1ce8220",
       "full": "1ce82204ebdf20432b0ee049e2b1db20c14c8b14",
       "date": "2026-10-17",
@@ -595,6 +1072,15 @@
       "subject": "fix(schedule): self-update only from neutral timeline, cache-primed reload [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-3]",
       "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": "task-3"
+    },
+    {
+      "sha": "52c55f6",
+      "full": "52c55f6c8c1fc780ee488d40691098df72199c6d",
+      "date": "2026-10-17",
+      "time": "17:33",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-11-10 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
     },
     {
       "sha": "1312d87",
@@ -624,6 +1110,42 @@
       "anchor": "task-2"
     },
     {
+      "sha": "63134e5",
+      "full": "63134e56c2373ad6d32680690fa0dd81eb838329",
+      "date": "2026-10-17",
+      "time": "17:29",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-11-09 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "fcb3657",
+      "full": "fcb365702644ef4c786f27f7c5af5a5c4c4e4ece",
+      "date": "2026-10-17",
+      "time": "17:29",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-11-11 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "b52583b",
+      "full": "b52583bfc2240b85f4ed37185ece938ca406e146",
+      "date": "2026-10-17",
+      "time": "17:27",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-31 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "dd548ac",
+      "full": "dd548ac72373b8c32e2033eea8f6e52c7c35fa27",
+      "date": "2026-10-17",
+      "time": "17:27",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-30 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
       "sha": "633d6b8",
       "full": "633d6b8c307224c83b017204ba28838bcdf95d71",
       "date": "2026-10-17",
@@ -631,6 +1153,24 @@
       "subject": "feat(schedule): non-blocking publish progress card [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]",
       "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": "task-2"
+    },
+    {
+      "sha": "be25655",
+      "full": "be25655f43842206ac953c620fa95b6c76a3ab2f",
+      "date": "2026-10-17",
+      "time": "17:22",
+      "subject": "chore(2026-10-11_202541-ops3d-v3-realworld-iteration.md): set due 2026-10-18 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "7035fcc",
+      "full": "7035fcce0c09c6480e3e7cb756a9439993fc9926",
+      "date": "2026-10-17",
+      "time": "17:21",
+      "subject": "chore(2026-10-11_202541-ops3d-v3-realworld-iteration.md): set due 2026-10-20 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
     },
     {
       "sha": "75404a3",
@@ -649,6 +1189,51 @@
       "subject": "feat(schedule): inline publish status — publishing… → published ✓ [plan:2026-10-17_180000-safepipe-smooth-scheduling.md#task-2]",
       "plan": "2026-10-17_180000-safepipe-smooth-scheduling.md",
       "anchor": "task-2"
+    },
+    {
+      "sha": "d06ecd1",
+      "full": "d06ecd109f9663afb782ff13d8b2995ad6c64b5b",
+      "date": "2026-10-17",
+      "time": "17:19",
+      "subject": "chore(2026-10-11_202541-ops3d-v3-realworld-iteration.md): set due 2026-10-19 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "b277240",
+      "full": "b2772400f6dda47c517a45e3be0d66db3e51bd68",
+      "date": "2026-10-17",
+      "time": "17:18",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-29 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "4807bcd",
+      "full": "4807bcdfd377d89a3a5a16625258545cf4e2e13f",
+      "date": "2026-10-17",
+      "time": "17:18",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-28 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "22fbe5e",
+      "full": "22fbe5e72b94862077fc831131adc76e5e993b02",
+      "date": "2026-10-17",
+      "time": "17:18",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "fe699b0",
+      "full": "fe699b0db5693da9fa86a331b0697893ab12285d",
+      "date": "2026-10-17",
+      "time": "17:18",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): clear due [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
     },
     {
       "sha": "04656cb",
@@ -696,11 +1281,38 @@
       "anchor": "task-1"
     },
     {
+      "sha": "887595e",
+      "full": "887595e2b54b4bdd654e08e6e57e5fc52b3813d9",
+      "date": "2026-10-17",
+      "time": "17:05",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-27 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
       "sha": "39fe98f",
       "full": "39fe98f677f5c6919e2717a5c6e10892400e4085",
       "date": "2026-10-17",
       "time": "17:02",
       "subject": "feat(changelog): live plan refresh, mobile filter sheet, prod-only login [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "8f106f1",
+      "full": "8f106f18ac50821567bd0f991c44718dd1524c5d",
+      "date": "2026-10-17",
+      "time": "16:48",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-30 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "5b7e88f",
+      "full": "5b7e88ffe7b275afc2d3f06fba226faa6b619776",
+      "date": "2026-10-17",
+      "time": "16:48",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-29 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
       "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
       "anchor": "scheduling"
     },
@@ -764,6 +1376,24 @@
       "date": "2026-10-17",
       "time": "01:32",
       "subject": "fix(changelog): confirmed picks outrank stale bundle mid-deploy [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "20e5ed1",
+      "full": "20e5ed1a9f92a0f64a1e326db7c97d8d1968c44e",
+      "date": "2026-10-17",
+      "time": "01:27",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-25 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "scheduling"
+    },
+    {
+      "sha": "5e96a2a",
+      "full": "5e96a2a4f56b3d189cefd539b0855ccc77939913",
+      "date": "2026-10-17",
+      "time": "01:27",
+      "subject": "chore(2026-10-13_233337-ops3d-twin-work.md): set due 2026-10-22 [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]",
       "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
       "anchor": "scheduling"
     },
@@ -989,6 +1619,15 @@
       "date": "2026-10-16",
       "time": "01:35",
       "subject": "style(changelog): tighter lanes, softer done wash [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "follow-up"
+    },
+    {
+      "sha": "dce00b5",
+      "full": "dce00b5edd5cb9f8a87118a19ce4c9ad220662d4",
+      "date": "2026-10-16",
+      "time": "01:26",
+      "subject": "docs(plan): stamp timeline gates 2-4 PASSED [plan:2026-10-15_120000-safepipe-changelog-timeline.md#follow-up]",
       "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
       "anchor": "follow-up"
     },
@@ -1277,6 +1916,15 @@
       "date": "2026-10-14",
       "time": "19:43",
       "subject": "chore(manifest): rebuild plan manifest + history, clear wip [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "33651d8",
+      "full": "33651d8b76d2cf7a61f9c1f2b9ce9b2ab83a9a5b",
+      "date": "2026-10-14",
+      "time": "19:17",
+      "subject": "docs(plan): close Tasks 34-37 with evidence + probe arming recipe [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
       "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
       "anchor": "phase-03"
     },
@@ -1731,6 +2379,15 @@
       "anchor": "lane-b"
     },
     {
+      "sha": "a7cf979",
+      "full": "a7cf979b95138834e08ce897ea4533fc6ffe7fa7",
+      "date": "2026-10-12",
+      "time": "17:57",
+      "subject": "docs(plan): geo-triangulation pass — multi-source accuracy + completeness [plan:2026-10-12_175646-ops3d-geo-triangulation.md#phase-01]",
+      "plan": "2026-10-12_175646-ops3d-geo-triangulation.md",
+      "anchor": "phase-01"
+    },
+    {
       "sha": "10956ad",
       "full": "10956ade66a5f5566882c24c0471930e3649ad40",
       "date": "2026-10-12",
@@ -2073,6 +2730,15 @@
       "anchor": "phase-02"
     },
     {
+      "sha": "f2d277b",
+      "full": "f2d277b19fed62a0327052fbdc548fdc9966e00c",
+      "date": "2026-10-12",
+      "time": "16:12",
+      "subject": "docs(plan): Task 10 public-scrape sourcing, owner supplies nothing [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
       "sha": "a992f8e",
       "full": "a992f8edeed249691cb0d684a8a092e7d471e8a5",
       "date": "2026-10-12",
@@ -2087,6 +2753,15 @@
       "date": "2026-10-12",
       "time": "16:08",
       "subject": "chore(traceability): retro-link 3 orphan commits, every-commit trailer rule [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-00]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-00"
+    },
+    {
+      "sha": "bbdb9d9",
+      "full": "bbdb9d986726f16480e3562408cd18a6273b8d88",
+      "date": "2026-10-12",
+      "time": "16:04",
+      "subject": "docs(plan): Phase 00 Task 1 slice record P0-P3 [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-00]",
       "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
       "anchor": "phase-00"
     },
@@ -2224,6 +2899,60 @@
       "subject": "chore(portability): vendor skill snapshots + spec into git; AGENTS.md for any harness",
       "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
       "anchor": null
+    },
+    {
+      "sha": "cf36897",
+      "full": "cf368971ed3854bf5caf62444f4228fa3ecc0286",
+      "date": "2026-10-12",
+      "time": "14:07",
+      "subject": "docs(plan): imagery research follows owner acquisition authorization, not no-scrape rule [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-01"
+    },
+    {
+      "sha": "fb2f707",
+      "full": "fb2f7076322406b877f3075a8607fa0a0e2f3bce",
+      "date": "2026-10-12",
+      "time": "14:06",
+      "subject": "docs(plan): markers follow models — panels-only Phase 00, marker port+wiring move to Phase 05 [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-00]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-00"
+    },
+    {
+      "sha": "8adad1c",
+      "full": "8adad1c524b571013ef540b4bbe6f8ca1db63d70",
+      "date": "2026-10-12",
+      "time": "14:02",
+      "subject": "docs(plan): owner authorizes scraping public data; open sources automated, Google views read interactively [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "4581a71",
+      "full": "4581a7153275b56e850c740a7b6251cfb70b48a5",
+      "date": "2026-10-12",
+      "time": "14:02",
+      "subject": "docs(plan): owner overrides source restriction — any imagery as modeling reference, procedural-only outputs [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "8bf3a3b",
+      "full": "8bf3a3be4ccb6c8c06dc278cf0f727f3006d6e24",
+      "date": "2026-10-12",
+      "time": "14:00",
+      "subject": "docs(plan): Phase 02 ordered build (terrain>backdrops>pipelines>facilities), evidence loops, selection deferred to Phase 05 [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
+    },
+    {
+      "sha": "2b24407",
+      "full": "2b24407e703ba87ff84e8d6322725b10d5831fcc",
+      "date": "2026-10-12",
+      "time": "13:53",
+      "subject": "docs(plan): canvas locked, twin parity rubric scores every REF gate [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-02]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-02"
     },
     {
       "sha": "d598f0f",
@@ -2631,6 +3360,15 @@
       "anchor": "phase-4"
     },
     {
+      "sha": "5704d87",
+      "full": "5704d872013744c9191cd8d2dcd61a44fd9d1ef1",
+      "date": "2026-10-11",
+      "time": "01:51",
+      "subject": "docs(plan): close Phase 4 — gate + capture proven, mark done [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
       "sha": "16d57b2",
       "full": "16d57b2cf07a8a0f28ab1858896b08ae4b660e03",
       "date": "2026-10-11",
@@ -2924,6 +3662,15 @@
       "date": "2026-10-10",
       "time": "22:56",
       "subject": "fix(v1): drop high-performance GL hint; default context survives Safari precision-разному GPUs [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "9588ff7",
+      "full": "9588ff7aa86ed06bb8dc26f45dfac1d9f8715a0e",
+      "date": "2026-10-10",
+      "time": "22:49",
+      "subject": "docs(plan): lean handoff for fresh session [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
       "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
       "anchor": "phase-4"
     },
@@ -3329,6 +4076,15 @@
       "date": "2026-10-10",
       "time": "20:29",
       "subject": "fix(ring2): chrome-first boot with staged status + fatal overlay, map mount timeout [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
+      "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "cbfe791",
+      "full": "cbfe7919895117a2fe93ad6120fc29e9b6312065",
+      "date": "2026-10-10",
+      "time": "20:22",
+      "subject": "docs(plan): shipped SHAs for ring2 phases [plan:2026-10-10_191500-ops3d-ring2-seamless-redo.md#phase-4]",
       "plan": "2026-10-10_191500-ops3d-ring2-seamless-redo.md",
       "anchor": "phase-4"
     },
@@ -3756,6 +4512,15 @@
       "anchor": "phase-1"
     },
     {
+      "sha": "2552140",
+      "full": "25521408c1b486db6a5692477f19273f9123e5dd",
+      "date": "2026-10-08",
+      "time": "18:01",
+      "subject": "docs(ops3d): fold feedback pass into Phase 1 — iteration, not a phase [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
       "sha": "815d3ad",
       "full": "815d3ad323baf19705cb09dcec8f1d333d474bde",
       "date": "2026-10-08",
@@ -3855,6 +4620,15 @@
       "anchor": "phase-1"
     },
     {
+      "sha": "78c7d1a",
+      "full": "78c7d1a39e56b244fce31f3988ff20d6ed0375de",
+      "date": "2026-10-08",
+      "time": "16:35",
+      "subject": "test(ops3d): terrain accuracy gates + phase-1 ratings vs Copernicus ground truth [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
       "sha": "116f51e",
       "full": "116f51ec9750b03743e82ff5ce07a31d810fa0a1",
       "date": "2026-10-08",
@@ -3869,6 +4643,15 @@
       "date": "2026-10-08",
       "time": "14:24",
       "subject": "chore(ds): track refresh — pick up phase-1 shas [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
+      "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
+      "anchor": "phase-1"
+    },
+    {
+      "sha": "267f0d2",
+      "full": "267f0d2cacb93c3a9b40464171837982c2ce4e3e",
+      "date": "2026-10-08",
+      "time": "14:24",
+      "subject": "docs(plan): close phase-1 — tasks 6-10 marked, shipped 97add68+a94fd6d [plan:2026-10-07_153000-ops3d-realworld-twin.md#phase-1]",
       "plan": "2026-10-07_153000-ops3d-realworld-twin.md",
       "anchor": "phase-1"
     },
@@ -4053,6 +4836,15 @@
       "anchor": "task-6"
     },
     {
+      "sha": "6934f4e",
+      "full": "6934f4e81cc5be0963bd3eecedb827e305133d3e",
+      "date": "2026-10-07",
+      "time": "13:30",
+      "subject": "docs(logic): close domain-logic tasks 1-5 — 111 tests green, build green, shipped in ba00e7f",
+      "plan": "2026-10-05_150017-safepipe-domain-logic.md",
+      "anchor": null
+    },
+    {
       "sha": "6976fbc",
       "full": "6976fbca2100e8e5c7a4780182a7b68b7b7b6386",
       "date": "2026-10-07",
@@ -4141,6 +4933,15 @@
       "subject": "feat(changelog): plan file + manifest readiness + per-plan names [plan:2026-10-07_130000-safepipe-changelog.md#task-1]",
       "plan": "2026-10-07_130000-safepipe-changelog.md",
       "anchor": "task-1"
+    },
+    {
+      "sha": "b33f7a9",
+      "full": "b33f7a9dc10379bf6b3c0404761016cd46d9fdcf",
+      "date": "2026-10-07",
+      "time": "13:00",
+      "subject": "chore(repo): track .hermes/plans — history travels with clones [plan:2026-10-05_150017-safepipe-ds-extraction.md#task-5]",
+      "plan": "2026-10-05_150017-safepipe-ds-extraction.md",
+      "anchor": "task-5"
     },
     {
       "sha": "8d1cb49",
@@ -4693,10 +5494,9 @@
     }
   ],
   "wip": [
-    ".agents/skills/changelog-kit/SKILL.md",
-    ".agents/skills/plan-traceability/SKILL.md",
-    "AGENTS.md",
-    "docs/agent-skills.md",
-    "public/version.json"
+    ".hermes/plans/2026-10-18_172008-supabase-scheduling-migration.md",
+    ".hermes/plans/2026-10-19_150735-changelog-readability.md",
+    "scripts/plan-track.mjs",
+    "src/changelog/changelog-parse.js"
   ]
 }

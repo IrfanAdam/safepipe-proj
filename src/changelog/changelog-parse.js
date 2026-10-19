@@ -102,9 +102,13 @@ export const anchorHitCI = (text, anchor) =>
 // not display Task 4's `GATE PASSED`. (An unanchored numberless head keeps the
 // positional fallback, which only numbered-free legacy heads reach.)
 export const gateNOf = (head, fb) => {
+  const a = declaredAnchor(head);
+  // A variant anchor (`{#phase-5-rev}`) explicitly opts out of owning Phase 5's
+  // gate; without this the numeric prefix would still claim the primary gate.
+  if (a && /^phase-\d+-/i.test(a)) return null;
   const m = String(head || '').match(/^(Phase|Task|Step)\s+(\d+)/i);
   if (m) return Number(m[2]);
-  if (declaredAnchor(head)) return null;
+  if (a) return null;
   return fb;
 };
 

@@ -5423,6 +5423,44 @@
      "state": ""
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-19",
+   "time": "18:04",
+   "hash": "6cfa374f",
+   "sections": [
+    {
+     "head": "Phase 1 — Foundation: schema, access, inventory {#phase-1}",
+     "hash": "67330908",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Write path: owner-checked Supabase upsert {#phase-2}",
+     "hash": "509a12da",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 3 — Read + Realtime: live overlay, no reload {#phase-3}",
+     "hash": "5caf8726",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Sync worker: Supabase → GitHub without deploys {#phase-4}",
+     "hash": "895f0ad3",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 5 — Cutover: backfill, flip, retire {#phase-5}",
+     "hash": "ee48c793",
+     "state": "3/3"
+    },
+    {
+     "head": "Closeout note {#phase-5-rev}",
+     "hash": "ccee801a",
+     "state": ""
+    }
+   ]
   }
  ],
  "2026-10-19_150735-changelog-readability.md": [
@@ -5505,6 +5543,34 @@
      "head": "Phase 2 — Grammar rollout: normalize gates + labels across plans {#phase-2}",
      "hash": "a994f47f",
      "state": ""
+    },
+    {
+     "head": "Phase 3 — Task headers, accordions, compact metadata {#phase-3}",
+     "hash": "9fb453a9",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Polish: ship-gate, stamps, titles, heads, ticks, lone-task, reconcilia",
+     "hash": "6cbc3f6b",
+     "state": "7/7"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-19",
+   "time": "18:04",
+   "hash": "e093ba16",
+   "sections": [
+    {
+     "head": "Phase 1 — Renderer: block structure, honest done, owned gates {#phase-1}",
+     "hash": "934744d5",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Grammar rollout: normalize gates + labels across plans {#phase-2}",
+     "hash": "ed2c0cb8",
+     "state": "0/2"
     },
     {
      "head": "Phase 3 — Task headers, accordions, compact metadata {#phase-3}",

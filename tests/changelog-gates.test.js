@@ -25,6 +25,8 @@ describe('gateNOf', () => {
   });
   it('falls back for numberless heads', () => {
     assert.equal(gateNOf('Follow-up polish', 7), 7);
+    assert.equal(gateNOf('Follow-up polish {#follow-up}', 7), null);
+    assert.equal(gateNOf('Phase 5 closeout note {#phase-5-rev}', 5), null);
     assert.equal(gateNOf('', 4), 4);
     assert.equal(gateNOf(null, 1), 1);
   });
