@@ -208,7 +208,7 @@
 |---|---|---|
 | 10 | Stamp rollup + section source order | smooth/timeline `## Task` heads show DONE, no nested `Task N`; Behavior contract sits before Steps; loose steps stay written-position |
 
-### Task 10: Stamp rollup + section source order ✓ done
+### Task 10: Stamp rollup + section source order ✓ done `50d70b4`
 
 **Objective:** A bare `### Task N ✓ done` stamp is the section's seal, not a sub-task; and an open section keeps its narrative.
 
@@ -224,3 +224,5 @@
 **Verify:** 7 new unit tests; corpus sweep green; smooth + timeline drawer screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-5]`; close with `✓ done` + sha.
 
 - REF GATE 5 (ship): smooth Task 1 head DONE with Files/Rules/Verify in order and no nested task; timeline Task 2 contract-before-steps. Evidence: screenshots + green suite.
+
+*Shipped in 50d70b4 · Task 10 · phase-5.*
