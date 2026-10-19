@@ -396,6 +396,40 @@ describe('title notes', () => {
   });
 });
 
+describe('lone-task promotion', () => {
+  const chunk = (lines) => renderSection(lines.join('\n'), {});
+  it('a ###-led single task reads as a phase: h2, status, flowing body', () => {
+    const { head, body } = chunk(['### Task 6: Graticule — checker parterre ✓ done (167a614)', '',
+      '**Objective:** Give the void a scale.', '', '**Files:**', '- Modify: `a.js`.']);
+    assert.ok(head.includes('<h2>Graticule — checker parterre</h2>'), head);
+    assert.ok(head.includes('✓ DONE (167a614)'), head);
+    assert.ok(!body.includes('<details') && !body.includes('<h3-task>'), body);
+    assert.ok(body.includes('Give the void a scale.'), body);
+    assert.ok(body.includes('ds-f-t">Files<'), body);
+  });
+  it('promoted title note leads the body, not the h2', () => {
+    const { head, body } = chunk(['### Task 1: Pre-flight ✓ done (docs/audit.md + 8 captures)', '', '**Files:**', '- Create: `a.js`.']);
+    assert.ok(head.includes('<h2>Pre-flight</h2>'), head);
+    assert.ok(body.includes('<p>docs/audit.md + 8 captures</p>'), body);
+  });
+  it('lone bare stamp promotes to h2 + DONE with empty body', () => {
+    const { head, body } = chunk(['### Task 1 ✓ done d27f94c']);
+    assert.ok(head.includes('✓ DONE'), head);
+    assert.ok(!body.includes('<details') && !body.includes('ds-task-fold'), body);
+  });
+  it('lone cancelled task promotes the cancelled verdict', () => {
+    const { head, body } = chunk(['### Task 9: Old thing ✗ cancelled', '', '**Verify:** green.']);
+    assert.ok(head.includes('<h2>Old thing</h2>'), head);
+    assert.ok(head.includes('✗ cancelled'), head);
+    assert.ok(!body.includes('<details'), body);
+  });
+  it('two tasks in one chunk keep their folds', () => {
+    const { head, body } = chunk(['### Task 1: A ✓ done', '', '**Files:**', '- Create: `a.js`.', '', '### Task 2: B', '', '**Verify:** green.']);
+    assert.ok(body.includes('<details class="ds-task-fold">'), body);
+    assert.ok(!head.includes('<h2>A</h2>'), head);
+  });
+});
+
 describe('ship-gate seal', () => {
   it('gateless plans keep the old rule', () => {
     assert.equal(shipGatesShut([]), true);

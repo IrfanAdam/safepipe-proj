@@ -281,6 +281,26 @@ export const splitItemContent = (content) => {
   return { lead, fields };
 };
 
+// A task's content as flowing HTML (no fold wrapper): note, objective,
+// lead, canonical fields, loose blocks. Shared by the fold and the
+// lone-task promotion (a section that IS one task reads as a phase).
+const taskInner = (task) => {
+  const { note } = taskTitleOf(task.title);
+  const obj = task.fields.find((f) => isObjective(f.label));
+  const rest = task.fields.filter((f) => !isObjective(f.label));
+  let inner = note ? `<p>${fmtInline(note)}</p>` : '';
+  if (obj) {
+    const otext = [...obj.inline, ...obj.parts.filter((p) => p.t === 'para').map((p) => p.text)]
+      .filter(Boolean).join(' ').trim();
+    if (otext) inner += `<p>${fmtInline(otext)}</p>`;
+    inner += renderParts(obj.parts.filter((p) => p.t !== 'para'));
+  }
+  if (task.lead.length) inner += `<p>${fmtInline(task.lead.join(' ').trim())}</p>`;
+  rest.sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
+  inner += renderFieldsOpen(rest);
+  inner += renderParts(task.loose);
+  return inner;
+};
 const renderTask = (task) => {
   // The task itself is the fold: summary = its own header + status (no
   // FILES line, no previews), body = everything unfolded. Content-less
@@ -301,20 +321,10 @@ const renderTask = (task) => {
   // headers carry the tick too (no caret: nothing to fold).
   const bare = (extra) => `<section class="ds-subtask"><div class="ds-task-bare">${taskTick(task)}<h3>${fmtInline(h3)}</h3></div>${extra || ''}</section>`;
   if (!hasContent) return bare();
-  let inner = note ? `<p>${fmtInline(note)}</p>` : '';
+  const inner = taskInner(task);
   if (!rest.length && !obj && !task.lead.length && !(task.loose || []).length) {
     return bare(inner);
   }
-  if (obj) {
-    const otext = [...obj.inline, ...obj.parts.filter((p) => p.t === 'para').map((p) => p.text)]
-      .filter(Boolean).join(' ').trim();
-    if (otext) inner += `<p>${fmtInline(otext)}</p>`;
-    inner += renderParts(obj.parts.filter((p) => p.t !== 'para'));
-  }
-  if (task.lead.length) inner += `<p>${fmtInline(task.lead.join(' ').trim())}</p>`;
-  rest.sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-  inner += renderFieldsOpen(rest);
-  inner += renderParts(task.loose);
   if (!inner) return bare();
   return `<section class="ds-subtask"><details class="ds-task-fold"><summary class="ds-acc-head">${trig}</summary><div class="ds-acc-body">${inner}</div></details></section>`;
 };
@@ -536,7 +546,22 @@ export const renderSection = (raw, opts) => {
       }
     }
   }
-  if (real.length) {
+  // Lone-task promotion: a ###-led chunk that IS one task (no usable
+  // section title) reads as a phase — the task name becomes the h2, its
+  // verdict the status line, its content flows unfolded. No fold, no
+  // invalid <h3-task> head. Multi-task or orphan-carrying chunks keep folds.
+  const orphans = tasks.filter((t) => !t.title);
+  const orphanContent = orphans.some((t) => t.lead.length || (t.loose || []).length
+    || t.fields.some((f) => fieldText(f) || (f.parts || []).length));
+  if (htag === 'h3-task' && real.length === 1 && !orphanContent && !blocks.length) {
+    const lone = real[0];
+    const lt = taskTitleOf(lone.title);
+    // headStatus only sees a verdict at the very end — a trailing bare sha
+    // blinds it, so strip that (paren shas stay and still display).
+    const vtitle = lone.title.replace(/\s+`?[0-9a-f]{7,40}`?\s*$/i, '');
+    head = `<h2>${fmtInline(lt.name || (lt.num ? `Task ${lt.num}` : 'Task'))}</h2>` + headStatus(vtitle, suffix);
+    body += taskInner(lone);
+  } else if (real.length) {
     // Label lines outside any ### (e.g. a phase-level note) keep author
     // order after the known set — they have no task to belong to.
     for (const t of tasks.filter((t) => !t.title)) {

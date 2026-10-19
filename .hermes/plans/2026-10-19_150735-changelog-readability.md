@@ -321,3 +321,31 @@
 
 *Shipped in 95e6902 · Task 13 · phase-8.*
 *Follow-up flush fold bodies in b2d6506 · Task 13 · phase-8.*
+
+---
+
+## Phase 9 — Lone-task promotion {#phase-9}
+
+*Tags: changelog, renderer*
+
+*What the build gains:* task-only right panes read as phases — the task is the title, status under it, body flowing, no fold.
+
+| # | Task | Done when |
+|---|---|---|
+| 14 | Lone-task promotion | terrain Task 6 pane shows h2 + DONE + divider + flowing body, no fold, no `<h3-task>` |
+
+### Task 14: Lone-task promotion ✓ done
+
+**Objective:** A section that IS one task behaves like a phase.
+
+**Files:**
+- Modify: `src/changelog/changelog/raw-detail.js` (`taskInner` shared; `###`-led single-task chunks promote to h2 + verdict status + unfolded body)
+- Modify: `tests/changelog-detail.test.js`
+
+**Changes:**
+- Promotion fires only for `###`-led chunks with exactly one task and no orphan/leading blocks; multi-task or orphan-carrying chunks keep folds.
+- Head reuses `headStatus` (verdict + gate suffix, phase shape); trailing bare sha stripped for verdict sight (paren shas still display).
+
+**Verify:** 5 new unit tests; corpus sweep green; terrain Task 6 screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-9]`; close with `✓ done` + sha.
+
+- REF GATE 9 (ship): Task 6 title + status + divider + flowing STEPs. Evidence: screenshots + green suite.
