@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-19T12:34:03.841Z",
+  "generated": "2026-10-19T14:10:53.084Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,51 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "6a3f9eb",
+      "full": "6a3f9eb1d07e0e7057cd3cfb0ab8f48bab1cafc8",
+      "date": "2026-10-19",
+      "time": "18:13",
+      "subject": "docs(skill): session engine rules — open-gate lead, --- separator, frozen ticks [plan:2026-10-19_150735-changelog-readability.md#phase-4]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "0083d57",
+      "full": "0083d57bc7c2582c5763a2611325c8fd9442664b",
+      "date": "2026-10-19",
+      "time": "18:13",
+      "subject": "docs(skill): fold-body token rule, structure vs theme split [plan:2026-10-19_150735-changelog-readability.md#phase-4]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "b41b06f",
+      "full": "b41b06fbb85992d64bc091a2484335e96506a74d",
+      "date": "2026-10-19",
+      "time": "18:11",
+      "subject": "fix(changelog): fold body text compact 14px token [plan:2026-10-19_150735-changelog-readability.md#phase-4]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-4"
+    },
+    {
+      "sha": "832b779",
+      "full": "832b779f75f9b8bc0735c7c32332c200e99e5ee6",
+      "date": "2026-10-19",
+      "time": "18:04",
+      "subject": "fix(changelog): closeout anchor owns no gate; track .hermes [plan:2026-10-18_172008-supabase-scheduling-migration.md#phase-5]",
+      "plan": "2026-10-18_172008-supabase-scheduling-migration.md",
+      "anchor": "phase-5"
+    },
+    {
+      "sha": "42cebc2",
+      "full": "42cebc28d7abea3b0c0399cf0128d2f6284817d0",
+      "date": "2026-10-19",
+      "time": "18:04",
+      "subject": "docs(plan): author Phase 2 Tasks 4-5, 15-task parse [plan:2026-10-19_150735-changelog-readability.md#phase-2]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-2"
+    },
     {
       "sha": "50922c3",
       "full": "50922c31870957ab7e5edbef3b7b9c12005e3fe2",
@@ -5493,10 +5538,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    ".hermes/plans/2026-10-18_172008-supabase-scheduling-migration.md",
-    ".hermes/plans/2026-10-19_150735-changelog-readability.md",
-    "scripts/plan-track.mjs",
-    "src/changelog/changelog-parse.js"
-  ]
+  "wip": []
 }
