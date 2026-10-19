@@ -302,7 +302,7 @@
 |---|---|---|
 | 13 | Checkbox summaries | 172008 Phase 4 folds read `☑ name ›` in ink, no DONE/sha/accent |
 
-### Task 13: Checkbox summaries ✓ done `95e6902` → flush fold bodies `
+### Task 13: Checkbox summaries ✓ done `95e6902` → flush fold bodies `b2d6506`
 
 **Objective:** The black checkbox-like mark leads; nothing accent-colored sits inline.
 
@@ -320,3 +320,4 @@
 - REF GATE 8 (ship): Phase 4 folds box-first, ink-only, caret inline. Evidence: screenshots + green suite.
 
 *Shipped in 95e6902 · Task 13 · phase-8.*
+*Follow-up flush fold bodies in b2d6506 · Task 13 · phase-8.*
