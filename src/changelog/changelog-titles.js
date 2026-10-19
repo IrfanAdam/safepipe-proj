@@ -59,13 +59,15 @@ export const shortPhase = (h) => String(h || '')
   .replace(/\s*[✓✗]\s*(done|cancelled)?\s*[—–\-–]?/gi, '')
   .trim().replace(/\.+$/, '');
 // Rail label: `Task 01`, `Phase 02`, `Step 00` (fallback: position).
+// Ontology: a plan is either a flat list of Tasks OR Phases containing Tasks.
+// Never "items" — that word is reserved for timeline bouts, not plan units.
 export const unitLabel = (h, i) => {
   const m = String(h || '').match(/^(Phase|Task|Step)\s+([\d–-]+)/i);
   if (m) {
     const word = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase();
     return `${word} ${String(m[2]).padStart(2, '0')}`;
   }
-  return `Item ${String(i + 1).padStart(2, '0')}`;
+  return `Task ${String(i + 1).padStart(2, '0')}`;
 };
 export const planSentence = ({ h1, goal, slug },
   max = 76) => sentOf(goal,

@@ -297,6 +297,9 @@ The changelog detail pane renders raw plan markdown, so author phases for scanni
 - `hits()`/tracker match anchors by regex on the COMMIT SUBJECT, never by heading rendering — so `{#phase-N}` need not sit literally on the heading line. A renderer that paints the body with plain `marked` prints a trailing `{#phase-N}` on a heading as raw text (it only honors the syntax with an anchor plugin): put the anchor in a hidden `<!-- {#phase-N} -->` comment under the heading instead — still verbatim in the raw text for `text.includes(anchor)` matching, invisible in the render.
 - A markdown table must be preceded by a BLANK line: an italic `*summary*` line directly above `| # | Task | Done when |` makes `marked` swallow the table into a pipe-laden paragraph blob in the detail pane. Summary line → blank line → table, in every phase.
 - When a phase gains tasks, renumber the tail in the same edit; grep `^### Task` first to list current numbers.
+- Ontology: plan is EITHER flat Tasks (`## Task`) OR Phases containing Tasks (`## Phase` + `### Task`). Never 'items' — canonical word is 'tasks' everywhere.
+- Iterations are Evals, not new Phases: polish/bug-fix/style tweak on shipped task = revision/eval (plan-history snapshot + gate · rev), not new `## Phase`. New Phase only for new scope.
+- Engine invariant: every phase renders with consistent status line (tasks fraction or DONE + gate verdict).
 
 ## Pitfalls
 

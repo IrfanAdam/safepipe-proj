@@ -38,11 +38,27 @@ export function paintDetail(root, ctx){
     const hsS = dupAnchor.has(i) ? [] : hits(plan.file, s.body, plan.sprints.indexOf(s) === 0),
       has = hsS.length ? ' · ' + hsS.length + ' commit' + (hsS.length > 1 ? 's' : '') : '',
       frac = state(s.body),
+      // Fallback when state is empty but tasks exist (e.g. raw ### tasks
+      // present but norm checkboxes absent due to gating/parsing edge):
+      // derive fraction from raw section's task heads so rail never goes
+      // bare. Never invents for table-only Phase 2 (0 tasks).
+      derivedFrac = (() => {
+        if (frac) return frac;
+        try {
+          const raw = sectionRaw(plan.raw || '', s.head);
+          if (!raw) return '';
+          const lines = raw.split('\n').filter((l) => /^###\s+(Task|Step|Phase)\b/i.test(l.trim()));
+          if (!lines.length) return '';
+          const done = lines.filter((l) => /[✓✗]/.test(l)).length;
+          return `${done}/${lines.length}`;
+        } catch { return ''; }
+      })(),
+      dispFrac = derivedFrac || frac,
       ed = edited && edited(s) ? ' · edited' : '';
     return [
       `<button class="ds-pick`,
       i === sel[1] && !atL1 ? ' on' : '',
-      isDone(frac) ? '' : ' is-open',
+      isDone(dispFrac) ? '' : ' is-open',
       `" data-tip="`,
       esc(tipOf(s.head, s.body, 100)),
       `"><span class="ds-row"><span class="ds-num">`,
@@ -50,7 +66,7 @@ export function paintDetail(root, ctx){
       `</span><b>`,
       esc(short(s.head)),
       `</b></span><small>`,
-      [frac + has + ed].filter(Boolean).join(' · '),
+      [dispFrac + has + ed].filter(Boolean).join(' · '),
       `</small></button>`,
     ].join('');
   }).join('') + [

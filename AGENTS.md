@@ -27,6 +27,13 @@ Read this file first; it replaces hallway knowledge.
 - Never invent files, coverage, coordinates, or findings — name the exact
   missing file + its official download page instead.
 
+### Plan Anatomy (binding)
+
+- **Plan is tasks OR phases with tasks** — a plan is EITHER a flat list of `## Task N` OR `## Phase N` with `### Task N` inside — never `items`. The word **tasks** is canonical in code, UI, docs, and changelog (rail `Task 02`, card `3 tasks`, status `3/3`, commits `### Task N ✓ done`). A request is not a phase.
+- **Iterations are evals, not phases** — re-running, fixing, or re-evaluating existing tasks is an `eval` on the existing phase/task, not a new phase (the `150735`-style phase-per-request is forbidden). Polish/bug-fix/style tweak = revision/eval (`plan-history` snapshot + gate `· rev` note or feedback block). New Phase only for new scope/deliverable. *Shipped phases stand as history — this rule governs new work from 2026-10-19 on.*
+- **Naming is `tasks` not `items`** — always use `Task N` / `tasks` in plans, commits, and changelog; never `items`.
+- **Changelog engine: consistent phase status + gate** — every `## Phase` that owns tasks renders a consistent status line — tasks fraction (or `✓ DONE` when all done) plus gate verdict (`GATE PASSED`/`FAILED`/`OPEN`) when a gate exists, matching the plan's REF GATE evidence. Never invent or diverge phase completion.
+
 ## Verification
 
 - `npm run build` must pass. UI changes need screenshots (chromium +

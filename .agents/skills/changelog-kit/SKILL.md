@@ -38,7 +38,10 @@ Runtime: tracker + preflight + backfill run on Node stdlib plus the `git` CLI on
 - Path: `<plansDir>/YYYY-MM-DD_HHMMSS-<slug>.md` (legacy `YYYY-MM-DD_<slug>.md` also parses).
 - Preamble carries Goal, Architecture, Tech Stack, Tags lines.
 - Phases: `## Phase N — <title> {#phase-N}` with optional `*Tags: X*` line under heading.
-- Tasks: `### Task N: <name>` marked done or cancelled with reason blockquote.
+- Tasks: `### Task N: <name>` marked done or cancelled **in the heading itself**, with reason blockquote — section-state parsers test the head only, so a `✓ done` sitting in an overview-table cell or body paragraph leaves the section reading open (e.g. a phase stuck at 1/6 with every task actually done).
+- Ontology: plan is EITHER flat Tasks (`## Task`) OR Phases containing Tasks (`## Phase` + `### Task`). Never 'items' — canonical word is 'tasks' everywhere.
+- Iterations are Evals, not new Phases: polish/bug-fix/style tweak on shipped task = revision/eval (plan-history snapshot + gate · rev), not new `## Phase`. New Phase only for new scope.
+- Engine invariant: every phase renders with consistent status line (tasks fraction or DONE + gate verdict).
 - Close line under each phase: `*Shipped in <sha> · Tasks a–b · phase-N.*` (anchor verbatim).
 - Hide marker (optional): `<!-- changelog: hide -->` after Tags — stays linked, not carded.
 - Due date (scheduling, optional): `*Due: YYYY-MM-DD*` alone on its own line directly under a `## Phase|Task|Step` head (or `### Task` head — whichever level holds the work; nearest wins). Honored ONLY for incomplete sections; done/cancelled sections ignore it. Invalid dates → null, never throw. Due lines are scheduling metadata, stripped at render like `{#anchors}` (never synthesized into checkboxes by `norm()`). Manifest shape is UNCHANGED — Due is live-parsed from the worktree plan; the history hash covers the Due line so schedule edits rev-bump naturally.

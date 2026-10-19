@@ -396,6 +396,28 @@ describe('title notes', () => {
   });
 });
 
+describe('phase fraction (never synthesized verdicts)', () => {
+  const sec = (lines, opts) => renderSection(lines.join('\n'), opts || {});
+  it('bare phase heads gain a fraction, never DONE', () => {
+    const { head } = sec(['## Phase 2 — Assets', '', '### Task 1: A ✓ done', '', '**Files:**', '- Create: `a.js`.', '', '### Task 2: B', '', '**Verify:** green.']);
+    assert.ok(head.includes('<h2>Phase 2 — Assets</h2>'), head);
+    assert.ok(head.includes('1/2'), head);
+    assert.ok(!head.includes('DONE') && !head.includes('cancelled'), head);
+  });
+  it('all-checked phases with no verdict stay verdict-free', () => {
+    const { head } = sec(['## Phase 5 — Cutover', '', '### Task 1: A ✓ done', '', '**Files:**', '- Create: `a.js`.']);
+    assert.ok(!head.includes('✓ DONE'), `no invented verdict: ${head}`);
+    assert.ok(head.includes('1/1'), head);
+  });
+  it('marked and gated heads pass through untouched', () => {
+    const marked = sec(['## Phase 1 — X ✓ done', '', '### Task 1: A ✓ done', '', '**Files:**', '- Create: `a.js`.']).head;
+    assert.ok(marked.includes('✓ DONE'), marked);
+    const gated = sec(['## Phase 5 — Y', '', '### Task 1: A', '', '**Files:**', '- Create: `a.js`.'], { gateSuffix: ' · GATE OPEN' }).head;
+    assert.ok(gated.includes('GATE OPEN'), gated);
+    assert.ok(!gated.includes('0/1'), `gate lines byte-identical: ${gated}`);
+  });
+});
+
 describe('lone-task promotion', () => {
   const chunk = (lines) => renderSection(lines.join('\n'), {});
   it('a ###-led single task reads as a phase: h2, status, flowing body', () => {

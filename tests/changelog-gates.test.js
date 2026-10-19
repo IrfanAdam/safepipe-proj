@@ -44,8 +44,8 @@ describe('corpus gate ownership', () => {
   it('timeline plan tasks own their own gates (not their positions)', () => {
     const md = readFileSync(join(plansDir, '2026-10-15_120000-safepipe-changelog-timeline.md'), 'utf8');
     const secs = split(md);
-    assert.equal(secs.length, 4);
-    secs.forEach((s, si) => {
+    assert.equal(secs.length, 5);
+    secs.slice(0, 4).forEach((s, si) => {
       const m = s.head.match(/^Task\s+(\d+)/);
       assert.ok(m, `numbered head: ${s.head}`);
       assert.equal(gateNOf(s.head, si), Number(m[1]));
@@ -63,13 +63,12 @@ describe('corpus gate ownership', () => {
       for (const c of manifest.commits.filter((c) => c.plan === file && (c.anchor ? anchorHit(s.body, c.anchor) : i === 0))) seen.add(c.sha);
     });
     const orphans = manifest.commits.filter((c) => c.plan === file && !seen.has(c.sha));
-    assert.ok(orphans.length > 0, 'expected orphan follow-up commits');
-    assert.ok(orphans.every((c) => c.anchor === 'follow-up'));
+    assert.equal(orphans.length, 0, `expected no orphans — Follow-up section now owns its commits: ${orphans.map(c=>c.sha).join(',')}`);
   });
   it('unlinked triage matches anchors case-insensitively (Follow-up heading)', () => {
     const file = '2026-10-15_120000-safepipe-changelog-timeline.md';
     const raw = readFileSync(join(plansDir, file), 'utf8');
-    assert.equal(anchorHit(raw, 'follow-up'), false);
+    assert.equal(anchorHit(raw, 'follow-up'), true);
     assert.equal(anchorHitCI(raw, 'follow-up'), true);
     assert.equal(anchorHitCI('see {#task-10}', 'task-1'), false);
     assert.equal(anchorHitCI('see {#task-1}', 'task-1'), true);

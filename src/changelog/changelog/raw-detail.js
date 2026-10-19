@@ -546,6 +546,22 @@ export const renderSection = (raw, opts) => {
       }
     }
   }
+  // ── Phase status fraction (ontology: phases contain tasks; never "items") ──
+  // A phase head that would otherwise render entirely bare (no verdict, no
+  // gate line) shows its task fraction so no phase scans title-only. Counts
+  // only — verdicts are NEVER synthesized: DONE/cancelled come from the
+  // author's head mark alone (an all-checked phase with an open gate, e.g.
+  // 172008 Phase 5 with remaining cutover work, must not claim DONE).
+  // Existing gate lines are left byte-identical; the rail already fractions
+  // every row, so heads gain nothing by restating them.
+  const isPhaseHead = /^Phase\b/i.test(cleanHead(htextRaw));
+  if (isPhaseHead && htag === 'h2' && real.length && !/✓ DONE|✗ cancelled/.test(head) && !/ds-is-gate/.test(head)) {
+    const total = real.length;
+    const done = real.filter(t => t.done || t.cancelled).length;
+    const frac = `${done}/${total}`;
+    if (head.includes('</h2>')) head = head.replace(/<\/h2>.*/, `</h2><p class="ds-status ds-is-gate">${esc(frac)}</p>`);
+    else head = `<h2>${fmtInline(cleanHead(htextRaw))}</h2><p class="ds-status ds-is-gate">${esc(frac)}</p>`;
+  }
   // Lone-task promotion: a ###-led chunk that IS one task (no usable
   // section title) reads as a phase — the task name becomes the h2, its
   // verdict the status line, its content flows unfolded. No fold, no
@@ -556,10 +572,18 @@ export const renderSection = (raw, opts) => {
   if (htag === 'h3-task' && real.length === 1 && !orphanContent && !blocks.length) {
     const lone = real[0];
     const lt = taskTitleOf(lone.title);
-    // headStatus only sees a verdict at the very end — a trailing bare sha
-    // blinds it, so strip that (paren shas stay and still display).
-    const vtitle = lone.title.replace(/\s+`?[0-9a-f]{7,40}`?\s*$/i, '');
-    head = `<h2>${fmtInline(lt.name || (lt.num ? `Task ${lt.num}` : 'Task'))}</h2>` + headStatus(vtitle, suffix);
+    // Lone-task promotion: the section IS one task. Show the task name as h2
+    // with an explicit status line. headStatus expects a trailing verdict, but
+    // twin-shaped titles keep `✓ done` mid-title (Task 5 ✓ done — shipped … · name),
+    // so it would miss. Derive status directly from the task's done/cancelled.
+    let status = '';
+    const gatePart = suffix ? ` · ${esc(suffix.trim().replace(/^[✓·\s]+/, '').trim())}` : '';
+    const shipParen = lt.shipped ? ` (${lt.shipped})` : '';
+    if (lone.done) status = `<p class="ds-status ds-is-done">✓ DONE${esc(shipParen)}${gatePart}</p>`;
+    else if (lone.cancelled) status = `<p class="ds-status ds-is-cancelled">✗ cancelled${shipParen ? esc(shipParen) : ''}${gatePart}</p>`;
+    else if (suffix) status = `<p class="ds-status ds-is-gate">${esc(suffix.trim())}</p>`;
+    else status = `<p class="ds-status ds-is-gate">0/1</p>`;
+    head = `<h2>${fmtInline(lt.name || (lt.num ? `Task ${lt.num}` : 'Task'))}</h2>` + status;
     body += taskInner(lone);
   } else if (real.length) {
     // Label lines outside any ### (e.g. a phase-level note) keep author

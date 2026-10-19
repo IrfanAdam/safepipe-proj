@@ -1,6 +1,7 @@
 // safepipe changelog — build cards · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
-import { fmtDate, fmtTime, buildState, isDone, parseGates } from '../changelog-parse.js';
+import { fmtDate, fmtTime, buildState, state, isDone, parseGates } from '../changelog-parse.js';
 import { shipGatesShut } from './raw-detail.js';
+import { sectionRaw } from './raw-detail.js';
 import { hits, commits, unlinked } from '../changelog-links.js';
 import { clip, oneLine } from '../changelog-titles.js';
 import { esc } from './esc.js';
@@ -29,6 +30,30 @@ export function paintPlan(root, ctx){
   const sprint = sprints[si];
   root.querySelector('[data-col="plan"]').innerHTML = list.map((p, i) => {
     const seq = String(list.length - i).padStart(2, '0'), num = p.id || seq, frac = buildState(p.sprints);
+    // Fallback when buildState is empty but tasks exist via raw ### heads
+    // (e.g. state() empty due to norm edge): derive done/total from raw
+    // so card never shows just "7 phases" with no fraction when tasks exist.
+    const dispFrac = (() => {
+      if (frac) return frac;
+      try {
+        if (!p.raw) return frac;
+        let d = 0, t = 0;
+        for (const s of p.sprints) {
+          let f = state(s.body);
+          if (f) {
+            const m = f.match(/(\d+)\/(\d+)/);
+            if (m) { d += Number(m[1]); t += Number(m[2]); continue; }
+          }
+          const raw = sectionRaw(p.raw, s.head);
+          if (!raw) continue;
+          const lines = raw.split('\n').filter((l) => /^###\s+(Task|Step|Phase)\b/i.test(l.trim()));
+          if (!lines.length) continue;
+          d += lines.filter((l) => /[✓✗]/.test(l)).length;
+          t += lines.length;
+        }
+        return t ? `${d}/${t}` : frac;
+      } catch { return frac; }
+    })();
     const hcs = p.sprints.flatMap((s) => hits(p.file, s.body, p.sprints.indexOf(s) === 0));
     const valid = hcs.concat(commits.filter((c) => c.plan === p.file && !hcs.includes(c)));
     const tagged = valid.filter((c) => c.date === p.date || (c.time && c.date >= p.date));
@@ -52,7 +77,7 @@ export function paintPlan(root, ctx){
     const rev = revOf ? revOf(p.file) : null;
     const stateTxt = [
       [p.sprints.length, ` ${unit}`].join(''),
-      frac,
+      dispFrac,
       rev ? `rev ${rev.n} · ${fmtDate(rev.last)}` : '',
     ].filter(Boolean).join(' · ');
     const tagCount = Math.min(3, p.tags.length);
@@ -65,7 +90,7 @@ export function paintPlan(root, ctx){
       // The card is the plan's seal: fractions full AND the ship gate shut.
       // Tasks done with an open ship gate (remaining cutover work) reads
       // open — rail rows keep their task fractions either way.
-      isDone(frac) && shipGatesShut(parseGates(p.raw || '')) ? '' : ' is-open',
+      isDone(dispFrac) && shipGatesShut(parseGates(p.raw || '')) ? '' : ' is-open',
       `" data-tip="`,
       esc(clip(oneLine(p.goal), 100) || oneLine(p.purpose) || oneLine(p.title)),
       `"><span class="ds-num">`,

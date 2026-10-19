@@ -351,3 +351,31 @@
 - REF GATE 9 (ship): Task 6 title + status + divider + flowing STEPs. Evidence: screenshots + green suite.
 
 *Shipped in c3cd09d · Task 14 · phase-9.*
+
+---
+
+## Phase 10 — Reconciliation (sibling lane) {#phase-10}
+
+*Tags: changelog, process*
+
+*What the build gains:* two same-tree lanes merge without losing either intent — honest verdicts stand, forward ontology adopted.
+
+| # | Task | Done when |
+|---|---|---|
+| 15 | Reconcile sibling worktree | green suite, both intents observable, every hunk decision recorded |
+
+### Task 15: Reconcile sibling worktree ✓ done
+
+**Objective:** A sibling session shipped an uncommitted lane (ontology, engine invariant, frac fallbacks, skill docs) on top of Phases 1–9. Merge it impartially per hunk.
+
+**Files:**
+- Kept (sibling): `state()` line-anchoring, `unitLabel` Task fallback, `derivedFrac`/`dispFrac` (zero corpus impact, measured), skills + `AGENTS.md` Plan Anatomy (+grandfather clause: shipped phases stand, rule governs new work), `docs/learning.md`, factual gates-test updates, `ghostOf` scoping + round-trip bound, sibling's promotion status derivation (equivalent, kept)
+- Scoped (mine): phase-head fractions on bare heads only — DONE synthesis dropped (172008 Phase 5 must not claim DONE with remaining cutover work); gate lines byte-identical
+- Reverted: filled checkbox → hollow ink box (user-approved); plan eval-collapse → shipped Phases 8/9 stand (trailers must resolve); `dueOf` tautology → honest pin (6 live Dues)
+
+**Changes:**
+- `src/changelog/changelog-parse.js`, `src/changelog/changelog-titles.js`, `src/changelog/changelog/paint-detail.js`, `src/changelog/changelog/paint-plan.js`, `src/changelog/changelog-drawer.css`, `src/changelog/changelog/raw-detail.js`, `tests/changelog-detail.test.js`, `tests/changelog-timeline.test.js`, `AGENTS.md`
+
+**Verify:** detail suite 60/60 (3 new fraction tests); full suite green except pre-existing geo + honestly-pinned counts; build green; 172008 P5 head shows no DONE; chromium + webkit zero page errors; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-10]`; close with `✓ done` + sha.
+
+- REF GATE 10 (ship): reconciled tree renders honest heads, hollow boxes, unchanged rails/cards. Evidence: screenshots + green suite.

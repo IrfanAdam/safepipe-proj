@@ -142,8 +142,12 @@ export const split = (md) => {
 };
 
 export const state = (body) => {
-  const d = (body.match(/- \[x\]/gi) || []).length;
-  const t = (body.match(/- \[ \]/g) || []).length;
+  // Count authored/norm-synthesized checkbox LINES only. An unanchored match
+  // also counts inline prose that documents the syntax (e.g. "fallback
+  // `- [ ]` tasks …"), which invented an extra open unit — a phase with all
+  // tasks done showed 3/4 and contradicted its own ✓ DONE status line.
+  const d = (body.match(/^[ \t]*-[ \t]*\[x\]/gim) || []).length;
+  const t = (body.match(/^[ \t]*-[ \t]*\[ \]/gm) || []).length;
   return d + t ? `${d}/${d + t}` : '';
 };
 
