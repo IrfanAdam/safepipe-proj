@@ -59,6 +59,7 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-md .ds-task-fold{margin:0}
 .ds-md .ds-task-fold > summary h3{font-size:var(--sp-text-sm);font-weight:700;margin:0;flex:0 1 auto;min-width:0}
 .ds-md summary.ds-acc-head > .ds-status{display:inline-block;margin:0;flex:none}
+.ds-md .ds-task-fold > summary .ds-caret{margin-left:auto;flex:none}
 .ds-md details.ds-task-fold:not([open]) .ds-caret{transform:rotate(0deg)}
 /* metadata accordions reuse the Evals details/caret language, tightened */
 .ds-md .ds-acc-head{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:var(--cl-4)}

@@ -285,9 +285,12 @@ const renderTask = (task) => {
   // The task itself is the fold: summary = its own header + status (no
   // FILES line, no previews), body = everything unfolded. Content-less
   // tasks render the header alone — nothing to fold.
+  // No task id in the fold header (owner steer: the name is the header) —
+  // except as fallback when a bare marker carries no name at all.
   const { num, name, shipped, note } = taskTitleOf(task.title);
-  const h3 = num ? `Task ${num}${name ? ` · ${name}` : ''}` : (name || 'Task');
-  const trig = `<span class="ds-caret">›</span><h3>${fmtInline(h3)}</h3>${taskStatus(task, shipped)}`;
+  const h3 = name || (num ? `Task ${num}` : 'Task');
+  // Summary order: name, status (checkmark untouched), caret as suffix.
+  const trig = `<h3>${fmtInline(h3)}</h3>${taskStatus(task, shipped)}<span class="ds-caret">›</span>`;
   const obj = task.fields.find((f) => isObjective(f.label));
   const rest = task.fields.filter((f) => !isObjective(f.label));
   const hasContent = !!note || !!obj || task.lead.length > 0

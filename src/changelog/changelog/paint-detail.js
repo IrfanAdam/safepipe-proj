@@ -170,8 +170,11 @@ export function paintDetail(root, ctx){
         + (hs.length ? badges(hs) : '');
       const raw = sectionRaw(plan.raw || '', sprint.head) || String(sprint.body || '');
       const rendered = renderSection(raw, { gateSuffix: gateSuffix(gates, phaseN) });
+      // The status sits under the title, then a rule: every phase head
+      // block scans the same (title / status / divider / body).
+      const headRule = rendered.head && rendered.body ? '<hr class="ds-hr ds-head-rule">' : '';
       const mdHTML = rendered.head
-        ? [rendered.head, dueHTML, rendered.body].join('')
+        ? [rendered.head, headRule, dueHTML, rendered.body].join('')
         : [dueHTML, rendered.body].join('');
       return [`<div class="ds-md">`, mdHTML + revsHTML, `</div>`].join('');
     })(),

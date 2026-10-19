@@ -257,3 +257,33 @@
 - REF GATE 6 (ship): terrain Task 1 header one line, note first inside, Tasks 2–7 shas in statuses. Evidence: screenshots + green suite.
 
 *Shipped in 0f674fe · Task 11 · phase-6.*
+
+---
+
+## Phase 7 — Head consistency {#phase-7}
+
+*Tags: changelog, renderer*
+
+*What the build gains:* every phase head scans the same (title / status / divider / body); task folds read name-first with the caret as suffix and no id.
+
+| # | Task | Done when |
+|---|---|---|
+| 12 | Head consistency | ring2 Phase 4 shows divider under DONE, folds read `name ✓ DONE ›` with no id |
+
+### Task 12: Head consistency ✓ done
+
+**Objective:** Status under the title, a rule after it, tasks name-first.
+
+**Files:**
+- Modify: `src/changelog/changelog/raw-detail.js` (fold h3 = name, id only as nameless fallback; summary order name → status → caret)
+- Modify: `src/changelog/changelog/paint-detail.js` (`<hr class="ds-hr ds-head-rule">` after the head when a body follows)
+- Modify: `src/changelog/changelog-drawer.css` (caret suffix alignment), `src/changelog/changelog.css` (head-rule rhythm)
+- Modify: `tests/changelog-detail.test.js`
+
+**Changes:**
+- Fold header drops `Task N ·` (fallback keeps it for nameless bare markers); caret moves from prefix to suffix (pushed right); checkmark/DONE/sha untouched.
+- Phase status stays directly under the title everywhere; divider after the head block, reused `ds-hr` language.
+
+**Verify:** suite updated (52 green); ring2 Phase 4 screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-7]`; close with `✓ done` + sha.
+
+- REF GATE 7 (ship): ring2 Phase 4 divider + suffix carets, no ids. Evidence: screenshots + green suite.

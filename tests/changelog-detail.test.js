@@ -82,7 +82,7 @@ describe('block structure', () => {
     ].join('\n');
     const { body } = renderSection(raw, {});
     assert.equal((body.match(/<details/g) || []).length, 1, body);
-    assert.ok(body.includes('<summary class="ds-acc-head"><span class="ds-caret">›</span><h3>Task 1 · A</h3>'), body);
+    assert.ok(body.includes('<summary class="ds-acc-head"><h3>A</h3><span class="ds-caret">›</span>'), body);
     assert.ok(!body.includes('ds-acc-prev'), `no trigger previews: ${body}`);
     assert.ok(body.includes('<ol><li>First step</li><li>Second step</li></ol>'), body);
     assert.ok(body.indexOf('<div class="ds-acc-body">') < body.indexOf('<ol>'), 'steps belong inside the fold: ' + body);
@@ -128,14 +128,14 @@ describe('task headers', () => {
   const taskBody = (head) => renderSection(['## Phase 1 — X {#phase-1}', '', head, '', '**Verify:** green.'].join('\n'), {}).body;
   it('colon heads render h3 + DONE in the summary, no checkbox', () => {
     const body = taskBody('### Task 1: A ✓ done `abc1234`');
-    assert.ok(body.includes('<summary class="ds-acc-head"><span class="ds-caret">›</span><h3>Task 1 · A</h3>'), body);
+    assert.ok(body.includes('<summary class="ds-acc-head"><h3>A</h3><span class="ds-status ds-is-done">✓ DONE (abc1234)</span><span class="ds-caret">›</span>'), body);
     assert.ok(body.includes('✓ DONE (abc1234)'), body);
     assert.equal(count(body, 'input'), 0, body);
     assert.ok(!body.includes('<strong>'), body);
   });
   it('twin heads fold the shipped sha into DONE', () => {
     const body = taskBody('### Task 4 ✓ done — shipped c557479 · Semantic zoom');
-    assert.ok(body.includes('<h3>Task 4 · Semantic zoom</h3>'), body);
+    assert.ok(body.includes('<h3>Semantic zoom</h3>'), body);
     assert.ok(body.includes('✓ DONE (c557479)'), body);
   });
   it('smooth heads show the bare-sha provenance', () => {
@@ -145,7 +145,7 @@ describe('task headers', () => {
   });
   it('unmarked tasks show h3 with no status line', () => {
     const body = taskBody('### Task 4: Skill sync + ship');
-    assert.ok(body.includes('<h3>Task 4 · Skill sync + ship</h3>'), body);
+    assert.ok(body.includes('<h3>Skill sync + ship</h3>'), body);
     assert.ok(!body.includes('ds-status'), body);
   });
   it('cancelled tasks show the cancelled line', () => {
@@ -158,7 +158,7 @@ describe('task headers', () => {
     assert.ok(body.includes('<div class="ds-tasks">'), body);
     assert.equal(count(body, 'section'), 2, body);
     assert.ok(!body.includes('<details'), 'content-less tasks render bare headers');
-    assert.ok(body.indexOf('Task 1 · A') < body.indexOf('Task 2 · B'), body);
+    assert.ok(body.indexOf('<h3>A</h3>') < body.indexOf('<h3>B</h3>'), body);
   });
 });
 
@@ -179,7 +179,7 @@ describe('task folds', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '',
       '**Verify:** green.', '**Changes:** tweaked the thing.', '**Files:**', '- Create: `a.js`', '- Modify: `b.js`'].join('\n'), {});
     assert.equal((body.match(/<details/g) || []).length, 1, body);
-    assert.ok(body.includes('<h3>Task 1 · A</h3>'), body);
+    assert.ok(body.includes('<h3>A</h3>'), body);
     const fi = body.indexOf('ds-f-t">Files<');
     const ci = body.indexOf('ds-f-t">Changes<');
     const vi = body.indexOf('ds-f-t">Verify<');
@@ -194,7 +194,7 @@ describe('task folds', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '',
       '**Steps:**', '1. First', '2. Second', '**Verify:** green.'].join('\n'), {});
     assert.equal((body.match(/<details/g) || []).length, 1, body);
-    assert.ok(body.includes('<h3>Task 1 · A</h3>'), body);
+    assert.ok(body.includes('<h3>A</h3>'), body);
     assert.ok(!body.includes('ds-acc-prev'), body);
     assert.ok(body.includes('<ol><li>First</li><li>Second</li></ol>'), body);
   });
@@ -202,7 +202,7 @@ describe('task folds', () => {
     const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '',
       'Just a lead line.', '', '1. First', '2. Second'].join('\n'), {});
     assert.equal((body.match(/<details/g) || []).length, 1, body);
-    assert.ok(body.includes('<h3>Task 1 · A</h3>'), body);
+    assert.ok(body.includes('<h3>A</h3>'), body);
     assert.ok(body.includes('<p>Just a lead line.</p>'), body);
     assert.ok(body.includes('<ol>'), body);
   });
@@ -354,19 +354,19 @@ describe('title notes', () => {
   const noteTask = (head) => renderSection(['## Phase 1 — X {#phase-1}', '', head, '', '**Objective:** Do it well.', '', '**Files:**', '- Create: `a.js`.'].join('\n'), {}).body;
   it('prose paren leaves the header, leads the body', () => {
     const body = noteTask('### Task 1: Pre-flight — prove the gap ✓ done (docs/audit.md + 8 captures — see audit)');
-    assert.ok(body.includes('<h3>Task 1 · Pre-flight — prove the gap</h3>'), body);
+    assert.ok(body.includes('<h3>Pre-flight — prove the gap</h3>'), body);
     assert.ok(!body.includes('docs/audit.md + 8 captures</h3>'), body);
     assert.ok(body.includes('<p>docs/audit.md + 8 captures — see audit</p>'), body);
     assert.ok(body.indexOf('<p>docs/audit.md') < body.indexOf('Do it well.'), `note first: ${body}`);
   });
   it('paren sha still ships (no note, status carries it)', () => {
     const body = noteTask('### Task 2: Terrain field v2 ✓ done (167a614)');
-    assert.ok(body.includes('<h3>Task 2 · Terrain field v2</h3>'), body);
+    assert.ok(body.includes('<h3>Terrain field v2</h3>'), body);
     assert.ok(body.includes('✓ DONE (167a614)'), body);
   });
   it('mixed paren becomes a note, status stays plain', () => {
     const body = noteTask('### Task 4: Elevation language ✓ done (167a614, scene-side; legend left for Task 8)');
-    assert.ok(body.includes('<h3>Task 4 · Elevation language</h3>'), body);
+    assert.ok(body.includes('<h3>Elevation language</h3>'), body);
     assert.ok(body.includes('<p>167a614, scene-side; legend left for Task 8</p>'), body);
     assert.ok(body.includes('✓ DONE</span>'), body);
   });

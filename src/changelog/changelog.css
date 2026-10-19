@@ -71,6 +71,7 @@ a.ds-gate-primary{text-decoration:none;display:inline-block}
 .ds-hero h1{font-family:var(--font-display);font-weight:700;font-size:clamp(40px,6vw,68px);letter-spacing:-0.02em;line-height:1.02;color:var(--color-ink);margin:0;text-wrap:balance;overflow-wrap:break-word}
 .ds-hero.wide .lede{max-width:none}
 .ds-hr{border:none;border-top:var(--border-hairline);margin:var(--cl-14) 0}
+.ds-hr.ds-head-rule{margin:var(--cl-8) 0 var(--cl-10)}
 .ds-chips{display:flex;gap:var(--cl-8);flex-wrap:wrap;align-items:center;margin:0 0 var(--cl-12);position:relative}
 .ds-chip-timeline{display:inline-flex;align-items:center;gap:var(--cl-8);margin-left:auto}
 .ds-chip-timeline__icon{display:inline-flex}
