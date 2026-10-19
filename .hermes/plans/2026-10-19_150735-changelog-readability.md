@@ -302,7 +302,7 @@
 |---|---|---|
 | 13 | Checkbox summaries | 172008 Phase 4 folds read `☑ name ›` in ink, no DONE/sha/accent |
 
-### Task 13: Checkbox summaries ✓ done
+### Task 13: Checkbox summaries ✓ done `95e6902`
 
 **Objective:** The black checkbox-like mark leads; nothing accent-colored sits inline.
 
@@ -318,3 +318,5 @@
 **Verify:** suite updated (52 green); 172008 Phase 4 screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-8]`; close with `✓ done` + sha.
 
 - REF GATE 8 (ship): Phase 4 folds box-first, ink-only, caret inline. Evidence: screenshots + green suite.
+
+*Shipped in 95e6902 · Task 13 · phase-8.*
