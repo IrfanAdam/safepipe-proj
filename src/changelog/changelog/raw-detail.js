@@ -105,12 +105,36 @@ const TASK_HEAD = (ln) => ln.match(/^###\s+(.+)$/);
 const isTaskHead = (title) => /^(Task|Step|Phase)\b/i.test(String(title || '').trim());
 
 const cleanHead = (t) => String(t || '').replace(/\{#[^}]*\}/g, '').replace(/<!--[\s\S]*?-->/g, '');
+const SHA_RE = '[0-9a-f]{7,40}';
+// Task titles come in three corpus shapes (all mean the same thing):
+//   `Task N: name ✓ done `sha``   (colon — most plans)
+//   `Task N ✓ done — shipped <sha> · name`   (twin — sha mid-title)
+//   `Task N ✓ done <sha>`   (smooth — bare trailing sha)
+// The shipped sha is provenance: it moves to the DONE paren so the h3
+// stays a clean `Task N · name`.
 const taskTitleOf = (title) => {
-  const m = cleanHead(title).match(/^Task\s+([\d-]+):\s*(.+)$/);
-  let name = m ? m[2] : cleanHead(title).trim();
-  name = name.replace(/✓\s*done\s*—?/i, '').replace(/✗\s*cancelled\s*—?/i, '')
+  const s = cleanHead(title).replace(/✓\s*done\s*—?/i, '').replace(/✗\s*cancelled\s*—?/i, '')
     .replace(/[✓✗]/g, '').trim().replace(/\.+$/, '.');
-  return { num: m ? m[1] : '', name };
+  let m = s.match(/^Task\s+([\d-]+)\s+shipped\s+([0-9a-f]{7,40})\s*·\s*(.+)$/i);
+  if (m) return { num: m[1], name: m[3].trim(), shipped: m[2] };
+  m = s.match(/^Task\s+([\d-]+):\s*(.+)$/);
+  if (m) {
+    let name = m[2].trim();
+    let shipped = '';
+    const sm = name.match(new RegExp(`\`?(${SHA_RE})\`?\\s*$`));
+    if (sm) { shipped = sm[1]; name = name.slice(0, sm.index).trim().replace(/\.+$/, '.'); }
+    return { num: m[1], name, shipped };
+  }
+  m = s.match(/^Task\s+([\d-]+)\s+([0-9a-f]{7,40})\s*$/);
+  if (m) return { num: m[1], name: '', shipped: m[2] };
+  return { num: '', name: s, shipped: '' };
+};
+// A task's own status line — the phase treatment, minus gates (tasks own
+// no gate verdict; DONE/cancelled come from the head mark only).
+const taskStatus = (task, shipped) => {
+  if (task.cancelled) return '<p class="ds-status ds-is-cancelled">✗ cancelled</p>';
+  if (task.done) return `<p class="ds-status ds-is-done">✓ DONE${shipped ? ` (${shipped})` : ''}</p>`;
+  return '';
 };
 
 // Own-verdict gate suffix for a section number. Every judged phase shows its
@@ -173,11 +197,38 @@ const renderParts = (parts) => parts.map((p) => {
   return `<p>${fmtInline(p.text)}</p>`;
 }).join('');
 
-const renderField = (f) => {
-  const inline = f.inline.filter(Boolean).join(' ');
-  const blocks = renderParts(f.parts);
+// Fields render two ways, always in canonical order: a single short line
+// stays a plain row; a field with block parts (list/pre) or long text
+// folds into a closed native accordion (summary = label + preview) so
+// drawers scan as headers first, detail on demand. Rows use spans —
+// details cannot live inside a dl, so the container is a div throughout.
+const ACC_TEXT_LIMIT = 140;
+const fieldText = (f) => (f.inline || []).filter(Boolean).join(' ').trim();
+const accPreview = (f) => {
+  const n = (f.parts || []).filter((p) => p.t === 'list').reduce((a, l) => a + l.items.length, 0);
+  if (n) return `${n} item${n > 1 ? 's' : ''}`;
+  if ((f.parts || []).some((p) => p.t === 'pre')) return 'code';
+  const t = fieldText(f);
+  return t.length > 64 ? `${t.slice(0, 64).trimEnd()}…` : (t || 'detail');
+};
+const renderFieldRow = (f) => {
+  const inline = fieldText(f);
+  if (!inline) return '';
+  return `<div class="ds-field"><span class="ds-f-t">${fmtInline(f.label)}</span><span class="ds-f-v">${fmtInline(inline)}</span></div>`;
+};
+const renderFieldAcc = (f) => {
+  const inline = fieldText(f);
+  const blocks = renderParts(f.parts || []);
   if (!inline && !blocks) return '';
-  return `<div class="ds-field"><dt>${fmtInline(f.label)}</dt><dd>${inline ? fmtInline(inline) : ''}${blocks}</dd></div>`;
+  return `<details class="ds-field is-acc"><summary class="ds-acc-head"><span class="ds-caret">›</span><span class="ds-f-t">${fmtInline(f.label)}</span><span class="ds-acc-prev">${esc(accPreview(f))}</span></summary><div class="ds-acc-body">${inline ? `<p>${fmtInline(inline)}</p>` : ''}${blocks}</div></details>`;
+};
+const renderField = (f) => (
+  (f.parts && f.parts.length) || fieldText(f).length > ACC_TEXT_LIMIT
+    ? renderFieldAcc(f) : renderFieldRow(f)
+);
+const renderFields = (fields) => {
+  const html = (fields || []).map(renderField).filter(Boolean).join('');
+  return html ? `<div class="ds-fields">${html}</div>` : '';
 };
 
 // Split a flattened `- [x] **Title** ... **Label:** ...` line (fallback path
@@ -197,29 +248,26 @@ export const splitItemContent = (content) => {
 };
 
 const renderTask = (task) => {
-  const box = task.cancelled
-    ? '<input type="checkbox" checked disabled>'
-    : task.done
-      ? '<input type="checkbox" checked disabled>'
-      : '<input type="checkbox" disabled>';
-  const { num, name } = taskTitleOf(task.title);
-  let html = `${box} <strong>${fmtInline([num, name].filter(Boolean).join(' '))}</strong>`;
+  // The phase treatment at task scale: h3 + own status line, never a bare
+  // bold line and never a checkbox (the status line owns done, as sections
+  // already do). Tasks own no gate verdict — DONE/cancelled come from the
+  // head mark only.
+  const { num, name, shipped } = taskTitleOf(task.title);
+  const h3 = num ? `Task ${num}${name ? ` · ${name}` : ''}` : (name || 'Task');
+  let html = `<h3>${fmtInline(h3)}</h3>` + taskStatus(task, shipped);
   const obj = task.fields.find((f) => isObjective(f.label));
   const rest = task.fields.filter((f) => !isObjective(f.label));
   if (obj) {
     const otext = [...obj.inline, ...obj.parts.filter((p) => p.t === 'para').map((p) => p.text)]
       .filter(Boolean).join(' ').trim();
-    if (otext) html += ` — ${fmtInline(otext)}`;
-    const oblocks = renderParts(obj.parts.filter((p) => p.t !== 'para'));
-    if (oblocks) html += oblocks;
+    if (otext) html += `<p>${fmtInline(otext)}</p>`;
+    html += renderParts(obj.parts.filter((p) => p.t !== 'para'));
   }
-  if (task.lead.length) html += ` — ${fmtInline(task.lead.join(' ').trim())}`;
-  if (task.cancelled) html += ' <span class="ds-status ds-is-cancelled">✗ cancelled</span>';
+  if (task.lead.length) html += `<p>${fmtInline(task.lead.join(' ').trim())}</p>`;
   rest.sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-  const fields = rest.map(renderField).filter(Boolean).join('');
-  if (fields) html += `<dl class="ds-fields">${fields}</dl>`;
+  html += renderFields(rest);
   html += renderParts(task.loose);
-  return `<li>${html}</li>`;
+  return `<section class="ds-subtask">${html}</section>`;
 };
 
 // Render a raw section chunk → {head, body}. head is the h2/h3 + status line;
@@ -396,11 +444,10 @@ export const renderSection = (raw, opts) => {
     // order after the known set — they have no task to belong to.
     for (const t of tasks.filter((t) => !t.title)) {
       const sorted = [...t.fields].sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-      const fhtml = sorted.map(renderField).filter(Boolean).join('');
-      if (fhtml) body += `<dl class="ds-fields">${fhtml}</dl>`;
+      body += renderFields(sorted);
       body += renderParts(t.loose);
     }
-    body += '<ul>' + real.map(renderTask).join('') + '</ul>';
+    body += '<div class="ds-tasks">' + real.map(renderTask).join('') + '</div>';
   } else if (tasks.length) {
     // ###-less section: the body is one implicit task owned by the head —
     // Objective leads (it is the summary), the rest follow canonically.
@@ -414,8 +461,7 @@ export const renderSection = (raw, opts) => {
     }
     const rest = all.filter((f) => f !== obj)
       .sort((a, b) => (fieldRank(a.label) - fieldRank(b.label)) || (a.idx - b.idx));
-    const fhtml = rest.map(renderField).filter(Boolean).join('');
-    if (fhtml) body += `<dl class="ds-fields">${fhtml}</dl>`;
+    body += renderFields(rest);
     body += renderParts(tasks.flatMap((t) => t.loose));
   }
   return { head, body };

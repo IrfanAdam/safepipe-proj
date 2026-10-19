@@ -47,14 +47,27 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-md .ds-is-done{color:var(--color-accent)}
 .ds-md .ds-is-cancelled{color:var(--color-ink-muted)}
 .ds-md h2 + .ds-status,.ds-md h3 + .ds-status{margin-top:var(--cl-2)}
-.ds-md .ds-fields{display:flex;flex-direction:column;gap:var(--cl-2);margin:var(--cl-2) 0 var(--cl-4)}
-.ds-md .ds-field{font-size:var(--text-ds-body);color:var(--color-ink);line-height:var(--leading-prose);overflow-wrap:anywhere}
-.ds-md .ds-field dt{display:inline;font-family:var(--font-mono);font-size:var(--text-micro);font-weight:700;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted);margin:0}
-.ds-md .ds-field dt::after{content:": ";letter-spacing:0}
-.ds-md .ds-field dd{display:inline;margin:0}
-/* block-aware detail (raw-detail.js): field values can hold real lists and
-   code — block values drop below the label line, never run on. */
-.ds-md .ds-field dd:has(ul,ol,pre){display:block;margin-top:var(--cl-2)}
+.ds-md .ds-fields{display:flex;flex-direction:column;gap:var(--cl-1);margin:var(--cl-1) 0 var(--cl-2)}
+.ds-md .ds-field{font-size:var(--sp-text-sm);color:var(--color-ink);line-height:1.5;overflow-wrap:anywhere}
+.ds-md .ds-field .ds-f-t{display:inline;font-family:var(--font-mono);font-size:var(--text-micro);font-weight:700;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted)}
+.ds-md .ds-field .ds-f-t::after{content:": ";letter-spacing:0}
+.ds-md .ds-field .ds-f-v{display:inline}
+/* tasks read as mini phases: compact h3 + status, stacked with rhythm */
+.ds-md .ds-tasks{display:flex;flex-direction:column;gap:var(--cl-12);margin:var(--cl-4) 0}
+.ds-md .ds-subtask > h3{font-size:var(--sp-text-sm);font-weight:700;margin:var(--cl-8) 0 var(--cl-2)}
+.ds-md .ds-subtask > h3 + .ds-status{margin-top:0}
+/* metadata accordions reuse the Evals details/caret language, tightened */
+.ds-md details.ds-field{margin:0}
+.ds-md .ds-acc-head{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:var(--cl-4)}
+.ds-md .ds-acc-head::-webkit-details-marker{display:none}
+.ds-md .ds-acc-head::marker{content:""}
+.ds-md details.ds-field:not([open]) .ds-caret{transform:rotate(0deg)}
+.ds-md .ds-acc-prev{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds-md .ds-acc-body{padding:var(--cl-2) 0 var(--cl-1) calc(var(--cl-12) + var(--cl-2))}
+.ds-md .ds-acc-body ul,.ds-md .ds-acc-body ol{padding-left:var(--cl-16);margin:var(--cl-2) 0}
+.ds-md .ds-acc-body li{margin-bottom:var(--cl-1)}
+.ds-md .ds-acc-body p{margin:var(--cl-1) 0;font-size:var(--sp-text-sm)}
+.ds-md .ds-acc-body pre{margin:var(--cl-2) 0}
 /* gate-only status (unmarked head with a verdict): quiet like cancelled. */
 .ds-md .ds-is-gate{color:var(--color-ink-muted)}
 .ds-md table{width:100%;table-layout:fixed;border-collapse:collapse}

@@ -101,3 +101,62 @@
 | 5 | Task labels to canonical set | No `Contract`/`Rules`-led blocks remain; order Files → Changes → Steps → Verify |
 
 - REF GATE 2 (ship): corpus-wide grep shows zero non-canonical gate/label lines; build green; screenshots unchanged-or-better.
+
+---
+
+## Phase 3 — Task headers, accordions, compact metadata {#phase-3}
+
+*Tags: changelog, renderer*
+
+*What the build gains:* every `###` task reads like a mini phase (h3 + own status, never a bare bold line) on phased AND task-led plans; long metadata folds into closed accordions; metadata type and spacing tighten — all token-only, still display-only.
+
+| # | Task | Done when |
+|---|---|---|
+| 6 | Task headers incl. task-led plans | every `###` task renders `h3` + own DONE/cancelled line (no gate, no checkbox); smooth-scheduling `###` items verified |
+| 7 | Metadata accordions | multi-line/list/code fields fold into closed native `<details>` with count preview; single-line fields stay rows; canonical order kept |
+| 8 | Compact metadata CSS + verify | token-only tightening of field type/spacing; chromium + webkit screenshots, zero page errors, suite green |
+
+### Task 6: Task headers incl. task-led plans ✓ done
+
+**Objective:** Tasks stop being bare bold lines — each gets the phase treatment (header + status).
+
+**Files:**
+- Modify: `src/changelog/changelog/raw-detail.js`
+- Modify: `tests/changelog-detail.test.js`
+
+**Changes:**
+- `###`-headed tasks render `<section class="ds-subtask">` with `h3` (`Task N · name`) + status line (DONE iff head marked, shipped sha in paren; cancelled iff ✗; unmarked tasks no line, never a gate).
+- Parse all three corpus head shapes: `Task N: name ✓ done \`sha\``, `Task N ✓ done — shipped <sha> · name`, `Task N ✓ done <sha>`.
+- Drop the synthesized checkbox (status line owns done, as sections already do); fallback `- [ ]` tasks take the same header path.
+
+**Verify:** new tests for all three head shapes + unmarked; smooth-scheduling `###` items render headed in the corpus sweep; no `<input>` in any detail body.
+
+### Task 7: Metadata accordions ✓ done
+
+**Objective:** Long metadata folds shut — drawers scan as headers first, detail on demand.
+
+**Files:**
+- Modify: `src/changelog/changelog/raw-detail.js`
+- Modify: `tests/changelog-detail.test.js`
+
+**Changes:**
+- A field with block parts (list/pre) or inline text over ~140 chars renders closed `<details class="ds-field is-acc">`: summary = caret + label + preview (`N items` / `code` / truncated lead); body holds the full value.
+- Single-line fields stay plain rows. Rows and accordions interleave in canonical order inside `<div class="ds-fields">` (valid HTML — no `details` inside `dl`; rows switch `dt`/`dd` to spans).
+
+**Verify:** tests for list-field accordion (preview count), long-text accordion, single-line row (no `details`), order across mixed rows; corpus sweep balances the new tags and asserts zero `dt`/`input` leaks.
+
+### Task 8: Compact metadata CSS + verify ✓ done
+
+**Objective:** Metadata reads as fine print under task headers — smaller type, tighter rhythm, token-only.
+
+**Files:**
+- Modify: `src/changelog/changelog-drawer.css`
+- Delete: dead checkbox rules (no emitter left).
+
+**Changes:**
+- Field values body → sm scale, labels stay micro mono; gaps/margins step down one token (`cl-2`→`cl-1`, block values tighter); task `h3` smaller than section `h3` with tight margins; accordion body lists indent less.
+- Reuse the house `details`/`summary` + caret language from Evals panels.
+
+**Verify:** screenshots (172008 P1 task headers + accordions, smooth-scheduling Task 1, domain Task 4, twin Phase 05) on chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-3]`; close tasks with `✓ done` + sha.
+
+- REF GATE 3 (ship): the 4 sample drawers show headed tasks, closed accordions, compact metadata; no visual regression on Evals/rails/cards. Evidence: screenshots + green suite.

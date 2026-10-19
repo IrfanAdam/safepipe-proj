@@ -29,7 +29,9 @@ describe('block structure', () => {
     ].join('\n');
     const { body } = renderSection(raw, {});
     assert.ok(body.includes('<ul><li>Create: <code>a.js</code></li><li>Modify: <code>b.js</code></li></ul>'), body);
-    assert.equal((body.match(/<ul>/g) || []).length, 2, `duplicated list: ${body}`);
+    assert.equal((body.match(/<ul>/g) || []).length, 1, `duplicated list: ${body}`);
+    assert.ok(body.includes('<details'), `Files list should fold: ${body}`);
+    assert.ok(body.includes('2 items'), body);
   });
   it('numbered steps render as an ordered list', () => {
     const raw = [
@@ -57,7 +59,7 @@ describe('block structure', () => {
     ].join('\n');
     const { body } = renderSection(raw, {});
     assert.ok(body.includes('<p>Executable forms.</p>'), 'objective leads: ' + body);
-    assert.ok(body.includes('<dt>Files</dt>'), body);
+    assert.ok(body.includes('<span class="ds-f-t">Files</span>'), body);
     assert.ok(body.includes('<ol>'), body);
   });
   it('fields order canonically regardless of author order', () => {
@@ -68,7 +70,7 @@ describe('block structure', () => {
       '**Files:**', '- Create: `a.js`',
     ].join('\n');
     const { body } = renderSection(raw, {});
-    assert.ok(body.indexOf('<dt>Files</dt>') < body.indexOf('<dt>Verify</dt>'), body);
+    assert.ok(body.indexOf('ds-f-t">Files<') < body.indexOf('ds-f-t">Verify<'), body);
   });
 });
   it('numbered lists stay loose under non-procedural fields', () => {
@@ -79,9 +81,9 @@ describe('block structure', () => {
       '1. First step', '2. Second step',
     ].join('\n');
     const { body } = renderSection(raw, {});
-    assert.ok(body.includes('<dt>Files</dt>'), body);
+    assert.ok(body.includes('<span class="ds-f-t">Files</span>'), body);
     assert.ok(body.includes('<ol><li>First step</li><li>Second step</li></ol>'), body);
-    assert.ok(!/<dd>[^<]*<ol>/.test(body), 'ol leaked into a field: ' + body);
+    assert.ok(!body.includes('<details'), 'short row must not fold: ' + body);
   });
   it('wrapped steps stay one list (domain Task 4 shape)', () => {
     const raw = [
@@ -113,11 +115,76 @@ describe('block structure', () => {
     const { head, body } = renderSection(raw, {});
     assert.ok(head.includes('✓ DONE'), head);
     const oi = body.indexOf('Do things well.');
-    const fi = body.indexOf('<dt>Files</dt>');
+    const fi = body.indexOf('ds-f-t">Files<');
     const oli = body.indexOf('<ol>');
     assert.ok(oi !== -1 && fi !== -1 && oli !== -1, body);
     assert.ok(oi < fi && fi < oli, 'order: objective, files, steps: ' + body);
   });
+
+describe('task headers', () => {
+  const taskBody = (head) => renderSection(['## Phase 1 — X {#phase-1}', '', head, '', '**Verify:** green.'].join('\n'), {}).body;
+  it('colon heads render h3 + DONE, no checkbox', () => {
+    const body = taskBody('### Task 1: A ✓ done `abc1234`');
+    assert.ok(body.includes('<section class="ds-subtask"><h3>Task 1 · A</h3>'), body);
+    assert.ok(body.includes('✓ DONE (abc1234)'), body);
+    assert.equal(count(body, 'input'), 0, body);
+    assert.ok(!body.includes('<strong>'), body);
+  });
+  it('twin heads fold the shipped sha into DONE', () => {
+    const body = taskBody('### Task 4 ✓ done — shipped c557479 · Semantic zoom');
+    assert.ok(body.includes('<h3>Task 4 · Semantic zoom</h3>'), body);
+    assert.ok(body.includes('✓ DONE (c557479)'), body);
+  });
+  it('smooth heads show the bare-sha provenance', () => {
+    const body = taskBody('### Task 1 ✓ done d27f94c');
+    assert.ok(body.includes('<h3>Task 1</h3>'), body);
+    assert.ok(body.includes('✓ DONE (d27f94c)'), body);
+  });
+  it('unmarked tasks show h3 with no status line', () => {
+    const body = taskBody('### Task 4: Skill sync + ship');
+    assert.ok(body.includes('<h3>Task 4 · Skill sync + ship</h3>'), body);
+    assert.ok(!body.includes('ds-status'), body);
+  });
+  it('cancelled tasks show the cancelled line', () => {
+    const body = taskBody('### Task 9: Old thing ✗ cancelled');
+    assert.ok(body.includes('✗ cancelled'), body);
+    assert.ok(!body.includes('DONE'), body);
+  });
+  it('tasks share one ds-tasks container, in order', () => {
+    const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '', '### Task 2: B'].join('\n'), {});
+    assert.ok(body.includes('<div class="ds-tasks">'), body);
+    assert.equal(count(body, 'section'), 2, body);
+    assert.ok(body.indexOf('Task 1 · A') < body.indexOf('Task 2 · B'), body);
+  });
+});
+
+describe('accordions', () => {
+  it('long inline text folds with a truncated preview', () => {
+    const long = 'word '.repeat(40).trim();
+    const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '', `**Verify:** ${long}`].join('\n'), {});
+    assert.ok(body.includes('<details class="ds-field is-acc">'), body);
+    assert.ok(body.includes('…'), body);
+    assert.equal(body.split(long).length - 1, 1, 'full text once (folded body), never in preview');
+  });
+  it('code blocks fold with a code preview', () => {
+    const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '', '**Contract:**', '```sql', 'select 1;', '```'].join('\n'), {});
+    assert.ok(body.includes('ds-acc-prev">code<'), body);
+    assert.ok(body.includes('<pre><code class="language-sql">select 1;</code></pre>'), body);
+  });
+  it('mixed rows and accordions keep canonical order', () => {
+    const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '',
+      '**Verify:** green.', '**Changes:** tweaked the thing.', '**Files:**', '- Create: `a.js`', '- Modify: `b.js`'].join('\n'), {});
+    const fi = body.indexOf('ds-f-t">Files<');
+    const ci = body.indexOf('ds-f-t">Changes<');
+    const vi = body.indexOf('ds-f-t">Verify<');
+    assert.ok(fi !== -1 && ci !== -1 && vi !== -1, body);
+    assert.ok(fi < ci && ci < vi, 'Files, Changes, Verify: ' + body);
+  });
+  it('accordions start closed', () => {
+    const { body } = renderSection(['## Phase 1 — X {#phase-1}', '', '### Task 1: A', '', '**Files:**', '- Create: `a.js`'].join('\n'), {});
+    assert.ok(!/<details[^>]*open/.test(body), body);
+  });
+});
 
 describe('honest done', () => {
   it('marked heads show DONE, unmarked heads show none', () => {
@@ -199,7 +266,9 @@ describe('corpus sweep', () => {
         assert.ok(!prose.includes('{#'), `${f} · anchor leak`);
         assert.ok(!/-\s*REF GATE/.test(prose), `${f} · gate leak`);
         assert.ok(!prose.includes('*Due:'), `${f} · due leak`);
-        for (const t of ['ul', 'ol', 'dl', 'p', 'pre', 'code', 'li']) {
+        assert.ok(!html.includes('<dt>') && !html.includes('<dd>'), `${f} · dl leak`);
+        assert.ok(!html.includes('<input'), `${f} · checkbox leak`);
+        for (const t of ['ul', 'ol', 'dl', 'p', 'pre', 'code', 'li', 'details', 'summary', 'section', 'div', 'span', 'h2', 'h3']) {
           assert.equal(count(html, t), count(html, '/' + t), `${f} · <${t}> imbalance`);
         }
       }
