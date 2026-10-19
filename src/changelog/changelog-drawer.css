@@ -69,7 +69,7 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-md .ds-acc-head{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:var(--cl-4)}
 .ds-md .ds-acc-head::-webkit-details-marker{display:none}
 .ds-md .ds-acc-head::marker{content:""}
-.ds-md .ds-acc-body{padding:var(--cl-2) 0 var(--cl-1) calc(var(--cl-12) + var(--cl-2))}
+.ds-md .ds-acc-body{padding:var(--cl-2) 0 var(--cl-1) 0}
 .ds-md .ds-acc-body > .ds-field{margin:var(--cl-2) 0}
 .ds-md .ds-acc-body ul,.ds-md .ds-acc-body ol{padding-left:var(--cl-16);margin:var(--cl-2) 0}
 .ds-md .ds-acc-body li{margin-bottom:var(--cl-1)}

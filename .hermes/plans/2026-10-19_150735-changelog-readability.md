@@ -302,7 +302,7 @@
 |---|---|---|
 | 13 | Checkbox summaries | 172008 Phase 4 folds read `☑ name ›` in ink, no DONE/sha/accent |
 
-### Task 13: Checkbox summaries ✓ done `95e6902`
+### Task 13: Checkbox summaries ✓ done `95e6902` → flush fold bodies `
 
 **Objective:** The black checkbox-like mark leads; nothing accent-colored sits inline.
 
