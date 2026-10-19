@@ -5443,6 +5443,24 @@
      "state": ""
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-19",
+   "time": "15:24",
+   "hash": "597d503c",
+   "sections": [
+    {
+     "head": "Phase 1 — Renderer: block structure, honest done, owned gates {#phase-1}",
+     "hash": "934744d5",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Grammar rollout: normalize gates + labels across plans {#phase-2}",
+     "hash": "6983843e",
+     "state": ""
+    }
+   ]
   }
  ]
 }

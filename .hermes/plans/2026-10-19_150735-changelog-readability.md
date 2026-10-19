@@ -38,7 +38,7 @@
 | 2 | Wire drawer: raw body, head-mark done, anchor dedupe, own-verdict gates | 172008 Phase 5 shows no DONE; closeout row shows 0 commits; P1–P5 gate tags uniform; build green |
 | 3 | Verify + close | chromium + webkit screenshots of 4 sample drawers, zero page errors, second track run diff-clean |
 
-### Task 1: Block-aware detail renderer + tests
+### Task 1: Block-aware detail renderer + tests ✓ done `d162a57`
 
 **Objective:** New pure module renders a raw section chunk with its block structure intact.
 
@@ -53,7 +53,7 @@
 
 **Verify:** `node --test tests/changelog-detail.test.js` all green; `norm()` output byte-identical (no history churn — assert one corpus hash stable).
 
-### Task 2: Wire drawer: raw body, head-mark done, anchor dedupe, own-verdict gates
+### Task 2: Wire drawer: raw body, head-mark done, anchor dedupe, own-verdict gates ✓ done `d162a57`
 
 **Objective:** Drawer paints from raw text; status and commits tell the truth.
 
@@ -69,7 +69,7 @@
 
 **Verify:** open 172008 P5 (no DONE), closeout row (0 commits), domain-logic Task 4 (ol + no phantom box), twin-work Phase 05 (unchanged shape); `npm run build` green.
 
-### Task 3: Verify + close
+### Task 3: Verify + close ✓ done `d162a57`
 
 **Objective:** Evidence before close.
 
@@ -84,6 +84,8 @@
 **Verify:** `npm run build` green; screenshots attached; this plan Phase 1 closed.
 
 - REF GATE 1: the 4 sample drawers (172008 P1 + P5, domain-logic Task 4, twin-work Phase 05) each show summary → files → changes → verify with real lists, no false DONE, uniform gate tags. Evidence: screenshots + green suite.
+
+*Shipped in d162a57 · Tasks 1–3 · phase-1.*
 
 ---
 
