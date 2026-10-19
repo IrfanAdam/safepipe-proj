@@ -56,10 +56,6 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-md .ds-subtask h3{font-size:var(--sp-text-sm);font-weight:700;margin:var(--cl-8) 0 var(--cl-2);flex:0 1 auto;min-width:0}
 .ds-md .ds-task-bare{display:flex;align-items:baseline;gap:var(--cl-4)}
 .ds-md .ds-task-bare h3{margin:0}
-/* task checkbox: ink-filled box, check in page bg — never accent */
-.ds-md .ds-box{display:inline-flex;align-items:center;justify-content:center;width:var(--cl-12);height:var(--cl-12);border:var(--cl-1) solid var(--color-ink);background:var(--color-ink);color:var(--color-bg);font-size:var(--text-micro);font-weight:700;line-height:1;flex:none}
-.ds-md .ds-box.ds-is-cancelled{border-color:var(--color-ink-muted);color:var(--color-ink-muted)}
-.ds-md .ds-box.is-open{border-color:var(--color-ink-muted)}
 /* the task IS the fold: summary carries its header + status, no FILES line */
 .ds-md .ds-task-fold{margin:0}
 .ds-md .ds-task-fold > summary h3{font-size:var(--sp-text-sm);font-weight:700;margin:0;flex:0 1 auto;min-width:0}

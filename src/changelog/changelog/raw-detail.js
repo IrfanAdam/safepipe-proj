@@ -141,13 +141,12 @@ const taskTitleOf = (title) => {
   if (m) return { num: m[1], name: '', shipped: m[2] };
   return { num: '', name: s, shipped: '' };
 };
-// A task's checkbox — a real box, ink bordered, check inside. Done and
-// cancelled differ by glyph alone; open tasks show the empty box. No DONE
-// word, no sha, no accent inline: the summary stays a single quiet line.
+// A task's checkbox is the native glyph alone — ☑ done, ☒ cancelled,
+// ☐ open. No drawn box, no accent: the summary stays a single quiet line.
 const taskTick = (task) => {
-  if (task.done) return '<span class="ds-box">✓</span>';
-  if (task.cancelled) return '<span class="ds-box ds-is-cancelled">✗</span>';
-  return '<span class="ds-box is-open"></span>';
+  if (task.done) return '☑';
+  if (task.cancelled) return '☒';
+  return '☐';
 };
 
 // Own-verdict gate suffix for a section number. Every judged phase shows its
