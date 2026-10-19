@@ -131,7 +131,7 @@
 
 **Verify:** new tests for all three head shapes + unmarked; smooth-scheduling `###` items render headed in the corpus sweep; no `<input>` in any detail body.
 
-### Task 7: Metadata accordions ✓ done `97ca963`
+### Task 7: Metadata accordions ✓ done `97ca963` → single-fold `a7e2a37`
 
 **Objective:** Long metadata folds shut — drawers scan as headers first, detail on demand.
 
@@ -161,3 +161,4 @@
 
 - REF GATE 3 (ship): the 4 sample drawers show headed tasks, closed accordions, compact metadata; no visual regression on Evals/rails/cards. Evidence: screenshots + green suite.
 *Shipped in 97ca963 · Tasks 6–8 · phase-3.*
+*Follow-up single-fold in a7e2a37 · Task 7 · phase-3.*
