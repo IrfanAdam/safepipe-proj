@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-19T09:54:44.937Z",
+  "generated": "2026-10-19T09:54:54.959Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "8ece275",
+      "full": "8ece2756752dd41a82ead09ceef17505f0a279bf",
+      "date": "2026-10-19",
+      "time": "15:24",
+      "subject": "docs(plan): close readability Phase 1, Tasks 1-3 done d162a57 [plan:2026-10-19_150735-changelog-readability.md#phase-1]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-1"
+    },
     {
       "sha": "d162a57",
       "full": "d162a570fa9e01d1312d3ec66319d92cba349150",
@@ -4557,7 +4566,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "public/version.json"
-  ]
+  "wip": []
 }
