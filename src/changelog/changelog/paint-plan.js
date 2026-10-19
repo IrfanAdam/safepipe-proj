@@ -1,5 +1,6 @@
 // safepipe changelog — build cards · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
-import { fmtDate, fmtTime, buildState, isDone } from '../changelog-parse.js';
+import { fmtDate, fmtTime, buildState, isDone, parseGates } from '../changelog-parse.js';
+import { shipGatesShut } from './raw-detail.js';
 import { hits, commits, unlinked } from '../changelog-links.js';
 import { clip, oneLine } from '../changelog-titles.js';
 import { esc } from './esc.js';
@@ -61,7 +62,10 @@ export function paintPlan(root, ctx){
     return [
       `<button class="ds-pick`,
       i === sel[0] ? ' on' : '',
-      isDone(frac) ? '' : ' is-open',
+      // The card is the plan's seal: fractions full AND the ship gate shut.
+      // Tasks done with an open ship gate (remaining cutover work) reads
+      // open — rail rows keep their task fractions either way.
+      isDone(frac) && shipGatesShut(parseGates(p.raw || '')) ? '' : ' is-open',
       `" data-tip="`,
       esc(clip(oneLine(p.goal), 100) || oneLine(p.purpose) || oneLine(p.title)),
       `"><span class="ds-num">`,

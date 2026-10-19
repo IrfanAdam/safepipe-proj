@@ -162,3 +162,33 @@
 - REF GATE 3 (ship): the 4 sample drawers show headed tasks, closed accordions, compact metadata; no visual regression on Evals/rails/cards. Evidence: screenshots + green suite.
 *Shipped in 97ca963 · Tasks 6–8 · phase-3.*
 *Follow-up single-fold in a7e2a37 · Task 7 · phase-3.*
+
+---
+
+## Phase 4 — Plan-level done honors the ship gate {#phase-4}
+
+*Tags: changelog, renderer*
+
+*What the build gains:* a plan card stops claiming done while its ship gate is still open — tasks-done and shipped are different facts, and the card tells them apart.
+
+| # | Task | Done when |
+|---|---|---|
+| 9 | Ship-gate plan status | 172008 + smooth cards read open (ship gates open); timeline card unchanged (ship passed); no other card flips |
+
+### Task 9: Ship-gate plan status
+
+**Objective:** The plan card is the plan's seal — an open `(ship)` gate keeps it open no matter the task fractions.
+
+**Files:**
+- Modify: `src/changelog/changelog-parse.js` (keep the gate paren on the parsed object — additive, no hash impact)
+- Modify: `src/changelog/changelog/raw-detail.js` (new pure `shipGatesShut`)
+- Modify: `src/changelog/changelog/paint-plan.js` (card class honors it)
+- Modify: `tests/changelog-detail.test.js`
+
+**Changes:**
+- Card reads done iff fractions full AND every non-rev `(ship)` gate passed/waived (gateless plans: old rule, zero blast radius).
+- Rail rows, Due gating, timeline, `state()`/`isDone()` semantics all untouched — this is the card seal only.
+
+**Verify:** unit tests + 172008/smooth/open-ship corpus asserts; timeline ship-passed assert; list screenshots chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-4]`; close with `✓ done` + sha.
+
+- REF GATE 4 (ship): 172008 card open, smooth card open, every other card unchanged. Evidence: list screenshots + green suite.

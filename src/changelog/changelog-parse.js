@@ -209,7 +209,9 @@ export const parseGates = (md) => {
       if (em) { evidence = em[1].replace(/\s+/g, ' ').trim(); break; }
     }
     const jm = rest.match(/how (?:it was judged|to judge):\s*([\s\S]*)$/i);
-    gates.push({ n, state: st, reviewer, date: dm ? dm[1] : '', note: rest, evidence, judge: jm ? jm[1].trim() : '' });
+    // Keep the paren marker ((ship), (scheduling), …) on the object: card
+    // seals and gate suffixes read it, hashes never see it (additive).
+    gates.push({ n, state: st, paren, reviewer, date: dm ? dm[1] : '', note: rest, evidence, judge: jm ? jm[1].trim() : '' });
   }
   return gates.sort((a, b) => a.n - b.n);
 };

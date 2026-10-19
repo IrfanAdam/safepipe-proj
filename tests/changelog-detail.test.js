@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { split } from '../src/changelog/changelog-parse.js';
 import { parseGates } from '../src/changelog/changelog-parse.js';
 import {
-  sectionRaw, stripGateThread, renderSection, anchorOwners, gateSuffix, fmtInline,
+  sectionRaw, stripGateThread, renderSection, anchorOwners, gateSuffix, fmtInline, shipGatesShut,
 } from '../src/changelog/changelog/raw-detail.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -271,6 +271,37 @@ describe('gates + anchors', () => {
     const { dup } = anchorOwners(sprints);
     assert.ok(!dup.has(0));
     assert.ok(dup.has(1), [...dup].join(','));
+  });
+});
+
+describe('ship-gate seal', () => {
+  it('gateless plans keep the old rule', () => {
+    assert.equal(shipGatesShut([]), true);
+    assert.equal(shipGatesShut([{ n: 1, state: 'open', paren: '', note: 'x' }]), true);
+  });
+  it('passed and waived ship gates read shut', () => {
+    assert.equal(shipGatesShut([{ n: 4, state: 'passed', paren: 'ship', note: '✓ PASSED' }]), true);
+    assert.equal(shipGatesShut([{ n: 4, state: 'waiver', paren: 'ship', note: 'PASSED by owner waiver' }]), true);
+  });
+  it('open and failed ship gates hold the card open', () => {
+    assert.equal(shipGatesShut([{ n: 5, state: 'open', paren: 'ship', note: 'drill' }]), false);
+    assert.equal(shipGatesShut([{ n: 5, state: 'failed', paren: 'ship', note: 'FAIL' }]), false);
+  });
+  it('rev lines never decide the seal', () => {
+    assert.equal(shipGatesShut([{ n: 5, state: 'open', paren: 'ship', note: '· rev 2026-10-14 x' }]), true);
+  });
+  it('parseGates keeps the paren marker', () => {
+    const g = parseGates('- REF GATE 5 (ship): drill pass.\n');
+    assert.equal(g[0].paren, 'ship');
+  });
+  it('172008 and smooth ship gates stand open, timeline stands shut', () => {
+    const read = (f) => readFileSync(join(plansDir, f), 'utf8');
+    const g172008 = parseGates(read('2026-10-18_172008-supabase-scheduling-migration.md'));
+    assert.equal(shipGatesShut(g172008), false);
+    const gSmooth = parseGates(read('2026-10-17_180000-safepipe-smooth-scheduling.md'));
+    assert.equal(shipGatesShut(gSmooth), false);
+    const gTimeline = parseGates(read('2026-10-15_120000-safepipe-changelog-timeline.md'));
+    assert.equal(shipGatesShut(gTimeline), true);
   });
 });
 

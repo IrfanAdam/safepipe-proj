@@ -156,6 +156,18 @@ export const gateSuffix = (gates, phaseN) => {
   return '';
 };
 
+// Plan-card seal: tasks-done and shipped are different facts. The card
+// reads done only when the fractions are full AND every non-rev (ship)
+// gate is passed or waived. Gateless plans keep the old rule (no blast
+// radius); an open ship gate with remaining work (172008 gate 5:
+// "REMAINING USER-RUN AT CUTOVER") keeps the card open.
+export const shipGatesShut = (gates) => {
+  const ships = (gates || []).filter((g) => /\bship\b/i.test(g.paren || ''));
+  const bases = ships.filter((x) => !/·\s*rev\b/i.test(x.note || ''));
+  if (!bases.length) return true;
+  return bases.every((x) => x.state === 'passed' || x.state === 'waiver');
+};
+
 // First section per anchor owns its commits; a repeated anchor (e.g. a prose
 // `## Phase 5 closeout note` claiming `phase-5`) renders none instead of
 // duplicating the whole commit list under two rail rows.
