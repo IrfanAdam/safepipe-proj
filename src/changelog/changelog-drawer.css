@@ -30,7 +30,8 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-rail .ds-pick.on{padding-left:calc(var(--cl-16) - var(--cl-2))}
 .ds-pick.on small{color:var(--color-ink-muted)}
 .ds-pick.is-open .ds-num{color:var(--color-ink-muted)}
-.ds-pick.is-cancelled .ds-num{color:var(--color-ink-muted)}
+.ds-pick.is-cancelled .ds-num{color:var(--sp-danger)}
+.ds-cancel-tag{color:var(--sp-danger)}
 .ds-commits{font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.7;color:var(--color-ink-muted);word-break:break-all}
 .ds-commits a{color:var(--color-ink);text-decoration:underline;text-underline-offset:var(--cl-2)}
 /* commit timeline: explicit date line, dot rows, hairline spine */
@@ -46,7 +47,7 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 /* task status line + labeled field boxes (detail legibility) */
 .ds-md .ds-status{display:block;font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;margin:var(--cl-4) 0 var(--cl-2)}
 .ds-md .ds-is-done{color:var(--color-accent)}
-.ds-md .ds-is-cancelled{color:var(--color-ink-muted)}
+.ds-md .ds-is-cancelled{color:var(--sp-danger)}
 .ds-md h2 + .ds-status,.ds-md h3 + .ds-status{margin-top:var(--cl-2)}
 .ds-md .ds-field{font-size:var(--sp-text-sm);color:var(--color-ink);line-height:1.5;overflow-wrap:anywhere;margin:var(--cl-1) 0}
 .ds-md .ds-field .ds-f-t{display:inline;font-family:var(--font-mono);font-size:var(--text-micro);font-weight:700;letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--color-ink-muted)}

@@ -61,7 +61,7 @@ export function paintDetail(root, ctx){
       i === sel[1] && !atL1 ? ' on' : '',
       // Cancelled phases are resolved, never open — they read cancelled
       // even with open checkboxes inside.
-      cancelled ? '' : (isDone(dispFrac) ? '' : ' is-open'),
+      cancelled ? ' is-cancelled' : (isDone(dispFrac) ? '' : ' is-open'),
       `" data-tip="`,
       esc(tipOf(s.head, s.body, 100)),
       `"><span class="ds-row"><span class="ds-num">`,
@@ -69,7 +69,7 @@ export function paintDetail(root, ctx){
       `</span><b>`,
       esc(short(s.head)),
       `</b></span><small>`,
-      [(cancelled ? '✗ cancelled' : dispFrac) + has + ed].filter(Boolean).join(' · '),
+      [(cancelled ? '<span class="ds-cancel-tag">✗ cancelled</span>' : dispFrac) + has + ed].filter(Boolean).join(' · '),
       `</small></button>`,
     ].join('');
   }).join('') + [

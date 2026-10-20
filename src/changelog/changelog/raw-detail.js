@@ -229,13 +229,16 @@ const liveRaw = (p) => {
   } catch { return (p && p.raw) || ''; }
 };
 
-// Plan-level cancelled: at least one cancelled section AND the live
-// remainder sealed. Mixed plans with open live work stay open — cancellation
-// resolves only what it names.
+// Plan-level cancelled: the trailing run of phases is cancelled through the
+// last phase AND everything before it is sealed. A cancelled middle with a
+// done last phase reads done; any open live work reads open — cancellation
+// resolves only what it names, and only closes the plan when it owns the end.
 export const planCancelled = (p) => {
   try {
     const sprints = (p && p.sprints) || [];
-    return sprints.some((s) => isCancelledHead(s && s.head)) && planSealed(p);
+    if (!sprints.length) return false;
+    const last = sprints[sprints.length - 1];
+    return isCancelledHead(last && last.head) && planSealed(p);
   } catch { return false; }
 };
 

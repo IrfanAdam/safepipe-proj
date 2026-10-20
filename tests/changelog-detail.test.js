@@ -568,6 +568,10 @@ describe('cancelled status (phase ✗ cancelled rolls up to plan)', () => {
     assert.equal(planCancelled({ sprints: [...done, ...axed], raw: '' }), true);
     assert.equal(planCancelled({ sprints: done, raw: '' }), false);
   });
+  it('cancelled middle with done last reads done, not cancelled', () => {
+    assert.equal(planSealed({ sprints: [...axed, ...done], raw: '' }), true);
+    assert.equal(planCancelled({ sprints: [...axed, ...done], raw: '' }), false);
+  });
   it('all-cancelled plan seals vacuously and reads cancelled', () => {
     assert.equal(planSealed({ sprints: axed, raw: '' }), true);
     assert.equal(planCancelled({ sprints: axed, raw: '' }), true);

@@ -78,7 +78,7 @@ export function paintPlan(root, ctx){
     const stateTxt = [
       [p.sprints.length, ` ${unit}`].join(''),
       dispFrac,
-      planCancelled(p) ? '✗ cancelled' : '',
+      planCancelled(p) ? '<span class="ds-cancel-tag">✗ cancelled</span>' : '',
       rev ? `rev ${rev.n} · ${fmtDate(rev.last)}` : '',
     ].filter(Boolean).join(' · ');
     const tagCount = Math.min(3, p.tags.length);
