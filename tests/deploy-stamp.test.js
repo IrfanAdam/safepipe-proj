@@ -21,7 +21,23 @@ function stampAt(sha) {
   } catch { return null; } // version.json not in this commit — nothing to compare
 }
 
-test('deploy stamp: every new-format stamp differs from its parent deploy', () => {
+test('deploy stamp (simulated): the scheme publishes distinct stamps for every commit', () => {
+  // What each commit's build WOULD have published: the parent's (sha, count),
+  // because the build runs before the commit exists. Pure plumbing, works on
+  // any checkout regardless of which format committed version.json carries.
+  assert.ok(shas.length > 1, 'needs history to compare');
+  const published = shas.map((sha) => {
+    const parent = execFileSync('git', ['rev-parse', `${sha}^`], { encoding: 'utf8' }).trim();
+    const count = execFileSync('git', ['rev-list', '--count', parent], { encoding: 'utf8' }).trim();
+    return `${parent}:${count}`;
+  });
+  for (let i = 0; i < published.length - 1; i++) {
+    assert.notEqual(published[i], published[i + 1],
+      `commits ${shas[i]} and ${shas[i + 1]} would publish the same stamp — open pages would not reload`);
+  }
+});
+
+test('deploy stamp: every committed new-format stamp differs from its parent deploy', () => {
   assert.ok(shas.length > 1, 'needs history to compare');
   const stamps = shas.map(stampAt);
   let checked = 0;
