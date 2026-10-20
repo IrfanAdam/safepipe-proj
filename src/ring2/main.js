@@ -667,11 +667,6 @@ async function boot() {
    * cold-cache / throttled-CPU boots still post on agreement instead of
    * timing out into an unposted swoop. */
   const HANDOFF_READY_CAP_MS = 25000;
-  /* Staged-seed freshness (scroll path): a staged-S post counts as the
-   * fingers' live S only within this window before release. Wheel ticks
-   * post every few ms while scrolling; a slow boot parks fingers for
-   * seconds — so a stale seed is parked fingers, never live input. */
-  const HANDOFF_STAGED_SEED_FRESH_MS = 1000;
   const handoffNow = () => {
     try {
       return performance.now();
@@ -1201,8 +1196,15 @@ async function boot() {
         const preStagedS = preStaged === null || preStaged === undefined ? null : Number(preStaged);
         const stagedInReveal = preStagedS !== null && Number.isFinite(preStagedS)
           && preStagedS >= TWIN_FWD_REVEAL_START_PX;
+        // Deep-frame painted release (scroll path): a handed frame at/past
+        // the map-side handoff gate (z 11.5) carries map pitch 45 — release
+        // on paint like the staged band so the reveal dissolves off the iso
+        // seed below, never a parked top-down hold whose ready-match an
+        // off-site arrival can structurally never grant.
+        const frameZ = Number(handoff.frame && handoff.frame.z);
+        const frameDeep = Number.isFinite(frameZ) && frameZ >= 11.5;
         const paintedRelease = heldMs >= HANDOFF_HOLD_MS && !handoff.readyPosted
-          && paintedPosted && stagedInReveal;
+          && paintedPosted && (stagedInReveal || frameDeep);
         if ((heldMs >= HANDOFF_HOLD_MS && handoff.readyPosted) || paintedRelease) {
           // Task-36 intro scrub: freeze the anchors into one forward leg
           // list — pose/mix/ring all read it as a pure function of progress
@@ -1226,29 +1228,25 @@ async function boot() {
             return;
           }
           handoff.from = live;
-          // Seed cap (scroll path only — the timed click path never posts
-          // staged S, so hasStaged is false and this reduces to progress 0
-          // + autoplay, exactly as before): honor the staged seed only
-          // while it is the fingers' LIVE S. A stale seed — slow boot with
-          // fingers parked at S=1250 long before release — is capped to 0,
-          // so the flight starts at the live pose and autoplays instead of
-          // jumping to progress 1; a late hold-exit never starts past the
-          // fingers' current staged S. Fresh scroll past release flips
-          // staged on and follows from there.
-          const stagedVal = handoff.fwdStagedS;
-          const hasStaged = stagedVal !== null && stagedVal !== undefined
-            && Number.isFinite(Number(stagedVal));
-          const seedAt = Number(handoff.fwdStagedAt);
-          const seedFresh = hasStaged && Number.isFinite(seedAt)
-            && (now - seedAt) <= HANDOFF_STAGED_SEED_FRESH_MS;
-          const seedS = seedFresh ? Math.max(0, Number(stagedVal)) : 0;
-          const staged = seedFresh;
+          // Release seed: staged arrivals stay S-coupled even when the seed
+          // went stale on a slow boot (any step lands behind the unrevealed
+          // overlay, which the S law owns — and the fingers resume coupled
+          // instead of jumping off an autoplay clock). Unstaged arrivals
+          // never post S: a deep handed frame seeds the swoop boundary
+          // (iso-45, the map's carried pitch) so the reveal dissolves onto
+          // a matched frame; shallow click frames seed the hold as before.
+          const hasStagedSeed = handoff.fwdStagedS !== null && handoff.fwdStagedS !== undefined
+            && Number.isFinite(Number(handoff.fwdStagedS));
+          const staged = hasStagedSeed;
           handoff.fwd = {
             legs,
-            progress: staged ? fwdProgressForStagedS(seedS) : 0,
+            progress: fwdProgressForStagedS(handoff.fwdStagedS ?? 0),
             t0: now,
             staged,
           };
+          if (!hasStagedSeed && frameDeep) {
+            handoff.fwd.progress = fwdProgressForStagedS(TWIN_FWD_REVEAL_START_PX);
+          }
           handoff.phase = 'swoop';
           handoff.t0 = now;
         }

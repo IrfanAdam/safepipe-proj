@@ -23,7 +23,7 @@ export const Z_MIN = 6.4; // country home — enforced as map minZoom (the cap)
 export const Z_FADE0 = 6.4; // fade starts: vector->sat keys off zoom only
 export const Z_FADE1 = 9.0; // fade ends: full sat well before the handoff (works at ANY center)
 export const Z_CENTER = 7.0; // proximity centering + brackets arm past this zoom
-export const Z_TOP = 11.0; // top-down checkpoint (bearing/pitch -> 0)
+export const Z_TOP = 10.5; // top-down checkpoint (bearing/pitch -> 0): a full zoom level of scrubbed tilt before the gate, so the iso reads as motion, never a snap
 export const Z_HANDOFF = 11.5; // deeper zoom hands to the twin
 export const Z_MAX = 14.0; // map maxZoom cap
 const HOME_EPS = 0.06; // zoomend-at-home tolerance for the reverse edge
@@ -119,7 +119,7 @@ export function handoffScrubForZoom(z) {
  *   blend  250..500 — terrain blend holds full satellite
  *   tilt   500..750 — iso tilt holds 45deg
  *   reveal 750..1250 — twin overlay dissolves 0..1 (twin-ready gates >0)
- * Ring/blend/tilt already arrive pre-gate in the native journey (11..12
+ * Ring/blend/tilt already arrive pre-gate in the native journey (10.5..11.5
  * band) — their staged laws HOLD the end-state; the reveal is the live
  * post-gate stage. Every value is a pure function of S, so scroll-up
  * retraces it symmetrically. Pure + node-checkable; the map-side wheel

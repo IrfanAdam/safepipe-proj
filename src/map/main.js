@@ -163,7 +163,7 @@ window.__mapProbe = {
   centerEase: 0, autoCenter: false, satOpacity: 0,
   // GATE-12-A native-zoom probe: zoom-keyed journey, proximity, ring clip.
   proximity: null, ringClip: { k: 0, cursorNear: false, centerNear: false },
-  zoomJourney: { zMin: 6.4, zHand: 11.5, zTop: 11, zMax: 14, topDown: false, handoff: false, home: true },
+  zoomJourney: { zMin: 6.4, zHand: 11.5, zTop: 10.5, zMax: 14, topDown: false, handoff: false, home: true },
   isoBridge: false, deepHandoff: null, staged: { active: false, s: 0, committed: false },
   vectorWarm: false, vectorCache: null, vectorSnapshot: false, vectorHold: false,
   vectorReturnMs: null,
@@ -627,6 +627,7 @@ let isoScrubOwned = false;
 let isoRestoreDue = false; // latched on iso engage; cleared only when a settle glides pitch home — the strand guarantor
 const ISO_SCRUB_SLACK_DEG = 2; // engage only when pitch is at/below target+slack: never yanks a user oblique
 const ISO_SCRUB_EPS_DEG = 0.3; // skip transform writes inside this of target
+const ISO_SCRUB_SLEW_DEG = 10; // per-step tilt cap: a flick jumping the band glides over following steps instead of snapping 0->45 in one frame
 const ISO_SCRUB_RELEASE = 0.3; // zoom below Z_TOP-this releases ownership
 
 function clamp01(v) {
@@ -1003,7 +1004,7 @@ function onNativeZoomStep(snap, source) {
     // does NOT block this — pitch 45->0 IS the mirrored checkpoint on the
     // way out, ridden by the same law.
     if (!twinOpen && !busyNoRecede && prox && (prox.near || isoScrubOwned || z >= Z_TOP)) {
-      const pTarget = pitchTargetForZoom(z);
+      const pLaw = pitchTargetForZoom(z);
       let pCur = null;
       try {
         pCur = +mapRef.getPitch();
@@ -1011,7 +1012,7 @@ function onNativeZoomStep(snap, source) {
       if (Number.isFinite(pCur)) {
         let releaseNow = false;
         if (!isoScrubOwned) {
-          if (z >= Z_TOP && pCur <= pTarget + ISO_SCRUB_SLACK_DEG) {
+          if (z >= Z_TOP && pCur <= pLaw + ISO_SCRUB_SLACK_DEG) {
             isoScrubOwned = true;
             isoRestoreDue = true;
           }
@@ -1019,6 +1020,12 @@ function onNativeZoomStep(snap, source) {
           isoScrubOwned = false;
           releaseNow = true;
         }
+        // Slew cap on the WRITE only (engage/release above still read the
+        // pure law, so a user oblique never gets owned): normal scrub steps
+        // pass through untouched, flick jumps glide over following steps.
+        let pTarget = pLaw;
+        const pDelta = pLaw - pCur;
+        if (Math.abs(pDelta) > ISO_SCRUB_SLEW_DEG) pTarget = pCur + Math.sign(pDelta) * ISO_SCRUB_SLEW_DEG;
         if ((isoScrubOwned || releaseNow) && Math.abs(pCur - pTarget) > ISO_SCRUB_EPS_DEG) {
           try {
             // Mid-glide this write may be clobbered by the native zoom
@@ -1044,6 +1051,27 @@ function onNativeZoomStep(snap, source) {
       try {
         window.__mapProbe.isoBridge = false;
       } catch { /* probe cosmetic */ }
+    }
+    // (4b) SETTLE CATCH-UP — the slew cap above can strand pitch mid-band
+    // when a flick ends there (no more steps arrive to finish the glide).
+    // On settle, finish the tilt the fingers started on the existing 250ms
+    // tempo instead of parking it. Below-band strands ride the reconcile in
+    // (3b); near arrivals already rode the center-ease above (same tempo —
+    // a second ease here would supersede its center glide, so this covers
+    // far settles only). At-target settles no-op here. Zoom is never touched.
+    if (!twinOpen && !busyNow && source === 'native-zoomend' && isoRestoreDue && shouldCenter(z) && prox && !prox.near) {
+      let pCatch = null;
+      try {
+        pCatch = +mapRef.getPitch();
+      } catch { pCatch = null; }
+      const pCatchT = pitchTargetForZoom(z);
+      if (Number.isFinite(pCatch) && Number.isFinite(pCatchT) && Math.abs(pCatch - pCatchT) > 1) {
+        try {
+          mapRef.easeTo({ pitch: pCatchT, duration: 250 });
+        } catch (err) {
+          errors.push('SETTLE-CATCHUP: ' + (err && err.message));
+        }
+      }
     }
     if (!twinOpen && !busyNow && needsHandoff(z)) {
       if (!scrubFired) {
