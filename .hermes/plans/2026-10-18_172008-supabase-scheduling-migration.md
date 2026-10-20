@@ -413,7 +413,7 @@ create policy "anon read schedules"
 - REF GATE 5 (ship): drill pass on chromium + webkit, zero page errors, Vercel skip proven, build green. Then append `### Task 15 ✓ done <sha>` and close phase. Evidence: build green; full suite 659 pass + 7 pre-existing corpus/geo fails; live backfill 6 dues (`dabf50a`); anon RLS read proof in `supabase/README.md`. REMAINING USER-RUN AT CUTOVER: two-device drill + Vercel skip-proof. CLOSED 2026-10-20: owner confirms both from their end — laptop pick → phone converges, no reload; Due-only push skipped, code push deploys. GATE PASSED, plan closed.
 
 
-## Closeout note {#phase-5-rev}
+## Closeout note ✓ done {#phase-5-rev}
 
 Migration fully implemented across Phases 1–5 (incl. Phase 4 pivot from DB-webhook to writer-driven GitHub sync — Supabase-issued tokens proved read-scoped; owner-token dual-auth in `679ea66`, webhook-secret door kept for later). Verified: build green, 74/74 targeted tests, full suite 659 pass + 7 pre-existing corpus/geo fails, live backfill 6 dues, anon RLS read proof. USER-RUN AT CUTOVER (CLOSED 2026-10-20, owner-confirmed): (1) two-device drill — laptop pick → phone converges <30s, no reload ✓; (2) Vercel skip-proof — Due-only push skipped, code push deploys ✓. Plan closed.
 

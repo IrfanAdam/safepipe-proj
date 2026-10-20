@@ -5461,6 +5461,82 @@
      "state": ""
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "13:42",
+   "hash": "5a2c7928",
+   "sections": [
+    {
+     "head": "Phase 1 — Foundation: schema, access, inventory {#phase-1}",
+     "hash": "67330908",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Write path: owner-checked Supabase upsert {#phase-2}",
+     "hash": "509a12da",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 3 — Read + Realtime: live overlay, no reload {#phase-3}",
+     "hash": "5caf8726",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Sync worker: Supabase → GitHub without deploys {#phase-4}",
+     "hash": "895f0ad3",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 5 — Cutover: backfill, flip, retire {#phase-5}",
+     "hash": "b850de4a",
+     "state": "3/3"
+    },
+    {
+     "head": "Closeout note {#phase-5-rev}",
+     "hash": "23deac28",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "13:46",
+   "hash": "c5bb5525",
+   "sections": [
+    {
+     "head": "Phase 1 — Foundation: schema, access, inventory {#phase-1}",
+     "hash": "67330908",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Write path: owner-checked Supabase upsert {#phase-2}",
+     "hash": "509a12da",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 3 — Read + Realtime: live overlay, no reload {#phase-3}",
+     "hash": "5caf8726",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Sync worker: Supabase → GitHub without deploys {#phase-4}",
+     "hash": "895f0ad3",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 5 — Cutover: backfill, flip, retire {#phase-5}",
+     "hash": "b850de4a",
+     "state": "3/3"
+    },
+    {
+     "head": "Closeout note ✓ done {#phase-5-rev}",
+     "hash": "58348048",
+     "state": "1/1"
+    }
+   ]
   }
  ],
  "2026-10-19_150735-changelog-readability.md": [

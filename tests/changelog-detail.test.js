@@ -9,6 +9,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { split } from '../src/changelog/changelog-parse.js';
 import { parseGates } from '../src/changelog/changelog-parse.js';
+import { norm, state, isDone } from '../src/changelog/changelog-parse.js';
 import {
   sectionRaw, stripGateThread, renderSection, anchorOwners, gateSuffix, fmtInline, shipGatesShut,
 } from '../src/changelog/changelog/raw-detail.js';
@@ -557,5 +558,24 @@ describe('corpus sweep', () => {
       }
     }
     assert.ok(n > 40, `expected 40+ sections, saw ${n}`);
+  });
+});
+
+describe('taskless phase completion (closeout edge case)', () => {
+  // Completion is fraction-based, so a section with zero tasks reads open
+  // forever — unless the author marks the ## head itself ✓ done, in which
+  // case norm() synthesizes the 1/1 seal (existing task-plan convention).
+  it('head-marked taskless section synthesizes 1/1', () => {
+    const secs = split('## Closeout note ✓ done {#phase-5-rev}\n\nProse.\n');
+    assert.equal(secs.length, 1);
+    assert.equal(state(secs[0].body), '1/1');
+    assert.ok(isDone(state(secs[0].body)));
+  });
+  it('unmarked taskless section stays fractionless (never invented)', () => {
+    const secs = split('## Closeout note {#phase-5-rev}\n\nProse.\n');
+    assert.equal(secs.length, 1);
+    assert.equal(state(secs[0].body), '');
+    assert.ok(!isDone(state(secs[0].body)));
+    assert.ok(!/^- \[x\]/m.test(norm('## Closeout note {#phase-5-rev}\n\nProse.\n')));
   });
 });
