@@ -30,6 +30,8 @@ import {
   handoffScrubForZoom,
   handoffStagesForScroll,
   accumStagedS,
+  stagedHoldPitchForS,
+  stagedHoldRingCloseForS,
   enclosureRadiusPxForZoom,
   MAP_VIGNETTE_RING_M,
   isHomeZoom,
@@ -651,7 +653,12 @@ function pumpIsoPitch() {
   isoPumpOn = true;
   const frame = () => {
     try {
-      if (!isoScrubOwned || twinOpen || transitId || pendingReveal || reverseWait || receding || !mapRef) {
+      // Live-hold carry: while the staged hold owns the frame (twin booting
+      // under the clamp), the pump keeps running and carries the S-driven
+      // hold tilt per-frame — otherwise tilt freezes mid-gesture exactly when
+      // the fingers need it. Every other twin/busy state still parks.
+      const holdOwned = stagedActive && !stagedCommitted;
+      if (!isoScrubOwned || !mapRef || ((twinOpen || transitId || pendingReveal || reverseWait || receding) && !holdOwned)) {
         isoPumpOn = false; // ownership ended — park, never fight the camera
         return;
       }
@@ -660,7 +667,11 @@ function pumpIsoPitch() {
         z = +mapRef.getZoom();
       } catch { z = null; }
       if (Number.isFinite(z)) {
-        const pLaw = pitchTargetForZoom(z);
+        // Live-hold carry: the S-driven hold tilt rides on top of the zoom
+        // law while the hold owns the frame (relaxes to the pole by commit),
+        // so the per-frame pump converges the fingers' tilt, not just the law.
+        const pLaw = pitchTargetForZoom(z)
+          + ((stagedActive && !stagedCommitted) ? stagedHoldPitchForS(stagedS) : 0);
         let pCur = null;
         try {
           pCur = +mapRef.getPitch();
@@ -1519,6 +1530,9 @@ function flyToSectorThenTwin(id, opts = {}) {
       stagedCommitted = false;
       lastPostedStagedS = null; // Task-37: the S producer re-arms (S=0 posts on first drive)
       try {
+        pumpIsoPitch(); // live-hold carry: keep the per-frame tilt pump running under the clamp (it now converges the S-driven hold tilt, never parks on the prewarm)
+      } catch { /* pump is best-effort */ }
+      try {
         window.__mapProbe.staged = { active: true, s: 0, committed: false };
       } catch { /* probe cosmetic */ }
       prewarmThenReveal(id, liveFrame(), { ...opts, staged: true });
@@ -1567,6 +1581,93 @@ function postTwinStagedS() {
   }
 }
 
+/** Live-hold travel: apply the S stages to VISIBLE map chrome on every staged
+ * tick — ready or not. The zoom clamp freezes every zoom-keyed law while the
+ * twin boots, so without this each wheel tick paints nothing until first
+ * paint (the dead hold). Tilt creeps past the pole under the fingers (owned
+ * tilt only — a user oblique is never yanked) and the enclosure circle closes
+ * onto the ring; both are pure fns of S, so scroll-up retraces them, and the
+ * tilt extra relaxes to 0 across the reveal band so the commit still meets
+ * the twin iso pole exactly. Satellite holds full (both laws agree it is 1
+ * here — glued to the fingers, never to the clamped z). Best-effort
+ * throughout; never throws. */
+function driveStagedHold(st) {
+  let pitchExtra = 0;
+  let ringClose = 0;
+  try {
+    pitchExtra = stagedHoldPitchForS(stagedS);
+  } catch { pitchExtra = 0; }
+  try {
+    ringClose = stagedHoldRingCloseForS(stagedS);
+  } catch { ringClose = 0; }
+  // (a) tilt travel past the pole — journey-owned tilt only.
+  try {
+    if (mapRef && isoScrubOwned && mapRef.transform && typeof mapRef.transform.setPitch === 'function') {
+      let zNow = null;
+      try {
+        zNow = +mapRef.getZoom();
+      } catch { zNow = null; }
+      const base = pitchTargetForZoom(Number.isFinite(zNow) ? zNow : Z_HANDOFF);
+      const target = base + pitchExtra;
+      let cur = null;
+      try {
+        cur = +mapRef.getPitch();
+      } catch { cur = null; }
+      if (Number.isFinite(cur) && Math.abs(cur - target) > ISO_SCRUB_EPS_DEG) {
+        mapRef.transform.setPitch(target);
+        if (typeof mapRef.triggerRepaint === 'function') mapRef.triggerRepaint();
+      }
+    }
+  } catch { /* hold tilt is best-effort */ }
+  // (b) ring travel: the enclosure circle closes onto the ring across the
+  // ring band — the staged ring law made visible while depth is clamped.
+  try {
+    const app = document.getElementById('app');
+    const prox = proximityInfo();
+    if (app && prox && mapRef) {
+      let w = 0;
+      let h = 0;
+      try {
+        const el = mapRef.getContainer();
+        w = (el && el.clientWidth) || window.innerWidth || 800;
+        h = (el && el.clientHeight) || window.innerHeight || 600;
+      } catch { w = 800; h = 600; }
+      let corner = null;
+      try {
+        const fx = Math.max(prox.sx, w - prox.sx);
+        const fy = Math.max(prox.sy, h - prox.sy);
+        corner = Math.sqrt(fx * fx + fy * fy);
+      } catch { corner = null; }
+      let zNow = null;
+      try {
+        zNow = +mapRef.getZoom();
+      } catch { zNow = null; }
+      const base = enclosureRadiusPxForZoom(
+        Number.isFinite(zNow) ? zNow : Z_HANDOFF, SITE.lat, MAP_VIGNETTE_RING_M, corner,
+      );
+      if (Number.isFinite(base) && base > 0) {
+        const vr = base * (1 - ringClose);
+        app.style.setProperty('--vr', vr.toFixed(1) + 'px');
+        try {
+          window.__mapProbe.vignetteR = +vr.toFixed(1);
+        } catch { /* probe cosmetic */ }
+      }
+    }
+  } catch { /* hold ring is best-effort */ }
+  // (c) satellite rides the same S progress as the overlay (the staged blend
+  // stage holds full sat): glued to the fingers through the hold, never to
+  // the clamped z both laws agree on anyway.
+  try {
+    let zNow = null;
+    try {
+      zNow = mapRef ? +mapRef.getZoom() : null;
+    } catch { zNow = null; }
+    const zSat = Number.isFinite(zNow) ? satOpacityForZoom(zNow) : 1;
+    setSatScrubbed(Math.max(zSat, st.blend));
+  } catch { /* sat stage is best-effort */ }
+  return { pitchExtra, ringClose };
+}
+
 /** Drive the staged overlay dissolve from accumulated scroll S. Twin-ready
  * (or first paint) GRANTS (>0 only once Lane B posts it); the S law owns
  * the progress, so a fast twin still dissolves on the fingers, never its
@@ -1606,8 +1707,20 @@ function driveStagedOverlay() {
       committed: false,
     };
   } catch { /* probe cosmetic */ }
+  // Live-hold travel FIRST — every S tick moves the frame even while the
+  // twin is dark (pre-grant). The grant below gates only the overlay
+  // dissolve, never finger motion.
+  let hold = null;
+  try {
+    hold = driveStagedHold(st);
+  } catch { /* hold travel is best-effort */ }
+  try {
+    window.__mapProbe.staged.holdPitch = hold ? +hold.pitchExtra.toFixed(3) : 0;
+    window.__mapProbe.staged.ringClose = hold ? +hold.ringClose.toFixed(4) : 0;
+  } catch { /* probe cosmetic */ }
   if (!ready) {
-    // Hold at 0 until Lane B grants the frame — the prewarm keeps booting.
+    // Hold at 0 until Lane B grants the frame — the prewarm keeps booting,
+    // but the S stages stay visible on the map side through driveStagedHold.
     try {
       if (root.style.opacity !== '0') root.style.opacity = '0';
     } catch { /* cosmetic */ }
@@ -1630,17 +1743,6 @@ function driveStagedOverlay() {
   try {
     armRevealFallback();
   } catch { /* timer is best-effort */ }
-  // Satellite rides the same S progress as the overlay (the staged blend
-  // stage holds full sat): glued to the fingers through the hold, never to
-  // the clamped z both laws agree on anyway.
-  try {
-    let zNow = null;
-    try {
-      zNow = mapRef ? +mapRef.getZoom() : null;
-    } catch { zNow = null; }
-    const zSat = Number.isFinite(zNow) ? satOpacityForZoom(zNow) : 1;
-    setSatScrubbed(Math.max(zSat, st.blend));
-  } catch { /* sat stage is best-effort */ }
 }
 
 /** Commit the staged hold: the fingers dissolved the twin to full — drop the
@@ -1674,6 +1776,27 @@ function exitStaged() {
   stagedCommitted = false;
   lastPostedStagedS = null; // symmetric unwind: the S stream ends with the hold
   restoreMaxZoom();
+  // Live-hold unwind: glide the S-driven hold tilt back onto the zoom law so
+  // a scroll-up unwind never strands extra pitch at the gate (pitch-only,
+  // same settle tempo; zoom/center untouched — the next zoom step re-derives
+  // the enclosure chrome from z the same way).
+  try {
+    if (had && mapRef && mapRef.transform && typeof mapRef.transform.setPitch === 'function') {
+      let zNow = null;
+      try {
+        zNow = +mapRef.getZoom();
+      } catch { zNow = null; }
+      const base = pitchTargetForZoom(Number.isFinite(zNow) ? zNow : Z_HANDOFF);
+      let cur = null;
+      try {
+        cur = +mapRef.getPitch();
+      } catch { cur = null; }
+      if (Number.isFinite(cur) && Math.abs(cur - base) > ISO_SCRUB_EPS_DEG) {
+        mapRef.transform.setPitch(base);
+        if (typeof mapRef.triggerRepaint === 'function') mapRef.triggerRepaint();
+      }
+    }
+  } catch { /* hold unwind is best-effort */ }
   try {
     window.__mapProbe.staged = { active: false, s: 0, committed: false };
   } catch { /* probe cosmetic */ }

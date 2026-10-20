@@ -153,6 +153,25 @@ export function accumStagedS(s, deltaY) {
   return Math.min(HANDOFF_STAGED_S_MAX, Math.max(0, cur - dy));
 }
 
+/* Live-hold travel past the gate (map side): z clamps at Z_HANDOFF while
+ * the twin boots, so every zoom-keyed law freezes — scroll fingers go dead
+ * until first paint, then the dissolve jumps. These pure laws translate the
+ * SAME staged scroll S into visible hold travel, so every wheel tick moves
+ * the frame with depth clamped and the twin dark. Handshake-safe: pitch and
+ * enclosure chrome are never handed params (twinlink carries cx/cy/z/bearing
+ * only). The tilt extra relaxes to 0 across the reveal band, so the commit
+ * still meets the twin iso pole exactly (ISO_PITCH_DEG). Pure +
+ * node-checkable; symmetric on scroll-up (pure fns of S). */
+export const STAGED_HOLD_PITCH_DEG = 5; // extra tilt at full tilt-stage, relaxed by reveal
+export const STAGED_HOLD_RING_CLOSE = 0.12; // enclosure radius closes this fraction at full ring-stage
+export function stagedHoldPitchForS(s) {
+  const st = handoffStagesForScroll(s);
+  return STAGED_HOLD_PITCH_DEG * st.tilt * (1 - st.reveal);
+}
+export function stagedHoldRingCloseForS(s) {
+  return STAGED_HOLD_RING_CLOSE * handoffStagesForScroll(s).ring;
+}
+
 /* Journey-enclosure radius (Task 37, map side): the ground ring the twin
  * clip cuts at — RING_RADIUS_M, imported from src/ring2/site.js (single
  * source of truth; the node suite pins them equal). No literal here, so

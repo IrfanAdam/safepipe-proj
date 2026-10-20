@@ -24,6 +24,10 @@ import {
   satOpacityForZoom,
   pitchTargetForZoom,
   ISO_PITCH_DEG,
+  STAGED_HOLD_PITCH_DEG,
+  STAGED_HOLD_RING_CLOSE,
+  stagedHoldPitchForS,
+  stagedHoldRingCloseForS,
 } from '../src/map/scrolltrigger.js';
 import { HANDOFF_ISO_POLAR_DEG } from '../src/ring2/sector.js';
 
@@ -121,4 +125,44 @@ test('driver: timed flight gone, staged scrub owns the outbound path', () => {
   // The timed ramp survives ONLY on the reverse path (Task 37 owns it).
   const forcedOn = (main.match(/setSatForced\(true\)/g) || []).length;
   assert.equal(forcedOn, 1, 'one setSatForced(true) left — the twin recede:true reverse handler');
+});
+
+test('live-hold travel: S moves tilt + ring pre-grant, tilt relaxes by commit', () => {
+  assert.equal(STAGED_HOLD_PITCH_DEG, 5, 'hold tilt gain is a named constant');
+  assert.equal(STAGED_HOLD_RING_CLOSE, 0.12, 'hold ring-close is a named constant');
+  assert.equal(stagedHoldPitchForS(0), 0, 'gate entry carries no extra tilt');
+  assert.equal(
+    stagedHoldPitchForS(3 * HANDOFF_STAGE_PX), STAGED_HOLD_PITCH_DEG,
+    'full tilt-stage, reveal ungated: extra tilt at the gain',
+  );
+  assert.equal(stagedHoldPitchForS(HANDOFF_STAGED_S_MAX), 0, 'commit relaxes to the pole — meets the twin iso exactly');
+  assert.equal(stagedHoldPitchForS(NaN), 0, 'non-numeric parks at 0');
+  let prev = -1;
+  for (let s = 0; s <= 3 * HANDOFF_STAGE_PX; s += 25) {
+    const v = stagedHoldPitchForS(s);
+    assert.ok(v >= prev - 1e-9, `S=${s} hold tilt must not step back pre-reveal`);
+    prev = v;
+  }
+  prev = Infinity;
+  for (let s = 3 * HANDOFF_STAGE_PX; s <= HANDOFF_STAGED_S_MAX; s += 25) {
+    const v = stagedHoldPitchForS(s);
+    assert.ok(v <= prev + 1e-9, `S=${s} hold tilt must relax across the reveal band`);
+    prev = v;
+  }
+  assert.equal(stagedHoldRingCloseForS(0), 0, 'gate entry leaves the enclosure wide');
+  assert.equal(
+    stagedHoldRingCloseForS(HANDOFF_STAGE_PX), STAGED_HOLD_RING_CLOSE,
+    'full ring-stage closes the enclosure by the named fraction',
+  );
+  assert.equal(stagedHoldRingCloseForS(HANDOFF_STAGED_S_MAX), STAGED_HOLD_RING_CLOSE, 'ring close holds through commit');
+  assert.equal(stagedHoldRingCloseForS(NaN), 0, 'non-numeric parks at 0');
+});
+
+test('driver: live hold drives visible travel on every staged tick, pre-grant', () => {
+  const main = srcOf('../src/map/main.js');
+  assert.ok(main.includes('driveStagedHold(st)'), 'staged driver paints hold travel before the grant check');
+  assert.ok(main.includes('stagedHoldPitchForS(stagedS)'), 'hold tilt rides the S law');
+  assert.ok(main.includes('stagedHoldRingCloseForS(stagedS)'), 'hold ring rides the S law');
+  assert.ok(main.includes('holdOwned'), 'tilt pump carries the hold instead of parking on the prewarm');
+  assert.ok(main.includes('pumpIsoPitch(); // live-hold carry'), 'staged entry restarts the tilt pump under the clamp');
 });
