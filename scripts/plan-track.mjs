@@ -49,9 +49,9 @@ if (existsSync(manifestPath)) {
 const seen = new Set(commits.map((c) => c.sha));
 for (const c of prev.commits || []) if (!seen.has(c.sha)) { commits.push(c); seen.add(c.sha); }
 
-// Plumbing exclusion: commits touching only generated files are tracker output,
+// Plumbing exclusion: commits touching only tracker files are tracker output,
 // not work — drop them so triage can reach empty (skill: GENERATED filter).
-const GENERATED = new Set(['src/ds/plan-manifest.json', 'src/ds/plan-history.json', 'public/version.json']);
+const GENERATED = new Set(['src/ds/plan-manifest.json', 'src/ds/plan-history.json', 'public/version.json', 'src/ds/plan-retro.json']);
 const filesOf = (sha) => {
   try { return execFileSync('git', ['show', '--name-only', '--format=', sha], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean); }
   catch { return ['unknown']; }
