@@ -149,3 +149,44 @@ test('the enclosure is black-only — no amber rim or wash', () => {
   // The brackets ARE amber (that is the ring-corner mark, not a rim).
   assert.ok(/--ops-amber/.test(html), 'the corner brackets stay amber');
 });
+
+test('the staged dissolve is scrubbed, not chased by a CSS transition', () => {
+  // The layer-swap cut: the overlay's opacity is written inline from the S
+  // law on every scroll tick, and the CSS carried `transition: opacity
+  // 0.45s ease` on #twin-overlay. A transition eases between COMMITTED
+  // values, so every per-tick write restarted it and the rendered opacity
+  // LAGGED the law (measured: target 1.0, rendered 0.89) — then the commit
+  // snapped it up. That is the one-frame hard cut in the owner's recording.
+  // The fix: while the scrub owns the opacity the transition is suspended
+  // (`.scrubbing`), so the law's value IS the rendered value and the commit
+  // hands back to the transition with nothing to snap.
+  const html = readFileSync(new URL('../ops3d-map.html', import.meta.url), 'utf8');
+  assert.ok(
+    /#twin-overlay\.scrubbing\s*\{\s*transition:\s*none;?\s*\}/.test(html),
+    'the scrubbed leg suspends the transition',
+  );
+  // The scrub adds the class; the commit and the timed crossfade remove it.
+  assert.ok(
+    /root\.classList\.add\('scrubbing'\)/.test(MAIN),
+    'the staged driver suspends the transition while it scrubs',
+  );
+  assert.ok(
+    /classList\.remove\('scrubbing'\)/.test(MAIN),
+    'the commit and the timed reveal restore the transition',
+  );
+  // The commit must release the inline opacity only AFTER the transition is
+  // live, and only when the law has reached 1 (so the hand-off is 1 -> 1).
+  assert.ok(
+    /const committed = Number\.isFinite\(at\) \? at : 1;/.test(MAIN),
+    'the commit carries the law value across',
+  );
+  assert.ok(
+    /root\.style\.opacity = committed >= 1 \? '' : String\(committed\);/.test(MAIN),
+    'the inline value is released only at 1 — never a snap',
+  );
+  // The reverse leg is TIMED, not scrubbed: it keeps its own transition.
+  assert.ok(
+    /#twin-overlay\.closing\s*\{[^}]*transition-duration/.test(html),
+    'the timed reverse keeps its transition',
+  );
+});

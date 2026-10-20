@@ -1766,6 +1766,19 @@ function driveStagedOverlay() {
     return;
   }
   try {
+    // GATE-3 REVISION: the dissolve must READ as a fade, not a cut.
+    // The staged dissolve is SCRUBBED — the S law rewrites the inline opacity
+    // on every scroll tick. The CSS transition must be suspended while that
+    // happens (`.scrubbing`), because a transition eases between COMMITTED
+    // values: each per-tick write would restart it from the current value,
+    // the rendered opacity would lag the law (measured: target 1.0, rendered
+    // 0.89), and the commit would then snap it up — a cut. With the
+    // transition suspended the law's value IS the rendered value, so the
+    // dissolve tracks the fingers exactly and the commit has nothing to snap.
+    // The law stays the single source of the opacity; the transition is only
+    // the easing for the UNSCRUBBED legs (the prewarm->reveal crossfade and
+    // the timed reverse), which the class is removed for.
+    if (!root.classList.contains('scrubbing')) root.classList.add('scrubbing');
     root.style.opacity = st.reveal <= 0 ? '0' : String(+st.reveal.toFixed(4));
   } catch { /* cosmetic */ }
   // S owns the dissolve: every staged grant slides the same paint-gated fallback
@@ -1838,8 +1851,22 @@ function finalizeStagedReveal(root) {
   stagedActive = false;
   lastPostedStagedS = null; // commit ends the S stream (producer guards on flags anyway)
   revealTwin(false); // dissolve: the staged scroll already animated it — the CSS crossfade completes the commit, never a cut
+  // GATE-3 REVISION: hand the opacity back to the CSS WITHOUT snapping it.
+  // The scrub suspended the transition (`.scrubbing`) so the law's value was
+  // the rendered value. At the commit the law has reached 1, so the inline
+  // value and the stylesheet's agree — the transition can be restored and the
+  // inline value released with NOTHING to snap. Restoring the class BEFORE
+  // releasing the inline opacity matters: the class removal re-enables the
+  // transition, and the inline release then eases from 1 to 1 (no change).
   try {
-    if (root) root.style.opacity = '';
+    if (root) {
+      const at = parseFloat(root.style.opacity);
+      const committed = Number.isFinite(at) ? at : 1;
+      root.classList.remove('scrubbing');
+      // The dissolve ends at 1: the inline value is released only after the
+      // transition is live, so the hand-off is 1 -> 1 and reads as nothing.
+      root.style.opacity = committed >= 1 ? '' : String(committed);
+    }
   } catch { /* cosmetic */ }
   restoreMaxZoom();
   try {
@@ -1887,7 +1914,13 @@ function exitStaged() {
   if (!had) return; // nothing staged: flags + unclamp only, never touch live state
   try {
     const root = document.getElementById('twin-overlay');
-    if (root) root.style.opacity = ''; // fall back to .prewarm CSS 0
+    if (root) {
+      // GATE-3 REVISION: the unwind releases the scrubbed opacity AND
+      // restores the transition — a staged hold that is unwound must leave
+      // the overlay in the same state a non-staged one would be in.
+      root.classList.remove('scrubbing');
+      root.style.opacity = ''; // fall back to .prewarm CSS 0
+    }
   } catch { /* cosmetic */ }
   // Quiet prewarm teardown (no fade/recede — nothing visible ever staged).
   try {
@@ -2080,6 +2113,15 @@ function revealTwin(instant = false) {
       if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
     } catch { /* timer teardown is best-effort */ }
     if (!overlayEls || overlayEls.root.hidden) return false;
+    // GATE-3 REVISION: the timed crossfade needs its transition BACK. The
+    // staged scrub suspends it (`.scrubbing`) so the law's value is the
+    // rendered value; once the scrub is done, the prewarm->reveal crossfade
+    // is a TIMED leg, so the transition must be live again. Removing the
+    // class here (and not only at the commit) keeps both legs correct: the
+    // scrubbed leg is instant-by-law, the timed leg eases.
+    try {
+      overlayEls.root.classList.remove('scrubbing');
+    } catch { /* cosmetic */ }
     if (!instant) {
       // Force a frame at opacity 0, then drop .prewarm so the CSS
       // opacity transition (~450ms) crossfades map->twin with no flash.

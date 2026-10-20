@@ -256,6 +256,17 @@
   #twin-overlay[hidden] { display: none; }
   #twin-overlay.prewarm { opacity: 0; pointer-events: none; }
   #twin-overlay.closing { opacity: 0; transition-duration: 0.45s; }
+  /* GATE-3 REVISION: the staged dissolve is SCRUBBED, so the browser must
+   * not also ease it. A CSS transition eases between committed values; when
+   * the scroll law rewrites the inline opacity every tick, each write
+   * restarts the transition from the current value, so the rendered opacity
+   * lags the law (measured: the target reached 1.0 while the rendered value
+   * was still 0.89) and the commit then snaps it up. With the transition
+   * suspended while the scrub owns the opacity, the law's value IS the
+   * rendered value (0, 0.1, 0.2 ... 1) and the commit hands back to the
+   * transition with nothing left to snap. The reverse leg (.closing) keeps
+   * its own transition — that one is timed, not scrubbed. */
+  #twin-overlay.scrubbing { transition: none; }
   @media (prefers-reduced-motion: reduce) {
     #twin-overlay { transition: none; }
   }
