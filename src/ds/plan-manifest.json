@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T12:42:17.003Z",
+  "generated": "2026-10-20T12:43:19.102Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "1671030",
+      "full": "16710304c6855915770b73c66cf2df9ff7807f7e",
+      "date": "2026-10-20",
+      "time": "18:12",
+      "subject": "fix(journey): layer-init tempos share CLOSE_FADE_MS + SAT_FADE_DURATION_MS [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "83371e3",
       "full": "83371e356524f9b11b0feda6725985f51b84cf1b",
@@ -5781,7 +5790,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/map/main.js"
-  ]
+  "wip": []
 }
