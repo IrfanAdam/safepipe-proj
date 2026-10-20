@@ -1045,7 +1045,11 @@ function onNativeZoomStep(snap, source) {
     // (isoRestoreDue) and the gesture settles below the band, glide pitch
     // home on the existing settle tempo. Center is never touched here, and
     // a camera the journey never tilted (due false) is never yanked.
-    if (!twinOpen && !busyNow && source === 'native-zoomend' && isoRestoreDue && !shouldCenter(z)) {
+    // Recede-exempt (busyNoRecede, not busyNow): this glide is pitch-only —
+    // it never touches zoom or center — so it cannot fight the gesture-owned
+    // z on the way out. Gating it on receding stranded pitch at iso all the
+    // way home: the home arrival below clears due with no flattening.
+    if (!twinOpen && !busyNoRecede && source === 'native-zoomend' && isoRestoreDue && !shouldCenter(z)) {
       let pSet = null;
       try {
         pSet = +mapRef.getPitch();
@@ -1137,7 +1141,8 @@ function onNativeZoomStep(snap, source) {
     // (3b); near arrivals already rode the center-ease above (same tempo —
     // a second ease here would supersede its center glide, so this covers
     // far settles only). At-target settles no-op here. Zoom is never touched.
-    if (!twinOpen && !busyNow && source === 'native-zoomend' && isoRestoreDue && shouldCenter(z) && prox && !prox.near) {
+    // Recede-exempt like the reconcile above: pitch-only, same settle tempo.
+    if (!twinOpen && !busyNoRecede && source === 'native-zoomend' && isoRestoreDue && shouldCenter(z) && prox && !prox.near) {
       let pCatch = null;
       try {
         pCatch = +mapRef.getPitch();
@@ -2192,6 +2197,19 @@ function recedeToHome() {
     try {
       showVectorHold(false);
     } catch { /* cosmetic */ }
+    // Last-chance flatten: the home arrival below clears isoRestoreDue, so a
+    // tilt that never retraced (fast flick over the band landing home on a
+    // live step, where the zoomend-gated reconcile above cannot fire) would
+    // strand at iso at world zoom. Pitch-only, existing settle tempo — zoom
+    // and center untouched, flat arrivals no-op inside tolerance.
+    try {
+      const pHome = mapRef ? +mapRef.getPitch() : null;
+      if (Number.isFinite(pHome) && Math.abs(pHome) > ISO_SETTLE_TOL_DEG) {
+        mapRef.easeTo({ pitch: 0, duration: SETTLE_EASE_MS });
+      }
+    } catch (err) {
+      errors.push('RECEDE-HOME-PITCH: ' + (err && err.message));
+    }
     try {
       resetScrubJourney();
     } catch { /* reset is best-effort */ }
