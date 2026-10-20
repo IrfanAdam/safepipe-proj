@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T14:35:01.511Z",
+  "generated": "2026-10-20T14:37:43.538Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "83f4f62",
+      "full": "83f4f62fd6f081449b852268f436089af707bf5c",
+      "date": "2026-10-20",
+      "time": "20:07",
+      "subject": "fix(journey): the staged dissolve is scrubbed, not chased [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "3e367ca",
       "full": "3e367caf01203e45eb0910049adcef890e78bee8",
@@ -5862,9 +5871,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "ops3d-map.html",
-    "public/version.json",
-    "src/map/main.js"
-  ]
+  "wip": []
 }
