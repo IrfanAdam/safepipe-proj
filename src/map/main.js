@@ -589,7 +589,7 @@ function setSatForced(on) {
   }
   try {
     if (mapRef && mapRef.getLayer(SAT_LAYER_ID)) {
-      mapRef.setPaintProperty(SAT_LAYER_ID, 'raster-opacity-transition', { duration: 450, delay: 0 });
+      mapRef.setPaintProperty(SAT_LAYER_ID, 'raster-opacity-transition', { duration: CLOSE_FADE_MS, delay: 0 });
     }
   } catch { /* transition restore is best-effort */ }
   window.__mapProbe.satOn = !!on;
