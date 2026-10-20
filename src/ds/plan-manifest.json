@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T14:37:43.538Z",
+  "generated": "2026-10-20T14:38:11.777Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -5871,5 +5871,7 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
+  ]
 }
