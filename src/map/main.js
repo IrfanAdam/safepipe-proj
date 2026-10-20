@@ -1699,6 +1699,29 @@ function armRevealFallback() {
     pendingReveal.timer = setTimeout(() => {
       try {
         if (!pendingReveal || pendingReveal.revealed) return;
+        // Staged holds never reveal directly: a direct revealTwin would cut
+        // to a parked frame (and the next S tick would jump opacity back
+        // down). First paint grants the dissolve through the staged driver
+        // instead, and scroll-up still unwinds the hold while nothing has
+        // painted. A fully silent twin unwinds the hold (map stays live)
+        // rather than blind-revealing a dead frame.
+        if (stagedActive && !stagedCommitted) {
+          lastPostedStagedS = null; // re-emit the live S (boot-raced seeds)
+          try {
+            driveStagedOverlay();
+          } catch { /* staged drive is best-effort */ }
+          if (!pendingReveal || pendingReveal.revealed || stagedCommitted) return;
+          const tries = (pendingReveal.tries ?? 0) + 1;
+          pendingReveal.tries = tries;
+          if (tries <= REVEAL_PAINT_TRIES) {
+            armRevealFallback();
+            return;
+          }
+          try {
+            exitStaged();
+          } catch { /* unwind is best-effort */ }
+          return;
+        }
         if (window.__mapProbe.twinReady) {
           revealTwin(false);
           return;
@@ -2125,8 +2148,15 @@ window.addEventListener('message', (e) => {
   } catch { /* probe cosmetic */ }
   // Task-35 staged: ready GRANTS the dissolve but the fingers own its
   // progress — route through the staged driver, never revealTwin directly.
+  // Re-emit the live S first: posts made while the twin iframe was still
+  // booting raced its listener attach and were lost, and the value-change
+  // throttle would otherwise never resend them (a lost seed reads as
+  // "no staged driver" twin-side — autoplay behind the overlay, the
+  // zoom-in cut). The ready post proves the listener exists, so the
+  // re-emit always lands.
   if (stagedActive && !stagedCommitted) {
     try {
+      lastPostedStagedS = null;
       driveStagedOverlay();
     } catch { /* staged drive is best-effort */ }
     return;
@@ -2158,9 +2188,12 @@ window.addEventListener('message', (e) => {
     window.__mapProbe.twinPainted = true;
   } catch { /* probe cosmetic */ }
   // Staged paint grants the dissolve — route through the staged driver,
-  // never revealTwin directly (the S law still owns the progress).
+  // never revealTwin directly (the S law still owns the progress). The
+  // painted post proves the twin listener exists, so re-emit the live S
+  // first (boot-raced seeds were lost; the throttle would never resend).
   if (stagedActive && !stagedCommitted) {
     try {
+      lastPostedStagedS = null;
       driveStagedOverlay();
     } catch { /* staged drive is best-effort */ }
   }

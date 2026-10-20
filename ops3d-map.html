@@ -148,18 +148,16 @@
    * do NOT put --vr in `transition`: a transition on the property freezes
    * the gradient at its start value instead of gliding (verified headless).
    * The close-in reads as animation because the gesture streams steps.
-   * Crisp edge: transparent core cuts to a 2px ring stroke AT --vr
-   * (hard stop pair — no feathered rim), then darkness feathers outward
-   * to the solid surround. */
+   * Colorless edge: transparent core runs to --vr, a hard stop pair cuts
+   * to black AT --vr (crisp boundary, no color stroke), then darkness
+   * feathers outward to the solid surround. */
   @property --vr { syntax: '<length>'; inherits: false; initial-value: 260px; }
   #map-vignette {
     position: absolute; inset: 0; z-index: 3; pointer-events: none;
     background: radial-gradient(circle var(--vr, 260px) at var(--vx, 50%) var(--vy, 50%),
       transparent 0,
-      transparent calc(var(--vr, 260px) - 2px),
-      rgba(255, 217, 160, 0.9) calc(var(--vr, 260px) - 2px),
-      rgba(255, 217, 160, 0.9) var(--vr, 260px),
-      rgba(0, 0, 0, 0.3) calc(var(--vr, 260px) + 34px),
+      transparent var(--vr, 260px),
+      rgba(0, 0, 0, 0.65) var(--vr, 260px),
       var(--ops-bg, #0b0c0c) 100%);
     opacity: 0; transition: opacity 0.45s ease; /* GATE-3 REVISION tempo */
   }

@@ -1228,25 +1228,25 @@ async function boot() {
             return;
           }
           handoff.from = live;
-          // Release seed: staged arrivals stay S-coupled even when the seed
-          // went stale on a slow boot (any step lands behind the unrevealed
-          // overlay, which the S law owns — and the fingers resume coupled
-          // instead of jumping off an autoplay clock). Unstaged arrivals
-          // never post S: a deep handed frame seeds the swoop boundary
-          // (iso-45, the map's carried pitch) so the reveal dissolves onto
-          // a matched frame; shallow click frames seed the hold as before.
+          // Release seed: scroll-path (deep handed frame) releases are
+          // finger-owned even when no staged seed survived the iframe-boot
+          // race (early S posts predate the twin listener and are lost —
+          // the map re-emits the live S at grant, but the release may land
+          // first). Park at the S-mapped progress and let scroll ticks drive
+          // — never the autoplay clock behind the unrevealed overlay, which
+          // played the push invisibly and read as a zoom-in cut while the
+          // zoom-out reverse stayed scrubbed. Legs start from the live pose,
+          // so the release is jump-free and scroll-up retraces it
+          // symmetrically. Shallow click frames keep the autoplay intro.
           const hasStagedSeed = handoff.fwdStagedS !== null && handoff.fwdStagedS !== undefined
             && Number.isFinite(Number(handoff.fwdStagedS));
-          const staged = hasStagedSeed;
+          const staged = hasStagedSeed || frameDeep;
           handoff.fwd = {
             legs,
             progress: fwdProgressForStagedS(handoff.fwdStagedS ?? 0),
             t0: now,
             staged,
           };
-          if (!hasStagedSeed && frameDeep) {
-            handoff.fwd.progress = fwdProgressForStagedS(TWIN_FWD_REVEAL_START_PX);
-          }
           handoff.phase = 'swoop';
           handoff.t0 = now;
         }
