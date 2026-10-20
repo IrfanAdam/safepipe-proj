@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T12:53:18.966Z",
+  "generated": "2026-10-20T13:06:43.517Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "e6256b2",
+      "full": "e6256b2840550636e0c5e7bcd6b432862218ac8b",
+      "date": "2026-10-20",
+      "time": "18:23",
+      "subject": "docs(plan): record bracket-law measurement on GATE 3 rev [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "f738232",
       "full": "f738232c2802bb28289d93922d71e77c01efbe56",
@@ -5800,6 +5809,6 @@
     }
   ],
   "wip": [
-    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
+    "scripts/plan-track.mjs"
   ]
 }
