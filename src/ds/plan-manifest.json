@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T11:54:03.108Z",
+  "generated": "2026-10-20T12:15:10.748Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "e93703c",
+      "full": "e93703ccdda287048398f45330135edfb0df15a0",
+      "date": "2026-10-20",
+      "time": "17:41",
+      "subject": "fix(journey): ring-law brackets, armed wash, S-owned fallback, per-frame tilt, sat-on-S [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "1a906b8",
       "full": "1a906b8073368dd70faaa36c9fb4a059ccbc9850",
@@ -5692,12 +5701,7 @@
     }
   ],
   "wip": [
-    "ops3d-map.html",
     "public/version.json",
-    "src/map/main.js",
-    "src/map/scrolltrigger.js",
-    "src/map/twinlink.js",
-    "src/ring2/main.js",
-    "src/ring2/sector.js"
+    "src/map/main.js"
   ]
 }
