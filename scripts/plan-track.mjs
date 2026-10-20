@@ -104,13 +104,21 @@ for (const f of plans) {
 }
 if (histAdded) writeFileSync(histPath, JSON.stringify(hist, null, 1) + '\n');
 // Deploy version stamp: public/version.json carries the current HEAD sha
-// (sha only — byte-stable per commit, no rebuild churn). The running app
+// plus the commit count (sha only — byte-stable per commit, no rebuild churn).
+// The count makes the stamp unique per commit: the sha is written BEFORE the
+// commit exists so it names the previous commit, and back-to-back commits
+// (content + sync) would otherwise publish the same value twice — an open
+// page polls this file and only reloads on change, so a repeated stamp
+// strands viewers on the older bundle. "<sha>:<count>" increments on every
+// commit and is stable across rebuilds of the same commit. The running app
 // polls it and auto-reloads an open page onto a new deploy, so editors and
 // viewers never sit on a stale bundle. Served from /version.json via public/.
 try {
   const head = git(['rev-parse', 'HEAD']);
+  const count = git(['rev-list', '--count', 'HEAD']);
+  const stamp = head && count ? `${head}:${count}` : (head || null);
   const verPath = join(root, 'public', 'version.json');
-  const verNext = JSON.stringify({ sha: head || null }) + '\n';
+  const verNext = JSON.stringify({ sha: stamp }) + '\n';
   let verPrev = null;
   try { verPrev = readFileSync(verPath, 'utf8'); } catch {}
   if (verPrev !== verNext) writeFileSync(verPath, verNext);
