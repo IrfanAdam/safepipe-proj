@@ -113,25 +113,24 @@ test('enclosure forming wash: screen corners close onto the clip circle', () => 
   const at7 = enclosureRadiusPxForZoom(7.01, SITE.lat, MAP_VIGNETTE_RING_M, C);
   assert.ok(Math.abs(at7 - C) < 5, `forming starts AT the corners (got ${at7.toFixed(1)}px)`);
   let prev = Infinity;
-  for (let z = 7.5; z <= 10.5; z += 0.5) {
+  for (let z = 7.5; z <= 11.5; z += 0.5) {
     const r = enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C);
     assert.ok(r < prev, `z=${z} closes in from the edges (${r.toFixed(0)}px < ${prev === Infinity ? 'inf' : prev.toFixed(0)}px)`);
     prev = r;
   }
-  // GATE-3 REVISION: past Z_TOP the enclosure HOLDS at the Z_TOP value. The
-  // twin's clip is a FIXED ground circle, so a live-zoom projection drifts
-  // away from it and re-opens the surround (+121px between Z_TOP and the
-  // handoff). One law, one hold point.
-  const atTop = enclosureRadiusPxForZoom(10.5, SITE.lat, MAP_VIGNETTE_RING_M, C);
-  for (const z of [11, 11.5, 12, 12.1, 13, 13.4]) {
+  // GATE-3 REVISION: past the HANDOFF the enclosure HOLDS at the handoff
+  // value — the twin's fixed ground clip radius. Holding at the earlier
+  // Z_TOP projection over-zoomed the map (121px vs the twin's 242px).
+  const atHandoff = enclosureRadiusPxForZoom(11.5, SITE.lat, MAP_VIGNETTE_RING_M, C);
+  for (const z of [11.5, 12, 12.1, 13, 13.4]) {
     assert.equal(
-      enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C), atTop,
-      `z=${z} HOLDS the Z_TOP enclosure (no re-open past the ring)`,
+      enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C), atHandoff,
+      `z=${z} HOLDS the handoff enclosure (no over-zoom past the ring)`,
     );
   }
   assert.equal(
-    atTop, vignetteRadiusPxForZoom(10.5, SITE.lat),
-    'at Z_TOP the enclosure IS the projected ring (handoff coincidence)',
+    atHandoff, vignetteRadiusPxForZoom(11.5, SITE.lat),
+    'at the handoff the enclosure IS the projected ring the twin clips to',
   );
 });
 
@@ -226,18 +225,19 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
   assert.ok(!main.includes(', 2500);'), '2500ms fallback timer is gone');
   assert.ok(main.includes('lastPostedStagedS = null; // symmetric unwind'), 'staged exit unwinds the S stream');
   assert.ok(main.includes('if (receding && needsHandoff(z))'), 'scrolling back in disarms the recede');
-  // GATE-3 REVISION: the engagement gained the STRAND case. The old test
-  // (z past the top gate, even unaimed) is still true — but the reverse leg
-  // dropped below Z_TOP, the law stopped driving, and the tilt sat at 45deg
-  // for the whole way home. `isoRestoreDue` is now part of the engagement,
-  // so the journey keeps the tilt until the law has actually flattened it.
+  // GATE-3 REVISION: the engagement gained the STRAND case and moved to the
+  // terrain grade. The old test (z past the top gate, even unaimed) is still
+  // true — but the reverse leg dropped below Z_TOP, the law stopped driving,
+  // and the tilt sat at 45deg for the whole way home. `isoRestoreDue` is now
+  // part of the engagement, so the journey keeps the tilt until the law has
+  // actually flattened it; the whole terrain->iso band starts at Z_ISO_START.
   assert.ok(
-    main.includes('(prox.near || isoScrubOwned || z >= Z_TOP || isoRestoreDue)'),
-    'iso scrub engages past the top gate, and keeps the tilt while the reverse still owes a flatten',
+    main.includes('(prox.near || isoScrubOwned || z >= Z_ISO_START || isoRestoreDue)'),
+    'iso scrub engages from the terrain grade, and keeps the tilt while the reverse still owes a flatten',
   );
   // The release waits for the law's value, not just the zoom.
   assert.ok(
-    main.includes('z < Z_TOP - ISO_SCRUB_RELEASE && Math.abs(pCur) <= ISO_SCRUB_EPS_DEG'),
+    main.includes('z < Z_ISO_START - ISO_SCRUB_RELEASE && Math.abs(pCur) <= ISO_SCRUB_EPS_DEG'),
     'the journey releases the tilt only once the law has flattened it (no mid-retrace strand)',
   );
   // The per-frame hook applies the law on BOTH sides of the band — the

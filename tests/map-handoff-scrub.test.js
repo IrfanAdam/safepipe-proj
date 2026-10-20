@@ -1,8 +1,8 @@
 // tests/map-handoff-scrub.test.js — Task 35: the outbound handoff is a
-// zoom-scrubbed staged crossfade, never a timed flight. Past Z_HANDOFF the
-// map holds z (maxZoom clamp) and further scroll ticks accumulate as stage
-// scroll S (px): ring -> blend -> tilt holds, then the twin dissolve — each
-// a pure function of S, symmetric on scroll-up. Sat rides the scrub law
+// zoom-scrubbed staged crossfade, never a timed flight. The twin dissolve is
+// a ZOOM law across Z_TOP..Z_HANDOFF (S maps onto the reveal band, so it
+// reaches full at the handoff without extra scrolling); the wheel S owns the
+// clamped post-gate hold and the reverse retrace. Sat rides the scrub law
 // (pure fn of z); map pitch carries 45 through the cut to meet the twin
 // iso pole at 45 under the shared 36.87deg FOV.
 // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]
@@ -127,35 +127,44 @@ test('driver: timed flight gone, staged scrub owns the outbound path', () => {
   assert.equal(forcedOn, 1, 'one setSatForced(true) left — the twin recede:true reverse handler');
 });
 
-test('live-hold travel: S moves tilt + ring pre-grant, tilt relaxes by commit', () => {
-  assert.equal(STAGED_HOLD_PITCH_DEG, 5, 'hold tilt gain is a named constant');
-  assert.equal(STAGED_HOLD_RING_CLOSE, 0.12, 'hold ring-close is a named constant');
-  assert.equal(stagedHoldPitchForS(0), 0, 'gate entry carries no extra tilt');
-  assert.equal(
-    stagedHoldPitchForS(3 * HANDOFF_STAGE_PX), STAGED_HOLD_PITCH_DEG,
-    'full tilt-stage, reveal ungated: extra tilt at the gain',
-  );
-  assert.equal(stagedHoldPitchForS(HANDOFF_STAGED_S_MAX), 0, 'commit relaxes to the pole — meets the twin iso exactly');
-  assert.equal(stagedHoldPitchForS(NaN), 0, 'non-numeric parks at 0');
-  let prev = -1;
-  for (let s = 0; s <= 3 * HANDOFF_STAGE_PX; s += 25) {
-    const v = stagedHoldPitchForS(s);
-    assert.ok(v >= prev - 1e-9, `S=${s} hold tilt must not step back pre-reveal`);
-    prev = v;
+test('zoom-driven reveal: S maps Z_TOP..Z_HANDOFF onto the reveal band; hold extras are zero', () => {
+  // GATE-3 REVISION: the S-driven tilt/ring extras are gone. Starting the
+  // reveal at Z_TOP and driving it by zoom is what carries the motion; an
+  // extra hold tilt would overshoot the 45deg pole and an extra ring close
+  // would shrink the enclosure past the twin's clip.
+  assert.equal(STAGED_HOLD_PITCH_DEG, 0, 'no extra hold tilt — the zoom band carries the motion');
+  assert.equal(STAGED_HOLD_RING_CLOSE, 0, 'no extra ring close — the enclosure lands on the twin clip');
+  for (const s of [0, HANDOFF_STAGE_PX, 3 * HANDOFF_STAGE_PX, 1000, HANDOFF_STAGED_S_MAX, NaN]) {
+    assert.equal(stagedHoldPitchForS(s), 0, `S=${s} adds no tilt`);
+    assert.equal(stagedHoldRingCloseForS(s), 0, `S=${s} adds no ring close`);
   }
-  prev = Infinity;
-  for (let s = 3 * HANDOFF_STAGE_PX; s <= HANDOFF_STAGED_S_MAX; s += 25) {
-    const v = stagedHoldPitchForS(s);
-    assert.ok(v <= prev + 1e-9, `S=${s} hold tilt must relax across the reveal band`);
-    prev = v;
-  }
-  assert.equal(stagedHoldRingCloseForS(0), 0, 'gate entry leaves the enclosure wide');
-  assert.equal(
-    stagedHoldRingCloseForS(HANDOFF_STAGE_PX), STAGED_HOLD_RING_CLOSE,
-    'full ring-stage closes the enclosure by the named fraction',
+  // The reveal band starts at the iso checkpoint: seed S is S_MAX - reveal.
+  assert.equal(HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX, 750, 'reveal starts at S=750');
+  const main = srcOf('../src/map/main.js');
+  assert.ok(
+    main.includes('smooth01((z - Z_TOP) / (Z_HANDOFF - Z_TOP))'),
+    'the dissolve is a zoom law inside the Z_TOP..Z_HANDOFF band',
   );
-  assert.equal(stagedHoldRingCloseForS(HANDOFF_STAGED_S_MAX), STAGED_HOLD_RING_CLOSE, 'ring close holds through commit');
-  assert.equal(stagedHoldRingCloseForS(NaN), 0, 'non-numeric parks at 0');
+  assert.ok(
+    main.includes('stagedS = revealStart + (HANDOFF_STAGED_S_MAX - revealStart) * tBand'),
+    'S maps the zoom band onto the reveal band',
+  );
+  assert.ok(
+    main.includes('const revealStart = Math.max(0, HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX);'),
+    'the staged entry computes the reveal band start',
+  );
+  assert.ok(
+    main.includes('((Number.isFinite(liveZ) ? liveZ : Z_TOP) - Z_TOP) / (Z_HANDOFF - Z_TOP)'),
+    'the staged entry seeds S from the LIVE zoom (fast wheel bursts already at the handoff)',
+  );
+  assert.ok(
+    main.includes('if (!twinOpen && !busyNow && z >= Z_TOP)'),
+    'the handoff/twin prewarm begins at the iso checkpoint',
+  );
+  assert.ok(
+    main.includes('mapRef.getZoom() < Z_TOP'),
+    'the deferred trigger aborts if the zoom dropped below the checkpoint',
+  );
 });
 
 test('driver: live hold drives visible travel on every staged tick, pre-grant', () => {

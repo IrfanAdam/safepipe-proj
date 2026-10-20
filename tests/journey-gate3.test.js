@@ -15,6 +15,7 @@ import {
   metersPerPixel,
   MAP_VIGNETTE_RING_M,
   ISO_PITCH_DEG,
+  Z_ISO_START,
   Z_TOP,
   Z_HANDOFF,
   Z_TWIN_COMMIT,
@@ -37,15 +38,18 @@ test('FIX 1: the pitch law is applied per frame, not per tick', () => {
     MAIN.includes('pitchTargetForZoom(z)'),
     'the hook derives the target from the one shared pitch law',
   );
-  // The law itself is untouched: pure, monotone, 0 at Z_TOP, ISO_PITCH_DEG
-  // at the handoff, held above it.
-  assert.equal(pitchTargetForZoom(Z_TOP), 0, 'no tilt at the top-down checkpoint');
-  assert.equal(pitchTargetForZoom(Z_HANDOFF), ISO_PITCH_DEG, 'the pole is reached at the handoff');
+  // The law: pure, monotone, 0 at the terrain grade (Z_ISO_START), the full
+  // 45deg by the iso checkpoint (Z_TOP), held through the handoff. Starting a
+  // full level earlier is the owner's "begin a lot sooner" fix.
+  assert.equal(pitchTargetForZoom(Z_ISO_START), 0, 'no tilt at the terrain grade');
+  assert.ok(pitchTargetForZoom(Z_ISO_START + 0.75) > 0, 'tilt begins before the checkpoint');
+  assert.equal(pitchTargetForZoom(Z_TOP), ISO_PITCH_DEG, 'the pole is reached at the checkpoint');
+  assert.equal(pitchTargetForZoom(Z_HANDOFF), ISO_PITCH_DEG, 'the pole is held through the handoff');
   assert.equal(pitchTargetForZoom(Z_TWIN_COMMIT), ISO_PITCH_DEG, 'the pole is held past the handoff');
   assert.equal(pitchTargetForZoom(Z_MAX), ISO_PITCH_DEG, 'and all the way to the zoom cap');
-  assert.equal(pitchTargetForZoom(Z_TOP - 1), 0, 'below the band there is no tilt');
+  assert.equal(pitchTargetForZoom(Z_ISO_START - 1), 0, 'below the band there is no tilt');
   let prev = -1;
-  for (let z = Z_TOP; z <= Z_HANDOFF; z += 0.1) {
+  for (let z = Z_ISO_START; z <= Z_HANDOFF; z += 0.1) {
     const p = pitchTargetForZoom(z);
     assert.ok(p >= prev - 1e-9, `pitch is monotone in zoom (z=${z.toFixed(1)})`);
     prev = p;
@@ -68,15 +72,20 @@ test('FIX 2: the deep handoff clamps regardless of `near`', () => {
     'a deep arrival always clamps',
   );
   assert.ok(MAIN.includes('mapRef.setMaxZoom(Z_HANDOFF)'), 'the clamp is the handoff zoom');
-  // The commit gate requires BOTH near and non-blank.
+  // The commit gate requires REAL CONTENT. Proximity must not gate it: the
+  // owner's scroll has to reach the twin even with the cursor off the spot.
   assert.ok(MAIN.includes('twinFrameHasContent'), 'the commit gate checks the twin for content');
   assert.ok(
     /const hasContent = twinFrameHasContent\(\);/.test(MAIN),
     'the twin content check is sampled once',
   );
   assert.ok(
-    /if \(!nearNow \|\| !hasContent\)/.test(MAIN),
-    'the commit requires near AND non-blank',
+    /if \(!hasContent\)/.test(MAIN),
+    'the commit requires non-blank twin content',
+  );
+  assert.ok(
+    !/if \(!nearNow \|\| !hasContent\)/.test(MAIN),
+    'proximity no longer blocks the commit',
   );
   // The twin reports the content signals the gate reads.
   assert.ok(RING2.includes('content: () => {'), 'the twin exposes its content state');
@@ -84,25 +93,28 @@ test('FIX 2: the deep handoff clamps regardless of `near`', () => {
   assert.ok(RING2.includes('sceneLive'), 'content reports the terrain-live state');
 });
 
-test('FIX 3: the enclosure holds at Z_TOP instead of re-opening', () => {
+test('FIX 3: the enclosure holds at the handoff instead of over-zooming', () => {
   const C = 900; // hotspot farthest-corner distance on the test viewport
-  const atTop = enclosureRadiusPxForZoom(Z_TOP, SITE.lat, MAP_VIGNETTE_RING_M, C);
-  assert.ok(Number.isFinite(atTop), 'the enclosure exists at Z_TOP');
+  const atHandoff = enclosureRadiusPxForZoom(Z_HANDOFF, SITE.lat, MAP_VIGNETTE_RING_M, C);
+  assert.ok(Number.isFinite(atHandoff), 'the enclosure exists at the handoff');
   assert.equal(
-    atTop, vignetteRadiusPxForZoom(Z_TOP, SITE.lat),
-    'at Z_TOP the enclosure IS the projected ring',
+    atHandoff, vignetteRadiusPxForZoom(Z_HANDOFF, SITE.lat),
+    'at the handoff the enclosure IS the projected ring the twin clips to',
   );
-  // The re-open: the live-zoom projection grew by ~121px by the handoff.
-  const live = vignetteRadiusPxForZoom(Z_HANDOFF, SITE.lat);
+  // The old hold evaluated the projection at Z_TOP: 121px, half the twin's
+  // 242px clip — the owner's "enclosure zooming in too much".
+  const oldHold = vignetteRadiusPxForZoom(Z_TOP, SITE.lat);
   assert.ok(
-    live - atTop > 100,
-    `the old live-zoom projection really did re-open (${(live - atTop).toFixed(1)}px)`,
+    atHandoff - oldHold > 100,
+    `the old Z_TOP hold over-zoomed by ${(atHandoff - oldHold).toFixed(1)}px`,
   );
-  // The fix: past Z_TOP the enclosure HOLDS — one value, no drift.
-  for (const z of [10.5, 11, 11.5, 12, 12.1, 13, 13.4, Z_MAX]) {
+  // The circle keeps closing through the band, then HOLDS on the twin clip.
+  const atTop = enclosureRadiusPxForZoom(Z_TOP, SITE.lat, MAP_VIGNETTE_RING_M, C);
+  assert.ok(atTop > atHandoff, 'the circle still has room to close at Z_TOP');
+  for (const z of [Z_HANDOFF, 12, 12.1, 13, 13.4, Z_MAX]) {
     assert.equal(
-      enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C), atTop,
-      `z=${z} holds the Z_TOP enclosure`,
+      enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C), atHandoff,
+      `z=${z} holds the handoff enclosure`,
     );
   }
   // The forming law is untouched: it still starts at the screen corners and
@@ -113,7 +125,7 @@ test('FIX 3: the enclosure holds at Z_TOP instead of re-opening', () => {
     'still starts AT the corners',
   );
   let prev = Infinity;
-  for (let z = 7.5; z <= Z_TOP; z += 0.5) {
+  for (let z = 7.5; z <= Z_HANDOFF; z += 0.5) {
     const r = enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C);
     assert.ok(r < prev, `z=${z} still closes in from the edges`);
     prev = r;

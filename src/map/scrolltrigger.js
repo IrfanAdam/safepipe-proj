@@ -25,12 +25,13 @@ export const Z_MIN = 6.4; // country home — enforced as map minZoom (the cap)
 export const Z_FADE0 = 6.4; // fade starts: vector->sat keys off zoom only
 export const Z_FADE1 = 9.0; // fade ends: full sat well before the handoff (works at ANY center)
 export const Z_CENTER = 7.0; // proximity centering + brackets arm past this zoom
-export const Z_TOP = 10.5; // top-down checkpoint (bearing/pitch -> 0): a full zoom level of scrubbed tilt before the gate, so the iso reads as motion, never a snap
-export const Z_HANDOFF = 11.5; // deeper zoom hands to the twin
+export const Z_ISO_START = Z_FADE1; // terrain->iso begins when the satellite is full
+export const Z_TOP = 10.5; // iso checkpoint: terrain->iso completes here; the twin dissolve begins here
+export const Z_HANDOFF = 11.5; // iso->twin completes here (the twin owns the pose at/above this)
 export const Z_MAX = 14.0; // map maxZoom cap
 const HOME_EPS = 0.06; // zoomend-at-home tolerance for the reverse edge
-// Single source for the re-arm gate below the handoff (derived, never restated).
-export const REARM_DOWN_BELOW = Z_HANDOFF - 0.5; // drop below to re-arm onDown
+// Single source for the re-arm gate below the staged entry (derived, never restated).
+export const REARM_DOWN_BELOW = Z_TOP - 0.5; // drop below to re-arm onDown / staging
 const REARM_UP_ABOVE = Z_MIN + 0.3; // rise above to re-arm onUp
 
 export function clamp01(v) {
@@ -60,12 +61,14 @@ export function satOpacityForZoom(z) {
 }
 
 /** Shared enclosure law: the bracket clip-k AND the vignette circle-t ride
- * this ONE span (Z_CENTER..Z_TOP, smoothstepped) so the brackets and the
- * circle stay in sync on the way in and on retrace. Pure + node-checkable. */
+ * this ONE span (Z_CENTER..Z_HANDOFF, smoothstepped) so the brackets and the
+ * circle stay in sync on the way in and on retrace. The span now ends at the
+ * handoff, not the iso checkpoint: the circle keeps closing while the twin
+ * dissolves in, and it never shrinks past the twin's own clip radius. */
 export function enclosureTForZoom(z) {
   const n = +z;
   if (!Number.isFinite(n)) return 0;
-  return smooth01((n - Z_CENTER) / (Z_TOP - Z_CENTER));
+  return smooth01((n - Z_CENTER) / (Z_HANDOFF - Z_CENTER));
 }
 
 /** Live zoom -> proximity-center blend 0..1 (the shared enclosure span). */
@@ -78,16 +81,18 @@ export function shouldCenter(z) {
   return Number.isFinite(+z) && +z >= Z_CENTER;
 }
 
-/** Iso scrub target: pitch rides the zoom across the TOP..HANDOFF band (0 at
- * or below the top-down checkpoint, smooth 0..ISO_PITCH_DEG inside the band,
- * held at ISO_PITCH_DEG above it). Pure + node-checkable; the driver writes
- * it straight into the map transform so the gesture owns the tilt forward
- * AND back — no latch, no ease, no timer. */
+/** Iso scrub target: pitch rides the zoom across the ISO_START..Z_TOP band
+ * (0 at/below the terrain grade, smooth 0..ISO_PITCH_DEG as the terrain turns
+ * iso, held at ISO_PITCH_DEG through the twin handoff). Starting at the
+ * satellite-full zoom makes the terrain->iso motion begin a full level
+ * earlier instead of snapping in over the last level before the gate. Pure +
+ * node-checkable; the driver writes it straight into the map transform so the
+ * gesture owns the tilt forward AND back — no latch, no ease, no timer. */
 export const ISO_PITCH_DEG = 45;
 export function pitchTargetForZoom(z) {
   const n = +z;
   if (!Number.isFinite(n)) return 0;
-  return ISO_PITCH_DEG * smooth01((n - Z_TOP) / (Z_HANDOFF - Z_TOP));
+  return ISO_PITCH_DEG * smooth01((n - Z_ISO_START) / (Z_TOP - Z_ISO_START));
 }
 /** Top-down checkpoint reached (bearing/pitch -> 0). */
 export function isTopDown(z) {
@@ -162,8 +167,8 @@ export function accumStagedS(s, deltaY) {
  * only). The tilt extra relaxes to 0 across the reveal band, so the commit
  * still meets the twin iso pole exactly (ISO_PITCH_DEG). Pure +
  * node-checkable; symmetric on scroll-up (pure fns of S). */
-export const STAGED_HOLD_PITCH_DEG = 5; // extra tilt at full tilt-stage, relaxed by reveal
-export const STAGED_HOLD_RING_CLOSE = 0.12; // enclosure radius closes this fraction at full ring-stage
+export const STAGED_HOLD_PITCH_DEG = 0; // the zoom-driven reveal already carries the motion; hold the iso pole exactly
+export const STAGED_HOLD_RING_CLOSE = 0; // enclosure already lands on the twin clip at the handoff; no extra shrink
 export function stagedHoldPitchForS(s) {
   const st = handoffStagesForScroll(s);
   return STAGED_HOLD_PITCH_DEG * st.tilt * (1 - st.reveal);
@@ -193,24 +198,23 @@ export function vignetteRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_
 /* Enclosure forming wash (map side): the displayed vignette circle starts at
  * the hotspot's farthest screen corner (clear frame, darkness only biasing
  * in from the edges) and closes onto the projected ring across the SHARED
- * enclosure span Z_CENTER..Z_TOP (enclosureTForZoom — the same law as the
+ * enclosure span Z_CENTER..Z_HANDOFF (enclosureTForZoom — the same law as the
  * bracket clip-k, so circle and brackets stay in sync) — display =
- * corner*(1-t) + projected*t. At/above Z_TOP t=1 so it IS the clip circle
- * exactly (held through handoff); at/below band start it
- * parks at null (an ungated surround would black the frame). cornerPx is
- * viewport-relative (driver passes the hotspot's farthest-corner distance),
- * so the enclosure always reaches the screen edges on any aspect — never a
- * peephole. Pure in (z, corner), symmetric on zoom-out. */
+ * corner*(1-t) + projected*t. At/above Z_HANDOFF t=1 so it IS the twin's clip
+ * circle exactly; the circle never shrinks below that radius, so the map-side
+ * enclosing and the twin clip meet without a re-open or an over-zoom.
+ * cornerPx is viewport-relative (driver passes the hotspot's farthest-corner
+ * distance), so the enclosure always reaches the screen edges on any aspect —
+ * never a peephole. Pure in (z, corner), symmetric on zoom-out. */
 export function enclosureRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M, cornerPx = null) {
   const n = +zoom;
   if (!Number.isFinite(n)) return null;
-  // The projected ring is evaluated at the HOLD zoom (Z_TOP), NEVER at the
-  // live zoom. The circle closes onto the ring across Z_CENTER..Z_TOP and
-  // then HOLDS: the twin's clip is a FIXED ground circle, so a live-zoom
-  // projection would drift away from it and re-open the surround (the ring
-  // subtends more pixels as you zoom in — +121px of re-open between Z_TOP
-  // and the handoff). One law, one hold point, symmetric on zoom-out.
-  const vr = vignetteRadiusPxForZoom(Z_TOP, latDeg, ringM);
+  // The projected ring is evaluated at the HANDOFF zoom: the twin's clip is a
+  // fixed ground circle at that pose. Holding at the earlier Z_TOP projection
+  // over-zoomed the map (121px vs the twin's 242px clip) — the owner sees the
+  // circle shrink too far before the twin arrives. Evaluate at the handoff so
+  // the circle lands on the twin's clip and holds there.
+  const vr = vignetteRadiusPxForZoom(Z_HANDOFF, latDeg, ringM);
   const c = +cornerPx;
   if (!Number.isFinite(vr) || !Number.isFinite(c) || !(c > 0)) return null;
   const t = enclosureTForZoom(n);

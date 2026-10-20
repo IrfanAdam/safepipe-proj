@@ -29,6 +29,8 @@ import {
   needsHandoff,
   handoffScrubForZoom,
   handoffStagesForScroll,
+  HANDOFF_STAGED_S_MAX,
+  HANDOFF_REVEAL_LEN_PX,
   accumStagedS,
   stagedHoldPitchForS,
   stagedHoldRingCloseForS,
@@ -45,6 +47,7 @@ import {
   Z_LOCK_ARM,
   Z_MIN,
   Z_FADE1,
+  Z_ISO_START,
   Z_HANDOFF,
   Z_TOP,
   Z_MAX,
@@ -637,7 +640,7 @@ const ISO_SCRUB_SLEW_DEG = 10; // per-step tilt cap: a flick jumping the band gl
 const ISO_SCRUB_RELEASE = 0.3; // zoom below Z_TOP-this releases ownership
 const ISO_SETTLE_TOL_DEG = 0.5; // settle landings treat bearing/pitch inside this of target as arrived — never fights damping
 const SETTLE_EASE_MS = 250; // every settle-landing glide (center-ease, reconcile, catch-up) shares this tempo
-const STAGED_EXIT_BELOW = 0.05; // zoomend settle this far below Z_HANDOFF unwinds the staged hold (at-gate holds)
+const STAGED_EXIT_BELOW = 0.05; // zoomend settle this far below Z_TOP unwinds the staged hold (at-gate holds)
 let isoPumpOn = false; // per-frame tilt pump flight flag (single rAF loop while the band owns pitch)
 /** Per-frame tilt pump: while the iso band owns pitch, drive it toward the
  * LIVE law target every animation frame — not per zoom tick. Mid-glide the
@@ -922,11 +925,11 @@ function onNativeZoomStep(snap, source) {
     // Journey enclosure: the vignette circle starts at the hotspot's farthest
     // screen corner (clear frame, darkness biasing in from the edges) and
     // closes onto the PROJECTED ring radius across the shared enclosure
-    // span Z_CENTER..Z_TOP (enclosureRadiusPxForZoom: corner*(1-t) + R/mpp*t
-    // — the SAME law as the bracket clip-k, so circle and brackets stay in
-    // sync — exact R at/above Z_TOP, held through handoff: the same ground
-    // circle the twin clip cuts), so the
-    // enclosing coincides with the twin clip exactly at handoff. The
+    // span Z_CENTER..Z_HANDOFF (enclosureRadiusPxForZoom: corner*(1-t) +
+    // R/mpp*t — the SAME law as the bracket clip-k, so circle and brackets
+    // stay in sync — exact R at/above Z_HANDOFF: the same ground circle the
+    // twin clip cuts), so the enclosing coincides with the twin clip exactly
+    // at handoff and never shrinks past it. The
     // corner brackets ride the SAME --vx/--vy/--vr (their glyph centres sit
     // on the ring bounding-square corners), so one write moves both — the
     // old canvas-percentage corner law is gone. Gate: blend>0 (z>7) — below
@@ -1078,8 +1081,8 @@ function onNativeZoomStep(snap, source) {
         }
       }
     }
-    // (4) ISO SCRUB — past the top-down checkpoint the tilt rides the zoom
-    // itself (Z_TOP..Z_HANDOFF -> pitch 0..45), written straight into the
+    // (4) ISO SCRUB — the tilt rides the zoom itself (Z_ISO_START..Z_TOP ->
+    // pitch 0..45, held at 45 through the handoff), written straight into the
     // transform so the running scroll glide is never stopped: no latch, no
     // easeTo, no timers. Zoom-out retraces it symmetrically. Ownership: the
     // scrub engages whenever the live pitch sits
@@ -1093,17 +1096,16 @@ function onNativeZoomStep(snap, source) {
     // Twin paths own the camera while open. Task-37: the gesture recede
     // does NOT block this — pitch 45->0 IS the mirrored checkpoint on the
     // way out, ridden by the same law.
-    // GATE-3 REVISION: the scrub owns the tilt on the way OUT too. The
-    // engagement test used to require z >= Z_TOP, so once the reverse leg
-    // dropped below the top-down checkpoint the law stopped driving and the
-    // tilt sat at ISO_PITCH_DEG for the whole way home (the settle-reconcile
-    // only fires on zoomend, i.e. after the gesture stops). The engagement
-    // is now: the journey owns the tilt if it owned it going in
+    // GATE-3 REVISION: the scrub owns the tilt from the terrain grade
+    // (Z_ISO_START) all the way through the handoff, on the way OUT too. The
+    // engagement test used to require z >= Z_TOP, so the terrain->iso motion
+    // only started at the last level; it now begins when the satellite is
+    // full. The journey owns the tilt if it owned it going in
     // (isoScrubOwned) OR the law currently asks for a non-zero tilt
-    // (z >= Z_TOP) OR the tilt is still stranded above the law's target
+    // (z >= Z_ISO_START) OR the tilt is still stranded above the law's target
     // (the flatten case). The law is ONE law — pitchTargetForZoom(z) —
     // and it is 0 below the band, so the reverse retraces it exactly.
-    if (!twinOpen && !busyNoRecede && prox && (prox.near || isoScrubOwned || z >= Z_TOP || isoRestoreDue)) {
+    if (!twinOpen && !busyNoRecede && prox && (prox.near || isoScrubOwned || z >= Z_ISO_START || isoRestoreDue)) {
       const pLaw = pitchTargetForZoom(z);
       let pCur = null;
       try {
@@ -1112,14 +1114,14 @@ function onNativeZoomStep(snap, source) {
       if (Number.isFinite(pCur)) {
         let releaseNow = false;
         if (!isoScrubOwned) {
-          if (z >= Z_TOP && pCur <= pLaw + ISO_SCRUB_SLACK_DEG) {
+          if (z >= Z_ISO_START && pCur <= pLaw + ISO_SCRUB_SLACK_DEG) {
             isoScrubOwned = true;
             isoRestoreDue = true;
             try {
               pumpIsoPitch(); // per-frame carry from here — cadence-independent tilt
             } catch { /* pump is best-effort */ }
           }
-        } else if (z < Z_TOP - ISO_SCRUB_RELEASE && Math.abs(pCur) <= ISO_SCRUB_EPS_DEG) {
+        } else if (z < Z_ISO_START - ISO_SCRUB_RELEASE && Math.abs(pCur) <= ISO_SCRUB_EPS_DEG) {
           // GATE-3 REVISION: the journey releases the tilt only once the law
           // has actually flattened it. The old test released on ZOOM alone
           // (z < Z_TOP - release), which handed the camera back mid-retrace
@@ -1184,7 +1186,7 @@ function onNativeZoomStep(snap, source) {
         }
       }
     }
-    if (!twinOpen && !busyNow && needsHandoff(z)) {
+    if (!twinOpen && !busyNow && z >= Z_TOP) {
       if (!scrubFired) {
         scrubFired = true; // latched now; staging runs next frame (afterFrame)
         try {
@@ -1193,7 +1195,7 @@ function onNativeZoomStep(snap, source) {
         afterFrame(() => {
           try {
             if (twinOpen || transitId || receding) return; // twin/staging owns it
-            if (!Number.isFinite(mapRef.getZoom()) || !needsHandoff(mapRef.getZoom())) { scrubFired = false; return; }
+            if (!Number.isFinite(mapRef.getZoom()) || mapRef.getZoom() < Z_TOP) { scrubFired = false; return; }
             flyToSectorThenTwin(siteSector);
           } catch { /* handoff best-effort */ }
         });
@@ -1202,11 +1204,25 @@ function onNativeZoomStep(snap, source) {
       scrubFired = false; // re-arm: a fresh deep zoom may hand off again
       isoScrubOwned = false;
     }
-    // Task-35 staged exit (reverse): zoomend settle below the gate unwinds
-    // the hold — unclamp, drop accumulated scroll, quietly tear down the
-    // uncommitted prewarm. Settle AT the gate holds (no-op). Forward exit is
-    // twin-ready + S-commit (driveStagedOverlay/finalizeStagedReveal).
-    if (stagedActive && source === 'native-zoomend' && z < Z_HANDOFF - STAGED_EXIT_BELOW) {
+    // GATE-3 REVISION: the iso->twin dissolve is a ZOOM law inside the
+    // Z_TOP..Z_HANDOFF band, not a post-gate wheel accumulator. Mapping z to
+    // the S reveal band makes the twin dissolve in as the map zooms, and it
+    // reaches full at the handoff without extra scrolling — the owner's
+    // "stuck at terrain iso, never reaches the twin" failure. The wheel S
+    // still owns the clamped post-gate hold and the reverse retrace.
+    if (stagedActive && !stagedCommitted && Number.isFinite(z) && z >= Z_TOP) {
+      const tBand = smooth01((z - Z_TOP) / (Z_HANDOFF - Z_TOP));
+      const revealStart = Math.max(0, HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX);
+      stagedS = revealStart + (HANDOFF_STAGED_S_MAX - revealStart) * tBand;
+      try {
+        driveStagedOverlay();
+      } catch { /* overlay drive is best-effort */ }
+    }
+    // Task-35 staged exit (reverse): zoomend settle below the iso checkpoint
+    // unwinds the hold — unclamp, drop accumulated scroll, quietly tear down
+    // the uncommitted prewarm. Settle inside the band holds (no-op). Forward
+    // exit is twin-ready + S-commit (driveStagedOverlay/finalizeStagedReveal).
+    if (stagedActive && source === 'native-zoomend' && z < Z_TOP - STAGED_EXIT_BELOW) {
       try {
         exitStaged();
       } catch { /* unwind is best-effort */ }
@@ -1466,7 +1482,12 @@ function flyToSectorThenTwin(id, opts = {}) {
   } catch {
     liveZ = null;
   }
-  const deep = Number.isFinite(liveZ) && needsHandoff(liveZ);
+  // Staging starts at the ISO checkpoint (Z_TOP), not the final handoff: the
+  // terrain->iso motion is already complete there, so the twin prewarm and the
+  // iso->twin dissolve get a full zoom level to run instead of starting after
+  // the map has already clamped. Click/fallback entries below Z_TOP keep the
+  // discrete jump path.
+  const deep = Number.isFinite(liveZ) && liveZ >= Z_TOP;
   transitId = id;
   window.__mapProbe.transit = id;
   // Task-37: a fresh handoff disarms an armed gesture recede (the camera is
@@ -1551,7 +1572,15 @@ function flyToSectorThenTwin(id, opts = {}) {
         if (mapRef && typeof mapRef.setMaxZoom === 'function') mapRef.setMaxZoom(Z_HANDOFF);
       } catch { /* clamp is best-effort */ }
       stagedActive = true;
-      stagedS = 0;
+      // Seed S from the LIVE zoom, not the band start: a fast wheel burst can
+      // arrive at 11.5 in one step, and there may be no further zoom step to
+      // drive the band. Seeding from liveZ means the prewarm/ready path
+      // already holds the correct reveal (and can commit immediately).
+      const revealStart = Math.max(0, HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX);
+      const tSeed = clamp01(
+        ((Number.isFinite(liveZ) ? liveZ : Z_TOP) - Z_TOP) / (Z_HANDOFF - Z_TOP),
+      );
+      stagedS = revealStart + (HANDOFF_STAGED_S_MAX - revealStart) * smooth01(tSeed);
       stagedCommitted = false;
       lastPostedStagedS = null; // Task-37: the S producer re-arms (S=0 posts on first drive)
       try {
@@ -1755,25 +1784,20 @@ function driveStagedOverlay() {
   // overlay is the exact failure (off-centre runs: the twin canvas held
   // 97.4% #0b0c0c, luma 94.7 -> 15.7, and never recovered) — `ready`
   // only proves the twin LISTENER is alive, not that it drew anything.
-  // The commit requires BOTH: the twin has real content (painted frames,
-  // basemap laid down, terrain live) AND the hotspot is near at commit
-  // time (re-derived live, never the arrival-time value).
+  // The commit requires REAL CONTENT. Proximity no longer gates the commit:
+  // the owner's scroll must reach the twin, and the deep arrival already
+  // clamps the camera; holding the map because the cursor is not near is
+  // what left the journey stuck at terrain iso.
   if (st.reveal >= 1) {
-    let nearNow = false;
-    try {
-      const px = proximityInfo();
-      nearNow = !!(px && px.near);
-    } catch { nearNow = false; }
     const hasContent = twinFrameHasContent();
-    if (!nearNow || !hasContent) {
+    if (!hasContent) {
       try {
         if (root.style.opacity !== '0') root.style.opacity = '0';
       } catch { /* cosmetic */ }
       try {
-        window.__mapProbe.staged.blankTwin = !hasContent;
-        window.__mapProbe.staged.commitNear = nearNow;
+        window.__mapProbe.staged.blankTwin = true;
       } catch { /* probe cosmetic */ }
-      return; // no commit — hold the map, retry on the next S tick
+      return; // no commit — hold the map, retry when the twin reports content
     }
     try {
       window.__mapProbe.staged.blankTwin = false;
