@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T12:20:25.201Z",
+  "generated": "2026-10-20T12:24:20.519Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,24 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "621dfb2",
+      "full": "621dfb222fc392b2a774b09003df452b62dd292e",
+      "date": "2026-10-20",
+      "time": "17:51",
+      "subject": "docs(journey): comment cites handoff zoom, not stale z=12 [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "0341184",
+      "full": "0341184dc4d9ea97b08b49cf89cf618eb7aa0fd4",
+      "date": "2026-10-20",
+      "time": "17:51",
+      "subject": "fix(vectors): process-osm reads repo-relative cache, kills last /tmp path [plan:2026-10-12_175646-ops3d-geo-triangulation.md#phase-01]",
+      "plan": "2026-10-12_175646-ops3d-geo-triangulation.md",
+      "anchor": "phase-01"
+    },
     {
       "sha": "ca15651",
       "full": "ca1565192b630d3235138369c5029e791544129d",
@@ -5728,7 +5746,10 @@
     }
   ],
   "wip": [
-    "scripts/process-osm.mjs",
+    "design-system/ops-tokens.css",
+    "ops3d-map.html",
+    "public/version.json",
+    "src/map/main.js",
     "src/map/scrolltrigger.js"
   ]
 }
