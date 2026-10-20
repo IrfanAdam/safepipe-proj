@@ -159,8 +159,8 @@ export function accumStagedS(s, deltaY) {
  * the map-side enclosing can never drift from the twin clip circle.
  * Projected to CSS px at the live zoom/lat: R / metersPerPixel. The
  * #map-vignette circle rides this radius, so the map-side enclosing
- * coincides with the twin clip circle exactly (~685px diameter at z=12,
- * an example zoom inside the post-gate band — not the gate itself,
+ * coincides with the twin clip circle exactly (~685px diameter at the handoff
+ * zoom, an example zoom inside the post-gate band — not the gate itself,
  * held through handoff) — symmetric on zoom-out, since it is a pure
  * function of z. */
 export const MAP_VIGNETTE_RING_M = RING_RADIUS_M;
