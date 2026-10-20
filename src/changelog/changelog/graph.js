@@ -58,7 +58,18 @@ export function graph({ plans, day }) {
   const cols = weeks.map((col) => {
     const cells = col.map((d) => {
       const k = isoDay(d),
-        todayCls = k === isoDay(today) ? ' is-today' : '';
+        todayIso = isoDay(today),
+        todayCls = k === todayIso ? ' is-today' : '';
+      // Versatile: commits gradation (lv) + due outline coexist — due never hides commits.
+      // Due that lands on today: tint (if commits exist) + accent outline + pulse.
+      if (k === todayIso && dues.has(k)) {
+        const nDue = dc[k] || 0;
+        if (!nDue) {
+          return `<button class="ds-day is-today is-due${day === k ? ' on' : ''}" data-day="${k}" data-due-day="${k}" data-tip="${dueCounts.get(k)} Due · ${fmtDate(k)} — filter list" aria-pressed="${day === k}" aria-label="${dueCounts.get(k)} due on ${fmtDate(k)} — filter list"></button>`;
+        }
+        const lvDue = Math.min(4, Math.ceil(4 * Math.sqrt(nDue / max)));
+        return `<button class="ds-day lv${lvDue} is-today is-due${day === k ? ' on' : ''}" data-day="${k}" data-due-day="${k}" data-tip="${nDue} changes · ${fmtDate(k)} + ${dueCounts.get(k)} Due — filter list" aria-pressed="${day === k}" aria-label="${nDue} changes + ${dueCounts.get(k)} due on ${fmtDate(k)} — filter list"></button>`;
+      }
       if (d > today) {
         if (dues.has(k)) return `<button class="ds-day is-future is-due${day === k ? ' on' : ''}" data-day="${k}" data-due-day="${k}" data-tip="${dueCounts.get(k)} Due · ${fmtDate(k)} — filter list" aria-pressed="${day === k}" aria-label="${dueCounts.get(k)} due on ${fmtDate(k)} — filter list"></button>`;
         return `<span class="ds-day is-future" data-tip="${fmtDate(k)}"></span>`;

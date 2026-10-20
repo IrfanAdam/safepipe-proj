@@ -15,11 +15,43 @@ button.ds-day.lv4{background:var(--color-accent)}
 .ds-day.on{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 button.ds-day:hover{outline:var(--cl-1) solid var(--color-accent);outline-offset:var(--cl-1)}
 button.ds-day:focus-visible{outline:var(--cl-1) solid var(--color-accent);outline-offset:var(--cl-1)}
-.ds-day.is-today{position:relative;border-color:var(--color-accent)}
+.ds-day.is-today{position:relative}
+/* Today ping (blobs): twin concentric ripples radiating from the
+   current-day cell — staggered rings gliding outward + fading. Inset
+   expands the ring (border-width stays constant); border-radius scales
+   proportionally so the squircle stays concentric at every frame:
+   R(n) = R0 * S/S0 = R0 + 0.5·n  (R0=var(--radius-xs)=4, S0=var(--cl-16)=16,
+   n=expansion). At n=var(--cl-6)=6 → R=7 keeps the 25% relative radii.
+   For a true geometric offset (equidistant stroke) use R0+n → 10px.
+   Opacity is capped ~0.38 and eased out so the loop is soft, not jarring. */
+.ds-day.is-today::before,
+.ds-day.is-today::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border:var(--cl-1) solid var(--color-accent);
+  border-radius:var(--radius-xs);
+  pointer-events:none;
+  opacity:0;
+  will-change:inset,opacity,border-radius;
+  animation:ds-today-pulse 3s cubic-bezier(.25,.46,.45,.94) infinite;
+}
+.ds-day.is-today::before{animation-delay:-1.5s}
+@keyframes ds-today-pulse{
+  0%{opacity:0;inset:0;border-radius:var(--radius-xs)}
+  14%{opacity:.36}
+  100%{opacity:0;inset:calc(-1 * var(--cl-6));border-radius:calc(var(--radius-xs) + var(--cl-6) * .5)}
+}
+@media (prefers-reduced-motion:reduce){
+  .ds-day.is-today::before{animation:none;opacity:.38;inset:calc(-1 * var(--cl-2));border-radius:calc(var(--radius-xs) + var(--cl-2) * .5)}
+  .ds-day.is-today::after{animation:none;display:none}
+}
 .ds-day.is-future{opacity:.6}
 /* scheduling ghost-dot (timeline Task 3): future Due marker — full-opacity
    accent outline on the dimmed future cell, no new colors. */
 .ds-day.is-due{opacity:1;border-color:var(--color-accent);outline:var(--cl-1) solid var(--color-accent);outline-offset:calc(-1 * var(--cl-1))}
+/* Versatile: gradation (lv1-4) = commits; is-due = accent outline on top. Future dues are hollow by definition (no commits yet) — that hollow comes from is-future, not from is-due. Today due is the combo: tint + outline + pulse. Only a due with zero commits renders hollow. */
+button.ds-day.is-due:not(.lv1):not(.lv2):not(.lv3):not(.lv4){background:var(--color-surface);border-color:var(--color-accent)}
 /* Future dues stay clickable filters but keep the hollow outline look —
    they are incomplete (nothing logged yet), never solid like history. */
 button.ds-day.is-future{background:var(--color-surface);border-color:var(--color-accent)}
