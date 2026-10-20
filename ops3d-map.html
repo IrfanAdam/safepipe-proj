@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Ops 3D — Hotspot launcher map</title>
 <link rel="icon" href="data:," />
+<link rel="stylesheet" href="./design-system/ops-tokens.css" />
 <style>
-  html, body { margin: 0; height: 100%; background: var(--ops-bg, #0b0c0c); }
+  html, body { margin: 0; height: 100%; background: var(--ops-bg); }
   #app { position: fixed; inset: 0; overflow: hidden; }
-  #map { position: absolute; inset: 0; background: var(--ops-bg, #0b0c0c);
+  #map { position: absolute; inset: 0; background: var(--ops-bg);
     /* GATE-12-A NATIVE-ZOOM: native zoom owns wheel + pinch — the journey
      * rides on zoom events, never captures gestures. touch-action:none lets
      * MapLibre receive the two-finger pinch natively. */
@@ -34,19 +35,19 @@
     --rc-half: calc((var(--rc-mark) + var(--rc-line) * 2) / 2); }
   #ring-clip.on { opacity: 1; }
   #ring-clip i { position: absolute; width: var(--rc-mark); height: var(--rc-mark);
-    border: var(--rc-line) solid var(--ops-amber, #ffd9a0); opacity: 0.9;
+    border: var(--rc-line) solid var(--ops-amber); opacity: 0.9;
     box-sizing: content-box; }
-  #ring-clip .rc-tl { left: calc(var(--vx, 50%) - var(--vr, 260px) - var(--rc-half));
-    top: calc(var(--vy, 50%) - var(--vr, 260px) - var(--rc-half));
+  #ring-clip .rc-tl { left: calc(var(--vx, 50%) - var(--vr) - var(--rc-half));
+    top: calc(var(--vy, 50%) - var(--vr) - var(--rc-half));
     border-right-color: transparent; border-bottom-color: transparent; }
-  #ring-clip .rc-tr { left: calc(var(--vx, 50%) + var(--vr, 260px) - var(--rc-half));
-    top: calc(var(--vy, 50%) - var(--vr, 260px) - var(--rc-half));
+  #ring-clip .rc-tr { left: calc(var(--vx, 50%) + var(--vr) - var(--rc-half));
+    top: calc(var(--vy, 50%) - var(--vr) - var(--rc-half));
     border-left-color: transparent; border-bottom-color: transparent; }
-  #ring-clip .rc-bl { left: calc(var(--vx, 50%) - var(--vr, 260px) - var(--rc-half));
-    top: calc(var(--vy, 50%) + var(--vr, 260px) - var(--rc-half));
+  #ring-clip .rc-bl { left: calc(var(--vx, 50%) - var(--vr) - var(--rc-half));
+    top: calc(var(--vy, 50%) + var(--vr) - var(--rc-half));
     border-right-color: transparent; border-top-color: transparent; }
-  #ring-clip .rc-br { left: calc(var(--vx, 50%) + var(--vr, 260px) - var(--rc-half));
-    top: calc(var(--vy, 50%) + var(--vr, 260px) - var(--rc-half));
+  #ring-clip .rc-br { left: calc(var(--vx, 50%) + var(--vr) - var(--rc-half));
+    top: calc(var(--vy, 50%) + var(--vr) - var(--rc-half));
     border-left-color: transparent; border-top-color: transparent; }
   @media (prefers-reduced-motion: reduce) {
     #ring-clip { transition: none; }
@@ -59,25 +60,25 @@
   #map-fs {
     position: absolute; right: 12px; bottom: 12px; z-index: 2;
     padding: 8px 18px; cursor: pointer;
-    background: var(--ops-panel, rgba(10, 14, 18, 0.88));
-    border: 1px solid var(--ops-line, rgba(207, 212, 214, 0.18));
+    background: var(--ops-map-panel);
+    border: 1px solid var(--ops-line);
     clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
     font: 10px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.12em;
-    color: var(--ops-ink, #cfd4d6);
+    color: var(--ops-map-ink);
   }
-  #map-fs:hover { color: var(--ops-amber, #ffd9a0); }
+  #map-fs:hover { color: var(--ops-amber); }
   .map-pins { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
   .map-pin {
     position: absolute; transform: translate(-50%, -50%);
     width: 26px; height: 26px; border-radius: 50%;
-    border: 2px solid var(--ops-bg, #0b0c0c);
-    font: 11px/1 ui-monospace, monospace; color: #0b0c0c;
+    border: 2px solid var(--ops-bg);
+    font: 11px/1 ui-monospace, monospace; color: var(--ops-bg);
     pointer-events: auto; cursor: pointer;
   }
-  .map-pin--ok { background: #3eb46e; }
-  .map-pin--warn { background: #e8a33d; }
-  .map-pin--crit { background: #e05252; }
-  .map-pin[data-sel="true"] { outline: 2px solid var(--ops-amber, #ffd9a0); }
+  .map-pin--ok { background: var(--ops-map-pin-ok); }
+  .map-pin--warn { background: var(--ops-map-pin-warn); }
+  .map-pin--crit { background: var(--ops-map-pin-crit); }
+  .map-pin[data-sel="true"] { outline: 2px solid var(--ops-amber); }
   /* GATE 3 look pass (Lane Q): single monitoring blip. Quiet 8px health dot
    * + expanding pulse ring + tag chip — reads as monitoring, never a pin
    * blob. Scoped to .map-pin--single only; multi-pin + twin overlay styles
@@ -86,14 +87,14 @@
     width: 14px; height: 14px; padding: 0;
     background: transparent; border: 0; border-radius: 50%;
   }
-  .map-pin--ok.map-pin--single { color: #3eb46e; }
-  .map-pin--warn.map-pin--single { color: #e8a33d; }
-  .map-pin--crit.map-pin--single { color: #e05252; }
+  .map-pin--ok.map-pin--single { color: var(--ops-map-pin-ok); }
+  .map-pin--warn.map-pin--single { color: var(--ops-map-pin-warn); }
+  .map-pin--crit.map-pin--single { color: var(--ops-map-pin-crit); }
   .map-pin--single .map-pin__dot {
     position: absolute; left: 50%; top: 50%;
     width: 8px; height: 8px; transform: translate(-50%, -50%);
     border-radius: 50%; background: currentColor;
-    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9), 0 0 6px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 0 0 1.5px var(--ops-map-halo), 0 0 6px var(--ops-map-shade);
   }
   .map-pin--single::after {
     content: ""; position: absolute; inset: -9px; border-radius: 50%;
@@ -112,25 +113,25 @@
   .map-pin--single .map-pin__tag {
     position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
     font: 10px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.14em;
-    color: #2d373c; background: rgba(255, 255, 255, 0.88);
-    border: 1px solid rgba(45, 55, 60, 0.25); border-radius: 3px;
+    color: var(--ops-map-tag-ink); background: var(--ops-map-tag-bg);
+    border: 1px solid var(--ops-map-tag-line); border-radius: 3px;
     padding: 3px 7px; white-space: nowrap;
   }
   .map-pin--single[data-sel="true"] { outline: none; }
   .map-pin--single[data-sel="true"] .map-pin__dot {
-    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9), 0 0 0 3.5px var(--ops-amber, #ffd9a0);
+    box-shadow: 0 0 0 1.5px var(--ops-map-halo), 0 0 0 3.5px var(--ops-amber);
   }
   /* Task 18+19: full-screen twin overlay (iframe). The map stays mounted
    * underneath, so close (X/Esc/back) returns with hex + selection intact. */
   body.twin-open { overflow: hidden; }
   #twin-overlay {
     position: fixed; inset: 0; z-index: 50;
-    background: var(--ops-bg, #0b0c0c);
+    background: var(--ops-bg);
   }
   #twin-overlay[hidden] { display: none; }
   #twin-overlay #twin-frame {
     position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
-    background: #0b0c0c;
+    background: var(--ops-bg);
   }
   .twin-overlay__bar {
     position: absolute; top: 12px; right: 12px; z-index: 2;
@@ -138,32 +139,32 @@
   }
   .twin-overlay__label {
     font: 10px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.12em;
-    color: var(--ops-dim, rgba(207, 212, 214, 0.65));
+    color: var(--ops-dim);
   }
   #twin-close {
     padding: 8px 18px; cursor: pointer;
-    background: var(--ops-panel, rgba(10, 14, 18, 0.88));
-    border: 1px solid var(--ops-line, rgba(207, 212, 214, 0.18));
+    background: var(--ops-map-panel);
+    border: 1px solid var(--ops-line);
     clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
     font: 10px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.12em;
-    color: var(--ops-ink, #cfd4d6);
+    color: var(--ops-map-ink);
   }
-  #twin-close:hover { color: var(--ops-amber, #ffd9a0); }
+  #twin-close:hover { color: var(--ops-amber); }
   /* Handoff-3 Lane 1: overlay-fullscreen guarantee. Fullscreen is requested
    * on #twin-overlay ITSELF, so the CLOSE bar (a child) stays visible in
    * every state: windowed, map-fullscreen, overlay-fullscreen. */
-  #app:fullscreen { background: var(--ops-bg, #0b0c0c); }
-  #twin-overlay:fullscreen { background: var(--ops-bg, #0b0c0c); }
+  #app:fullscreen { background: var(--ops-bg); }
+  #twin-overlay:fullscreen { background: var(--ops-bg); }
   #twin-overlay:fullscreen .twin-overlay__bar { display: flex; }
-  #twin-overlay::backdrop { background: #0b0c0c; }
+  #twin-overlay::backdrop { background: var(--ops-bg); }
   /* T2 handoff: hotspot-centered circular enclosure staging the twin open.
    * Radius rides --vr (projected RING_RADIUS_M at the live zoom, set by the
-   * journey driver; 260px fallback) so the enclosing coincides with the
+   * journey driver; initial-value fallback) so the enclosing coincides with the
    * twin clip circle at handoff. Token-only where
    * possible (outer wash falls back to --ops-bg); pointer-transparent
    * so blip hit-testing is unchanged. Sits above pins, below twin.
    * --vr is a registered property (typed <length>) so per-step radius writes
-   * always resolve to a length — never fall back to 260px mid-gesture. NOTE:
+   * always resolve to a length — never fall back mid-gesture. NOTE:
    * do NOT put --vr in `transition`: a transition on the property freezes
    * the gradient at its start value instead of gliding (verified headless).
    * The close-in reads as animation because the gesture streams steps.
@@ -173,11 +174,11 @@
   @property --vr { syntax: '<length>'; inherits: true; initial-value: 260px; }
   #map-vignette {
     position: absolute; inset: 0; z-index: 3; pointer-events: none;
-    background: radial-gradient(circle var(--vr, 260px) at var(--vx, 50%) var(--vy, 50%),
+    background: radial-gradient(circle var(--vr) at var(--vx, 50%) var(--vy, 50%),
       transparent 0,
-      transparent var(--vr, 260px),
-      rgba(0, 0, 0, 0.65) var(--vr, 260px),
-      var(--ops-bg, #0b0c0c) 100%);
+      transparent var(--vr),
+      rgba(0, 0, 0, var(--ops-vignette-alpha)) var(--vr),
+      var(--ops-bg) 100%);
     opacity: 0; transition: opacity 0.45s ease; /* GATE-3 REVISION tempo */
   }
   #map-vignette.on { opacity: 1; }
@@ -186,7 +187,7 @@
    * Below vignette/pins so chrome never pops; pointer-transparent. */
   #vector-hold {
     position: absolute; inset: 0; z-index: 2; pointer-events: none;
-    background: #f2f1ec;
+    background: var(--ops-map-hold);
     opacity: 0; transition: opacity 0.3s ease;
   }
   #vector-hold.on { opacity: 1; transition: none; }
@@ -196,7 +197,7 @@
   #map-fatal {
     display: none; position: fixed; left: 12px; bottom: 12px; z-index: 99;
     max-width: 80vw; padding: 8px 14px;
-    background: rgba(80, 10, 10, 0.94); color: #ffd9a0;
+    background: var(--ops-map-fatal); color: var(--ops-amber);
     font: 11px/1.6 ui-monospace, monospace; white-space: pre-wrap;
   }
   /* LANE A: naked flat view — minimal micro attribution (terms require a
@@ -204,7 +205,7 @@
   #map-credit {
     position: absolute; left: 6px; bottom: 4px; z-index: 2;
     font: 8px/1.4 ui-monospace, Menlo, monospace; letter-spacing: 0.02em;
-    color: rgba(45, 55, 60, 0.5); background: transparent;
+    color: var(--ops-map-credit); background: transparent;
     pointer-events: none; user-select: none; max-width: 60vw;
   }
   #map-credit a { color: inherit; text-decoration: none; }
@@ -217,24 +218,24 @@
     z-index: 2; pointer-events: none; user-select: none;
     display: flex; flex-direction: column; align-items: center; gap: 5px;
     padding: 7px 12px;
-    background: var(--ops-panel, rgba(10, 14, 18, 0.88));
-    border: 1px solid var(--ops-line, rgba(207, 212, 214, 0.18));
+    background: var(--ops-map-panel);
+    border: 1px solid var(--ops-line);
     font: 10px/1.4 ui-monospace, Menlo, monospace; letter-spacing: 0.1em;
-    color: var(--ops-ink, #cfd4d6); white-space: nowrap;
+    color: var(--ops-map-ink); white-space: nowrap;
   }
   #map-zoomrange-row { display: flex; align-items: center; gap: 8px; }
-  #map-zoomrange-left, #map-zoomrange-right { opacity: 0.65; }
+  #map-zoomrange-left, #map-zoomrange-right { opacity: var(--ops-faint); }
   #map-zoomrange-track {
     position: relative; width: 170px; height: 3px;
-    background: var(--ops-line, rgba(207, 212, 214, 0.28));
+    background: var(--ops-map-track);
   }
   #map-zoomrange-needle {
     position: absolute; top: -3px; width: 2px; height: 9px;
-    background: var(--ops-ink, #cfd4d6);
+    background: var(--ops-map-ink);
   }
   #map-zoomrange-hand {
     position: absolute; top: -2px; width: 2px; height: 7px;
-    background: var(--ops-amber, #ffd9a0); opacity: 0.9;
+    background: var(--ops-amber); opacity: 0.9;
   }
   /* LANE A: never show the maplibre attrib pill / info button even if a
    * control slips in via a plugin path. */

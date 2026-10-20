@@ -43,3 +43,35 @@
   /* Stacking */
   --ops-z-hud: 10;
 }
+
+/* ops3d-map.html lane (additive, exact-value) — the map page loads no other
+ * ops stylesheet, so every var() there previously resolved to its inline
+ * fallback. Each value below is byte-identical to the fallback it replaces:
+ * no visual change. Bare --ops-bg / --ops-amber / --ops-dim / --ops-line are
+ * referenced ONLY by ops3d-map.html (verified repo-wide), so defining them
+ * here changes no other page. --ops-panel / --ops-ink are intentionally NOT
+ * reused: their values differ from the map fallbacks, so the map keeps the
+ * exact-value --ops-map-panel / --ops-map-ink below.
+ */
+:root {
+  --ops-bg: #0b0c0c;
+  --ops-amber: #ffd9a0;
+  --ops-dim: rgba(207, 212, 214, 0.65);
+  --ops-line: rgba(207, 212, 214, 0.18);
+  --ops-map-panel: rgba(10, 14, 18, 0.88);
+  --ops-map-ink: #cfd4d6;
+  --ops-map-track: rgba(207, 212, 214, 0.28);
+  --ops-map-pin-ok: #3eb46e;
+  --ops-map-pin-warn: #e8a33d;
+  --ops-map-pin-crit: #e05252;
+  --ops-map-halo: rgba(255, 255, 255, 0.9);
+  --ops-map-shade: rgba(0, 0, 0, 0.35);
+  --ops-map-tag-ink: #2d373c;
+  --ops-map-tag-bg: rgba(255, 255, 255, 0.88);
+  --ops-map-tag-line: rgba(45, 55, 60, 0.25);
+  --ops-map-hold: #f2f1ec;
+  --ops-map-fatal: rgba(80, 10, 10, 0.94);
+  --ops-map-credit: rgba(45, 55, 60, 0.5);
+  --ops-vignette-alpha: 0.65;
+  --ops-faint: 0.65;
+}
