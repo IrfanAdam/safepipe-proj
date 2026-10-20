@@ -84,12 +84,12 @@ describe('dueOf', () => {
     assert.equal(dueOf({ head: 'Task 1 — A', body: '## Task 1 — A\n*Due: 2026-10-20*\n- [x] **a** x' }), null);
     assert.equal(dueOf(null), null);
   });
-  it('finds the live Dues in the real corpus (6, all on incomplete sections)', () => {
-    // Pinned: prototype-screens PIP sheet, realworld Phase 06, geo Lanes A+B,
+  it('finds the live Dues in the real corpus (4, all on incomplete sections)', () => {
+    // Pinned: prototype-screens PIP sheet, realworld Phase 06,
     // twin-work Phases 01-02. A Due added/cleared must update this pin.
     let n = 0;
     for (const p of corpus) for (const s of p.sprints) if (dueOf(s) !== null) n++;
-    assert.equal(n, 6);
+    assert.equal(n, 4);
   });
 });
 
