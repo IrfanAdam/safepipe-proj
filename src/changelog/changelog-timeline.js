@@ -14,7 +14,7 @@
 //     revs: [{ date, ... }] }                // history[file] entries
 // `sprints` may read `sections`; `revs` may read `history`; per-section
 // commits may read `hits`. A precomputed section Due may ride `s.due`.
-import { buildState, state, isDone, parseGates, dueOf, goal as goalOf } from './changelog-parse.js';
+import { buildState, state, isDone, parseGates, dueOf, goal as goalOf, liveSprints, isCancelledHead } from './changelog-parse.js';
 import { descOf, clip, oneLine, planSentence } from './changelog-titles.js';
 
 // Max internal gap (days) inside one streak. Frozen — do not rename.
@@ -127,7 +127,7 @@ export const planSummary = (plan = {}, todayISO) => {
   const today = ISO.test(todayISO || '') ? todayISO : isoToday();
   return {
     title: titleOf(plan),
-    status: buildState(sections),
+    status: buildState(liveSprints(sections)),
     commits: ((plan && plan.commits) || []).length,
     revs: revsOf(plan).length,
     evals: evalsOf(plan.raw || ''),
@@ -155,7 +155,7 @@ export const boutSummary = (plan = {}, bout = {}, todayISO) => {
     title: titleOf(plan),
     status,
     phases: sections.length,
-    phasesDone: sections.filter((s) => isDone(buildState([s]))).length,
+    phasesDone: sections.filter((s) => isCancelledHead(s.head) || isDone(buildState([s]))).length,
     complete: isDone(status),
     done: dates.length ? dates[dates.length - 1] : null,
     commits: ((plan && plan.commits) || []).filter(has).length,

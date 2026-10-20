@@ -5,7 +5,7 @@
 // boutSummary — no reimplemented grouping.
 import { activeDatesOf, boutsOf, ghostOf, boutSummary, planTip, MERGE_GAP } from '../changelog-timeline.js';
 import { hits, commits } from '../changelog-links.js';
-import { state, isDone, buildState, dueOf, fmtDate, isoDay } from '../changelog-parse.js';
+import { state, isDone, buildState, dueOf, fmtDate, isoDay, liveSprints } from '../changelog-parse.js';
 import { clip, oneLine } from '../changelog-titles.js';
 import { esc } from './esc.js';
 import history from '../../ds/plan-history.json';
@@ -190,7 +190,7 @@ export function paintTimeline(root, ctx) {
       tip = planTip(ep, 100) || clip(oneLine(ep.title), 100);
     } catch { dates = []; bouts = []; ghost = null; tip = ''; }
     return { plan: ep, dates, bouts, ghost,
-      frac: buildState(ep.sprints || []), tip };
+      frac: buildState(liveSprints(ep.sprints || [])), tip };
   });
   const grid = timelineGrid(rows, today);
   rows = sortTimelineRows(rows, st.tlSort);

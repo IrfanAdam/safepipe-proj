@@ -1,6 +1,6 @@
 // safepipe changelog — build cards · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
-import { fmtDate, fmtTime, buildState, state, isDone } from '../changelog-parse.js';
-import { planSealed } from './raw-detail.js';
+import { fmtDate, fmtTime, buildState, state, isDone, liveSprints } from '../changelog-parse.js';
+import { planSealed, planCancelled } from './raw-detail.js';
 import { sectionRaw } from './raw-detail.js';
 import { hits, commits, unlinked } from '../changelog-links.js';
 import { clip, oneLine } from '../changelog-titles.js';
@@ -29,7 +29,7 @@ export function paintPlan(root, ctx){
   }
   const sprint = sprints[si];
   root.querySelector('[data-col="plan"]').innerHTML = list.map((p, i) => {
-    const seq = String(list.length - i).padStart(2, '0'), num = p.id || seq, frac = buildState(p.sprints);
+    const seq = String(list.length - i).padStart(2, '0'), num = p.id || seq, live = liveSprints(p.sprints), frac = buildState(live);
     // Fallback when buildState is empty but tasks exist via raw ### heads
     // (e.g. state() empty due to norm edge): derive done/total from raw
     // so card never shows just "7 phases" with no fraction when tasks exist.
@@ -38,7 +38,7 @@ export function paintPlan(root, ctx){
       try {
         if (!p.raw) return frac;
         let d = 0, t = 0;
-        for (const s of p.sprints) {
+        for (const s of live) {
           let f = state(s.body);
           if (f) {
             const m = f.match(/(\d+)\/(\d+)/);
@@ -78,6 +78,7 @@ export function paintPlan(root, ctx){
     const stateTxt = [
       [p.sprints.length, ` ${unit}`].join(''),
       dispFrac,
+      planCancelled(p) ? '✗ cancelled' : '',
       rev ? `rev ${rev.n} · ${fmtDate(rev.last)}` : '',
     ].filter(Boolean).join(' · ');
     const tagCount = Math.min(3, p.tags.length);
@@ -89,8 +90,9 @@ export function paintPlan(root, ctx){
       i === sel[0] ? ' on' : '',
       // The card is the plan's seal: fractions full AND the ship gate shut.
       // Tasks done with an open ship gate (remaining cutover work) reads
-      // open — rail rows keep their task fractions either way.
-      planSealed(p) ? '' : ' is-open',
+      // open — rail rows keep their task fractions either way. A sealed
+      // plan with cancelled phases reads cancelled, never done.
+      planSealed(p) ? (planCancelled(p) ? ' is-cancelled' : '') : ' is-open',
       `" data-tip="`,
       esc(clip(oneLine(p.goal), 100) || oneLine(p.purpose) || oneLine(p.title)),
       `"><span class="ds-num">`,

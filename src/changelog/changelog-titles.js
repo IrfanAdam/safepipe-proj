@@ -56,6 +56,7 @@ export const shortPhase = (h) => String(h || '')
   .replace(/`/g, '')
   .replace(/^(Phase|Task|Step)\s+[\d–-]+\s*[—–\-:]\s*/i, '')
   .replace(/\s*\{#[^}]*\}\s*$/g, '')
+  .replace(/\s*✗\s*cancelled.*$/i, '')
   .replace(/\s*[✓✗]\s*(done|cancelled)?\s*[—–\-–]?/gi, '')
   .trim().replace(/\.+$/, '');
 // Rail label: `Task 01`, `Phase 02`, `Step 00` (fallback: position).

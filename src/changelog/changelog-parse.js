@@ -1,6 +1,6 @@
 // safepipe changelog — parse helpers · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
 // Exports: chunks, goal, norm, split, state, isDone, buildState, parseMeta, anchorOf, anchorHit,
-//   parseDue, dueOf (+ phash, parseGates, gateNOf, anchorHitCI)
+//   parseDue, dueOf (+ phash, parseGates, gateNOf, anchorHitCI, isCancelledHead, liveSprints)
 // Re-exports MONTHS, fmtDate, fmtTime, pDay, isoDay via changelog-format.js
 // Safepipe adapter: plans use `## Task N` / `## Step N` (or bare `### Task N`)
 // instead of `## Phase N`; commit anchors are bare `task-N`.
@@ -159,6 +159,14 @@ export const isDone = (frac) => {
   const m = String(frac || '').match(/(\d+)\/(\d+)/);
   return !!m && Number(m[2]) > 0 && Number(m[1]) === Number(m[2]);
 };
+
+// Cancelled status (phase level, rolls up to plan): a section whose head
+// carries `✗ cancelled` is resolved-but-abandoned — its open checkboxes no
+// longer count toward fractions, and its gates no longer block the seal.
+// Task-level `✗` already counts as done in the raw-head fallback; this is
+// the same rule at section granularity.
+export const isCancelledHead = (head) => /✗\s*cancelled/i.test(String(head || ''));
+export const liveSprints = (ss) => (ss || []).filter((s) => !isCancelledHead(s && s.head));
 
 // Content hash for plan-history snapshots (shared node+browser; fnv1a, sync).
 // Whitespace-collapsed so reformat-only edits still match.

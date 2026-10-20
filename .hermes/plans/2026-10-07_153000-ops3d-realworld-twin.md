@@ -141,7 +141,7 @@ Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 
 - Flow: comet layer (short bright pulses, 2.5× base speed, breathing opacity) over the cyan drift.
 - Verify: 138 tests green (+1 tracked todo for the Task 6 georeferencing fix), build clean.
 
-## Phase 2 — Real inspectable assets
+## Phase 2 — Real inspectable assets ✗ cancelled 2026-10-20 (owner: superseded — method + remaining scope carried by `2026-10-11_202541-ops3d-v3-realworld-iteration.md`; open gates below stand as record, not blockers)
 <!-- {#phase-2} -->
 *Every asset/facility a defined model you can inspect to the last bolt.*
 
@@ -175,7 +175,7 @@ Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 
 - REF GATE 2 (OPEN, by owner: detail-level approval owed): you approve detail level (toy / noisy / just right).
 - Evidence: open — approval owed by owner; no pass recorded.
 
-## Phase 3 — Hotspot launcher map
+## Phase 3 — Hotspot launcher map ✗ cancelled 2026-10-20 (owner: superseded — map launcher rescoped as v3 demo front door)
 <!-- {#phase-3} -->
 *The map is the launcher — circular hotspots on a real basemap, click → full-screen twin; close → back to map.*
 
@@ -209,7 +209,7 @@ Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 
 - REF GATE 3 (OPEN, by owner: map-look pick owed): you pick map look (Dark Matter vs satellite vs hybrid) + confirm the ring reads right.
 - Evidence: open — pick owed by owner; no pass recorded.
 
-## Phase 4 — Time variance + sim
+## Phase 4 — Time variance + sim ✗ cancelled 2026-10-20 (owner: superseded — see v3 plan)
 <!-- {#phase-4} -->
 *Infrastructure that changes with time; per-sector threat sim you can trust.*
 
@@ -249,7 +249,7 @@ Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 
 - REF GATE 4 (OPEN, by owner: time-slider feel approval owed): you approve time-slider feel + sim honesty.
 - Evidence: open — approval owed by owner; no pass recorded.
 
-## Phase 5 — Operations layer
+## Phase 5 — Operations layer ✗ cancelled 2026-10-20 (owner: superseded — see v3 plan)
 <!-- {#phase-5} -->
 *Safety/compliance/maintenance platform you can run, not just watch.*
 
@@ -283,7 +283,7 @@ Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 
 - REF GATE 5 (OPEN, by owner: gate-flow approval owed): you approve the gate flow (too many taps / too loose).
 - Evidence: open — approval owed by owner; no pass recorded.
 
-## Phase 6 — Lock
+## Phase 6 — Lock ✗ cancelled 2026-10-20 (owner: superseded — ship scope rescoped under v3)
 <!-- {#phase-6} -->
 *Ships clean, stays clean.*
 

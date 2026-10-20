@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { split } from '../src/changelog/changelog-parse.js';
 import { parseGates } from '../src/changelog/changelog-parse.js';
 import { norm, state, isDone } from '../src/changelog/changelog-parse.js';
-import { planSealed } from '../src/changelog/changelog/raw-detail.js';
+import { planSealed, planCancelled } from '../src/changelog/changelog/raw-detail.js';
+import { isCancelledHead, liveSprints } from '../src/changelog/changelog-parse.js';
 import {
   sectionRaw, stripGateThread, renderSection, anchorOwners, gateSuffix, fmtInline, shipGatesShut,
 } from '../src/changelog/changelog/raw-detail.js';
@@ -549,6 +550,36 @@ describe('plan seal (Incomplete filter shares the card rule)', () => {
   it('never throws on empty input', () => {
     assert.equal(planSealed(null), false);
     assert.equal(planSealed({}), false);
+  });
+});
+
+describe('cancelled status (phase ✗ cancelled rolls up to plan)', () => {
+  const done = [{ head: '## Phase 1', body: '- [x] a\n- [x] b' }];
+  const open = [{ head: '## Phase 2', body: '- [ ] c\n- [ ] d' }];
+  const axed = [{ head: '## Phase 2 ✗ cancelled', body: '- [ ] c\n- [ ] d' }];
+  it('cancelled sections leave the fraction (done + axed reads sealed)', () => {
+    assert.equal(planSealed({ sprints: [...done, ...axed], raw: '' }), true);
+  });
+  it('cancelled + open remainder reads open, never cancelled', () => {
+    assert.equal(planSealed({ sprints: [...done, ...axed, ...open], raw: '' }), false);
+    assert.equal(planCancelled({ sprints: [...done, ...axed, ...open], raw: '' }), false);
+  });
+  it('sealed-with-axed reads cancelled at plan level', () => {
+    assert.equal(planCancelled({ sprints: [...done, ...axed], raw: '' }), true);
+    assert.equal(planCancelled({ sprints: done, raw: '' }), false);
+  });
+  it('all-cancelled plan seals vacuously and reads cancelled', () => {
+    assert.equal(planSealed({ sprints: axed, raw: '' }), true);
+    assert.equal(planCancelled({ sprints: axed, raw: '' }), true);
+  });
+  it('gates inside cancelled sections never block the seal', () => {
+    const raw = '## Phase 1\n- [x] a\n## Phase 2 ✗ cancelled\n- REF GATE 2 (ship, OPEN, by owner: moot)\n- [ ] c';
+    assert.equal(planSealed({ sprints: [...done, ...axed], raw }), true);
+  });
+  it('heads match the cancelled grammar only with ✗ cancelled', () => {
+    assert.equal(isCancelledHead('## Phase 2 ✗ cancelled'), true);
+    assert.equal(isCancelledHead('## Phase 2'), false);
+    assert.equal(liveSprints([...done, ...axed]).length, 1);
   });
 });
 

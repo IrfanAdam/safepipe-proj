@@ -30,6 +30,7 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-rail .ds-pick.on{padding-left:calc(var(--cl-16) - var(--cl-2))}
 .ds-pick.on small{color:var(--color-ink-muted)}
 .ds-pick.is-open .ds-num{color:var(--color-ink-muted)}
+.ds-pick.is-cancelled .ds-num{color:var(--color-ink-muted)}
 .ds-commits{font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.7;color:var(--color-ink-muted);word-break:break-all}
 .ds-commits a{color:var(--color-ink);text-decoration:underline;text-underline-offset:var(--cl-2)}
 /* commit timeline: explicit date line, dot rows, hairline spine */

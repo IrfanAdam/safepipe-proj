@@ -1,7 +1,7 @@
 // safepipe changelog — rail + detail · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
 import { hits, badges, unlinked } from '../changelog-links.js';
 import { shortPhase as short, unitLabel, provenance, descOf, tipOf } from '../changelog-titles.js';
-import { isDone, state, parseGates, dueOf, fmtDate, gateNOf } from '../changelog-parse.js';
+import { isDone, state, parseGates, dueOf, fmtDate, gateNOf, isCancelledHead } from '../changelog-parse.js';
 import { sectionRaw, renderSection, anchorOwners, gateSuffix } from './raw-detail.js';
 import { esc } from './esc.js';
 import { paintRevs } from './paint-revs.js';
@@ -54,11 +54,14 @@ export function paintDetail(root, ctx){
         } catch { return ''; }
       })(),
       dispFrac = derivedFrac || frac,
-      ed = edited && edited(s) ? ' · edited' : '';
+      ed = edited && edited(s) ? ' · edited' : '',
+      cancelled = isCancelledHead(s.head);
     return [
       `<button class="ds-pick`,
       i === sel[1] && !atL1 ? ' on' : '',
-      isDone(dispFrac) ? '' : ' is-open',
+      // Cancelled phases are resolved, never open — they read cancelled
+      // even with open checkboxes inside.
+      cancelled ? '' : (isDone(dispFrac) ? '' : ' is-open'),
       `" data-tip="`,
       esc(tipOf(s.head, s.body, 100)),
       `"><span class="ds-row"><span class="ds-num">`,
@@ -66,7 +69,7 @@ export function paintDetail(root, ctx){
       `</span><b>`,
       esc(short(s.head)),
       `</b></span><small>`,
-      [dispFrac + has + ed].filter(Boolean).join(' · '),
+      [(cancelled ? '✗ cancelled' : dispFrac) + has + ed].filter(Boolean).join(' · '),
       `</small></button>`,
     ].join('');
   }).join('') + [

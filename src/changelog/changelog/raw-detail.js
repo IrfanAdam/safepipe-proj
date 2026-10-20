@@ -4,7 +4,7 @@
 // as <pre>. norm()/hashes/anchors are untouched — this is display only, so
 // plan history gains no churn.
 // [plan:2026-10-19_150735-changelog-readability.md#phase-1]
-import { chunks, anchorOf, buildState, state, isDone, parseGates } from '../changelog-parse.js';
+import { chunks, anchorOf, buildState, state, isDone, parseGates, liveSprints, isCancelledHead } from '../changelog-parse.js';
 import { esc as escAttr } from './esc.js';
 
 const esc = (t) => String(t || '')
@@ -185,11 +185,13 @@ export const shipGatesShut = (gates) => {
 // a plan never reads sealed in one place and open in the other.
 export const planSealed = (p) => {
   try {
+    const sprints = (p && p.sprints) || [];
+    const live = liveSprints(sprints);
     let frac = '';
-    try { frac = buildState((p && p.sprints) || []); } catch { frac = ''; }
-    if (!frac && p && p.raw) {
+    try { frac = buildState(live); } catch { frac = ''; }
+    if (!frac && p && p.raw && live.length) {
       let d = 0, t = 0;
-      for (const s of (p.sprints || [])) {
+      for (const s of live) {
         let f = '';
         try { f = state(s.body); } catch { f = ''; }
         if (f) {
@@ -205,7 +207,35 @@ export const planSealed = (p) => {
       }
       if (t) frac = `${d}/${t}`;
     }
-    return isDone(frac) && shipGatesShut(parseGates((p && p.raw) || ''));
+    // All-cancelled plans have no live fractions — vacuous full, the same
+    // convention as a ✓ done taskless head synthesizing 1/1.
+    if (!frac && !live.length && sprints.some((s) => isCancelledHead(s && s.head))) frac = '1/1';
+    return isDone(frac) && shipGatesShut(parseGates(liveRaw(p)));
+  } catch { return false; }
+};
+
+// Gates inside cancelled sections are moot — the seal reads gates from the
+// preamble + live sections only. Cancelled gates stand in the drawer as
+// record of what was owed when the phase was abandoned, never as blockers.
+const liveRaw = (p) => {
+  try {
+    const raw = String((p && p.raw) || '');
+    const bodies = liveSprints((p && p.sprints) || []).map((s) => s.body || '');
+    // Preamble always rides along (gates may live above the first ## head,
+    // and section-less raws ARE the preamble). Section gates may double up
+    // against the preamble — harmless: the seal only asks every(), which is
+    // idempotent under duplicates.
+    return [raw.split(/^## /m)[0], ...bodies].join('\n');
+  } catch { return (p && p.raw) || ''; }
+};
+
+// Plan-level cancelled: at least one cancelled section AND the live
+// remainder sealed. Mixed plans with open live work stay open — cancellation
+// resolves only what it names.
+export const planCancelled = (p) => {
+  try {
+    const sprints = (p && p.sprints) || [];
+    return sprints.some((s) => isCancelledHead(s && s.head)) && planSealed(p);
   } catch { return false; }
 };
 

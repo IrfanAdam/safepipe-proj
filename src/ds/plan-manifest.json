@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T09:31:46.282Z",
+  "generated": "2026-10-20T09:56:30.906Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "3bf687b",
+      "full": "3bf687bf9cdc189b6d76a8e2cd5d0c163f4b98ba",
+      "date": "2026-10-20",
+      "time": "15:01",
+      "subject": "fix(timeline): lane jumps clear helpers + directional settle nudge [plan:2026-10-15_120000-safepipe-changelog-timeline.md#task-2]",
+      "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+      "anchor": "task-2"
+    },
     {
       "sha": "f0ba5df",
       "full": "f0ba5dfdf94ac0ed8b52157d056a72b7c3a83fc9",
@@ -5575,8 +5584,15 @@
     }
   ],
   "wip": [
+    ".hermes/plans/2026-10-07_153000-ops3d-realworld-twin.md",
     "public/version.json",
-    "src/changelog/changelog-events.js",
-    "src/changelog/changelog-timeline.css"
+    "src/changelog/changelog-drawer.css",
+    "src/changelog/changelog-parse.js",
+    "src/changelog/changelog-timeline.js",
+    "src/changelog/changelog-titles.js",
+    "src/changelog/changelog/paint-detail.js",
+    "src/changelog/changelog/paint-plan.js",
+    "src/changelog/changelog/raw-detail.js",
+    "src/changelog/changelog/timeline-paint.js"
   ]
 }

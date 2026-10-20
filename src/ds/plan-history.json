@@ -2032,6 +2032,49 @@
      "state": "0/3"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "15:22",
+   "hash": "451f912b",
+   "sections": [
+    {
+     "head": "Phase 0 — Fix the foundation",
+     "hash": "c5789c20",
+     "state": "5/5"
+    },
+    {
+     "head": "Phase 1 — Real terrain",
+     "hash": "3cc30a9e",
+     "state": "5/5"
+    },
+    {
+     "head": "Phase 2 — Real inspectable assets ✗ cancelled 2026-10-20 (owner: superseded — me",
+     "hash": "de96e51e",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 3 — Hotspot launcher map ✗ cancelled 2026-10-20 (owner: superseded — map l",
+     "hash": "bba34dc2",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 4 — Time variance + sim ✗ cancelled 2026-10-20 (owner: superseded — see v3",
+     "hash": "e5093aff",
+     "state": "0/5"
+    },
+    {
+     "head": "Phase 5 — Operations layer ✗ cancelled 2026-10-20 (owner: superseded — see v3 pl",
+     "hash": "cc77850a",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 6 — Lock ✗ cancelled 2026-10-20 (owner: superseded — ship scope rescoped u",
+     "hash": "42adbea2",
+     "state": "0/3"
+    }
+   ]
   }
  ],
  "2026-10-10_150100-ops3d-sangachal-twin.md": [
