@@ -145,6 +145,7 @@ let recedeDone = false;
 // closeSeq invalidates a pending hide/recede when a fresh open lands first.
 const CLOSE_FADE_MS = 450;
 const RECEDE_DELAY_MS = 500;
+const SAT_FADE_DURATION_MS = 800; // tile-level crossfade: Esri swaps source captures across zooms — fades old->new tiles instead of popping. Independent of the opacity ramp.
 const SAT_HIDE_DELAY_MS = 500; // delayed sat-layer hide tracks the 450ms ramp (same beat as the close fade)
 let closeSeq = 0;
 // Handoff-4 Lane A seeded reveal: prewarm state. pendingReveal = { id, timer,
@@ -2810,15 +2811,15 @@ async function boot() {
           source: SAT_SOURCE_ID,
           layout: { visibility: 'none' },
           // T2: staged crossfade — opacity animates, visibility flips.
-          // GATE-3 REVISION tempo: 450ms ramp completes inside the flight.
+          // GATE-3 REVISION tempo: CLOSE_FADE_MS ramp completes inside the flight.
           paint: {
             'raster-opacity': 0,
-            'raster-opacity-transition': { duration: 450, delay: 0 },
+            'raster-opacity-transition': { duration: CLOSE_FADE_MS, delay: 0 },
             // Tile-level crossfade: Esri swaps source captures across zooms
             // ("inevitably different" images) — this fades old->new tiles
             // instead of popping. Independent of the opacity ramp above.
-            // 800ms so a deeper-zoom tone change reads as a dissolve.
-            'raster-fade-duration': 800,
+            // SAT_FADE_DURATION_MS so a deeper-zoom tone change reads as a dissolve.
+            'raster-fade-duration': SAT_FADE_DURATION_MS,
           },
         });
       }
