@@ -97,10 +97,29 @@ test('sample road point (way 20878167) projects within the ring', () => {
   const [x, z] = way.pts[0];
   assert.ok(isWithinRing(x, z), `first vertex [${x},${z}] inside 10 km ring`);
   // Cross-check the stored projection against a live geoToWorld call.
-  const g = JSON.parse(readFileSync('/tmp/phase01-roads.json', 'utf8'))
-    .elements.find((e) => e.id === 20878167).geometry[0];
-  const live = geoToWorld(g.lat, g.lon);
-  assert.ok(Math.abs(live.x - x) < 0.1 && Math.abs(live.z - z) < 0.1);
+  // The upstream lat/lon comes from the TRACKED raw OSM dump
+  // (public/data/osm-sangachal.json — Overpass base 2026-10-12T10:41:56Z),
+  // which ships in the repo. The previous read of the machine-local
+  // phase01-roads.json scratch cache failed on any fresh checkout.
+  // Same shape as that cache: elements[].geometry[].lat/lon.
+  const raw = JSON.parse(readFileSync('public/data/osm-sangachal.json', 'utf8'));
+  const el = raw.elements.find((e) => e.id === 20878167);
+  assert.ok(el, 'way 20878167 present in the raw OSM dump');
+  assert.equal(el.geometry.length, way.pts.length, 'raw dump and asset agree on vertex count');
+  const live = geoToWorld(el.geometry[0].lat, el.geometry[0].lon);
+  assert.ok(
+    Math.abs(live.x - x) < 0.1 && Math.abs(live.z - z) < 0.1,
+    `first vertex: asset [${x},${z}] vs live [${live.x.toFixed(3)},${live.z.toFixed(3)}]`,
+  );
+  // Every vertex agrees within the pipeline's 0.1 m rounding.
+  el.geometry.forEach((g, i) => {
+    const p = geoToWorld(g.lat, g.lon);
+    const [ax, az] = way.pts[i];
+    assert.ok(
+      Math.abs(p.x - ax) < 0.1 && Math.abs(p.z - az) < 0.1,
+      `vertex ${i}: asset [${ax},${az}] vs live [${p.x.toFixed(3)},${p.z.toFixed(3)}]`,
+    );
+  });
 });
 
 test('every mounted layer carries an osm|parametric|indicated provenance tier', () => {
