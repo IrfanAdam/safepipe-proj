@@ -42,9 +42,11 @@ import {
   EARTH_CIRC_M,
   Z_LOCK_ARM,
   Z_MIN,
+  Z_FADE1,
   Z_HANDOFF,
   Z_TOP,
   Z_MAX,
+  REARM_DOWN_BELOW,
 } from './scrolltrigger.js';
 import {
   sectorH3Map,
@@ -72,7 +74,7 @@ const SEL_KEY = 'ops3d-map-selected';
 // (flat travel -> sat fade -> handoff) streams over warming tiles instead
 // of cold-opening mid-journey. Journey math already clamps sub-home to 0.
 const COUNTRY_CENTER = [47.6, 40.15];
-const COUNTRY_ZOOM = 6.4;
+const COUNTRY_ZOOM = Z_MIN; // country home IS the journey floor — one source, never a matching literal
 const MAP_FLOOR = 1.0;
 
 const errors = [];
@@ -141,6 +143,7 @@ let recedeDone = false;
 // closeSeq invalidates a pending hide/recede when a fresh open lands first.
 const CLOSE_FADE_MS = 450;
 const RECEDE_DELAY_MS = 500;
+const SAT_HIDE_DELAY_MS = 500; // delayed sat-layer hide tracks the 450ms ramp (same beat as the close fade)
 let closeSeq = 0;
 // Handoff-4 Lane A seeded reveal: prewarm state. pendingReveal = { id, timer,
 // revealed } or null. twinReady mirrors the Lane B {type:TWIN_READY_MSG}
@@ -163,7 +166,7 @@ window.__mapProbe = {
   centerEase: 0, autoCenter: false, satOpacity: 0,
   // GATE-12-A native-zoom probe: zoom-keyed journey, proximity, ring clip.
   proximity: null, ringClip: { k: 0, cursorNear: false, centerNear: false },
-  zoomJourney: { zMin: 6.4, zHand: 11.5, zTop: 10.5, zMax: 14, topDown: false, handoff: false, home: true },
+  zoomJourney: { zMin: Z_MIN, zHand: Z_HANDOFF, zTop: Z_TOP, zMax: Z_MAX, topDown: false, handoff: false, home: true },
   isoBridge: false, deepHandoff: null, staged: { active: false, s: 0, committed: false },
   vectorWarm: false, vectorCache: null, vectorSnapshot: false, vectorHold: false,
   vectorReturnMs: null,
@@ -629,6 +632,66 @@ const ISO_SCRUB_SLACK_DEG = 2; // engage only when pitch is at/below target+slac
 const ISO_SCRUB_EPS_DEG = 0.3; // skip transform writes inside this of target
 const ISO_SCRUB_SLEW_DEG = 10; // per-step tilt cap: a flick jumping the band glides over following steps instead of snapping 0->45 in one frame
 const ISO_SCRUB_RELEASE = 0.3; // zoom below Z_TOP-this releases ownership
+const ISO_SETTLE_TOL_DEG = 0.5; // settle landings treat bearing/pitch inside this of target as arrived — never fights damping
+const SETTLE_EASE_MS = 250; // every settle-landing glide (center-ease, reconcile, catch-up) shares this tempo
+const STAGED_EXIT_BELOW = 0.05; // zoomend settle this far below Z_HANDOFF unwinds the staged hold (at-gate holds)
+let isoPumpOn = false; // per-frame tilt pump flight flag (single rAF loop while the band owns pitch)
+/** Per-frame tilt pump: while the iso band owns pitch, drive it toward the
+ * LIVE law target every animation frame — not per zoom tick. Mid-glide the
+ * native zoom animation re-applies the gesture-start pitch per frame, so
+ * per-tick writes only land on settle (pitch becomes a function of cadence:
+ * 44deg at 800ms, 18deg at 250ms, 0 in a dense burst). The pump re-asserts
+ * the slew-capped target each frame, so the tilt converges mid-gesture at
+ * any cadence; zoom is never touched (setPitch only), ownership/engage/
+ * release laws stay per-tick, and the settle reconcile stays the guarantor.
+ * Started on engage; self-stops the frame ownership ends. Never throws. */
+function pumpIsoPitch() {
+  if (isoPumpOn) return; // one flight — engages re-fire per step, the loop persists
+  if (typeof requestAnimationFrame !== 'function') return;
+  isoPumpOn = true;
+  const frame = () => {
+    try {
+      if (!isoScrubOwned || twinOpen || transitId || pendingReveal || reverseWait || receding || !mapRef) {
+        isoPumpOn = false; // ownership ended — park, never fight the camera
+        return;
+      }
+      let z = null;
+      try {
+        z = +mapRef.getZoom();
+      } catch { z = null; }
+      if (Number.isFinite(z)) {
+        const pLaw = pitchTargetForZoom(z);
+        let pCur = null;
+        try {
+          pCur = +mapRef.getPitch();
+        } catch { pCur = null; }
+        if (Number.isFinite(pCur)) {
+          let pT = pLaw;
+          const d = pLaw - pCur;
+          if (Math.abs(d) > ISO_SCRUB_SLEW_DEG) pT = pCur + Math.sign(d) * ISO_SCRUB_SLEW_DEG;
+          if (Math.abs(pCur - pT) > ISO_SCRUB_EPS_DEG) {
+            try {
+              if (mapRef.transform && typeof mapRef.transform.setPitch === 'function') {
+                mapRef.transform.setPitch(pT);
+                if (typeof mapRef.triggerRepaint === 'function') mapRef.triggerRepaint();
+              }
+            } catch { /* frame write is best-effort */ }
+          }
+        }
+      }
+    } catch { /* pump never breaks the frame */ }
+    try {
+      requestAnimationFrame(frame);
+    } catch {
+      isoPumpOn = false;
+    }
+  };
+  try {
+    requestAnimationFrame(frame);
+  } catch {
+    isoPumpOn = false;
+  }
+}
 
 function clamp01(v) {
   const n = +v;
@@ -704,8 +767,10 @@ function proximityInfo() {
   }
 }
 
-/** Ring clip: corner brackets converge canvas-edges -> ring-edges with the
- * center blend. k=0 rests at the canvas edges, k=1 hugs the hotspot ring. */
+/** Ring clip: --clip gates bracket APPEARANCE (fades in above ~0.02).
+ * Positioning rides the shared enclosure vars (--vx/--vy/--vr on #app,
+ * written by the journey driver) — glyph centres sit on the ring
+ * bounding-square corners, so k only needs to fade, never to place. */
 function updateRingClip(k, prox) {
   const v = clamp01(k);
   try {
@@ -850,16 +915,20 @@ function onNativeZoomStep(snap, source) {
     // sync — exact R at/above Z_TOP, held through handoff: the same ground
     // circle the twin clip cuts), so the
     // enclosing coincides with the twin clip exactly at handoff. The
-    // corner brackets stay as dressing only. Gate: blend>0 (z>7) — below
+    // corner brackets ride the SAME --vx/--vy/--vr (their glyph centres sit
+    // on the ring bounding-square corners), so one write moves both — the
+    // old canvas-percentage corner law is gone. Gate: blend>0 (z>7) — below
     // that the ring is sub-pixel and the surround would black the frame.
     // Zoom-out retraces it symmetrically (pure function of z + viewport).
     // Twin paths own it while open.
+    // Written on #app (not the vignette node): #map-vignette and #ring-clip
+    // are both inset:0 over #app, so both inherit identical values.
     if (!twinOpen && prox) {
       try {
-        const v = document.getElementById('map-vignette');
-        if (v) {
-          v.style.setProperty('--vx', Math.round(prox.sx) + 'px');
-          v.style.setProperty('--vy', Math.round(prox.sy) + 'px');
+        const app = document.getElementById('app');
+        if (app) {
+          app.style.setProperty('--vx', Math.round(prox.sx) + 'px');
+          app.style.setProperty('--vy', Math.round(prox.sy) + 'px');
           let corner = null;
           try {
             const el = mapRef.getContainer();
@@ -871,10 +940,12 @@ function onNativeZoomStep(snap, source) {
           } catch { corner = null; }
           const vr = enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, corner);
           if (Number.isFinite(vr)) {
-            v.style.setProperty('--vr', vr.toFixed(1) + 'px');
+            app.style.setProperty('--vr', vr.toFixed(1) + 'px');
             try {
               window.__mapProbe.vignetteR = +vr.toFixed(1);
             } catch { /* probe cosmetic */ }
+          } else {
+            app.style.removeProperty('--vr'); // park at the registered initial; brackets hide with .on anyway
           }
         }
       } catch { /* cosmetic */ }
@@ -885,7 +956,10 @@ function onNativeZoomStep(snap, source) {
     // in naturally so its raster fade-in actually plays (a cached tile
     // swaps in at full opacity and pops). One 3x3 per level
     // (gated on level change; cap + hit counting live in prefetchSatTiles).
-    if (!twinOpen && prox && z >= 8 && z < 12) {
+    // Window rides the journey laws: one level below full-sat (so the +2
+    // prefetch lands in-sat) to half a level past the gate (deeper, the
+    // staged path owns prewarm) — numerically [8, 12), never bare literals.
+    if (!twinOpen && prox && z >= Z_FADE1 - 1 && z < Z_HANDOFF + 0.5) {
       try {
         const zl = Math.floor(z) + 2;
         if (zl !== lastDeepWarmZ) { lastDeepWarmZ = zl; prefetchSatTiles(SITE_LNGLAT, zl); }
@@ -944,12 +1018,12 @@ function onNativeZoomStep(snap, source) {
         const b = mapRef.getBearing();
         const p = mapRef.getPitch();
         pHold = pitchTargetForZoom(z);
-        tilt = Math.abs(b || 0) > 0.5 || Math.abs((p || 0) - pHold) > 0.5;
+        tilt = Math.abs(b || 0) > ISO_SETTLE_TOL_DEG || Math.abs((p || 0) - pHold) > ISO_SETTLE_TOL_DEG;
       } catch { /* bearing read is best-effort */ }
       if ((far || tilt) && now - lastCenterEaseT >= CENTER_EASE_MS) {
         lastCenterEaseT = now;
         try {
-          mapRef.easeTo({ center: SITE_LNGLAT.slice(), bearing: 0, pitch: pHold, duration: 250 });
+          mapRef.easeTo({ center: SITE_LNGLAT.slice(), bearing: 0, pitch: pHold, duration: SETTLE_EASE_MS });
         } catch (err) {
           errors.push('CENTER-EASE: ' + (err && err.message));
         }
@@ -977,9 +1051,9 @@ function onNativeZoomStep(snap, source) {
         pSet = +mapRef.getPitch();
       } catch { pSet = null; }
       if (Number.isFinite(pSet)) {
-        if (Math.abs(pSet) > 0.5) {
+        if (Math.abs(pSet) > ISO_SETTLE_TOL_DEG) {
           try {
-            mapRef.easeTo({ pitch: 0, duration: 250 });
+            mapRef.easeTo({ pitch: 0, duration: SETTLE_EASE_MS });
           } catch (err) {
             errors.push('SETTLE-RECONCILE: ' + (err && err.message));
           }
@@ -1015,6 +1089,9 @@ function onNativeZoomStep(snap, source) {
           if (z >= Z_TOP && pCur <= pLaw + ISO_SCRUB_SLACK_DEG) {
             isoScrubOwned = true;
             isoRestoreDue = true;
+            try {
+              pumpIsoPitch(); // per-frame carry from here — cadence-independent tilt
+            } catch { /* pump is best-effort */ }
           }
         } else if (z < Z_TOP - ISO_SCRUB_RELEASE) {
           isoScrubOwned = false;
@@ -1030,7 +1107,8 @@ function onNativeZoomStep(snap, source) {
           try {
             // Mid-glide this write may be clobbered by the native zoom
             // animation (it re-applies the gesture-start pitch per frame) —
-            // never stop the glide for it (stair-steps zoom). The settle
+            // never stop the glide for it (stair-steps zoom). The per-frame
+            // pump carries the tilt between ticks; the settle
             // reconcile below is the guarantor: isoRestoreDue stays latched
             // until a zoomend glides pitch home.
             if (mapRef.transform && typeof mapRef.transform.setPitch === 'function') {
@@ -1054,7 +1132,7 @@ function onNativeZoomStep(snap, source) {
     }
     // (4b) SETTLE CATCH-UP — the slew cap above can strand pitch mid-band
     // when a flick ends there (no more steps arrive to finish the glide).
-    // On settle, finish the tilt the fingers started on the existing 250ms
+    // On settle, finish the tilt the fingers started on the shared settle
     // tempo instead of parking it. Below-band strands ride the reconcile in
     // (3b); near arrivals already rode the center-ease above (same tempo —
     // a second ease here would supersede its center glide, so this covers
@@ -1067,7 +1145,7 @@ function onNativeZoomStep(snap, source) {
       const pCatchT = pitchTargetForZoom(z);
       if (Number.isFinite(pCatch) && Number.isFinite(pCatchT) && Math.abs(pCatch - pCatchT) > 1) {
         try {
-          mapRef.easeTo({ pitch: pCatchT, duration: 250 });
+          mapRef.easeTo({ pitch: pCatchT, duration: SETTLE_EASE_MS });
         } catch (err) {
           errors.push('SETTLE-CATCHUP: ' + (err && err.message));
         }
@@ -1087,7 +1165,7 @@ function onNativeZoomStep(snap, source) {
           } catch { /* handoff best-effort */ }
         });
       }
-    } else if (z < Z_HANDOFF - 0.5 && scrubFired && !twinOpen) {
+    } else if (z < REARM_DOWN_BELOW && scrubFired && !twinOpen) {
       scrubFired = false; // re-arm: a fresh deep zoom may hand off again
       isoScrubOwned = false;
     }
@@ -1095,7 +1173,7 @@ function onNativeZoomStep(snap, source) {
     // the hold — unclamp, drop accumulated scroll, quietly tear down the
     // uncommitted prewarm. Settle AT the gate holds (no-op). Forward exit is
     // twin-ready + S-commit (driveStagedOverlay/finalizeStagedReveal).
-    if (stagedActive && source === 'native-zoomend' && z < Z_HANDOFF - 0.05) {
+    if (stagedActive && source === 'native-zoomend' && z < Z_HANDOFF - STAGED_EXIT_BELOW) {
       try {
         exitStaged();
       } catch { /* unwind is best-effort */ }
@@ -1388,13 +1466,28 @@ function flyToSectorThenTwin(id, opts = {}) {
     try {
       setSatScrubbed(satOpacityForZoom(Number.isFinite(liveZ) ? liveZ : Z_HANDOFF));
     } catch { /* sat stage is best-effort */ }
-    showVignette(true);
+    const proxNow = proximityInfo();
+    const nearNow = !!(proxNow && proxNow.near);
+    // Wash only when ARMED: re-derive the center from the live projection and
+    // require the proximity predicate. An off-screen arrival (zoom-around-
+    // cursor can park the spot 100k+ px out) skips the wash — never the
+    // handoff below. Showing the wash on a stale/off-screen center blacks
+    // the frame in one tick; the per-step driver keeps writing live values,
+    // so the wash appears honestly the moment the spot is near.
+    if (nearNow) {
+      try {
+        const app = document.getElementById('app');
+        if (app && proxNow) {
+          app.style.setProperty('--vx', Math.round(proxNow.sx) + 'px');
+          app.style.setProperty('--vy', Math.round(proxNow.sy) + 'px');
+        }
+      } catch { /* center re-derive is best-effort */ }
+      showVignette(true);
+    }
     // Handoff-5-close: publish the staged zoom for the framing probe.
     try {
       window.__mapProbe.mapZoom = liveFrame()?.z ?? null;
     } catch { /* probe cosmetic */ }
-    const proxNow = proximityInfo();
-    const nearNow = !!(proxNow && proxNow.near);
     // Reduced-motion never stages (no scroll-driven dissolve to follow) —
     // the unstaged prewarm below reveals instantly inside prewarmThenReveal.
     let reducedMotion = false;
@@ -1522,6 +1615,27 @@ function driveStagedOverlay() {
   try {
     root.style.opacity = st.reveal <= 0 ? '0' : String(+st.reveal.toFixed(4));
   } catch { /* cosmetic */ }
+  // S owns the dissolve: every staged grant slides the same paint-gated fallback
+  // window (disarm + re-arm), so a flowing hold is never preempted
+  // mid-dissolve — the window only fires after S stalls a full timeout. The
+  // commit path above never slides: revealTwin already disarmed it.
+  try {
+    if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
+  } catch { /* timer teardown is best-effort */ }
+  try {
+    armRevealFallback();
+  } catch { /* timer is best-effort */ }
+  // Satellite rides the same S progress as the overlay (the staged blend
+  // stage holds full sat): glued to the fingers through the hold, never to
+  // the clamped z both laws agree on anyway.
+  try {
+    let zNow = null;
+    try {
+      zNow = mapRef ? +mapRef.getZoom() : null;
+    } catch { zNow = null; }
+    const zSat = Number.isFinite(zNow) ? satOpacityForZoom(zNow) : 1;
+    setSatScrubbed(Math.max(zSat, st.blend));
+  } catch { /* sat stage is best-effort */ }
 }
 
 /** Commit the staged hold: the fingers dissolved the twin to full — drop the
@@ -1673,11 +1787,11 @@ function prewarmThenReveal(id, frame, opts = {}) {
     revealTwin(true);
     return true;
   }
-  // Staged prewarms arm the same paint-gated fallback: first paint grants
-  // the dissolve through driveStagedOverlay, so a twin whose ready-match
-  // never agrees still dissolves on the fingers instead of holding forever
-  // (scroll-up unwinds the hold while nothing has painted).
-  armRevealFallback();
+  // Staged prewarms do NOT arm the timer: S owns the dissolve — every staged
+  // grant slides the same paint-gated fallback (see driveStagedOverlay), so
+  // a flowing hold can never be preempted mid-dissolve, and scroll-up still
+  // unwinds the hold while nothing has painted. Unstaged prewarms arm here.
+  if (!opts.staged) armRevealFallback();
   return true;
 }
 
@@ -1687,8 +1801,9 @@ function prewarmThenReveal(id, frame, opts = {}) {
  * first-painted-frame (twinPainted), never on a black canvas: unpainted at
  * fire re-arms (up to REVEAL_PAINT_TRIES), and only a fully silent twin
  * takes the flagged blind reveal so the map never strands behind a dead
- * frame. Staged prewarms arm this too (paint grants the dissolve through
- * driveStagedOverlay; scroll-up unwinds while nothing has painted). */
+ * frame. Staged prewarms never arm this directly (S owns their dissolve);
+ * every staged grant slides it instead (see driveStagedOverlay), and
+ * scroll-up unwinds while nothing has painted. */
 const REVEAL_PAINT_TRIES = 3;
 function armRevealFallback() {
   try {
@@ -2594,7 +2709,7 @@ async function boot() {
                 map.setLayoutProperty(SAT_LAYER_ID, 'visibility', 'none');
               }
             } catch { /* delayed hide is best-effort */ }
-          }, 500); // GATE-3 REVISION tempo: tracks the 450ms ramp
+          }, SAT_HIDE_DELAY_MS); // GATE-3 REVISION tempo: tracks the 450ms ramp
         }
       } catch (err) {
         errors.push('SAT-TOGGLE: ' + (err && err.message));

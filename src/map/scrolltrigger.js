@@ -17,7 +17,9 @@
 //        only fires this when the map canvas itself is zoomed home; the
 //        twin overlay covers the canvas while open, so twin-side reverse
 //        stays owned by Lane B via the ready/close message contract).
-// Pure helpers are node-checkable: no map imports, callbacks injected.
+// Pure helpers are node-checkable: no map imports (the single site.js
+// import below is pure geo constants, no maplibre/three), callbacks injected.
+import { RING_RADIUS_M } from '../ring2/site.js';
 
 export const Z_MIN = 6.4; // country home — enforced as map minZoom (the cap)
 export const Z_FADE0 = 6.4; // fade starts: vector->sat keys off zoom only
@@ -27,7 +29,8 @@ export const Z_TOP = 10.5; // top-down checkpoint (bearing/pitch -> 0): a full z
 export const Z_HANDOFF = 11.5; // deeper zoom hands to the twin
 export const Z_MAX = 14.0; // map maxZoom cap
 const HOME_EPS = 0.06; // zoomend-at-home tolerance for the reverse edge
-const REARM_DOWN_BELOW = Z_HANDOFF - 0.5; // drop below to re-arm onDown
+// Single source for the re-arm gate below the handoff (derived, never restated).
+export const REARM_DOWN_BELOW = Z_HANDOFF - 0.5; // drop below to re-arm onDown
 const REARM_UP_ABOVE = Z_MIN + 0.3; // rise above to re-arm onUp
 
 export function clamp01(v) {
@@ -119,7 +122,7 @@ export function handoffScrubForZoom(z) {
  *   blend  250..500 — terrain blend holds full satellite
  *   tilt   500..750 — iso tilt holds 45deg
  *   reveal 750..1250 — twin overlay dissolves 0..1 (twin-ready gates >0)
- * Ring/blend/tilt already arrive pre-gate in the native journey (10.5..11.5
+ * Ring/blend/tilt already arrive pre-gate in the native journey (Z_TOP..Z_HANDOFF
  * band) — their staged laws HOLD the end-state; the reveal is the live
  * post-gate stage. Every value is a pure function of S, so scroll-up
  * retraces it symmetrically. Pure + node-checkable; the map-side wheel
@@ -151,14 +154,16 @@ export function accumStagedS(s, deltaY) {
 }
 
 /* Journey-enclosure radius (Task 37, map side): the ground ring the twin
- * clip cuts at (RING_RADIUS_M, owned by src/ring2/site.js — mirrored here
- * so this module stays import-free; the node suite pins them equal).
+ * clip cuts at — RING_RADIUS_M, imported from src/ring2/site.js (single
+ * source of truth; the node suite pins them equal). No literal here, so
+ * the map-side enclosing can never drift from the twin clip circle.
  * Projected to CSS px at the live zoom/lat: R / metersPerPixel. The
  * #map-vignette circle rides this radius, so the map-side enclosing
  * coincides with the twin clip circle exactly (~685px diameter at z=12,
+ * an example zoom inside the post-gate band — not the gate itself,
  * held through handoff) — symmetric on zoom-out, since it is a pure
  * function of z. */
-export const MAP_VIGNETTE_RING_M = 10000;
+export const MAP_VIGNETTE_RING_M = RING_RADIUS_M;
 export function vignetteRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M) {
   const R = +ringM;
   if (!Number.isFinite(R) || !(R > 0)) return null;

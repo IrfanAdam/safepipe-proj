@@ -220,9 +220,9 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
   assert.ok(main.includes('(prox.near || isoScrubOwned || z >= Z_TOP)'), 'iso scrub engages on z past the top gate even unaimed, owned tilt restores even after pan-away');
 });
 
-test('map vignette: radius from projected R, brackets retired as enclosure signal', () => {
+test('map vignette: radius from projected R, brackets ride the same law', () => {
   const main = srcOf('../src/map/main.js');
-  assert.ok(main.includes("v.style.setProperty('--vr'"), 'journey writes the vignette radius');
+  assert.ok(main.includes("app.style.setProperty('--vr'"), 'journey writes the vignette radius');
   assert.ok(main.includes('enclosureRadiusPxForZoom(z, SITE.lat'), 'display radius rides the forming law');
   assert.ok(main.includes('showVignette(prox.near && blend > 0)'), 'enclosure gated past z=8: sub-pixel ring never blacks the frame');
   assert.ok(!main.includes('showVignette(prox.near);'), 'ungated proximity enclosure is gone');
@@ -269,7 +269,7 @@ test('forward path untouched: staged laws, intro legs, iso ownership, FOV', () =
   assert.ok(map.includes('prox.near || isoScrubOwned'), 'owned scrub restores pitch even after pan-away');
   assert.ok(map.includes('isoRestoreDue = true'), 'engage latches the restore due flag');
   assert.ok(map.includes("source === 'native-zoomend' && isoRestoreDue && !shouldCenter(z)"), 'below-band settle glides journey tilt home');
-  assert.ok(map.includes('mapRef.easeTo({ pitch: 0, duration: 250 })'), 'reconcile glides pitch home on settle tempo');
+  assert.ok(map.includes('mapRef.easeTo({ pitch: 0, duration: SETTLE_EASE_MS })'), 'reconcile glides pitch home on settle tempo');
   assert.ok(map.includes('prewarmThenReveal(id, liveFrame(), { ...opts, staged: true })'), 'near-gate arrival still stages');
   const twin = srcOf('../src/ring2/main.js');
   assert.ok(twin.includes('poseForScrubProgress(fwd.legs, fwd.progress)'), 'forward pose still reads the scrub law');

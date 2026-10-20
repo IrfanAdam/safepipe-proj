@@ -16,10 +16,11 @@ export const TWIN_FS_MSG = 'safepipe-twin-fullscreen';
 // staged map end-frame and is ready to be revealed. Pure.
 export const TWIN_READY_MSG = 'safepipe-twin-ready';
 // Task-36/37 staged-scroll contract (parent -> twin): the map posts
-// { type: TWIN_STAGED_MSG, s } as stage scroll S (px past the z=11.5 gate)
-// accumulates. Mirrors src/ring2/sector.js (which owns the twin-side copy
-// + the S->progress law); the node suite pins them equal so a Lane A move
-// breaks loudly, never silently. Pure.
+// { type: TWIN_STAGED_MSG, s } as stage scroll S (px past the handoff gate)
+// accumulates. This module OWNS the wire string; src/ring2/sector.js imports
+// + re-exports it (and derives the S->progress law anchors from the
+// scrolltrigger journey laws), so the channel name can never drift between
+// the producer and the consumer. Pure.
 export const TWIN_STAGED_MSG = 'safepipe-twin-staged';
 
 /** Build the staged-scroll post payload. S parks at >= 0. Pure. */

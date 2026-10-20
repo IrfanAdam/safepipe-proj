@@ -115,7 +115,7 @@ test('driver: timed flight gone, staged scrub owns the outbound path', () => {
   assert.ok(main.includes('setMaxZoom(Z_HANDOFF)'), 'scroll-as-zoom clamps at the gate');
   assert.ok(main.includes('installStagedAccum'), 'stage-scroll accumulator is wired');
   assert.ok(main.includes('prewarmThenReveal(id, liveFrame(), { ...opts, staged: true })'), 'near-gate arrival stages');
-  assert.ok(main.includes('Staged prewarms arm the same paint-gated fallback'), 'staged prewarms arm the paint-gated fallback');
+  assert.ok(main.includes('grant slides the same paint-gated fallback'), 'staged grants slide the fallback window — S owns the dissolve');
   assert.ok(main.includes('driveStagedOverlay'), 'twin-ready routes through the staged driver');
   assert.ok(main.includes('exitStaged()'), 'zoomend settle unwinds the hold');
   // The timed ramp survives ONLY on the reverse path (Task 37 owns it).

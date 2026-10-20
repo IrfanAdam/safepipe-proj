@@ -35,6 +35,7 @@ import { isSizedWH, waitForSized } from './sizeGate.js';
  * Lane A constant move applies with no further edits. Named imports above
  * stay the static contract; this is the forward-compatible lookup. */
 import * as sectorNs from './sector.js';
+import { Z_HANDOFF } from '../map/scrolltrigger.js';
 import {
   createCtxMon,
   ctxLive,
@@ -1182,7 +1183,7 @@ async function boot() {
         // late post still releases normally, and Lane A's own reveal timeout
         // owns the fallback reveal either way.
         if (!handoff.readyPosted && !handoff.capExpired
-          && heldMs >= HANDOFF_HOLD_MS + HANDOFF_READY_CAP_MS && twinFrames >= 3) {
+          && heldMs >= HANDOFF_HOLD_MS + HANDOFF_READY_CAP_MS && twinFrames >= HANDOFF_PREWARM_MIN_FRAMES) {
           handoff.capExpired = true;
         }
         // Scroll-path painted release: the timed click path never posts
@@ -1197,12 +1198,12 @@ async function boot() {
         const stagedInReveal = preStagedS !== null && Number.isFinite(preStagedS)
           && preStagedS >= TWIN_FWD_REVEAL_START_PX;
         // Deep-frame painted release (scroll path): a handed frame at/past
-        // the map-side handoff gate (z 11.5) carries map pitch 45 — release
+        // the map-side handoff gate (Z_HANDOFF) carries map pitch 45 — release
         // on paint like the staged band so the reveal dissolves off the iso
         // seed below, never a parked top-down hold whose ready-match an
         // off-site arrival can structurally never grant.
         const frameZ = Number(handoff.frame && handoff.frame.z);
-        const frameDeep = Number.isFinite(frameZ) && frameZ >= 11.5;
+        const frameDeep = Number.isFinite(frameZ) && frameZ >= Z_HANDOFF;
         const paintedRelease = heldMs >= HANDOFF_HOLD_MS && !handoff.readyPosted
           && paintedPosted && (stagedInReveal || frameDeep);
         if ((heldMs >= HANDOFF_HOLD_MS && handoff.readyPosted) || paintedRelease) {

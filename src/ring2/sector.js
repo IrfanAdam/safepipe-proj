@@ -6,8 +6,21 @@ import { latLngToCell } from 'h3-js';
 import { H3_RES, SECTORS, worstHealth, HEALTH_RANK } from '../map/feed.js';
 import { geoToWorld } from './site.js';
 import { rangeForZoom, MAP_TRUE_FOV_DEG, TWIN_MIN_RANGE_M, TWIN_MAX_RANGE_M } from './sync.js';
+/* Wire strings: twinlink.js is the single source (map-side link module);
+ * re-exported here under the twin-side names so the iframe boundary can
+ * never name two channels. S-band anchors + iso pole derive from the
+ * scrolltrigger journey laws for the same reason. */
+import {
+  SECTOR_PARAM as MAP_SECTOR_PARAM,
+  TWIN_CLOSE_MSG as MAP_TWIN_CLOSE_MSG,
+  TWIN_READY_MSG as MAP_TWIN_READY_MSG,
+  TWIN_PAINTED_MSG as MAP_TWIN_PAINTED_MSG,
+  TWIN_STAGED_MSG as MAP_TWIN_STAGED_MSG,
+  TWIN_FS_MSG as MAP_TWIN_FS_MSG,
+} from '../map/twinlink.js';
+import { HANDOFF_STAGE_PX, HANDOFF_STAGED_S_MAX, ISO_PITCH_DEG } from '../map/scrolltrigger.js';
 
-export const SECTOR_PARAM = 'sector';
+export const SECTOR_PARAM = MAP_SECTOR_PARAM;
 export const EMBED_PARAM = 'embed';
 /* Twinlink handoff frame params (LANE 3): the map overlay opens the twin as
  * ?sector=<h3>&cx=<lng>&cy=<lat>&z=<zoom>[&bearing=<deg>] at vertical
@@ -22,19 +35,20 @@ export const CX_PARAM = 'cx';
 export const CY_PARAM = 'cy';
 export const ZOOM_PARAM = 'z';
 export const BEARING_PARAM = 'bearing';
-export const TWIN_CLOSE_MSG = 'safepipe-twin-close';
+export const TWIN_CLOSE_MSG = MAP_TWIN_CLOSE_MSG;
 /* Handoff-4 Lane B ready (twin->parent): posted ONCE when the top-down
  * satellite start frame matches the staged map end-frame and the first
  * matched sat frame has painted. Lane A reveals the overlay on this
  * (pre-warm hold + ~600 ms crossfade are map-side owned). */
-export const TWIN_READY_MSG = 'safepipe-twin-ready';
+export const TWIN_READY_MSG = MAP_TWIN_READY_MSG;
 /* Delegated fullscreen (twin-side): when embedded (?embed=1) the twin
  * FULLSCREEN button must NOT fullscreen its own document (that would hide
  * the parent's CLOSE chrome). It posts { type, on } to the parent instead
  * and syncs its label from the parent's echoed state. Standalone keeps
  * native self-fullscreen. Map-side receipt + fullscreen target are
- * Lane-1 owned — this file only names the wire format. */
-export const TWIN_FULLSCREEN_MSG = 'safepipe-twin-fullscreen';
+ * Lane-1 owned — the wire string is twinlink.js single source (re-exported
+ * here). */
+export const TWIN_FULLSCREEN_MSG = MAP_TWIN_FS_MSG;
 
 /* Handoff flight timing (ms) — GATE-3 NATIVE-ZOOM tempo (handoff12-B): the
  * full transition must read as ONE slow continuous gesture, so holds are
@@ -58,16 +72,18 @@ export const HANDOFF_END_MIX = 100;
 /* Iso terminal view (matches the sector reframe in main.js): two zoom levels
  * out from the old 4500 m stance — ~12 km footprint holds the ~3 km facility
  * + margin in frame at the same iso angle. Slider still drives to 100.
- * Task-35 angle coincidence: 45, not 50 — the map-side iso scrub holds pitch
- * at ISO_PITCH_DEG (45) through the handoff cut and carries it (nothing on
- * the forward path resets pitch to 0), so the twin's swoop/terminal iso
- * lands exactly on the map's held tilt under the shared 36.87deg FOV
+ * Task-35 angle coincidence: the map-side iso scrub holds pitch at
+ * ISO_PITCH_DEG through the handoff cut and carries it (nothing on the
+ * forward path resets pitch to 0), so the twin's swoop/terminal iso lands
+ * exactly on the map's held tilt under the shared 36.87deg FOV
  * (MAP_TRUE_FOV_DEG, sync.js single source) — the old 5deg snap is gone.
+ * Derived from ISO_PITCH_DEG (scrolltrigger.js single source), so the
+ * cut meets with no snap by construction, not by matching literals.
  * The twin hold itself still pins top-down; Task 36 scrubs the intro so the
  * cut dissolves end-to-end. Decision recorded: carry-45-through + meet at
- * 45 (this constant), not flatten-to-0. */
+ * the shared pole (this constant), not flatten-to-0. */
 export const HANDOFF_ISO_RANGE_M = 18000;
-export const HANDOFF_ISO_POLAR_DEG = 45;
+export const HANDOFF_ISO_POLAR_DEG = ISO_PITCH_DEG;
 
 /** Raw ?sector= / ?embed= values from a search string. Frame params
  * (cx/cy/z/bearing) ride along when the map overlay opens the twin. */
@@ -192,7 +208,7 @@ export function isTwinReadyMessage(data) {
  * reveal); it arms the map-side fallback to reveal on paint instead of
  * blind, so an open sequence never shows an opaque frame before the twin's
  * first paint. Plain object — structured-clone safe. */
-export const TWIN_PAINTED_MSG = 'safepipe-twin-painted';
+export const TWIN_PAINTED_MSG = MAP_TWIN_PAINTED_MSG;
 export function buildTwinPaintedMessage() {
   return { type: TWIN_PAINTED_MSG };
 }
@@ -485,17 +501,16 @@ export function scrubProgressForWalk(legs, i, legT0, now) {
  * by buildForwardLegs. An autoplay clock may advance the scalar until the
  * staged driver arrives — the mapping stays pure either way, so scroll
  * ticks can take over with no pose jump. */
-export const TWIN_STAGED_MSG = 'safepipe-twin-staged';
+export const TWIN_STAGED_MSG = MAP_TWIN_STAGED_MSG;
 /* Map-side staged-scroll contract anchors (scrolltrigger.js owns the
- * values): S px past the z=12 gate over [0,250,500,750,1250] =
- * ring/blend/tilt/reveal, overlay opacity = ready ? reveal(S) : 0. The
- * twin intro consumes S through fwdProgressForStagedS: the swoop completes
- * exactly where the reveal dissolve starts (750), the push completes where
- * the dissolve completes (1250) — the cut dissolves onto a settled iso
- * frame. These mirror the map constants; the node suite pins them equal,
- * so a Lane A move breaks loudly, never silently. */
-export const TWIN_FWD_REVEAL_START_PX = 750;
-export const TWIN_FWD_STAGED_MAX_PX = 1250;
+ * values — derived below, never restated): S px past the handoff gate over
+ * [0,STAGE,2xSTAGE,3xSTAGE,STAGED_MAX] = ring/blend/tilt/reveal, overlay
+ * opacity = ready ? reveal(S) : 0. The twin intro consumes S through
+ * fwdProgressForStagedS: the swoop completes exactly where the reveal
+ * dissolve starts (3xSTAGE), the push completes where the dissolve completes
+ * (STAGED_MAX) — the cut dissolves onto a settled iso frame. */
+export const TWIN_FWD_REVEAL_START_PX = 3 * HANDOFF_STAGE_PX;
+export const TWIN_FWD_STAGED_MAX_PX = HANDOFF_STAGED_S_MAX;
 
 /** True for the parent->twin staged-scroll shape { type, s } (S px past
  * the gate). The scroll value itself is validated at the consumer — this

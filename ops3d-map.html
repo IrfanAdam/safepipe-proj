@@ -13,22 +13,41 @@
      * rides on zoom events, never captures gestures. touch-action:none lets
      * MapLibre receive the two-finger pinch natively. */
     touch-action: none; }
-  /* GATE-12-A: map-side ring clip — corner brackets converging from the
-   * canvas edges (--clip:0) to the hotspot ring edges (--clip:1) with the
-   * proximity center blend. Pointer-transparent; sits above pins. */
-  #ring-clip { position: absolute; inset: 0; z-index: 2; pointer-events: none;
-    opacity: 0; transition: opacity 0.3s ease; --clip: 0; }
+  /* GATE-12-A: map-side ring clip — corner brackets mark the hotspot ring.
+   * The four marks sit ON the ring bounding-square corners: each glyph
+   * centre is anchored at centre±radius ((--vx,--vy) ± --vr) minus half the
+   * glyph size, so all four centres are equidistant from the hotspot by
+   * construction — the SAME --vx/--vy/--vr the vignette circle rides (one
+   * law writes both; see the journey driver). --clip drives APPEARANCE
+   * only (.on fades the layer in); it no longer positions anything, so the
+   * old canvas-percentage law (and its corner/circle gap) is gone.
+   * Mark size/line are single-definition tokens (--rc-mark/--rc-line); the
+   * centering offset derives from them, never a bare px. Hidden sides keep
+   * transparent (not removed) borders so every box stays symmetric and its
+   * centre lands exactly on the anchor. #ring-clip is
+   * inset:0 over #app — the same box as #map and #map-vignette — so the
+   * hotspot px apply 1:1. Pointer-transparent; sits above pins AND the
+   * wash (the opaque surround must never erase the marks). */
+  #ring-clip { position: absolute; inset: 0; z-index: 4; pointer-events: none;
+    opacity: 0; transition: opacity 0.3s ease; --clip: 0;
+    --rc-mark: 26px; --rc-line: 2px;
+    --rc-half: calc((var(--rc-mark) + var(--rc-line) * 2) / 2); }
   #ring-clip.on { opacity: 1; }
-  #ring-clip i { position: absolute; width: 26px; height: 26px;
-    border: 2px solid var(--ops-amber, #ffd9a0); opacity: 0.9; }
-  #ring-clip .rc-tl { left: calc(14px + var(--clip) * 34%); top: calc(14px + var(--clip) * 30%);
-    border-right: 0; border-bottom: 0; }
-  #ring-clip .rc-tr { right: calc(14px + var(--clip) * 34%); top: calc(14px + var(--clip) * 30%);
-    border-left: 0; border-bottom: 0; }
-  #ring-clip .rc-bl { left: calc(14px + var(--clip) * 34%); bottom: calc(14px + var(--clip) * 30%);
-    border-right: 0; border-top: 0; }
-  #ring-clip .rc-br { right: calc(14px + var(--clip) * 34%); bottom: calc(14px + var(--clip) * 30%);
-    border-left: 0; border-top: 0; }
+  #ring-clip i { position: absolute; width: var(--rc-mark); height: var(--rc-mark);
+    border: var(--rc-line) solid var(--ops-amber, #ffd9a0); opacity: 0.9;
+    box-sizing: content-box; }
+  #ring-clip .rc-tl { left: calc(var(--vx, 50%) - var(--vr, 260px) - var(--rc-half));
+    top: calc(var(--vy, 50%) - var(--vr, 260px) - var(--rc-half));
+    border-right-color: transparent; border-bottom-color: transparent; }
+  #ring-clip .rc-tr { left: calc(var(--vx, 50%) + var(--vr, 260px) - var(--rc-half));
+    top: calc(var(--vy, 50%) - var(--vr, 260px) - var(--rc-half));
+    border-left-color: transparent; border-bottom-color: transparent; }
+  #ring-clip .rc-bl { left: calc(var(--vx, 50%) - var(--vr, 260px) - var(--rc-half));
+    top: calc(var(--vy, 50%) + var(--vr, 260px) - var(--rc-half));
+    border-right-color: transparent; border-top-color: transparent; }
+  #ring-clip .rc-br { left: calc(var(--vx, 50%) + var(--vr, 260px) - var(--rc-half));
+    top: calc(var(--vy, 50%) + var(--vr, 260px) - var(--rc-half));
+    border-left-color: transparent; border-top-color: transparent; }
   @media (prefers-reduced-motion: reduce) {
     #ring-clip { transition: none; }
   }
@@ -151,7 +170,7 @@
    * Colorless edge: transparent core runs to --vr, a hard stop pair cuts
    * to black AT --vr (crisp boundary, no color stroke), then darkness
    * feathers outward to the solid surround. */
-  @property --vr { syntax: '<length>'; inherits: false; initial-value: 260px; }
+  @property --vr { syntax: '<length>'; inherits: true; initial-value: 260px; }
   #map-vignette {
     position: absolute; inset: 0; z-index: 3; pointer-events: none;
     background: radial-gradient(circle var(--vr, 260px) at var(--vx, 50%) var(--vy, 50%),
