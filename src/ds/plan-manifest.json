@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T11:37:37.937Z",
+  "generated": "2026-10-20T11:54:03.108Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "1a906b8",
+      "full": "1a906b8073368dd70faaa36c9fb4a059ccbc9850",
+      "date": "2026-10-20",
+      "time": "17:08",
+      "subject": "fix(journey): black-only enclosure, zoom-in S seeds survive boot race [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "44b6988",
       "full": "44b6988b474253ec0290356960a2069e43e12ef6",
@@ -5684,7 +5693,11 @@
   ],
   "wip": [
     "ops3d-map.html",
+    "public/version.json",
     "src/map/main.js",
-    "src/ring2/main.js"
+    "src/map/scrolltrigger.js",
+    "src/map/twinlink.js",
+    "src/ring2/main.js",
+    "src/ring2/sector.js"
   ]
 }
