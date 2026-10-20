@@ -118,12 +118,21 @@ test('enclosure forming wash: screen corners close onto the clip circle', () => 
     assert.ok(r < prev, `z=${z} closes in from the edges (${r.toFixed(0)}px < ${prev === Infinity ? 'inf' : prev.toFixed(0)}px)`);
     prev = r;
   }
-  for (const z of [11, 11.5, 12, 13]) {
+  // GATE-3 REVISION: past Z_TOP the enclosure HOLDS at the Z_TOP value. The
+  // twin's clip is a FIXED ground circle, so a live-zoom projection drifts
+  // away from it and re-opens the surround (+121px between Z_TOP and the
+  // handoff). One law, one hold point.
+  const atTop = enclosureRadiusPxForZoom(10.5, SITE.lat, MAP_VIGNETTE_RING_M, C);
+  for (const z of [11, 11.5, 12, 12.1, 13, 13.4]) {
     assert.equal(
-      enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C), vignetteRadiusPxForZoom(z, SITE.lat),
-      `z=${z} display IS the projected ring (handoff coincidence)`,
+      enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C), atTop,
+      `z=${z} HOLDS the Z_TOP enclosure (no re-open past the ring)`,
     );
   }
+  assert.equal(
+    atTop, vignetteRadiusPxForZoom(10.5, SITE.lat),
+    'at Z_TOP the enclosure IS the projected ring (handoff coincidence)',
+  );
 });
 
 test('scrub entry: accumulated outward delta replaces the dwell counter', () => {

@@ -1519,10 +1519,18 @@ function flyToSectorThenTwin(id, opts = {}) {
     // before, native zoom untouched.
     try {
       window.__mapProbe.deepHandoff = Number.isFinite(liveZ)
-        ? { z: +liveZ.toFixed(2), scrub: +handoffScrubForZoom(liveZ).toFixed(4), staged: deep && nearNow && !reducedMotion }
+        ? { z: +liveZ.toFixed(2), scrub: +handoffScrubForZoom(liveZ).toFixed(4), staged: deep && !reducedMotion }
         : null;
     } catch { /* probe cosmetic */ }
-    if (deep && nearNow && !reducedMotion) {
+    // GATE-3 REVISION: the DEEP arrival clamps REGARDLESS of `near`.
+    // `near` decided only whether the WASH shows (a separate, correct
+    // behaviour — the surround stays proximity-armed). It must NOT decide
+    // whether the handoff is clamped: an off-centre arrival skipped the
+    // clamp, native zoom ran free to z 12.1-13.4, and the twin revealed
+    // with the site outside the frame. The clamp is a ZOOM CEILING, not a
+    // proximity behaviour — the staged hold is the only thing that owns
+    // the extra scroll past the gate.
+    if (deep && !reducedMotion) {
       try {
         if (mapRef && typeof mapRef.setMaxZoom === 'function') mapRef.setMaxZoom(Z_HANDOFF);
       } catch { /* clamp is best-effort */ }
@@ -1727,7 +1735,33 @@ function driveStagedOverlay() {
     } catch { /* cosmetic */ }
     return;
   }
+  // GATE-3 REVISION: never commit on a BLANK twin. A painted-but-black
+  // overlay is the exact failure (off-centre runs: the twin canvas held
+  // 97.4% #0b0c0c, luma 94.7 -> 15.7, and never recovered) — `ready`
+  // only proves the twin LISTENER is alive, not that it drew anything.
+  // The commit requires BOTH: the twin has real content (painted frames,
+  // basemap laid down, terrain live) AND the hotspot is near at commit
+  // time (re-derived live, never the arrival-time value).
   if (st.reveal >= 1) {
+    let nearNow = false;
+    try {
+      const px = proximityInfo();
+      nearNow = !!(px && px.near);
+    } catch { nearNow = false; }
+    const hasContent = twinFrameHasContent();
+    if (!nearNow || !hasContent) {
+      try {
+        if (root.style.opacity !== '0') root.style.opacity = '0';
+      } catch { /* cosmetic */ }
+      try {
+        window.__mapProbe.staged.blankTwin = !hasContent;
+        window.__mapProbe.staged.commitNear = nearNow;
+      } catch { /* probe cosmetic */ }
+      return; // no commit — hold the map, retry on the next S tick
+    }
+    try {
+      window.__mapProbe.staged.blankTwin = false;
+    } catch { /* probe cosmetic */ }
     finalizeStagedReveal(root);
     return;
   }
@@ -1744,6 +1778,55 @@ function driveStagedOverlay() {
   try {
     armRevealFallback();
   } catch { /* timer is best-effort */ }
+}
+
+/** GATE-3 REVISION: does the twin overlay have a REAL frame?
+ * The commit must never land on a blank twin. `twinReady`/`twinPainted` only
+ * prove the twin LISTENER is alive — a painted-but-black canvas is the exact
+ * failure (97.4% #0b0c0c, luma 94.7 -> 15.7, no recovery).
+ * The twin is a same-origin iframe, so the map can read its own state: the
+ * twin exposes `window.__ring2` (map, frame counter, handoff phase). A frame
+ * counts as CONTENT when the twin has painted past its prewarm floor AND the
+ * twin's map reports loaded. A frame that is black-but-painted fails the
+ * second test, so a boot that has not laid down imagery cannot commit.
+ * Conservative by design: if the twin's state cannot be read at all the
+ * answer is FALSE (never commit blind) and the next S tick retries.
+ * Never throws. */
+const TWIN_MIN_CONTENT_FRAMES = 1; // twin paint frames required before a commit
+function twinFrameHasContent() {
+  try {
+    const fr = overlayEls && overlayEls.frame;
+    if (!fr || fr.getAttribute('data-url') === 'about:blank') return false;
+    const win = fr.contentWindow;
+    if (!win) return false;
+    const r2 = win.__ring2;
+    if (!r2) return false;
+    // The twin reports the same signals its first-paint post computes:
+    // painted frames, basemap tile-idle, terrain live. A frame that is
+    // painted-but-black fails the idle/live tests, so a twin that has not
+    // laid down imagery cannot commit.
+    let c = null;
+    try {
+      c = typeof r2.content === 'function' ? r2.content() : null;
+    } catch { c = null; }
+    if (!c || typeof c !== 'object') return false;
+    const ok =
+      !!c.mapIdle &&
+      !!c.sceneLive &&
+      Number.isFinite(c.frames) &&
+      c.frames >= TWIN_MIN_CONTENT_FRAMES;
+    try {
+      window.__mapProbe.twinContent = {
+        loaded: !!c.mapIdle,
+        sceneLive: !!c.sceneLive,
+        frames: c.frames,
+        ok,
+      };
+    } catch { /* probe cosmetic */ }
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 /** Commit the staged hold: the fingers dissolved the twin to full — drop the
@@ -2769,6 +2852,33 @@ async function boot() {
     // LANE A naked view: no default attribution pill / info (ⓘ) button.
     // A minimal micro credit is mounted instead (mountMicroCredit).
     attributionControl: false,
+    // GATE-3 REVISION: the iso must GLIDE, never stair-step.
+    // MapLibre's native zoom animation re-applies the gesture-start pitch
+    // on EVERY frame, so a per-tick write only lands on settle — the tilt
+    // then becomes a function of gesture cadence (0deg at the gate for
+    // 60/120ms, ~30deg at 250ms, 44.85deg only at 800ms, in 8-27deg
+    // stair-steps). This hook runs BEFORE the camera moves, so the law's
+    // target wins by construction on every frame of the native zoom — the
+    // per-tick write and the per-frame pump both become redundant.
+    // One law: pitchTargetForZoom(z). Zoom is never touched here.
+    transformCameraUpdate: (next) => {
+      try {
+        if (twinOpen || transitId || pendingReveal || reverseWait) return next;
+        const z = +next.zoom;
+        if (!Number.isFinite(z)) return next;
+        if (z < Z_TOP) return next;
+        // Ownership: the scrub only takes the tilt when the live pitch sits
+        // at/below the law target (+slack), so a user-set oblique is never
+        // yanked. A user who pitched past the target keeps their angle.
+        const pLaw = pitchTargetForZoom(z);
+        const pCur = +next.pitch;
+        if (!Number.isFinite(pCur)) return next;
+        if (pCur > pLaw + ISO_SCRUB_SLACK_DEG) return next;
+        return { ...next, pitch: pLaw };
+      } catch {
+        return next;
+      }
+    },
   });
   // No key prompts anywhere: suppress geolocate, never request tokens.
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: false, showCompass: true }), 'top-right');

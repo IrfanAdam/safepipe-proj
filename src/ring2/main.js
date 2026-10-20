@@ -1828,6 +1828,22 @@ async function boot() {
     setLevel: handleLevel,
     onLevel: handleLevel,
     getStatus,
+    // GATE-3 REVISION: the map's commit gate needs to know whether this twin
+    // has a REAL frame, not merely a live listener. `ready`/`painted` prove
+    // the listener is alive; a painted-but-black canvas is the exact failure
+    // the gate must never commit on. Expose the same signals the first-paint
+    // post already computes: painted frames, basemap tile-idle, terrain live.
+    content: () => {
+      let mapIdle = false;
+      try {
+        mapIdle = map && typeof map.loaded === 'function' ? !!map.loaded() : false;
+      } catch { mapIdle = false; }
+      let sceneLive = false;
+      try {
+        sceneLive = typeof terrainState === 'function' ? terrainState() === 'vex' : false;
+      } catch { sceneLive = false; }
+      return { frames: twinFrames, mapIdle, sceneLive };
+    },
     handoff,
     requestTwinClose,
     handoffPhase: () => handoff.phase,

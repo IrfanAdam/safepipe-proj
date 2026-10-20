@@ -202,11 +202,17 @@ export function vignetteRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_
  * so the enclosure always reaches the screen edges on any aspect — never a
  * peephole. Pure in (z, corner), symmetric on zoom-out. */
 export function enclosureRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M, cornerPx = null) {
-  const vr = vignetteRadiusPxForZoom(zoom, latDeg, ringM);
-  const c = +cornerPx;
-  if (!Number.isFinite(vr) || !Number.isFinite(c) || !(c > 0)) return null;
   const n = +zoom;
   if (!Number.isFinite(n)) return null;
+  // The projected ring is evaluated at the HOLD zoom (Z_TOP), NEVER at the
+  // live zoom. The circle closes onto the ring across Z_CENTER..Z_TOP and
+  // then HOLDS: the twin's clip is a FIXED ground circle, so a live-zoom
+  // projection would drift away from it and re-open the surround (the ring
+  // subtends more pixels as you zoom in — +121px of re-open between Z_TOP
+  // and the handoff). One law, one hold point, symmetric on zoom-out.
+  const vr = vignetteRadiusPxForZoom(Z_TOP, latDeg, ringM);
+  const c = +cornerPx;
+  if (!Number.isFinite(vr) || !Number.isFinite(c) || !(c > 0)) return null;
   const t = enclosureTForZoom(n);
   if (!(t > 0)) return null;
   return c * (1 - t) + vr * t;
