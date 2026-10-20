@@ -420,7 +420,7 @@ const renderTask = (task) => {
 // the h2 on Task-headed plans.
 export const renderSection = (raw, opts) => {
   const { gateSuffix: suffix = '' } = opts || {};
-  const src = stripInlineAnchors(esc(stripGateThread(raw)));
+  const src = stripInlineAnchors(esc(stripGateThread(raw).replace(/<!--[\s\S]*?-->/g, '')));
   const lines = src.split('\n');
   let hi = -1;
   let htag = '';
