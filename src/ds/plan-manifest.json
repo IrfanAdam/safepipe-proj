@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T12:16:55.741Z",
+  "generated": "2026-10-20T12:20:25.201Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "ca15651",
+      "full": "ca1565192b630d3235138369c5029e791544129d",
+      "date": "2026-10-20",
+      "time": "17:47",
+      "subject": "docs(plan): correct two GATE 3 rev dates to 2026-10-20, matching git [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "b263a32",
       "full": "b263a328a93d40358e74f88cfa6a140e036177f5",
@@ -5719,6 +5728,7 @@
     }
   ],
   "wip": [
-    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
+    "scripts/process-osm.mjs",
+    "src/map/scrolltrigger.js"
   ]
 }
