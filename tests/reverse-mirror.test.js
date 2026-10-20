@@ -228,7 +228,8 @@ test('map vignette: radius from projected R, brackets ride the same law', () => 
   assert.ok(!main.includes('showVignette(prox.near);'), 'ungated proximity enclosure is gone');
   const html = srcOf('../ops3d-map.html');
   assert.ok(html.includes('@property --vr'), 'radius is registered animatable so the close-in glides');
-  assert.ok(html.includes('circle var(--vr, 260px)'), 'enclosure circle rides the projected radius');
+  assert.ok(html.includes('circle var(--vr)'), 'enclosure circle rides the projected radius');
+  assert.equal((html.match(/260px/g) || []).length, 1, '260px lives in exactly one place (the @property initial-value)');
   assert.ok(html.includes('at var(--vx, 50%) var(--vy, 50%)'), 'enclosure stays hotspot-centered');
 });
 
