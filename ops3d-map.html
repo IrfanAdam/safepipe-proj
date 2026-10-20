@@ -29,17 +29,8 @@
     border-right: 0; border-top: 0; }
   #ring-clip .rc-br { right: calc(14px + var(--clip) * 34%); bottom: calc(14px + var(--clip) * 30%);
     border-left: 0; border-top: 0; }
-  /* Journey vignette: circular enclosure riding on the hotspot (--vx/--vy),
-   * fading in once the brackets converge. Transparent core, dark periphery;
-   * pointer-transparent; twin open/close share the same toggle. */
-  #map-vignette { position: absolute; inset: 0; z-index: 2; pointer-events: none;
-    opacity: 0; transition: opacity 0.5s ease; --vx: 50%; --vy: 50%;
-    background: radial-gradient(circle 260px at var(--vx) var(--vy),
-      transparent 52%, var(--ops-vig, rgba(4, 6, 8, 0.48)) 100%); }
-  #map-vignette.on { opacity: 1; }
   @media (prefers-reduced-motion: reduce) {
     #ring-clip { transition: none; }
-    #map-vignette { transition: none; }
   }
   /* Handoff-3 Lane 1: no MAP/SAT toggle ribbon — satellite switching is
    * transition-only/automatic (outbound flight + recede). Micro attribution
@@ -149,19 +140,27 @@
   /* T2 handoff: hotspot-centered circular enclosure staging the twin open.
    * Radius rides --vr (projected RING_RADIUS_M at the live zoom, set by the
    * journey driver; 260px fallback) so the enclosing coincides with the
-   * twin clip circle (685px across at handoff z=12). Token-only where
+   * twin clip circle at handoff. Token-only where
    * possible (outer wash falls back to --ops-bg); pointer-transparent
    * so blip hit-testing is unchanged. Sits above pins, below twin.
    * --vr is a registered property (typed <length>) so per-step radius writes
    * always resolve to a length — never fall back to 260px mid-gesture. NOTE:
    * do NOT put --vr in `transition`: a transition on the property freezes
    * the gradient at its start value instead of gliding (verified headless).
-   * The close-in reads as animation because the gesture streams steps. */
+   * The close-in reads as animation because the gesture streams steps.
+   * Crisp edge: transparent core cuts to a 2px ring stroke AT --vr
+   * (hard stop pair — no feathered rim), then darkness feathers outward
+   * to the solid surround. */
   @property --vr { syntax: '<length>'; inherits: false; initial-value: 260px; }
   #map-vignette {
     position: absolute; inset: 0; z-index: 3; pointer-events: none;
     background: radial-gradient(circle var(--vr, 260px) at var(--vx, 50%) var(--vy, 50%),
-      transparent 52%, rgba(0, 0, 0, 0.28) 78%, var(--ops-bg, #0b0c0c) 100%);
+      transparent 0,
+      transparent calc(var(--vr, 260px) - 2px),
+      rgba(255, 217, 160, 0.9) calc(var(--vr, 260px) - 2px),
+      rgba(255, 217, 160, 0.9) var(--vr, 260px),
+      rgba(0, 0, 0, 0.3) calc(var(--vr, 260px) + 34px),
+      var(--ops-bg, #0b0c0c) 100%);
     opacity: 0; transition: opacity 0.45s ease; /* GATE-3 REVISION tempo */
   }
   #map-vignette.on { opacity: 1; }

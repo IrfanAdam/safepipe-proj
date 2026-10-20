@@ -163,7 +163,7 @@ window.__mapProbe = {
   centerEase: 0, autoCenter: false, satOpacity: 0,
   // GATE-12-A native-zoom probe: zoom-keyed journey, proximity, ring clip.
   proximity: null, ringClip: { k: 0, cursorNear: false, centerNear: false },
-  zoomJourney: { zMin: 6.4, zHand: 12, zTop: 11, zMax: 14, topDown: false, handoff: false, home: true },
+  zoomJourney: { zMin: 6.4, zHand: 11.5, zTop: 11, zMax: 14, topDown: false, handoff: false, home: true },
   isoBridge: false, deepHandoff: null, staged: { active: false, s: 0, committed: false },
   vectorWarm: false, vectorCache: null, vectorSnapshot: false, vectorHold: false,
   vectorReturnMs: null,
@@ -693,7 +693,7 @@ function proximityInfo() {
     }
     const centerNear = distCenter <= PROX_CENTER_PX;
     return {
-      sx: +pt.x.toFixed(1), sy: +pt.y.toFixed(1),
+      sx: Math.round(pt.x), sy: Math.round(pt.y),
       distCursor: distCursor == null ? null : +distCursor.toFixed(1),
       distCenter: +distCenter.toFixed(1),
       cursorNear, centerNear, near: cursorNear || centerNear,
@@ -843,11 +843,13 @@ function onNativeZoomStep(snap, source) {
     updateRingClip(clipK, prox);
     // Journey enclosure: the vignette circle starts at the hotspot's farthest
     // screen corner (clear frame, darkness biasing in from the edges) and
-    // closes onto the PROJECTED ring radius across Z_CENTER..Z_HANDOFF
-    // (enclosureRadiusPxForZoom: corner*(1-t) + R/mpp*t, exact R at
-    // handoff — the same ground circle the twin clip cuts), so the
+    // closes onto the PROJECTED ring radius across the shared enclosure
+    // span Z_CENTER..Z_TOP (enclosureRadiusPxForZoom: corner*(1-t) + R/mpp*t
+    // — the SAME law as the bracket clip-k, so circle and brackets stay in
+    // sync — exact R at/above Z_TOP, held through handoff: the same ground
+    // circle the twin clip cuts), so the
     // enclosing coincides with the twin clip exactly at handoff. The
-    // corner brackets stay as dressing only. Gate: blend>0 (z>8) — below
+    // corner brackets stay as dressing only. Gate: blend>0 (z>7) — below
     // that the ring is sub-pixel and the surround would black the frame.
     // Zoom-out retraces it symmetrically (pure function of z + viewport).
     // Twin paths own it while open.
@@ -855,8 +857,8 @@ function onNativeZoomStep(snap, source) {
       try {
         const v = document.getElementById('map-vignette');
         if (v) {
-          v.style.setProperty('--vx', prox.sx.toFixed(1) + 'px');
-          v.style.setProperty('--vy', prox.sy.toFixed(1) + 'px');
+          v.style.setProperty('--vx', Math.round(prox.sx) + 'px');
+          v.style.setProperty('--vy', Math.round(prox.sy) + 'px');
           let corner = null;
           try {
             const el = mapRef.getContainer();
@@ -989,9 +991,10 @@ function onNativeZoomStep(snap, source) {
     // itself (Z_TOP..Z_HANDOFF -> pitch 0..45), written straight into the
     // transform so the running scroll glide is never stopped: no latch, no
     // easeTo, no timers. Zoom-out retraces it symmetrically. Ownership: the
-    // scrub engages only while near and only when the live pitch sits
-    // at/below target (+slack), so a user-set oblique is never yanked; the
-    // settle landing above still zeroes bearing and holds this same target.
+    // scrub engages whenever the live pitch sits
+    // at/below target (+slack), near or far, so a user-set oblique is never
+    // yanked; the settle landing above still zeroes bearing and holds this
+    // same target.
     // Once owned, the scrub keeps driving until pitch is restored even if
     // proximity drops (pan-away-then-zoom-out), and the release step itself
     // writes the target — a fast flick-out that jumps clean over the band
@@ -999,7 +1002,7 @@ function onNativeZoomStep(snap, source) {
     // Twin paths own the camera while open. Task-37: the gesture recede
     // does NOT block this — pitch 45->0 IS the mirrored checkpoint on the
     // way out, ridden by the same law.
-    if (!twinOpen && !busyNoRecede && prox && (prox.near || isoScrubOwned)) {
+    if (!twinOpen && !busyNoRecede && prox && (prox.near || isoScrubOwned || z >= Z_TOP)) {
       const pTarget = pitchTargetForZoom(z);
       let pCur = null;
       try {
@@ -1008,7 +1011,7 @@ function onNativeZoomStep(snap, source) {
       if (Number.isFinite(pCur)) {
         let releaseNow = false;
         if (!isoScrubOwned) {
-          if (prox.near && z >= Z_TOP && pCur <= pTarget + ISO_SCRUB_SLACK_DEG) {
+          if (z >= Z_TOP && pCur <= pTarget + ISO_SCRUB_SLACK_DEG) {
             isoScrubOwned = true;
             isoRestoreDue = true;
           }
@@ -1439,9 +1442,10 @@ function postTwinStagedS() {
 }
 
 /** Drive the staged overlay dissolve from accumulated scroll S. Twin-ready
- * GRANTS (>0 only once Lane B posts it); the S law owns the progress, so a
- * fast twin still dissolves on the fingers, never its own rhythm. At full
- * reveal the hold commits (finalizeStagedReveal). Pure-law in, DOM out. */
+ * (or first paint) GRANTS (>0 only once Lane B posts it); the S law owns
+ * the progress, so a fast twin still dissolves on the fingers, never its
+ * own rhythm. At full reveal the hold commits (finalizeStagedReveal).
+ * Pure-law in, DOM out. */
 function driveStagedOverlay() {
   if (!stagedActive || stagedCommitted) return;
   // Task-37: feed S to the twin on every drive (value-change throttled
@@ -1460,7 +1464,7 @@ function driveStagedOverlay() {
   if (!root) return;
   let ready = false;
   try {
-    ready = !!window.__mapProbe.twinReady;
+    ready = !!window.__mapProbe.twinReady || !!window.__mapProbe.twinPainted;
   } catch {
     ready = false;
   }
@@ -1493,18 +1497,18 @@ function driveStagedOverlay() {
 }
 
 /** Commit the staged hold: the fingers dissolved the twin to full — drop the
- * inline staging opacity, run the standard instant reveal bookkeeping
+ * inline staging opacity, run the standard dissolve reveal bookkeeping
  * (flags, probe, focus) and unclamp native zoom. Idempotent. */
 function finalizeStagedReveal(root) {
   if (stagedCommitted) return;
   stagedCommitted = true;
   stagedActive = false;
   lastPostedStagedS = null; // commit ends the S stream (producer guards on flags anyway)
+  revealTwin(false); // dissolve: the staged scroll already animated it — the CSS crossfade completes the commit, never a cut
   try {
     if (root) root.style.opacity = '';
   } catch { /* cosmetic */ }
   restoreMaxZoom();
-  revealTwin(true); // instant: the scroll already animated the dissolve
   try {
     window.__mapProbe.staged = { active: false, s: +stagedS.toFixed(1), committed: true };
   } catch { /* probe cosmetic */ }
@@ -1514,8 +1518,8 @@ function finalizeStagedReveal(root) {
  * Unclamps, drops accumulated scroll, hides the staged dissolve, and quietly
  * tears down the uncommitted prewarm (overlay hidden, frame blanked, twin
  * flags cleared) so no invisible twin-open state lingers — the map is never
- * stranded and re-entry restages cold. The twin-ready message is the only
- * other exit (forward, via driveStagedOverlay). */
+ * stranded and re-entry restages cold. The twin-ready/paint grant is the
+ * only other exit (forward, via driveStagedOverlay). */
 function exitStaged() {
   const had = stagedActive || stagedS !== 0;
   stagedActive = false;
@@ -1571,10 +1575,11 @@ function exitStaged() {
 /** Handoff-4 Lane A seeded reveal: PRE-WARM the twin at the ring frame —
  * create the overlay iframe hidden (opacity 0 via .prewarm, still loading
  * ?sector&cx&cy&z&embed=1) and HOLD the map end-frame until the twin posts
- * {type:'safepipe-twin-ready'} (Lane B). Timeout fallback (~4s) reveals
- * anyway so a silent twin can never strand the map — SKIPPED for staged
- * prewarms (opts.staged): there the twin-ready message is the only forward
- * exit and the map is never stranded (scroll-up unwinds the hold). On ready,
+ * {type:'safepipe-twin-ready'} (Lane B). Timeout fallback (~4s, paint-gated)
+ * reveals anyway so a silent twin can never strand the map — staged
+ * prewarms (opts.staged) arm the same paint-gated fallback: paint grants
+ * the dissolve through driveStagedOverlay, and scroll-up still unwinds the
+ * hold while nothing has painted. On ready,
  * CROSSFADE map->twin over ~450ms (overlay opacity 0->1 above the matched
  * sat frame). Reduced-motion: reveal instantly. */
 function prewarmThenReveal(id, frame, opts = {}) {
@@ -1640,22 +1645,22 @@ function prewarmThenReveal(id, frame, opts = {}) {
     revealTwin(true);
     return true;
   }
-  // Staged prewarms skip the timeout fallback: twin-ready is the only
-  // forward exit (scroll-up unwinds instead), so a silent twin can never
-  // strand the map — the hold simply never dissolves.
-  if (!opts.staged) {
-    armRevealFallback();
-  }
+  // Staged prewarms arm the same paint-gated fallback: first paint grants
+  // the dissolve through driveStagedOverlay, so a twin whose ready-match
+  // never agrees still dissolves on the fingers instead of holding forever
+  // (scroll-up unwinds the hold while nothing has painted).
+  armRevealFallback();
   return true;
 }
 
-/* Unstaged fallback reveal, paint-gated: Lane B ready normally reveals via
+/* Unstaged + staged fallback reveal, paint-gated: Lane B ready normally reveals via
  * its message listener; this covers a twin whose ready-match never agrees
  * (off-site arrivals fail the map-cam check structurally). It reveals on
  * first-painted-frame (twinPainted), never on a black canvas: unpainted at
  * fire re-arms (up to REVEAL_PAINT_TRIES), and only a fully silent twin
  * takes the flagged blind reveal so the map never strands behind a dead
- * frame. Staged prewarms never arm this (ready-or-unwind only). */
+ * frame. Staged prewarms arm this too (paint grants the dissolve through
+ * driveStagedOverlay; scroll-up unwinds while nothing has painted). */
 const REVEAL_PAINT_TRIES = 3;
 function armRevealFallback() {
   try {
@@ -2112,9 +2117,10 @@ window.addEventListener('message', (e) => {
   } catch { /* late-sync is best-effort */ }
 });
 // Painted-frame arm (twin->parent first-paint, no match required): records
-// paint so the unstaged fallback reveals on a painted frame instead of
-// blind. Never reveals directly — ready owns the reveal; staged dissolves
-// keep waiting for the match. Stale paints with no open twin are ignored.
+// paint so the fallback reveals on a painted frame instead of
+// blind. Never reveals directly on the unstaged path — ready owns the
+// reveal there; staged dissolves ride the same grant through the staged
+// driver. Stale paints with no open twin are ignored.
 window.addEventListener('message', (e) => {
   let p = null;
   try { p = parseTwinPaintedMessage(e && e.data); } catch { p = null; }
@@ -2123,6 +2129,13 @@ window.addEventListener('message', (e) => {
   try {
     window.__mapProbe.twinPainted = true;
   } catch { /* probe cosmetic */ }
+  // Staged paint grants the dissolve — route through the staged driver,
+  // never revealTwin directly (the S law still owns the progress).
+  if (stagedActive && !stagedCommitted) {
+    try {
+      driveStagedOverlay();
+    } catch { /* staged drive is best-effort */ }
+  }
 });
 window.addEventListener('message', (e) => {
   if (!twinOpen || !isTwinCloseData(e && e.data)) return;
@@ -2272,8 +2285,8 @@ function positionDomPins(map) {
   pins.forEach((p) => {
     try {
       const pt = map.project([SITE.lon, SITE.lat]);
-      p.style.left = pt.x + 'px';
-      p.style.top = pt.y + 'px';
+      p.style.left = Math.round(pt.x) + 'px';
+      p.style.top = Math.round(pt.y) + 'px';
     } catch { /* pre-ready: centered via CSS */ }
   });
 }

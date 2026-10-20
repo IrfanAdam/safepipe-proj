@@ -107,18 +107,18 @@ test('vignette radius: projected R, coincides with the twin clip at handoff', ()
 
 test('enclosure forming wash: screen corners close onto the clip circle', () => {
   const C = 900; // hotspot farthest-corner distance on the test viewport
-  assert.equal(enclosureRadiusPxForZoom(7.9, SITE.lat, MAP_VIGNETTE_RING_M, C), null, 'parks below the band — never blacks the frame');
-  assert.equal(enclosureRadiusPxForZoom(9, SITE.lat, MAP_VIGNETTE_RING_M, null), null, 'parks without a viewport corner');
-  assert.equal(enclosureRadiusPxForZoom(9, SITE.lat, MAP_VIGNETTE_RING_M, -4), null, 'parks on a non-positive corner');
-  const at8 = enclosureRadiusPxForZoom(8.01, SITE.lat, MAP_VIGNETTE_RING_M, C);
-  assert.ok(Math.abs(at8 - C) < 5, `forming starts AT the corners (got ${at8.toFixed(1)}px)`);
+  assert.equal(enclosureRadiusPxForZoom(6.9, SITE.lat, MAP_VIGNETTE_RING_M, C), null, 'parks below the band — never blacks the frame');
+  assert.equal(enclosureRadiusPxForZoom(8, SITE.lat, MAP_VIGNETTE_RING_M, null), null, 'parks without a viewport corner');
+  assert.equal(enclosureRadiusPxForZoom(8, SITE.lat, MAP_VIGNETTE_RING_M, -4), null, 'parks on a non-positive corner');
+  const at7 = enclosureRadiusPxForZoom(7.01, SITE.lat, MAP_VIGNETTE_RING_M, C);
+  assert.ok(Math.abs(at7 - C) < 5, `forming starts AT the corners (got ${at7.toFixed(1)}px)`);
   let prev = Infinity;
-  for (let z = 8.5; z <= 11.5; z += 0.5) {
+  for (let z = 7.5; z <= 10.5; z += 0.5) {
     const r = enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C);
     assert.ok(r < prev, `z=${z} closes in from the edges (${r.toFixed(0)}px < ${prev === Infinity ? 'inf' : prev.toFixed(0)}px)`);
     prev = r;
   }
-  for (const z of [12, 13]) {
+  for (const z of [11, 11.5, 12, 13]) {
     assert.equal(
       enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C), vignetteRadiusPxForZoom(z, SITE.lat),
       `z=${z} display IS the projected ring (handoff coincidence)`,
@@ -217,7 +217,7 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
   assert.ok(!main.includes(', 2500);'), '2500ms fallback timer is gone');
   assert.ok(main.includes('lastPostedStagedS = null; // symmetric unwind'), 'staged exit unwinds the S stream');
   assert.ok(main.includes('if (receding && needsHandoff(z))'), 'scrolling back in disarms the recede');
-  assert.ok(main.includes('!busyNoRecede && prox && (prox.near || isoScrubOwned)'), 'iso retrace rides the gesture home, owned tilt restores even after pan-away');
+  assert.ok(main.includes('(prox.near || isoScrubOwned || z >= Z_TOP)'), 'iso scrub engages on z past the top gate even unaimed, owned tilt restores even after pan-away');
 });
 
 test('map vignette: radius from projected R, brackets retired as enclosure signal', () => {

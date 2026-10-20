@@ -22,9 +22,9 @@
 export const Z_MIN = 6.4; // country home — enforced as map minZoom (the cap)
 export const Z_FADE0 = 6.4; // fade starts: vector->sat keys off zoom only
 export const Z_FADE1 = 9.0; // fade ends: full sat well before the handoff (works at ANY center)
-export const Z_CENTER = 8.0; // proximity centering + brackets arm past this zoom
+export const Z_CENTER = 7.0; // proximity centering + brackets arm past this zoom
 export const Z_TOP = 11.0; // top-down checkpoint (bearing/pitch -> 0)
-export const Z_HANDOFF = 12.0; // deeper zoom hands to the twin
+export const Z_HANDOFF = 11.5; // deeper zoom hands to the twin
 export const Z_MAX = 14.0; // map maxZoom cap
 const HOME_EPS = 0.06; // zoomend-at-home tolerance for the reverse edge
 const REARM_DOWN_BELOW = Z_HANDOFF - 0.5; // drop below to re-arm onDown
@@ -56,11 +56,18 @@ export function satOpacityForZoom(z) {
   return smooth01((n - Z_FADE0) / (Z_FADE1 - Z_FADE0));
 }
 
-/** Live zoom -> proximity-center blend 0..1 (CENTER..TOP span). */
-export function centerBlendForZoom(z) {
+/** Shared enclosure law: the bracket clip-k AND the vignette circle-t ride
+ * this ONE span (Z_CENTER..Z_TOP, smoothstepped) so the brackets and the
+ * circle stay in sync on the way in and on retrace. Pure + node-checkable. */
+export function enclosureTForZoom(z) {
   const n = +z;
   if (!Number.isFinite(n)) return 0;
   return smooth01((n - Z_CENTER) / (Z_TOP - Z_CENTER));
+}
+
+/** Live zoom -> proximity-center blend 0..1 (the shared enclosure span). */
+export function centerBlendForZoom(z) {
+  return enclosureTForZoom(z);
 }
 
 /** Centering arms past Z_CENTER (proximity-gated by main.js). */
@@ -148,8 +155,9 @@ export function accumStagedS(s, deltaY) {
  * so this module stays import-free; the node suite pins them equal).
  * Projected to CSS px at the live zoom/lat: R / metersPerPixel. The
  * #map-vignette circle rides this radius, so the map-side enclosing
- * coincides with the twin clip circle exactly (685px diameter at handoff
- * z=12) — symmetric on zoom-out, since it is a pure function of z. */
+ * coincides with the twin clip circle exactly (~685px diameter at z=12,
+ * held through handoff) — symmetric on zoom-out, since it is a pure
+ * function of z. */
 export const MAP_VIGNETTE_RING_M = 10000;
 export function vignetteRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M) {
   const R = +ringM;
@@ -160,9 +168,11 @@ export function vignetteRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_
 }
 /* Enclosure forming wash (map side): the displayed vignette circle starts at
  * the hotspot's farthest screen corner (clear frame, darkness only biasing
- * in from the edges) and closes onto the projected ring across the
- * Z_CENTER..Z_HANDOFF span — display = corner*(1-t) + projected*t. At
- * handoff t=1 so it IS the clip circle exactly; at/below band start it
+ * in from the edges) and closes onto the projected ring across the SHARED
+ * enclosure span Z_CENTER..Z_TOP (enclosureTForZoom — the same law as the
+ * bracket clip-k, so circle and brackets stay in sync) — display =
+ * corner*(1-t) + projected*t. At/above Z_TOP t=1 so it IS the clip circle
+ * exactly (held through handoff); at/below band start it
  * parks at null (an ungated surround would black the frame). cornerPx is
  * viewport-relative (driver passes the hotspot's farthest-corner distance),
  * so the enclosure always reaches the screen edges on any aspect — never a
@@ -173,7 +183,7 @@ export function enclosureRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING
   if (!Number.isFinite(vr) || !Number.isFinite(c) || !(c > 0)) return null;
   const n = +zoom;
   if (!Number.isFinite(n)) return null;
-  const t = smooth01((n - Z_CENTER) / (Z_HANDOFF - Z_CENTER));
+  const t = enclosureTForZoom(n);
   if (!(t > 0)) return null;
   return c * (1 - t) + vr * t;
 }

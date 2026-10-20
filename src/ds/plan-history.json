@@ -3500,6 +3500,52 @@
      "state": ""
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "15:51",
+   "hash": "9ca74226",
+   "sections": [
+    {
+     "head": "Lane A — OSM completeness (owns: `scripts/data-pipe/*`, `public/data/sangachal-v",
+     "hash": "c5fb0fdb",
+     "state": ""
+    },
+    {
+     "head": "Lane B — Elevation triangulation (owns: new `scripts/data-pipe/elev-*.mjs` + scr",
+     "hash": "7252159c",
+     "state": ""
+    },
+    {
+     "head": "Lane C — Source recon: Cesium / OSM2World / GDAL / PostGIS (read-only + scratch ",
+     "hash": "d129a64d",
+     "state": ""
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "15:56",
+   "hash": "d1a8a690",
+   "sections": [
+    {
+     "head": "Phase 01 — OSM vector completeness, close the loop",
+     "hash": "4721ce57",
+     "state": "0/3"
+    },
+    {
+     "head": "Phase 02 — Elevation verdict locked",
+     "hash": "49769ce6",
+     "state": "0/2"
+    },
+    {
+     "head": "Phase 03 — Source recon verdicts",
+     "hash": "ec974cb3",
+     "state": "0/3"
+    }
+   ]
   }
  ],
  "2026-10-13_233337-ops3d-twin-work.md": [

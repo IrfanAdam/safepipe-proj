@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage, TWIN_FWD_REVEAL_START_PX } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -645,6 +645,7 @@ async function boot() {
     scrub: null, // scroll-scrub reverse: { progress:0..1, accum, justEntered } or null (wheel owns the walk)
     fwd: null, // Task-36 intro scrub: { legs:[swoop,push], progress:0..1, t0, staged } or null (pose = pure fn of progress)
     fwdStagedS: null, // last parent-posted staged scroll S (px); null = no staged driver, autoplay advances the scalar
+    fwdStagedAt: null, // handoffNow() ms of the last staged-S post (freshness stamp for the release seed cap)
     capExpired: false, // hold parked past HOLD+CAP with no ready post (shelved-cap observability for the probe)
     entryAccum: 0, // Task-37 gesture entry: accumulated outward wheel/pinch delta (px) at the zoom clamp toward scrub-reverse
     frame: null, // handed-off { cx, cy, z, bearing } (range refit source)
@@ -666,6 +667,11 @@ async function boot() {
    * cold-cache / throttled-CPU boots still post on agreement instead of
    * timing out into an unposted swoop. */
   const HANDOFF_READY_CAP_MS = 25000;
+  /* Staged-seed freshness (scroll path): a staged-S post counts as the
+   * fingers' live S only within this window before release. Wheel ticks
+   * post every few ms while scrolling; a slow boot parks fingers for
+   * seconds — so a stale seed is parked fingers, never live input. */
+  const HANDOFF_STAGED_SEED_FRESH_MS = 1000;
   const handoffNow = () => {
     try {
       return performance.now();
@@ -752,6 +758,7 @@ async function boot() {
     handoff.from = null;
     handoff.fwd = null;
     handoff.fwdStagedS = null;
+    handoff.fwdStagedAt = null;
     handoff.capExpired = false;
     handoff.revMode = null;
     handoff.walk = null;
@@ -1183,15 +1190,34 @@ async function boot() {
           && heldMs >= HANDOFF_HOLD_MS + HANDOFF_READY_CAP_MS && twinFrames >= 3) {
           handoff.capExpired = true;
         }
-        if (heldMs >= HANDOFF_HOLD_MS && handoff.readyPosted) {
-          // Task-36 intro scrub: freeze the (refit-final) anchors into one
-          // forward leg list — pose/mix/ring all read it as a pure function
-          // of progress from here on. Staged scroll received during the hold
-          // only seeds the release progress (the pin never moved, so the
-          // ready match stayed honest).
+        // Scroll-path painted release: the timed click path never posts
+        // staged S, so its ready-gated exit below is untouched. A
+        // painted-but-unready twin with fingers in the reveal band exits
+        // the hold on paint — same leg-freezing path — so
+        // fwdProgressForStagedS scrubs swoop then push+mix under the
+        // fingers instead of parking at driveMix(0). The truly unpainted
+        // case stays parked (pin + mix 0, no advance).
+        const preStaged = handoff.fwdStagedS;
+        const preStagedS = preStaged === null || preStaged === undefined ? null : Number(preStaged);
+        const stagedInReveal = preStagedS !== null && Number.isFinite(preStagedS)
+          && preStagedS >= TWIN_FWD_REVEAL_START_PX;
+        const paintedRelease = heldMs >= HANDOFF_HOLD_MS && !handoff.readyPosted
+          && paintedPosted && stagedInReveal;
+        if ((heldMs >= HANDOFF_HOLD_MS && handoff.readyPosted) || paintedRelease) {
+          // Task-36 intro scrub: freeze the anchors into one forward leg
+          // list — pose/mix/ring all read it as a pure function of progress
+          // from here on. Staged scroll received during the hold only seeds
+          // the release progress (the pin never moved, so the ready match
+          // stayed honest). The legs start from the LIVE pose (no jump on
+          // release), falling back to the pinned start when uncaptured.
           const st = handoff.start;
+          const live = capturePose();
+          const liveStart = live && live.eye && live.target
+            ? { eye: live.eye, target: live.target }
+            : null;
           const legs = buildForwardLegs({
-            startPose: st ? { eye: startEye(st), target: { x: st.tx, y: st.ty, z: st.tz } } : null,
+            startPose: liveStart
+              ?? (st ? { eye: startEye(st), target: { x: st.tx, y: st.ty, z: st.tz } } : null),
             mid: handoff.mid,
             to: handoff.to,
           });
@@ -1199,11 +1225,27 @@ async function boot() {
             endHandoffFlight();
             return;
           }
-          handoff.from = capturePose();
-          const staged = handoff.fwdStagedS !== null && handoff.fwdStagedS !== undefined;
+          handoff.from = live;
+          // Seed cap (scroll path only — the timed click path never posts
+          // staged S, so hasStaged is false and this reduces to progress 0
+          // + autoplay, exactly as before): honor the staged seed only
+          // while it is the fingers' LIVE S. A stale seed — slow boot with
+          // fingers parked at S=1250 long before release — is capped to 0,
+          // so the flight starts at the live pose and autoplays instead of
+          // jumping to progress 1; a late hold-exit never starts past the
+          // fingers' current staged S. Fresh scroll past release flips
+          // staged on and follows from there.
+          const stagedVal = handoff.fwdStagedS;
+          const hasStaged = stagedVal !== null && stagedVal !== undefined
+            && Number.isFinite(Number(stagedVal));
+          const seedAt = Number(handoff.fwdStagedAt);
+          const seedFresh = hasStaged && Number.isFinite(seedAt)
+            && (now - seedAt) <= HANDOFF_STAGED_SEED_FRESH_MS;
+          const seedS = seedFresh ? Math.max(0, Number(stagedVal)) : 0;
+          const staged = seedFresh;
           handoff.fwd = {
             legs,
-            progress: staged ? fwdProgressForStagedS(handoff.fwdStagedS) : 0,
+            progress: staged ? fwdProgressForStagedS(seedS) : 0,
             t0: now,
             staged,
           };
@@ -1558,6 +1600,9 @@ async function boot() {
       const v = Number(s);
       if (!Number.isFinite(v)) return false;
       handoff.fwdStagedS = Math.max(0, v);
+      try {
+        handoff.fwdStagedAt = handoffNow();
+      } catch { /* freshness stamp is best-effort */ }
       if (handoff.fwd && (handoff.phase === 'swoop' || handoff.phase === 'push')) {
         handoff.fwd.staged = true;
       }
