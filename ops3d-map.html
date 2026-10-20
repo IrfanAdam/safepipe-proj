@@ -19,7 +19,10 @@
    * centre is anchored at centre±radius ((--vx,--vy) ± --vr) minus half the
    * glyph size, so all four centres are equidistant from the hotspot by
    * construction — the SAME --vx/--vy/--vr the vignette circle rides (one
-   * law writes both; see the journey driver). --clip drives APPEARANCE
+   * law writes both; see the journey driver). Each bracket CENTRE sits ON
+   * the ring: the axis offset --rc-axis = --vr / sqrt(2) (1/sqrt(2) is the
+   * mathematical constant that puts a point at (a,a) exactly on a circle
+   * of radius r), so the ink straddles the edge. --clip drives APPEARANCE
    * only (.on fades the layer in); it no longer positions anything, so the
    * old canvas-percentage law (and its corner/circle gap) is gone.
    * Mark size/line are single-definition tokens (--rc-mark/--rc-line); the
@@ -32,22 +35,23 @@
   #ring-clip { position: absolute; inset: 0; z-index: 4; pointer-events: none;
     opacity: 0; transition: opacity 0.3s ease; --clip: 0;
     --rc-mark: 26px; --rc-line: 2px;
-    --rc-half: calc((var(--rc-mark) + var(--rc-line) * 2) / 2); }
+    --rc-half: calc((var(--rc-mark) + var(--rc-line) * 2) / 2);
+    --rc-axis: calc(var(--vr) * 0.7071067811865476); }
   #ring-clip.on { opacity: 1; }
   #ring-clip i { position: absolute; width: var(--rc-mark); height: var(--rc-mark);
     border: var(--rc-line) solid var(--ops-amber); opacity: 0.9;
     box-sizing: content-box; }
-  #ring-clip .rc-tl { left: calc(var(--vx, 50%) - var(--vr) - var(--rc-half));
-    top: calc(var(--vy, 50%) - var(--vr) - var(--rc-half));
+  #ring-clip .rc-tl { left: calc(var(--vx, 50%) - var(--rc-axis) - var(--rc-half));
+    top: calc(var(--vy, 50%) - var(--rc-axis) - var(--rc-half));
     border-right-color: transparent; border-bottom-color: transparent; }
-  #ring-clip .rc-tr { left: calc(var(--vx, 50%) + var(--vr) - var(--rc-half));
-    top: calc(var(--vy, 50%) - var(--vr) - var(--rc-half));
+  #ring-clip .rc-tr { left: calc(var(--vx, 50%) + var(--rc-axis) - var(--rc-half));
+    top: calc(var(--vy, 50%) - var(--rc-axis) - var(--rc-half));
     border-left-color: transparent; border-bottom-color: transparent; }
-  #ring-clip .rc-bl { left: calc(var(--vx, 50%) - var(--vr) - var(--rc-half));
-    top: calc(var(--vy, 50%) + var(--vr) - var(--rc-half));
+  #ring-clip .rc-bl { left: calc(var(--vx, 50%) - var(--rc-axis) - var(--rc-half));
+    top: calc(var(--vy, 50%) + var(--rc-axis) - var(--rc-half));
     border-right-color: transparent; border-top-color: transparent; }
-  #ring-clip .rc-br { left: calc(var(--vx, 50%) + var(--vr) - var(--rc-half));
-    top: calc(var(--vy, 50%) + var(--vr) - var(--rc-half));
+  #ring-clip .rc-br { left: calc(var(--vx, 50%) + var(--rc-axis) - var(--rc-half));
+    top: calc(var(--vy, 50%) + var(--rc-axis) - var(--rc-half));
     border-left-color: transparent; border-top-color: transparent; }
   @media (prefers-reduced-motion: reduce) {
     #ring-clip { transition: none; }

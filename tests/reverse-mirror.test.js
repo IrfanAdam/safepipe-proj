@@ -231,6 +231,9 @@ test('map vignette: radius from projected R, brackets ride the same law', () => 
   assert.ok(html.includes('circle var(--vr)'), 'enclosure circle rides the projected radius');
   assert.equal((html.match(/260px/g) || []).length, 1, '260px lives in exactly one place (the @property initial-value)');
   assert.ok(html.includes('at var(--vx, 50%) var(--vy, 50%)'), 'enclosure stays hotspot-centered');
+  assert.ok(html.includes('--rc-axis: calc(var(--vr) * 0.7071067811865476)'), 'bracket axis derives from the ring radius (1/sqrt(2), centre on the ring)');
+  assert.equal((html.match(/var\(--rc-axis\)/g) || []).length, 8, 'all four corners anchor to --rc-axis (left+top each)');
+  assert.ok(!html.includes('- var(--vr) - var(--rc-half)'), 'no corner rides the bounding square anymore');
 });
 
 test('paint-gated reveal: no opaque frame before the twin first paints', () => {
