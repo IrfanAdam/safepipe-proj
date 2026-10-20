@@ -15,14 +15,15 @@
 - Modify: `src/changelog/schedule-gate.js` — boot-time silent health check (`GET /user`, 10s budget, single attempt); invalid → clear user+token once, render logged-out.
 - Modify: `src/changelog/changelog-events.js` — gate opens ONLY on explicit user action (Schedule entry click, or pick while logged out shows inline "Log in to save" affordance). 401/403 on `/api/due` → clear token, one inline re-login affordance with scope note, never an auto-popup.
 
-**Rules:**
+**Changes:**
 - No auto-open of the gate on any async path (pick, retry, poll, boot). A popup the user didn't summon is the bug.
 - Logout clears user AND token together (today logout clears both but 401/403 clears token only — unify).
 - Old scope-less grants (pre-`public_repo`) get one clear "grant access" message, then behave.
 
 **Verify:** login → refresh keeps session; new tab keeps session; revoked token degrades to logged-out silently; pick while logged out never popups by itself; logout wipes all.
 
-- REF GATE 1: cold-load logged-in, refresh, pick — zero gate opens; revocation drill degrades silently.
+- REF GATE 1 (OPEN, by owner: zero-auto-open + silent-degradation drill owed): cold-load logged-in, refresh, pick — zero gate opens; revocation drill degrades silently.
+- Evidence: Task 1 shipped `d27f94c` (2026-10-17) — cold-load/refresh/pick drill + revocation drill sign-off still owed (owner).
 
 ### Task 1 ✓ done d27f94c
 
@@ -34,14 +35,15 @@
 - Modify: `src/changelog/due-freeze.js` — retire the blocking overlay; keep at most a tiny non-blocking sync indicator (or delete the module + its CSS if unused).
 - Modify: `src/changelog/changelog/paint-detail.js` — commit states become `saving(silent) → saved | retry`; failure renders inline Retry, never a modal.
 
-**Rules:**
+**Changes:**
 - The pick is never hostage to the network: preview + override apply synchronously before any fetch.
 - No screen-blocking UI on any scheduling path. `due-freeze.js` must end deleted or unreachable from pick flows.
 - `confirmDueLive` stays for nothing in the own-pick path (repo proof arrives in the commit response); keep the module only if cross-device sync reuses its section check.
 
 **Verify:** pick → "Saved" in <300ms on wifi; offline pick → inline Retry, date intact after refresh; 3 rapid picks → last wins, no stuck `saving…`; zero full-screen overlays in any scheduling flow.
 
-- REF GATE 2: network-throttled (Slow 3G) pick → instant Saved, background commit lands, no freeze, no popup.
+- REF GATE 2 (OPEN, by owner: Slow-3G instant-Saved drill owed): network-throttled (Slow 3G) pick → instant Saved, background commit lands, no freeze, no popup.
+- Evidence: Task 2 shipped `0300298` (2026-10-17) — throttled-pick drill sign-off still owed (owner).
 
 ### Task 2 ✓ done 0300298
 
@@ -52,7 +54,7 @@
 - Modify: `src/changelog/pages-changelog.js` — poll the sha every ~15s (not all 14 files); on change, fetch + rebuild only changed files, repaint with selection/filter untouched. Refresh immediately on `visibilitychange` visible / `focus` / `online`. Same-device tabs sync via `storage` event on the override key.
 - Keep: the 24h committed-override outranking applies to OWN picks only; drop any override the moment live text carries its value.
 
-**Rules:**
+**Changes:**
 - No polling of `raw.githubusercontent.com` on a timer (CDN staleness is the reload bug). Raw fetch only for a file whose sha just changed, cache-busted.
 - Unauthenticated poll budget: 1 req / 15s ≈ 240/hr per device worst-case — stays under the 60/hr unauthenticated cap ONLY if conditional (use `If-None-Match`/ETag on the commits request, or stretch to 30s). Implement ETag caching; fall back to 30s interval without ETag support.
 - Background tabs do nothing (`document.hidden` guard stays).
@@ -60,6 +62,7 @@
 **Verify:** laptop pick → phone shows in <30s with zero touches; backgrounded phone refreshes on foreground; offline→online refreshes; second run of tracker/build unaffected (no manifest shape change).
 
 - REF GATE 3 (ship): two-device drill (laptop pick → phone converges, no reload, no login prompt), chromium + webkit screenshots, zero page errors, `npm run build` green. Verdict: ✓ PASSED 2026-10-20 (owner) — two-device drill owner-confirmed from their end.
+- Evidence: two-device drill owner-confirmed from their end; Verdict ✓ PASSED 2026-10-20 (owner); Task 3 shipped `d65bcdb` (2026-10-17).
 
 ### Task 3 ✓ done d65bcdb
 

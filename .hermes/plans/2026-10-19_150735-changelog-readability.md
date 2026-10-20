@@ -83,7 +83,8 @@
 
 **Verify:** `npm run build` green; screenshots attached; this plan Phase 1 closed.
 
-- REF GATE 1: the 4 sample drawers (172008 P1 + P5, domain-logic Task 4, twin-work Phase 05) each show summary → files → changes → verify with real lists, no false DONE, uniform gate tags. Evidence: screenshots + green suite.
+- REF GATE 1 (OPEN, by owner): the 4 sample drawers (172008 P1 + P5, domain-logic Task 4, twin-work Phase 05) each show summary → files → changes → verify with real lists, no false DONE, uniform gate tags. Evidence: screenshots + green suite. Owed: owner sign-off on the 4 sample drawers.
+- Evidence: screenshots + green suite; Phase 1 Tasks 1–3 shipped in d162a57.
 
 *Shipped in d162a57 · Tasks 1–3 · phase-1.*
 
@@ -114,7 +115,7 @@
 - Append `- Evidence: …` directly under a gate head that has none (screenshots, suite counts, grep output); no gate body reflowed, no verdict invented.
 - Edit history plans in place; `norm()`/anchors stay put, so a plan hash only moves where its gate line moved.
 
-**Verify:** Pending. Baseline recorded at authoring (2026-10-19): `parseGates()` over the 17 plans returns 39 gate lines — 32 open / 6 passed / 1 waiver — with **19 open gates carrying no reviewer and 22 gate lines with no `(STATUS)` paren** (realworld-twin 1–5, smooth-scheduling 1–2, 172008 1 + 3, this plan 1 + 4). Closes when a `REF GATE [0-9]` grep finds no line missing its paren status, every remaining OPEN names its reviewer, and the gates suite is green.
+**Verify:** Done 2026-10-20 (missing-paren 0, unowned-open 0, gates suite green). Baseline recorded at authoring (2026-10-19): `parseGates()` over the 17 plans returns 39 gate lines — 32 open / 6 passed / 1 waiver — with **19 open gates carrying no reviewer and 22 gate lines with no `(STATUS)` paren** (realworld-twin 1–5, smooth-scheduling 1–2, 172008 1 + 3, this plan 1 + 4). Closes when a `REF GATE [0-9]` grep finds no line missing its paren status, every remaining OPEN names its reviewer, and the gates suite is green.
 
 ### Task 5: Task labels to canonical set
 
@@ -129,9 +130,10 @@
 - Order the surviving fields Files → Changes → Steps → Verify in every touched task; `Steps:` stays numbered, every other field stays bullets.
 - Shipped task bodies keep their own prose (AGENTS.md grandfather clause): only the label and its position move, never the claim.
 
-**Verify:** Pending. Baseline recorded at authoring (2026-10-19): **13 non-canonical field blocks remain** — `172008` 6 `Contract` + 3 `Rules`, `smooth-scheduling` 3 `Rules`, `changelog-timeline` 1 `Rules`. Closes when that grep returns 0, every touched task reads Files → Changes → Steps → Verify, and the detail suite is green.
+**Verify:** Done 2026-10-20 (non-canonical heads 0, detail suite green). Baseline recorded at authoring (2026-10-19): **13 non-canonical field blocks remain** — `172008` 6 `Contract` + 3 `Rules`, `smooth-scheduling` 3 `Rules`, `changelog-timeline` 1 `Rules`. Closes when that grep returns 0, every touched task reads Files → Changes → Steps → Verify, and the detail suite is green.
 
-- REF GATE 2 (ship): corpus-wide grep shows zero non-canonical gate/label lines; build green; screenshots unchanged-or-better.
+- REF GATE 2 (ship): corpus-wide grep shows zero non-canonical gate/label lines; build green; screenshots unchanged-or-better. Verdict: ✓ PASSED 2026-10-20 — gate parens 23→0 (rev lines inherit base paren by parser contract, reviewer named in-note), labels 13→0, gates + detail suites green, build green, chromium 4-sample screenshots zero page errors + owner Safari glance clean.
+- Evidence: missing-paren 0, unowned-open 0; node --test green (pre-existing geo fixture excepted); npm run build green + second plan-track diff-clean; screenshots gate3-172008-p1/p5, gate3-domain-task4, gate3-twin-p05 + Safari owner glance 2026-10-20.
 
 ---
 
@@ -190,7 +192,7 @@
 
 **Verify:** screenshots (172008 P1 task headers + accordions, smooth-scheduling Task 1, domain Task 4, twin Phase 05) on chromium + webkit, zero page errors; full suite green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-3]`; close tasks with `✓ done` + sha.
 
-- REF GATE 3 (ship): the 4 sample drawers show headed tasks, closed accordions, compact metadata; no visual regression on Evals/rails/cards. Evidence: screenshots + green suite.
+- REF GATE 3 (ship): the 4 sample drawers show headed tasks, closed accordions, compact metadata; no visual regression on Evals/rails/cards. Evidence: screenshots + green suite. Verdict: ✓ PASSED 2026-10-20 — 172008 P1/P5, domain-logic Task 4, twin P05 all render h2+h3 headed tasks with only Day-group chrome open and honest gate tags (OPEN shown OPEN, PASSED shown PASSED); chromium zero page errors + owner Safari glance clean; suites green.
 *Shipped in 97ca963 · Tasks 6–8 · phase-3.*
 *Follow-up single-fold in a7e2a37 · Task 7 · phase-3.*
 *Follow-up task-fold (no FILES line) in 08ad967 · Task 7 · phase-3.*
@@ -318,7 +320,9 @@
 
 **Verify:** detail suite 60/60 (3 new fraction tests); full suite green except pre-existing geo + honestly-pinned counts; build green; 172008 P5 head shows no DONE; chromium + webkit zero page errors; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-10]`; close with `✓ done` + sha.
 
-- REF GATE 4 (ship): 172008 card open, smooth card open, every other card unchanged. Evidence: list screenshots + green suite.
-- REF GATE 4 · rev (Tasks 10–15): subsequent polish — stamp rollup, title-note, head consistency, checkbox, lone-task, reconciliation — each verified screenshots + green suite.
+- REF GATE 4 (ship, OPEN, by owner): 172008 card open, smooth card open, every other card unchanged. Evidence: list screenshots + green suite. Owed: owner confirms 172008 + smooth cards read open, every other card unchanged.
+- Evidence: list screenshots + green suite.
+- REF GATE 4 (OPEN, by owner) · rev (Tasks 10–15): subsequent polish — stamp rollup, title-note, head consistency, checkbox, lone-task, reconciliation — each verified screenshots + green suite. Owed: owner sign-off on Tasks 10–15 polish.
+- Evidence: Tasks 10–15 each verified screenshots + green suite.
 
 *Shipped in 2b6f5ae · Tasks 9–15 · phase-4 · anchors {#phase-4} {#phase-5} {#phase-6} {#phase-7} {#phase-8} {#phase-9} {#phase-10} {#phase-11} retained for history.*

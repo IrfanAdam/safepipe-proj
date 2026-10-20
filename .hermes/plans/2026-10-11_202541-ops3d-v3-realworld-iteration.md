@@ -55,7 +55,7 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 **Objective:** No visual or behavior regression a demo viewer could spot.
 **Verify:** Chromium + webkit captures at mix 0/50/100, TOP/NEAR, zero pageerrors — then the owner confirm below.
 
-- REF GATE 0 ✓ PASSED: owner confirms panels feel like v1 on real Safari.
+- REF GATE 0 (PASSED, by owner): owner confirms panels feel like v1 on real Safari.
 
 ## Phase 01 — The ground becomes the real Sangachal coast ✓ done
 <!-- {#phase-01} -->
@@ -93,7 +93,7 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 **Objective:** A fresh reader reproduces the data pipeline from docs alone — scripts + per-dataset metadata (name, URL, date, resolution, CRS, units, license, steps, limits).
 **Verify:** Scripts rerun clean; manifest covers every external file; close-out `ea7f7c8` + manifest `141af13`.
 
-- REF GATE 1 ✓ PASSED — how it was judged: screenshot of the built terrain set against the pinned reference imagery; pass = owner confirms it reads as the real Sangachal coast.
+- REF GATE 1 (PASSED, by owner) — how it was judged: screenshot of the built terrain set against the pinned reference imagery; pass = owner confirms it reads as the real Sangachal coast.
 
 ## Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)
 <!-- {#phase-02} -->
@@ -187,12 +187,12 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 
 **Probe recipe (staged/iso walk arming — required for evidence runs):** synthetic probes must track the hotspot with the cursor: each step read `__mapProbe.proximity` → `mouse.move(sx, sy)` → wheel. Static-center cursors drift off-site (site leaves the near gate: cursor ≤140px or center ≤90px), so `staged.active`/`isoBridge` stay false and the handoff fires unstaged — that path is valid (paint-gated reveal) but exercises none of Tasks 34–37. Arming checklist: near true → z≥11 iso owns tilt → z=12 clamp + staged S-walk → twin-ready grants dissolve. Unaimed arrivals (handoff frame far from site) can never satisfy Lane B map-cam match — by construction they take the painted-fallback reveal.
 
-- REF GATE 3 (OPEN): owner picks map look + confirms ring reads right. How to judge: open the map, toggle satellite, click a ring, Esc back; pass = look approved + ring matches feed worst-health per sector.
-- REF GATE 3 · rev 2026-10-13 review-feedback (owner): "make it a little faster, smoother choreography"; "trigger the openstreetmap-to-twin transition and back by user scroll instead of click — gesture-based, intuitive". Verdict: OPEN — tempo + scroll-drive land as a revision on this gate, then proceed.
-- REF GATE 3 · rev 2026-10-13 scroll-scrub feedback (owner): sat→vector zoom-out unsmooth (cache vector tiles); zoom-in trigger erratic; auto-center hotspot on approach; fade must follow the scroll, not its own rhythm; twin zoom-out-at-max must trigger the reverse; scroll-listening reverse in twin. Verdict: OPEN — scrub revision lands on this gate.
-- REF GATE 3 · rev 2026-10-14 gesture feedback (owner): pinch in/out broken; scroll clamping unintuitive; precache by predicted next scroll/zoom; tone mismatch top-view vs iso at close-up; ring must animate from corners not fade; goal = magically intuitive scroll-zoom both ways. Verdict: OPEN — gesture revision lands on this gate.
-- REF GATE 3 · rev 2026-10-14 native-zoom iteration (owner): regular scroll/pinch zoom must keep working, enhanced not replaced; vector→sat fade must happen where the user is, never jump; near-hotspot (cursor-near or nearest-to-center) → smooth center + top-down with ring clip converging canvas-edges→ring-edges; further scroll → slow top→iso→twin; identical checkpoints in reverse; fix zoom-out blowing past cap and sticking. Verdict: OPEN — native-zoom-driven journey lands on this gate.
-- REF GATE 3 · rev 2026-10-14 gesture-journey (owner): the whole zoom-in to twin level and back to global must be entirely gesture-based — no timed/choreographed moves; viewer never notices the map swaps; enclosing matches the twin-map clip; handoff angles coincide; reverse mirrors forward checkpoints (today erratic). Verdict: OPEN — timed→scrubbed conversion lands on this gate as Tasks 34–37, then proceed.
+- REF GATE 3 (OPEN, by owner: map look + ring readability owed): owner picks map look + confirms ring reads right. How to judge: open the map, toggle satellite, click a ring, Esc back; pass = look approved + ring matches feed worst-health per sector.
+- REF GATE 3 · rev 2026-10-13 review-feedback (OPEN, by owner): "make it a little faster, smoother choreography"; "trigger the openstreetmap-to-twin transition and back by user scroll instead of click — gesture-based, intuitive". Verdict: OPEN — tempo + scroll-drive land as a revision on this gate, then proceed.
+- REF GATE 3 · rev 2026-10-13 scroll-scrub feedback (OPEN, by owner): sat→vector zoom-out unsmooth (cache vector tiles); zoom-in trigger erratic; auto-center hotspot on approach; fade must follow the scroll, not its own rhythm; twin zoom-out-at-max must trigger the reverse; scroll-listening reverse in twin. Verdict: OPEN — scrub revision lands on this gate.
+- REF GATE 3 · rev 2026-10-14 gesture feedback (OPEN, by owner): pinch in/out broken; scroll clamping unintuitive; precache by predicted next scroll/zoom; tone mismatch top-view vs iso at close-up; ring must animate from corners not fade; goal = magically intuitive scroll-zoom both ways. Verdict: OPEN — gesture revision lands on this gate.
+- REF GATE 3 · rev 2026-10-14 native-zoom iteration (OPEN, by owner): regular scroll/pinch zoom must keep working, enhanced not replaced; vector→sat fade must happen where the user is, never jump; near-hotspot (cursor-near or nearest-to-center) → smooth center + top-down with ring clip converging canvas-edges→ring-edges; further scroll → slow top→iso→twin; identical checkpoints in reverse; fix zoom-out blowing past cap and sticking. Verdict: OPEN — native-zoom-driven journey lands on this gate.
+- REF GATE 3 · rev 2026-10-14 gesture-journey (OPEN, by owner): the whole zoom-in to twin level and back to global must be entirely gesture-based — no timed/choreographed moves; viewer never notices the map swaps; enclosing matches the twin-map clip; handoff angles coincide; reverse mirrors forward checkpoints (today erratic). Verdict: OPEN — timed→scrubbed conversion lands on this gate as Tasks 34–37, then proceed.
 
 ## Phase 06 — Lock
 *Due: 2026-10-20*
@@ -215,7 +215,7 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
 **Objective:** Every phase marked ✓ with its sha, zero wip, walkthrough signed.
 **Verify:** Manifest shows all phases closed; sign-off recorded.
 
-- REF GATE 6 (final, OPEN): full walkthrough sign-off. **Success = recognisably the real Sangachal landscape** (real-DEM terrain, plausible coastline, evidence-placed structures) — accuracy + coherence over decoration. How to judge: end-to-end walkthrough map→twin→time→ops; pass = sign-off + the landscape reads as Sangachal.
+- REF GATE 6 (final, OPEN, by owner: walkthrough sign-off owed): full walkthrough sign-off. **Success = recognisably the real Sangachal landscape** (real-DEM terrain, plausible coastline, evidence-placed structures) — accuracy + coherence over decoration. How to judge: end-to-end walkthrough map→twin→time→ops; pass = sign-off + the landscape reads as Sangachal.
 
 ---
 

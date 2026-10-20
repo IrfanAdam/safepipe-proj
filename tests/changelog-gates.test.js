@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { split, anchorHit, anchorHitCI, anchorOf, gateNOf } from '../src/changelog/changelog-parse.js';
+import { split, anchorHit, anchorHitCI, anchorOf, gateNOf, parseGates } from '../src/changelog/changelog-parse.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const plansDir = join(root, '.hermes', 'plans');
@@ -79,5 +79,32 @@ describe('corpus gate ownership', () => {
     for (const s of split(raw)) { const a = anchorOf(s.head); if (a) text += `\n{#${a}}`; }
     const flagged = manifest.commits.filter((c) => c.plan === file && c.anchor && !anchorHitCI(text, c.anchor));
     assert.equal(flagged.length, 0, `wrongly unlinked: ${flagged.map((c) => c.sha).join(',')}`);
+  });
+});
+
+describe('corpus gate grammar (readability Task 4)', () => {
+  // End state: every `- REF GATE N` line carries a (STATUS) paren and every
+  // remaining OPEN gate names its reviewer (parseGates reads `owner`).
+  it('gate lines carry a paren verdict; open gates name a reviewer', () => {
+    const files = readdirSync(plansDir).filter((f) => f.endsWith('.md')).sort();
+    const missing = [];
+    const unowned = [];
+    for (const f of files) {
+      const md = readFileSync(join(plansDir, f), 'utf8');
+      for (const g of parseGates(md)) {
+        // Rev iterations inherit their base gate's paren by parser contract
+        // (parseGates blanks rev parens by design); they still must name
+        // their reviewer in-note, so only the paren check is exempt.
+        if (/·\s*rev\b/.test(g.note || '')) {
+          if (g.state === 'open' && !/owner/i.test(g.note || ''))
+            unowned.push(`${f} · gate ${g.n} rev`);
+          continue;
+        }
+        if (!g.paren) missing.push(`${f} · gate ${g.n}`);
+        if (g.state === 'open' && !g.reviewer) unowned.push(`${f} · gate ${g.n}`);
+      }
+    }
+    assert.equal(missing.length, 0, `gate lines missing (STATUS) paren: ${missing.join(', ')}`);
+    assert.equal(unowned.length, 0, `open gates naming no reviewer: ${unowned.join(', ')}`);
   });
 });

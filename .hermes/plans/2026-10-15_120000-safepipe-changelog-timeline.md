@@ -42,7 +42,8 @@
 
 **Verify:** node test suite green; probe prints per-plan bout lists for all 13 plans; `npm run build` green.
 
-- REF GATE 1: pure pipeline green in node over the real corpus (no renderer edits), build green, preflight check clean ✓ PASSED.
+- REF GATE 1 (PASSED): pure pipeline green in node over the real corpus (no renderer edits), build green, preflight check clean ✓ PASSED.
+- Evidence: pure pipeline green in node over the real corpus, build green, preflight check clean; Task 1 shipped `a755d5e` (2026-10-15).
 
 ### Task 1 ✓ done a755d5e
 
@@ -78,6 +79,7 @@
 **Verify:** every plan with commits shows ≥1 bar; ghost absent until a Due is set (Task 3 proves presence); streak summary counts equal manual bout filter; sporadic summary lists exactly its day; list→timeline→plan→close lands on timeline; `?view=timeline` cold-load works.
 
 - REF GATE 2 (visual): chromium + webkit screenshots of (a) button next to graph, (b) open timeline with bars, (c) hover tooltip, (d) bout popover + bout summary, (e) plan opened from track; zero page errors; `npm run build` green ✓ PASSED.
+- Evidence: chromium + webkit screenshots (a)–(e), zero page errors, build green; Task 2 shipped `ea83227` (2026-10-15).
 
 ### Task 2 ✓ done ea83227
 
@@ -93,7 +95,7 @@
 - Modify: `src/changelog/changelog/graph.js` — future Due dates gain a ghost-dot marker class (distinct from commit `lv*`; reuse `is-future` + Due marker, no new colors).
 - Modify: `src/changelog/changelog/timeline-paint.js` — "What's next" nearest-Due-first toggle + overdue-top cluster with count chip (render only; model from Task 1).
 
-**Rules:**
+**Changes:**
 - Write path is the worktree plan file `.hermes/plans/<file>.md`: set = insert after head/Tags line or replace existing Due line idempotently (never duplicate); clear = remove the line. Empty input clears. Past dates allowed, immediately flag overdue (no blocking).
 - After write: `doPaint` recomputes `ghostOf` live for preview; author commits with `[plan:<file>#<anchor>]` trailer then tracker regen. `plan-track.mjs` needs NO change.
 - Ghost preview requires no build; committed state verified via build hook.
@@ -105,7 +107,8 @@
 
 **Verify:** set Due on open task → file diff shows exactly one Due line; done task offers no control; set Due +7d → ghost bar + calendar future dot appear; overdue Due → top cluster + overdue treatment; `npm run build` + second `plan-track` run diff-clean; preflight `--check` passes.
 
-- REF GATE 3: end-to-end set→ghost→clear captured in screenshots; Due commits carry trailers; tracker 0 wip after regen ✓ PASSED.
+- REF GATE 3 (PASSED): end-to-end set→ghost→clear captured in screenshots; Due commits carry trailers; tracker 0 wip after regen ✓ PASSED.
+- Evidence: set→ghost→clear screenshots; Due commits carry trailers; tracker 0 wip after regen; Task 3 shipped `1e89d6c` (2026-10-15).
 
 ### Task 3 ✓ done 1e89d6c
 
@@ -131,6 +134,7 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 **Verify:** SKILL.md diff shows version bump + new sections; full skill Verification checklist (old + new timeline items) ticked; `npm run build` green; 0 wip.
 
 - REF GATE 4 (ship): build green, 0 wip, screenshots attached, skill v0.4.0 committed, this plan closed ✓ PASSED.
+- Evidence: build green, 0 wip, skill v0.4.0 committed; Task 4 shipped `c5e9946` (2026-10-15).
 
 ### Task 4 ✓ done c5e9946
 
@@ -188,7 +192,8 @@ Note (post-ship fix): `###`-fallback plans (no `##` heads — norm() consumes th
 
 24. Mobile responsive pass (owner steer, 2026-10-17): phone widths ≤720px. Build rows stack id+title / date / state / tags at ≤640 (the query set columns but not rows — tags sat on the title's row, state on the date's); calendar cells 14→16px (max that keeps 16 weeks + DoW column inside 342px); drawer/timeline ✕ get 32px hit boxes and rail pick titles a 2-line clamp (were hard-cut mid-word); due-picker day cells 26→36px with ≥32px nav/Clear/sched hit boxes; header tightens ≤420px (✕ fell ~10px outside the card at 320); scroll chaining contained in the rail/task/timeline panes; first `.ds-month` label now starts on its month's own week (text-less lead-in spacer — the only desktop-visible delta is that one label shifting one week); touch taps no longer latch the hover tooltip / timeline popover (`touchInput` guard; desktop hover byte-identical). Verified: 320/390 rects + zero-overlap scans, desktop 1280 parity (cells 14px, tags col3/row1 38ch), build green.
 
-- REF GATE (polish): chromium + webkit — white 7×7 tile in grid; 13 rows named on bars, no sidebar; popover 5 lines; bar→drawer-only→✕→timeline; zero page errors; build green.
+- REF GATE 7 (OPEN, by owner: polish checklist owed): chromium + webkit — white 7×7 tile in grid; 13 rows named on bars, no sidebar; popover 5 lines; bar→drawer-only→✕→timeline; zero page errors; build green.
+- Evidence: open — polish pass owed by owner; no pass recorded.
 
 ### Follow-up ✓ done ead03a5
 

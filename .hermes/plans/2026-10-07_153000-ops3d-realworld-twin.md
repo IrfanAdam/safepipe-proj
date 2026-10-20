@@ -80,7 +80,8 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 **Files:** `src/ops3d/sound.js`, `src/ops3d/hud.js`
 **Verify:** no pre-gesture console warning; mute kills click confirms + pulses.
 
-- REF GATE 0 (your first steer): confirm focus feel + palette on 2 (TOP + NEAR) captures.
+- REF GATE 0 (OPEN, by owner: first steer): confirm focus feel + palette on 2 (TOP + NEAR) captures.
+- Evidence: open — steer decision owed by owner; no pass recorded.
 
 ## Phase 1 — Real terrain
 *Shipped in 97add68 + a94fd6d · Tasks 6–10 · phase-1.*
@@ -125,7 +126,8 @@ Rebuild the twin around a **real place with real data**: Phase 0 kills the old b
 **Verify:** TOP fault found in 2s; NEAR frames a pad from 550 m.
 **Accuracy: rating 8/10** (perceptual, not terrain — verified in code + photometry gates 2026-10-08, `tests/ops3d-attention.test.js`). Single sun ✓ (1× `DirectionalLight` in `scene.js`); flow cyan `0x35c5d8` vs watch amber `#ff8c39` ≈ 160° hue separation, never confusable ✓ (gated >90°); terrain whisper opacities set (0.44/0.92) with bloom threshold 0.36 ✓. Correction to the old claim: critical-red body (L≈0.335) does NOT self-bloom — faults win by white-hot pins + lamp dots (L≈0.488, gated to clear the threshold) + pulse against the evenly glowing map; the gate forbids raising the threshold above lamp-red. −2: the "fault found in 2s" claim has no harness — needs a scripted TOP-frame luminance-contrast check or a timed human pass at REF GATE 1.
 
-- REF GATE 1: you pick the terrain mood (photo/map screenshot); confirm the pinned center + the audit's layout.
+- REF GATE 1 (OPEN, by owner: terrain-mood pick owed): you pick the terrain mood (photo/map screenshot); confirm the pinned center + the audit's layout.
+- Evidence: open — pick owed by owner; phase shipped in 97add68 + a94fd6d, no gate pass recorded.
 
 ### Feedback pass — Phase 1 iteration ✓ done (2026-10-08)
 Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 25-pt grid). Ratings moved: Task 8 6→7.
@@ -170,7 +172,8 @@ Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 
 **Files:** `src/ops3d/hud.js`, `src/ops3d/table.js`
 **Verify:** every selectable asset shows provenance; no unlabeled synthetic.
 
-- REF GATE 2: you approve detail level (toy / noisy / just right).
+- REF GATE 2 (OPEN, by owner: detail-level approval owed): you approve detail level (toy / noisy / just right).
+- Evidence: open — approval owed by owner; no pass recorded.
 
 ## Phase 3 — Hotspot launcher map
 <!-- {#phase-3} -->
@@ -203,7 +206,8 @@ Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 
 **Files:** `src/ops3d/map.js`, `src/ops3d/twin.js`
 **Verify:** Esc mid-orbit works; back button does the same trip.
 
-- REF GATE 3: you pick map look (Dark Matter vs satellite vs hybrid) + confirm the ring reads right.
+- REF GATE 3 (OPEN, by owner: map-look pick owed): you pick map look (Dark Matter vs satellite vs hybrid) + confirm the ring reads right.
+- Evidence: open — pick owed by owner; no pass recorded.
 
 ## Phase 4 — Time variance + sim
 <!-- {#phase-4} -->
@@ -242,7 +246,8 @@ Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 
 **Files:** `src/ops3d/sim.js` (new)
 **Verify:** same seed → same outcome; watermark visible whenever sim time active.
 
-- REF GATE 4: you approve time-slider feel + sim honesty.
+- REF GATE 4 (OPEN, by owner: time-slider feel approval owed): you approve time-slider feel + sim honesty.
+- Evidence: open — approval owed by owner; no pass recorded.
 
 ## Phase 5 — Operations layer
 <!-- {#phase-5} -->
@@ -275,7 +280,8 @@ Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 
 **Files:** `src/ops3d/sound.js`, `src/ops3d/hud.js`
 **Verify:** all sounds post-gesture; mute covers Phase-0 sounds too.
 
-- REF GATE 5: you approve the gate flow (too many taps / too loose).
+- REF GATE 5 (OPEN, by owner: gate-flow approval owed): you approve the gate flow (too many taps / too loose).
+- Evidence: open — approval owed by owner; no pass recorded.
 
 ## Phase 6 — Lock
 <!-- {#phase-6} -->
@@ -302,7 +308,8 @@ Visual/realism feedback addressed before Phase 2, same ground truth (Copernicus 
 **Files:** this plan file
 **Verify:** 0 wip; all 30 tasks marked; final walkthrough signed.
 
-- REF GATE 6 (final): full walkthrough sign-off.
+- REF GATE 6 (final, OPEN, by owner: walkthrough sign-off owed): full walkthrough sign-off.
+- Evidence: open — sign-off owed by owner; no pass recorded.
 
 ## Standing rules (carried over)
 - Dev `:5175` only; path-limited commits; `npm run build` green before every commit; `plan:track` clean; no push without your `y`.

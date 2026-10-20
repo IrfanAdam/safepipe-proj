@@ -121,7 +121,8 @@ create policy "anon read schedules"
 **Verify:** screenshots or curl outputs of allow + deny in `supabase/README.md`. No app code touched.
 
 
-- REF GATE 1: open Supabase tables + `supabase/schema.sql` + `README` proof. Pass = 3 tables exist, anon read ok, anon write denied, zero app diffs. Evidence: anon SELECT ok + anon INSERT denied proven in `supabase/README.md` (anon RLS read proof); `82245ad` touches `supabase/` + `scripts/` only — zero app diffs.
+- REF GATE 1 (OPEN, by owner: tables-exist + RLS allow/deny sign-off owed): open Supabase tables + `supabase/schema.sql` + `README` proof. Pass = 3 tables exist, anon read ok, anon write denied, zero app diffs. Evidence: anon SELECT ok + anon INSERT denied proven in `supabase/README.md` (anon RLS read proof); `82245ad` touches `supabase/` + `scripts/` only — zero app diffs.
+- Evidence: anon SELECT ok + anon INSERT denied proven in `supabase/README.md`; Phase 1 shipped `82245ad` (2026-10-18) — owner sign-off on the pass criteria still owed.
 
 ---
 
@@ -132,7 +133,7 @@ create policy "anon read schedules"
 **Files:**
 - Create: `scripts/supabase-inventory.mjs` — read-only, never writes.
 
-**Contract:**
+**Changes:**
 - Reuse `split` + `dueOf` from `src/changelog/changelog-parse.js`. No new parsing.
 - Output: `{ file, head, section_key, due }` per incomplete section with Due. Invalid dates excluded (same rule as `parseDue`).
 
@@ -164,7 +165,7 @@ create policy "anon read schedules"
 **Files:**
 - Create: `api/schedule.js`
 
-**Contract:**
+**Changes:**
 - Filename: `^[\w][\w\-. ]*\.md$`, no `..` — identical to `api/due.js:92`.
 - `due`: reuse `isValidDue` logic (shape + calendar, year ≤ 2099). Copy, don't loosen.
 - Identity: caller token → `GET /user` → `login === VERCEL_GIT_REPO_OWNER`, else 401/403.
@@ -184,7 +185,7 @@ create policy "anon read schedules"
 **Files:**
 - Modify: `api/schedule.js`
 
-**Contract:**
+**Changes:**
 - `section_key = normHead(head)` imported from `../src/logic/due-overrides.js` — no forked normalizer.
 - Upsert: `version = old.version + 1` on change; same `idempotency_key` returns existing row without bump.
 - Insert `schedule_events { plan_file, section_key, due, actor: login, source: 'ui' }` once per new version.
@@ -207,7 +208,8 @@ create policy "anon read schedules"
 **Verify:** Run `node --test tests/schedule-api.test.js tests/due-pipeline.test.js` — Expected: all pass.
 
 
-- REF GATE 2: POST valid pick in staging → row in `schedules` + event in `schedule_events`; retry same key idempotent; bad inputs rejected; both test files green. Pass = no GitHub commit made by this phase. Evidence: owner-gated idempotent upsert + validation pinned by `tests/schedule-api.test.js` (`23e529e`); no GitHub commit made by Phase 2 — write path stops at Supabase.
+- REF GATE 2 (OPEN, by owner: staging upsert + no-GitHub-commit sign-off owed): POST valid pick in staging → row in `schedules` + event in `schedule_events`; retry same key idempotent; bad inputs rejected; both test files green. Pass = no GitHub commit made by this phase. Evidence: owner-gated idempotent upsert + validation pinned by `tests/schedule-api.test.js` (`23e529e`); no GitHub commit made by Phase 2 — write path stops at Supabase.
+- Evidence: owner-gated idempotent upsert + validation pinned by `tests/schedule-api.test.js`; Phase 2 shipped `23e529e` (2026-10-18) — staging pass sign-off still owed (owner).
 
 ---
 
@@ -230,7 +232,7 @@ create policy "anon read schedules"
 **Files:**
 - Create: `src/changelog/supabase-schedule.js`
 
-**Contract:**
+**Changes:**
 - `fetchSchedules()` → `GET /api/schedule?list=1` (server reads via service_role, returns `{ "file\u0000key": "YYYY-MM-DD"|null }`). Never expose service key.
 - `subscribeSchedules(cb)` → `supabase-js` channel on `postgres_changes` `schedules`. Uses `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` only. Returns `unsubscribe()`.
 - Never throws: any failure resolves `null` / no-op; caller falls back to `fetchLatestPlanSha` in `src/changelog/plan-source.js`.
@@ -250,7 +252,7 @@ create policy "anon read schedules"
 - Modify: `src/changelog/pages-changelog.js` — extend `applyDueOverrides`, don't replace.
 - Modify: `src/logic/due-overrides.js` — add `supabaseVerdict` reuse, no TTL change.
 
-**Rules:**
+**Changes:**
 - Precedence: Supabase confirmed > file > localStorage optimistic. File convergence drops any overlay (reuse `overrideVerdict` drop rule).
 - Repaint preserves `st.sel`, `st.day`, `st.tags`, open datepicker (reuse existing `snapshotDuePop`/`restoreDuePop`).
 - No new colors, no layout changes — data only.
@@ -274,7 +276,8 @@ create policy "anon read schedules"
 **Verify:** 3 rapid picks → last wins; offline pick → inline Retry, date intact after refresh.
 
 
-- REF GATE 3: laptop pick → second session paints in <30s with zero touches, selection intact, no reload, no login prompt. Backgrounded tab refreshes on foreground. `npm run build` green. Evidence: build green; targeted scheduling tests 74/74 green (`schedule-api` + `sync-due` + `due-pipeline`); overlay + realtime wiring in `804c996`.
+- REF GATE 3 (OPEN, by owner: two-device drill owed): laptop pick → second session paints in <30s with zero touches, selection intact, no reload, no login prompt. Backgrounded tab refreshes on foreground. `npm run build` green. Evidence: build green; targeted scheduling tests 74/74 green (`schedule-api` + `sync-due` + `due-pipeline`); overlay + realtime wiring in `804c996`.
+- Evidence: targeted scheduling tests 74/74 green (`schedule-api` + `sync-due` + `due-pipeline`); overlay shipped `804c996` (2026-10-18) — two-device drill still owed (owner).
 
 ---
 
@@ -297,7 +300,7 @@ create policy "anon read schedules"
 **Files:**
 - Create: `api/sync-due.js`
 
-**Contract:**
+**Changes:**
 - Trigger: Supabase DB webhook on `schedules` insert/update → `POST /api/sync-due` with `SUPABASE_WEBHOOK_SECRET` header check.
 - GitHub auth: server PAT `DUE_SYNC_TOKEN` (Contents read+write, repo-only). Never user token, never client.
 - Edit: import `dueEditText` from `api/due.js` — do not fork. Resolve head via `findHeadIndex`; `found=false` → `sync_state=error('head-not-found')`, no commit.
@@ -326,7 +329,7 @@ create policy "anon read schedules"
 }
 ```
 
-**Rules:**
+**Changes:**
 - `[skip ci]` in msg is primary; `ignoreCommand` is belt-and-braces for Due-only pushes.
 - Verify Vercel docs wording during implementation — if `[skip ci]` unsupported, `ignoreCommand` becomes primary.
 
@@ -341,7 +344,7 @@ create policy "anon read schedules"
 - Modify: `src/changelog/due-progress.js`
 - Modify: `src/changelog/changelog/paint-detail.js`
 
-**Contract:**
+**Changes:**
 - States: `saving(silent) → saved | retry`. Failure renders inline Retry with terse cause (`timeout` / `offline` / `http <status>` / `unchanged` / `head-not-found`), `console.error` full body.
 - Retries: webhook 3x exponential server-side; client 1x on write. No auto-popup gate on any async path.
 - `sync_state` readable via `GET /api/schedule?sync=<file>` for debugging.
@@ -349,7 +352,8 @@ create policy "anon read schedules"
 **Verify:** revoke PAT in staging → pick shows Retry with cause; restore PAT → retry succeeds.
 
 
-- REF GATE 4: valid pick → Supabase row → GitHub Due line within minutes → Vercel skipped → UI `published ✓`. Kill webhook once → status `error` + inline retry, no popup, no lost pick. Evidence: pivot shipped in `679ea66` — writer-driven GitHub sync via owner-token dual-auth (Supabase-issued tokens proved read-scoped, DB-webhook path dropped); webhook-secret door kept for later; Due-only pushes skip deploy (`d1b512f`).
+- REF GATE 4 (OPEN, by owner: end-to-end sync + skip-deploy sign-off owed): valid pick → Supabase row → GitHub Due line within minutes → Vercel skipped → UI `published ✓`. Kill webhook once → status `error` + inline retry, no popup, no lost pick. Evidence: pivot shipped in `679ea66` — writer-driven GitHub sync via owner-token dual-auth (Supabase-issued tokens proved read-scoped, DB-webhook path dropped); webhook-secret door kept for later; Due-only pushes skip deploy (`d1b512f`).
+- Evidence: writer-driven sync shipped `679ea66`, skip-deploy in `d1b512f` (2026-10-18) — end-to-end + skip-proof sign-off still owed (owner).
 
 ---
 
@@ -389,7 +393,7 @@ create policy "anon read schedules"
 - Modify: `api/due.js` — header comment `DEPRECATED: fallback only, remove after <date>`.
 - Modify: `src/logic/due-overrides.js` — keep as offline fallback; Supabase outranks.
 
-**Rules:**
+**Changes:**
 - Keep `/__ds/due` (dev loopback writer) — local authoring still needs it.
 - Keep sha-poll + `version.json` self-update as Realtime fallback — never delete fallback in this phase.
 
@@ -411,6 +415,7 @@ create policy "anon read schedules"
 4. `npm run build` green, second `plan-track` run diff-clean.
 
 - REF GATE 5 (ship): drill pass on chromium + webkit, zero page errors, Vercel skip proven, build green. Then append `### Task 15 ✓ done <sha>` and close phase. Evidence: build green; full suite 659 pass + 7 pre-existing corpus/geo fails; live backfill 6 dues (`dabf50a`); anon RLS read proof in `supabase/README.md`. REMAINING USER-RUN AT CUTOVER: two-device drill + Vercel skip-proof. CLOSED 2026-10-20: owner confirms both from their end — laptop pick → phone converges, no reload; Due-only push skipped, code push deploys. GATE PASSED, plan closed. Verdict: ✓ PASSED 2026-10-20 (owner) — two-device drill + Vercel skip-proof owner-confirmed from their end.
+- Evidence: build green; full suite 659 pass + 7 pre-existing corpus/geo fails; live backfill 6 dues (`dabf50a`); two-device drill + Vercel skip-proof owner-confirmed 2026-10-20.
 
 
 ## Closeout note ✓ done {#phase-5-rev}

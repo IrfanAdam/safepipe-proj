@@ -1989,6 +1989,49 @@
      "state": "0/3"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "14:00",
+   "hash": "d0629402",
+   "sections": [
+    {
+     "head": "Phase 0 — Fix the foundation",
+     "hash": "c5789c20",
+     "state": "5/5"
+    },
+    {
+     "head": "Phase 1 — Real terrain",
+     "hash": "3cc30a9e",
+     "state": "5/5"
+    },
+    {
+     "head": "Phase 2 — Real inspectable assets",
+     "hash": "2e9a55c6",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 3 — Hotspot launcher map",
+     "hash": "a0e70ba6",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 4 — Time variance + sim",
+     "hash": "9e4853cd",
+     "state": "0/5"
+    },
+    {
+     "head": "Phase 5 — Operations layer",
+     "hash": "e974f8fc",
+     "state": "0/4"
+    },
+    {
+     "head": "Phase 6 — Lock",
+     "hash": "061ebe42",
+     "state": "0/3"
+    }
+   ]
   }
  ],
  "2026-10-10_150100-ops3d-sangachal-twin.md": [
@@ -3301,6 +3344,39 @@
     {
      "head": "Phase 06 — Lock",
      "hash": "a177abff",
+     "state": "0/3"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "14:00",
+   "hash": "fe1842e1",
+   "sections": [
+    {
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
+     "hash": "8ceae064",
+     "state": "2/2"
+    },
+    {
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
+     "hash": "f93d185e",
+     "state": "7/7"
+    },
+    {
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
+     "hash": "3222adb3",
+     "state": "6/6"
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "8342d4ef",
+     "state": "8/8"
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "06e99a53",
      "state": "0/3"
     }
    ]
@@ -5279,6 +5355,39 @@
      "state": "1/1"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "14:00",
+   "hash": "d64854fd",
+   "sections": [
+    {
+     "head": "Task 1: Due contract + timeline model (pure, tested)",
+     "hash": "fa4ec9d7",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Timeline view — button, side panel, tracks, summaries, nav",
+     "hash": "45c327ec",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Scheduling — date setter, ghost reflection, upcoming view",
+     "hash": "574c788e",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 4: Skill sync + ship",
+     "hash": "c84158b8",
+     "state": "1/1"
+    },
+    {
+     "head": "Follow-up polish (owner steer, 2026-10-15) ✓ done {#follow-up}",
+     "hash": "3068e30c",
+     "state": "1/1"
+    }
+   ]
   }
  ],
  "2026-10-17_180000-safepipe-smooth-scheduling.md": [
@@ -5370,6 +5479,29 @@
     {
      "head": "Task 3: Fast cross-device sync — no reload, seconds not minutes {#task-3}",
      "hash": "1188f457",
+     "state": "1/1"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "14:00",
+   "hash": "b2753377",
+   "sections": [
+    {
+     "head": "Task 1: Sticky login — log in once per device, never auto-nag {#task-1}",
+     "hash": "006d51a3",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Optimistic save — Saved instantly, commit in background, no freeze {#tas",
+     "hash": "c5e94365",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Fast cross-device sync — no reload, seconds not minutes {#task-3}",
+     "hash": "6d3d50c3",
      "state": "1/1"
     }
    ]
@@ -5598,6 +5730,44 @@
      "state": "1/1"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "14:00",
+   "hash": "28f1c54b",
+   "sections": [
+    {
+     "head": "Phase 1 — Foundation: schema, access, inventory {#phase-1}",
+     "hash": "aca787b7",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Write path: owner-checked Supabase upsert {#phase-2}",
+     "hash": "5665c87b",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 3 — Read + Realtime: live overlay, no reload {#phase-3}",
+     "hash": "22783209",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Sync worker: Supabase → GitHub without deploys {#phase-4}",
+     "hash": "60a514a0",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 5 — Cutover: backfill, flip, retire {#phase-5}",
+     "hash": "d332b350",
+     "state": "3/3"
+    },
+    {
+     "head": "Closeout note ✓ done {#phase-5-rev}",
+     "hash": "58348048",
+     "state": "1/1"
+    }
+   ]
   }
  ],
  "2026-10-19_150735-changelog-readability.md": [
@@ -5717,6 +5887,62 @@
     {
      "head": "Phase 4 — Polish: ship-gate, stamps, titles, heads, ticks, lone-task, reconcilia",
      "hash": "6cbc3f6b",
+     "state": "7/7"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "14:00",
+   "hash": "0dda923f",
+   "sections": [
+    {
+     "head": "Phase 1 — Renderer: block structure, honest done, owned gates {#phase-1}",
+     "hash": "c2f0e840",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Grammar rollout: normalize gates + labels across plans {#phase-2}",
+     "hash": "ed2c0cb8",
+     "state": "0/2"
+    },
+    {
+     "head": "Phase 3 — Task headers, accordions, compact metadata {#phase-3}",
+     "hash": "9fb453a9",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Polish: ship-gate, stamps, titles, heads, ticks, lone-task, reconcilia",
+     "hash": "d9237845",
+     "state": "7/7"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "14:06",
+   "hash": "0f7e1f09",
+   "sections": [
+    {
+     "head": "Phase 1 — Renderer: block structure, honest done, owned gates {#phase-1}",
+     "hash": "c2f0e840",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Grammar rollout: normalize gates + labels across plans {#phase-2}",
+     "hash": "e3218de5",
+     "state": "0/2"
+    },
+    {
+     "head": "Phase 3 — Task headers, accordions, compact metadata {#phase-3}",
+     "hash": "fb5c2d8a",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Polish: ship-gate, stamps, titles, heads, ticks, lone-task, reconcilia",
+     "hash": "d9237845",
      "state": "7/7"
     }
    ]

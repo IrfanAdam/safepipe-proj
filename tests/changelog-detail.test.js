@@ -521,12 +521,14 @@ describe('ship-gate seal', () => {
     const g = parseGates('- REF GATE 5 (ship): drill pass.\n');
     assert.equal(g[0].paren, 'ship');
   });
-  it('172008 and smooth ship gates stand open, timeline stands shut', () => {
+  it('172008 and smooth ship gates stand shut, timeline stands shut', () => {
+    // Sealed 2026-10-20 by recorded owner-confirmed verdicts
+    // (172008 gate 5 two-device drill + skip-proof; smooth gate 3 drill).
     const read = (f) => readFileSync(join(plansDir, f), 'utf8');
     const g172008 = parseGates(read('2026-10-18_172008-supabase-scheduling-migration.md'));
-    assert.equal(shipGatesShut(g172008), false);
+    assert.equal(shipGatesShut(g172008), true);
     const gSmooth = parseGates(read('2026-10-17_180000-safepipe-smooth-scheduling.md'));
-    assert.equal(shipGatesShut(gSmooth), false);
+    assert.equal(shipGatesShut(gSmooth), true);
     const gTimeline = parseGates(read('2026-10-15_120000-safepipe-changelog-timeline.md'));
     assert.equal(shipGatesShut(gTimeline), true);
   });
@@ -558,6 +560,14 @@ describe('corpus sweep', () => {
       }
     }
     assert.ok(n > 40, `expected 40+ sections, saw ${n}`);
+  });
+  it('zero non-canonical field heads (Contract/Rules/Scope folded into Changes)', () => {
+    const bad = [];
+    for (const f of files) {
+      const md = readFileSync(join(plansDir, f), 'utf8');
+      for (const m of md.matchAll(/^\s*\*\*(Contract|Rules|Scope):\*\*/gm)) bad.push(`${f} · **${m[1]}:**`);
+    }
+    assert.equal(bad.length, 0, `non-canonical field heads remain: ${bad.join(', ')}`);
   });
 });
 
