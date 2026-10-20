@@ -30,6 +30,9 @@ const loadPlan = (file) => {
 const corpus = files.map(loadPlan);
 const TODAY = '2026-10-15';
 
+// Due lines are stripped by duePreviewEdit's clear path by design.
+const stripDue = (body) => body.split('\n').filter((l) => !/^\s*\*Due:\s*[^*\n]*\*\s*$/.test(l)).join('\n');
+
 // Synthetic fixture: one open section with a Due, one done section whose Due
 // must be ignored, dated commits + revs.
 const synth = () => {
@@ -84,12 +87,12 @@ describe('dueOf', () => {
     assert.equal(dueOf({ head: 'Task 1 — A', body: '## Task 1 — A\n*Due: 2026-10-20*\n- [x] **a** x' }), null);
     assert.equal(dueOf(null), null);
   });
-  it('finds the live Dues in the real corpus (4, all on incomplete sections)', () => {
-    // Pinned: prototype-screens PIP sheet, realworld Phase 06,
+  it('finds the live Dues in the real corpus (6, all on incomplete sections)', () => {
+    // Pinned: prototype-screens PIP sheet, realworld Phase 06, geo Phases 01-02,
     // twin-work Phases 01-02. A Due added/cleared must update this pin.
     let n = 0;
     for (const p of corpus) for (const s of p.sprints) if (dueOf(s) !== null) n++;
-    assert.equal(n, 4);
+    assert.equal(n, 6);
   });
 });
 
@@ -276,11 +279,16 @@ describe('duePreviewEdit fallback for norm-synthesized bodies', () => {
         if (!st || isDone(st)) continue;
         open++;
         const set = duePreviewEdit(s.body, s.head, '2026-10-22');
+        // A section that natively carries a Due must round-trip to the body
+        // with its Due line stripped — duePreviewEdit's clear path removes
+        // Due lines by design (changelog-events.js), so restoring the Due
+        // is not a round-trip, it is an un-clear.
+        const target = parseDue(s.body) ? stripDue(s.body) : s.body;
         if (set !== s.body && parseDue(set) === '2026-10-22'
-          && duePreviewEdit(set, s.head, null) === s.body) edited++;
+          && duePreviewEdit(set, s.head, null) === target) edited++;
       }
     }
-    assert.ok(edited >= open - 3, `${edited}/${open} incomplete sections round-trip`);
+    assert.equal(edited, open, `${edited}/${open} incomplete sections round-trip`);
   });
   it('descOf never surfaces a Due line as the description', () => {
     assert.equal(descOf('*Due: 2026-10-22*\n- [ ] **1 X** detail'), '');
