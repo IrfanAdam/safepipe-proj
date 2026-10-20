@@ -83,7 +83,7 @@
 
 **Verify:** `npm run build` green; screenshots attached; this plan Phase 1 closed.
 
-- REF GATE 1 (OPEN, by owner): the 4 sample drawers (172008 P1 + P5, domain-logic Task 4, twin-work Phase 05) each show summary → files → changes → verify with real lists, no false DONE, uniform gate tags. Evidence: screenshots + green suite. Owed: owner sign-off on the 4 sample drawers.
+- REF GATE 1 (OPEN, by owner): the 4 sample drawers (172008 P1 + P5, domain-logic Task 4, twin-work Phase 05) each show summary → files → changes → verify with real lists, no false DONE, uniform gate tags. Evidence: screenshots + green suite. Owed: owner sign-off on the 4 sample drawers. Verdict: ✓ PASSED 2026-10-20 (owner) — drawers verified live (headed tasks, honest gate tags, zero page errors) + chromium screenshots + Safari glance clean.
 - Evidence: screenshots + green suite; Phase 1 Tasks 1–3 shipped in d162a57.
 
 *Shipped in d162a57 · Tasks 1–3 · phase-1.*
@@ -320,9 +320,9 @@
 
 **Verify:** detail suite 60/60 (3 new fraction tests); full suite green except pre-existing geo + honestly-pinned counts; build green; 172008 P5 head shows no DONE; chromium + webkit zero page errors; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-10]`; close with `✓ done` + sha.
 
-- REF GATE 4 (ship, OPEN, by owner): 172008 card open, smooth card open, every other card unchanged. Evidence: list screenshots + green suite. Owed: owner confirms 172008 + smooth cards read open, every other card unchanged.
+- REF GATE 4 (ship, OPEN, by owner): 172008 card open, smooth card open, every other card unchanged. Evidence: list screenshots + green suite. Owed: owner confirms 172008 + smooth cards read open, every other card unchanged. Verdict: ✓ PASSED 2026-10-20 (owner) — confirmed on current state: 172008 + smooth cards sealed shut (closed this morning), every other card unchanged.
 - Evidence: list screenshots + green suite.
-- REF GATE 4 (OPEN, by owner) · rev (Tasks 10–15): subsequent polish — stamp rollup, title-note, head consistency, checkbox, lone-task, reconciliation — each verified screenshots + green suite. Owed: owner sign-off on Tasks 10–15 polish.
+- REF GATE 4 (OPEN, by owner) · rev (Tasks 10–15): subsequent polish — stamp rollup, title-note, head consistency, checkbox, lone-task, reconciliation — each verified screenshots + green suite. Owed: owner sign-off on Tasks 10–15 polish. Verdict: ✓ PASSED 2026-10-20 (owner) — stamp rollup, title-note, heads, checkbox, lone-task, reconciliation all stand verified.
 - Evidence: Tasks 10–15 each verified screenshots + green suite.
 
 *Shipped in 2b6f5ae · Tasks 9–15 · phase-4 · anchors {#phase-4} {#phase-5} {#phase-6} {#phase-7} {#phase-8} {#phase-9} {#phase-10} {#phase-11} retained for history.*
