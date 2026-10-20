@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T14:45:10.457Z",
+  "generated": "2026-10-20T15:42:23.906Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "56bbaa6",
+      "full": "56bbaa6e1346bce9e3c2f4bab30f890fd34a6efb",
+      "date": "2026-10-20",
+      "time": "20:59",
+      "subject": "fix(journey): the reverse leg flattens the tilt it owns [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "699ef81",
       "full": "699ef81ea88e8b975588d64d16ea784b8766872d",
@@ -5754,6 +5763,15 @@
       "anchor": null
     },
     {
+      "sha": "8d610d8",
+      "full": "8d610d82769c46d9c36d62b520c42291c7cfe801",
+      "date": "2026-10-20",
+      "time": "20:59",
+      "subject": "fix(journey): the reverse leg flattens the tilt it owns [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
       "sha": "bc45a70",
       "full": "bc45a70dadd5c363400710304ba459be382b1298",
       "date": "2026-10-20",
@@ -5889,5 +5907,9 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "public/version.json",
+    "src/map/main.js",
+    "src/map/scrolltrigger.js"
+  ]
 }
