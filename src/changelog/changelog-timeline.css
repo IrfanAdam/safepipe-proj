@@ -65,7 +65,7 @@ aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
    outline-only per the toggle rule — no fill change. */
 .ds-tl-edge{position:sticky;display:inline-flex;align-items:center;justify-content:center;width:var(--cl-26);height:var(--cl-26);margin-top:calc((var(--cl-tl-row) - var(--cl-26)) / 2);padding:0;background:var(--color-surface);color:var(--color-ink);border:var(--border-hairline);border-radius:var(--radius-xs);font-family:var(--font-mono);font-size:var(--text-micro);cursor:pointer;z-index:1}
 .ds-tl-edge[hidden]{display:none}
-.ds-tl-edge.is-l{left:var(--cl-8)}
+.ds-tl-edge.is-l{left:calc(var(--cl-8) - var(--cl-16))}
 .ds-tl-edge.is-r{float:right;right:var(--cl-8)}
 .ds-tl-edge:hover{outline:var(--cl-1) solid var(--color-ink);outline-offset:var(--cl-1)}
 .ds-tl-pop{position:fixed;z-index:var(--z-ds-controls);max-width:min(40ch,70vw);font-family:var(--font-mono);font-size:var(--text-micro);line-height:1.5;color:var(--color-ink);background:var(--color-surface);border:var(--border-hairline);padding:var(--cl-8) var(--cl-12);border-radius:var(--cl-6);box-shadow:var(--sp-elevation-2);pointer-events:none;box-sizing:border-box;white-space:normal;opacity:1;visibility:visible;transform:translateY(0);transition:opacity .16s ease,transform .16s ease,visibility .16s ease}
