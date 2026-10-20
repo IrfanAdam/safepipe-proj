@@ -410,7 +410,7 @@ create policy "anon read schedules"
 3. Offline pick → inline retry, intact after refresh.
 4. `npm run build` green, second `plan-track` run diff-clean.
 
-- REF GATE 5 (ship): drill pass on chromium + webkit, zero page errors, Vercel skip proven, build green. Then append `### Task 15 ✓ done <sha>` and close phase. Evidence: build green; full suite 659 pass + 7 pre-existing corpus/geo fails; live backfill 6 dues (`dabf50a`); anon RLS read proof in `supabase/README.md`. REMAINING USER-RUN AT CUTOVER: two-device drill + Vercel skip-proof. CLOSED 2026-10-20: owner confirms both from their end — laptop pick → phone converges, no reload; Due-only push skipped, code push deploys. GATE PASSED, plan closed.
+- REF GATE 5 (ship): drill pass on chromium + webkit, zero page errors, Vercel skip proven, build green. Then append `### Task 15 ✓ done <sha>` and close phase. Evidence: build green; full suite 659 pass + 7 pre-existing corpus/geo fails; live backfill 6 dues (`dabf50a`); anon RLS read proof in `supabase/README.md`. REMAINING USER-RUN AT CUTOVER: two-device drill + Vercel skip-proof. CLOSED 2026-10-20: owner confirms both from their end — laptop pick → phone converges, no reload; Due-only push skipped, code push deploys. GATE PASSED, plan closed. Verdict: ✓ PASSED 2026-10-20 (owner) — two-device drill + Vercel skip-proof owner-confirmed from their end.
 
 
 ## Closeout note ✓ done {#phase-5-rev}
