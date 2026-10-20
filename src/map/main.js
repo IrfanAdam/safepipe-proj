@@ -1470,7 +1470,7 @@ function flyToSectorThenTwin(id, opts = {}) {
       const w = wideZoomForBounds(bounds);
       try {
         if (w) mapRef.jumpTo({ center: w.center, zoom: w.zoom, bearing: 0, pitch: pitchTargetForZoom(w.zoom) });
-        else mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: wideFitPadding(), maxZoom: 14 });
+        else mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: wideFitPadding(), maxZoom: Z_MAX });
         try {
           liveZ = +mapRef.getZoom();
         } catch { /* keep the pre-jump read */ }
