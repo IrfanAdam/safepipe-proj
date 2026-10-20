@@ -23,9 +23,9 @@
 - Environment: NO gdal/ogr2ogr, NO postgis/psql on this machine; java present.
 
 ## Phase 01 — OSM vector completeness, close the loop
+*Due: 2026-10-28*
 <!-- {#phase-01} -->
 *What accuracy gains: the installed vectors stop being questioned — suite fully green, M1 gap re-verified against fresh OSM, manifest counts match the asset. (Continues Lane A {#lane-a}.)*
-*Schedule: 2026-10-28*
 *Fanout: Task 2 and Task 3 read the same asset — run Task 3 after Task 2 only if Task 2 integrates new geometry. Task 1 is file-disjoint, parallel-safe.*
 
 | # | Task | Done when |
@@ -54,9 +54,9 @@
 - REF GATE 1 (OPEN, by owner: vector-suite sign-off owed): `tests/ring2-vectors*.test.js` 24/24 with zero out-of-repo reads; full suite 768/768; manifest counts match the asset; M1 verdict dated 2026-10 or later. Evidence: test output + manifest diff. No screenshots — data-only phase.
 
 ## Phase 02 — Elevation verdict locked
+*Due: 2026-11-17*
 <!-- {#phase-02} -->
 *What accuracy gains: the Terrarium-holds verdict is reproducible on demand and fully recorded — RMSE, relief, shoreline — with the GLO-30 gap named. (Continues Lane B {#lane-b}.)*
-*Schedule: 2026-11-17*
 *Fanout: Task 4 then Task 5 — Task 5 reads the manifest Task 4 confirms.*
 
 | # | Task | Done when |
@@ -80,7 +80,6 @@
 ## Phase 03 — Source recon verdicts
 <!-- {#phase-03} -->
 *What accuracy gains: three build-vs-buy-vs-never verdicts on record — Cesium, OSM2World, GDAL/PostGIS — so nobody re-investigates them. (Lane C {#lane-c}, no commits yet.)*
-*Schedule: 2026-11-17 (inherited horizon — confirm or move)*
 *Fanout: Tasks 6–8 fully parallel — disjoint tools, scratch/prose only, zero repo writes outside manifest/plan.*
 
 | # | Task | Done when |
