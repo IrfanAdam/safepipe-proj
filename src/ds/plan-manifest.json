@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T12:47:40.773Z",
+  "generated": "2026-10-20T12:53:18.966Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "f738232",
+      "full": "f738232c2802bb28289d93922d71e77c01efbe56",
+      "date": "2026-10-20",
+      "time": "18:18",
+      "subject": "fix(journey): brackets sit ON the ring via --rc-axis vr/sqrt(2) [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "1671030",
       "full": "16710304c6855915770b73c66cf2df9ff7807f7e",
@@ -5791,6 +5800,6 @@
     }
   ],
   "wip": [
-    "ops3d-map.html"
+    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ]
 }
