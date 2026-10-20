@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T14:44:52.190Z",
+  "generated": "2026-10-20T14:45:10.457Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "699ef81",
+      "full": "699ef81ea88e8b975588d64d16ea784b8766872d",
+      "date": "2026-10-20",
+      "time": "20:14",
+      "subject": "docs(plan): note the off-screen --vr reading on the ring-law rev [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "6bcda3a",
       "full": "6bcda3a67b375d4e12efad06ad7e99f63dcdd1b2",
@@ -5880,7 +5889,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
-  ]
+  "wip": []
 }
