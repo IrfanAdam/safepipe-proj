@@ -410,23 +410,40 @@ export function bindChangelogEvents(root, st, helpers) {
   // start in, clipped-right pulls the end in (or the start, when the cluster
   // is wider than the window). No-op only when fully visible.
   // Instant, matching the lane-jump rule — repeated clicks never race.
+  // Landing pads clear the sticky helpers: left caret (26px @ -8 → 18px
+  // footprint) + breathing room = 32; right caret (26px @ 8 → 34px) = 48.
+  const PAD_L = 32, PAD_R = 48;
+  // Directional settle: after an instant jump, the row eases a few px back
+  // to rest from the side it came from — direction feedback without a full
+  // scroll animation. Motion-safe: the classes only animate under
+  // prefers-reduced-motion: no-preference.
+  const nudgeX = (el, dx) => {
+    if (!el || !dx) return;
+    el.classList.remove('is-nudge-fwd', 'is-nudge-back');
+    void el.offsetWidth;
+    el.classList.add(dx > 0 ? 'is-nudge-fwd' : 'is-nudge-back');
+  };
   const scrollRowIntoView = (row, dir) => {
     const sc = root.querySelector('.ds-tl-scroll');
     if (!sc) return;
     const tracks = [...row.querySelectorAll('[data-tl-bout],[data-tl-ghost]')];
     if (!tracks.length) return;
-    const vr = sc.getBoundingClientRect(), pad = 14;
+    const vr = sc.getBoundingClientRect();
     const f = tracks[0].getBoundingClientRect(), l = tracks[tracks.length - 1].getBoundingClientRect();
     const fDoc = f.left - vr.left + sc.scrollLeft, lDoc = l.right - vr.left + sc.scrollLeft;
     const viewL = sc.scrollLeft, viewR = viewL + sc.clientWidth;
     let x = null;
-    if (dir === 'l') x = lDoc - sc.clientWidth + pad;
-    else if (dir === 'r') x = fDoc - pad;
-    else if (fDoc < viewL + pad) x = fDoc - pad;
-    else if (lDoc > viewR - pad) {
-      x = (lDoc - fDoc <= sc.clientWidth) ? lDoc - sc.clientWidth + pad : fDoc - pad;
+    if (dir === 'l') x = lDoc - sc.clientWidth + PAD_R;
+    else if (dir === 'r') x = fDoc - PAD_L;
+    else if (fDoc < viewL + PAD_L) x = fDoc - PAD_L;
+    else if (lDoc > viewR - PAD_R) {
+      x = (lDoc - fDoc <= sc.clientWidth) ? lDoc - sc.clientWidth + PAD_R : fDoc - PAD_L;
     }
-    if (x !== null && Math.abs(x - sc.scrollLeft) > 1) sc.scrollTo({ left: Math.max(0, x), behavior: 'auto' });
+    if (x !== null && Math.abs(x - sc.scrollLeft) > 1) {
+      const dx = x - sc.scrollLeft;
+      sc.scrollTo({ left: Math.max(0, x), behavior: 'auto' });
+      nudgeX(row, dx);
+    }
     // Programmatic scrolls don't reliably raise scroll events in every
     // engine/harness, so re-sync the edge carets explicitly (user-driven
     // scrolls are covered by the scroller's own onscroll in paint).
@@ -1029,7 +1046,12 @@ export function bindChangelogEvents(root, st, helpers) {
         const first = lane.querySelector('[data-tl-bout],[data-tl-ghost]');
         if (sc && first) {
           const x = first.getBoundingClientRect().left - lane.getBoundingClientRect().left + sc.scrollLeft;
-          sc.scrollTo({ left: Math.max(0, x - 14), behavior: 'auto' });
+          const target = Math.max(0, x - PAD_L);
+          if (Math.abs(target - sc.scrollLeft) > 1) {
+            const dx = target - sc.scrollLeft;
+            sc.scrollTo({ left: target, behavior: 'auto' });
+            nudgeX(lane, dx);
+          }
         }
       }
       return;

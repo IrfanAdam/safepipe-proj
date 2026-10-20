@@ -41,6 +41,12 @@ aside.ds-timeline.is-open{opacity:1;transform:none;visibility:visible}
 .ds-tl-tick{position:absolute;top:0;height:var(--cl-20);line-height:var(--cl-16);border-left:var(--border-hairline);font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);width:var(--cl-tl-day);text-align:center;padding-left:0;white-space:nowrap;overflow:visible}
 aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
 .ds-tl-row{display:flex;align-items:stretch;border-bottom:var(--border-hairline);min-height:var(--cl-tl-row)}
+@keyframes ds-tl-nudge-fwd{from{transform:translateX(8px)}to{transform:translateX(0)}}
+@keyframes ds-tl-nudge-back{from{transform:translateX(-8px)}to{transform:translateX(0)}}
+@media (prefers-reduced-motion: no-preference){
+.ds-tl-row.is-nudge-fwd,.ds-tl-lane.is-nudge-fwd{animation:ds-tl-nudge-fwd 180ms ease-out}
+.ds-tl-row.is-nudge-back,.ds-tl-lane.is-nudge-back{animation:ds-tl-nudge-back 180ms ease-out}
+}
 .ds-tl-row.has-track{background:color-mix(in srgb, var(--color-surface) 45%, transparent)}
 .ds-tl-row:hover{background:color-mix(in srgb, var(--color-surface) 80%, transparent)}
 .ds-tl-lane{position:relative;flex:none;align-self:stretch}
