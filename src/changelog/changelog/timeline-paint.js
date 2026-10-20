@@ -53,6 +53,20 @@ export function syncTlEdges(panel) {
   const sc = panel.querySelector('.ds-tl-scroll');
   if (!sc) return;
   const vr = sc.getBoundingClientRect(), slop = 24;
+  // Sticky month: badge pinned at the axis left edge names the leftmost
+  // visible month — shown only once that month's own tick scrolled out.
+  const badge = panel.querySelector('[data-tl-curmonth]');
+  if (badge) {
+    const months = [...panel.querySelectorAll('.ds-tl-tick.is-month')];
+    let cur = '', curLeft = Infinity;
+    for (const m of months) {
+      const l = m.getBoundingClientRect().left;
+      if (l <= vr.left + slop) { cur = m.textContent; curLeft = l; }
+    }
+    if (!cur && months.length) { cur = months[0].textContent; curLeft = months[0].getBoundingClientRect().left; }
+    if (badge.textContent !== cur) badge.textContent = cur;
+    badge.hidden = !(cur && curLeft < vr.left);
+  }
   panel.querySelectorAll('[data-tl-row]').forEach((row) => {
     const tracks = [...row.querySelectorAll('[data-tl-bout],[data-tl-ghost]')];
     const L = row.querySelector('[data-tl-edge="l"]'), R = row.querySelector('[data-tl-edge="r"]');
@@ -261,6 +275,7 @@ export function paintTimeline(root, ctx) {
     `<div class="ds-tl-head"><b>Timeline</b><small>${esc(rangeTxt)}</small>`,
     `<button data-tl-close aria-label="Close timeline">✕</button></div>`,
     `<div class="ds-tl-scroll"><div class="ds-tl-axis">` +
+    `<span class="ds-tl-curmonth" data-tl-curmonth hidden></span>` +
     `<div class="ds-tl-ticks" style="${laneW}">${ticks}</div></div>${body}</div>`,
   ].join('');
   // Keep today in view on open: with prev/next-month padding the lane is
