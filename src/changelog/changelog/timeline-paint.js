@@ -66,6 +66,13 @@ export function syncTlEdges(panel) {
     if (!cur && months.length) { cur = months[0].textContent; curLeft = months[0].getBoundingClientRect().left; }
     if (badge.textContent !== cur) badge.textContent = cur;
     badge.hidden = !(cur && curLeft < vr.left);
+    // The badge overlays the ticks without shifting them: pull the ticks
+    // strip left by exactly the badge width (mono month names = stable).
+    const ticksEl = panel.querySelector('.ds-tl-ticks');
+    if (ticksEl) {
+      const want = badge.hidden ? '' : `${-badge.offsetWidth}px`;
+      if (ticksEl.style.marginLeft !== want) ticksEl.style.marginLeft = want;
+    }
   }
   panel.querySelectorAll('[data-tl-row]').forEach((row) => {
     const tracks = [...row.querySelectorAll('[data-tl-bout],[data-tl-ghost]')];
