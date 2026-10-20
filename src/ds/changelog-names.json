@@ -42,5 +42,13 @@
   "2026-10-11_202541-ops3d-v3-realworld-iteration.md": {
     "title": "Sangachal Digital Twin — platform demo on Ring-2",
     "purpose": "platform demo"
+  },
+  "2026-10-12_175646-ops3d-geo-triangulation.md": {
+    "title": "Geo triangulation — multi-source accuracy + completeness for the twin",
+    "purpose": "geo accuracy"
+  },
+  "2026-10-13_233337-ops3d-twin-work.md": {
+    "title": "Twin realism — make it real, then operate on it",
+    "purpose": "twin realism"
   }
 }
