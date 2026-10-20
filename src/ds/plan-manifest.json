@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T08:34:32.317Z",
+  "generated": "2026-10-20T08:37:10.471Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "447ed17",
+      "full": "447ed17bdc437dd1cad5ec0a6d64b564d613c9ba",
+      "date": "2026-10-20",
+      "time": "14:06",
+      "subject": "feat(plan): Phase 2 grammar rollout — gates + labels corpus-wide [plan:2026-10-19_150735-changelog-readability.md#phase-2]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-2"
+    },
     {
       "sha": "acba0e9",
       "full": "acba0e9f2931b8d4dc7f2390156820815dfb3089",
@@ -5467,11 +5476,6 @@
     }
   ],
   "wip": [
-    ".hermes/plans/2026-10-07_153000-ops3d-realworld-twin.md",
-    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md",
-    ".hermes/plans/2026-10-15_120000-safepipe-changelog-timeline.md",
-    ".hermes/plans/2026-10-17_180000-safepipe-smooth-scheduling.md",
-    ".hermes/plans/2026-10-18_172008-supabase-scheduling-migration.md",
     ".hermes/plans/2026-10-19_150735-changelog-readability.md",
     "public/version.json",
     "src/changelog/changelog-cal.css",

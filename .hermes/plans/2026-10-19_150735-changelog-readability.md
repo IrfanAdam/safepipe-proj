@@ -101,7 +101,7 @@
 | 4 | Gate lines to `REF GATE N (STATUS):` + Evidence | Every corpus gate parses to a non-open state or an explicit OPEN with reviewer |
 | 5 | Task labels to canonical set | No `Contract`/`Rules`-led blocks remain; order Files → Changes → Steps → Verify |
 
-### Task 4: Gate lines to REF GATE N (STATUS) + Evidence
+### Task 4: Gate lines to REF GATE N (STATUS) + Evidence ✓ done 447ed17
 
 **Objective:** Every `REF GATE` line in the corpus states its verdict in the paren and carries its evidence, so the drawer never has to guess open-vs-closed.
 
@@ -117,7 +117,7 @@
 
 **Verify:** Done 2026-10-20 (missing-paren 0, unowned-open 0, gates suite green). Baseline recorded at authoring (2026-10-19): `parseGates()` over the 17 plans returns 39 gate lines — 32 open / 6 passed / 1 waiver — with **19 open gates carrying no reviewer and 22 gate lines with no `(STATUS)` paren** (realworld-twin 1–5, smooth-scheduling 1–2, 172008 1 + 3, this plan 1 + 4). Closes when a `REF GATE [0-9]` grep finds no line missing its paren status, every remaining OPEN names its reviewer, and the gates suite is green.
 
-### Task 5: Task labels to canonical set
+### Task 5: Task labels to canonical set ✓ done 447ed17
 
 **Objective:** Field labels collapse to the canonical set so the renderer's canonical-order path is the only path a body can take.
 
