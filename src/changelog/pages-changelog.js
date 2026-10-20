@@ -9,7 +9,7 @@ import names from '../ds/changelog-names.json';
 import history from '../ds/plan-history.json';
 import { goal, split, parseMeta, anchorOf, phash, dueOf } from './changelog-parse.js';
 import { paint } from './changelog-paint.js';
-import { planSealed } from './changelog/raw-detail.js';
+import { planStatus } from './changelog/raw-detail.js';
 import { duePreviewEdit } from './changelog-events.js';
 import { loadDueOverrides, dropDueOverride, overrideVerdict, normHead, canonicalHead, readDueConfirm, clearDueConfirm, dueFetchVerdict, findHeadIndex, readDuePending, clearDuePending, dueDeployVerdict } from '../logic/due-overrides.js';
 import { getSchedToken } from '../logic/schedule-auth.js';
@@ -530,20 +530,20 @@ function startLiveRefresh() {
     } catch { supaUnsub = null; }
   } catch {}
 }
-const st = { active: new Set(), incompleteOnly: false, day: '', sel: [0, 0], open: false, stage: 'list',
+const st = { active: new Set(), statusFilter: '', day: '', sel: [0, 0], open: false, stage: 'list',
   mlevel: 1,
   view: 'list', tlSel: null, tlLast: null, tlSort: '', returnView: null, tlDate: '' };
 let tlToken = 0;
 const dueOnDay = (p, day) => (p.sprints || []).some((s) => { try { return dueOf(s) === day; } catch { return false; } });
 const visiblePlans = () => plans
   .filter((p) => (!st.active.size || p.tags.some((t) => st.active.has(t)))
-    && (!st.incompleteOnly || !planSealed(p))
+    && (!st.statusFilter || planStatus(p) === st.statusFilter)
     && (!st.day || p.date === st.day || commits.some((c) => c.plan === p.file && c.date === st.day) || dueOnDay(p, st.day)));
 // Timeline ignores the landing day-blob filter: tracks always span the full
 // range. Track chips (st.active) still apply.
 const visiblePlansNoDay = () => plans
   .filter((p) => (!st.active.size || p.tags.some((t) => st.active.has(t)))
-    && (!st.incompleteOnly || !planSealed(p)));
+    && (!st.statusFilter || planStatus(p) === st.statusFilter));
 const visibleSprints = (plan) => {
   const ss = st.active.size ? plan.sprints.filter((s) => s.tags.some((t) => st.active.has(t))) : plan.sprints;
   return ss.length ? ss : plan.sprints;
@@ -636,7 +636,7 @@ function doPaint(root) {
   if (isMobile() && st.open && st.mlevel === 1 && st.sel[1] < 0) st.sel = [pi, -1];
   else st.sel = [pi, Math.max(si, 0)];
   paint(root, { list, pi, plan, sprints, si: st.sel[1], active: st.active, day: st.day,
-    incompleteOnly: st.incompleteOnly,
+    statusFilter: st.statusFilter,
     sel: st.sel, open: st.open, stage: st.stage, mlevel: st.mlevel || 1, counts, plans, texts,
     dueCommit: st.dueCommit || null,
     rev: plan ? revOf(plan.file) : null, revOf, edited: plan ? (s) => sectionEdited(plan.file, s) : () => false,

@@ -229,6 +229,15 @@ const liveRaw = (p) => {
   } catch { return (p && p.raw) || ''; }
 };
 
+// Filter status in one place: cancelled (trailing run owns the end) > done
+// (sealed) > incomplete. Cards, rails, and the status radio share this —
+// they can never disagree.
+export const planStatus = (p) => {
+  try {
+    if (planCancelled(p)) return 'cancelled';
+    return planSealed(p) ? 'done' : 'incomplete';
+  } catch { return 'incomplete'; }
+};
 // Plan-level cancelled: the trailing run of phases is cancelled through the
 // last phase AND everything before it is sealed. A cancelled middle with a
 // done last phase reads done; any open live work reads open — cancellation

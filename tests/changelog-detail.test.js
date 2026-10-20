@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { split } from '../src/changelog/changelog-parse.js';
 import { parseGates } from '../src/changelog/changelog-parse.js';
 import { norm, state, isDone } from '../src/changelog/changelog-parse.js';
-import { planSealed, planCancelled } from '../src/changelog/changelog/raw-detail.js';
+import { planSealed, planCancelled, planStatus } from '../src/changelog/changelog/raw-detail.js';
 import { isCancelledHead, liveSprints } from '../src/changelog/changelog-parse.js';
 import {
   sectionRaw, stripGateThread, renderSection, anchorOwners, gateSuffix, fmtInline, shipGatesShut,
@@ -584,6 +584,12 @@ describe('cancelled status (phase ✗ cancelled rolls up to plan)', () => {
     assert.equal(isCancelledHead('## Phase 2 ✗ cancelled'), true);
     assert.equal(isCancelledHead('## Phase 2'), false);
     assert.equal(liveSprints([...done, ...axed]).length, 1);
+  });
+  it('planStatus splits done / incomplete / cancelled', () => {
+    assert.equal(planStatus({ sprints: done, raw: '' }), 'done');
+    assert.equal(planStatus({ sprints: [...done, ...open], raw: '' }), 'incomplete');
+    assert.equal(planStatus({ sprints: [...done, ...axed], raw: '' }), 'cancelled');
+    assert.equal(planStatus(null), 'incomplete');
   });
 });
 

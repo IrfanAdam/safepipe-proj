@@ -897,21 +897,35 @@ export function bindChangelogEvents(root, st, helpers) {
     const dp = root.querySelector('[data-due-pop]:not([hidden])');
     if (dp && !(e.target.closest && e.target.closest('[data-due-pop],[data-due-open]'))) dp.hidden = true;
     if (e.target.closest('[data-day-clear]')) { st.day = ''; st.sel = [0, 0]; doPaint(root); return; }
-    // Filter dropdown toggle
+    // Filter dropdown toggles (tag + status share the dismiss idiom; opening
+    // one closes the other)
+    const closeDd = (ddSel, btnSel) => {
+      const dd = root.querySelector(`[${ddSel}]`);
+      if (dd) dd.hidden = true;
+      const fb = root.querySelector(`[${btnSel}]`);
+      if (fb) fb.setAttribute('aria-expanded', 'false');
+    };
     const tf = e.target.closest('[data-tag-filter]');
     if (tf) {
       const dd = root.querySelector('[data-tag-dropdown]');
       if (dd) { dd.hidden = !dd.hidden; tf.setAttribute('aria-expanded', String(!dd.hidden)); }
+      closeDd('data-status-dropdown', 'data-status-filter');
       return;
     }
-    // Outside-dismiss: a click outside an open tag dropdown and outside its
-    // button closes it (same idiom as the datepicker dismiss above).
+    const sf = e.target.closest('[data-status-filter]');
+    if (sf) {
+      const dd = root.querySelector('[data-status-dropdown]');
+      if (dd) { dd.hidden = !dd.hidden; sf.setAttribute('aria-expanded', String(!dd.hidden)); }
+      closeDd('data-tag-dropdown', 'data-tag-filter');
+      return;
+    }
+    // Outside-dismiss: a click outside either open dropdown and outside both
+    // buttons closes them (same idiom as the datepicker dismiss above).
     // [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
-    const openDd = root.querySelector('[data-tag-dropdown]:not([hidden])');
-    if (openDd && !(e.target.closest && e.target.closest('[data-tag-dropdown],[data-tag-filter]'))) {
-      openDd.hidden = true;
-      const fb = root.querySelector('[data-tag-filter]');
-      if (fb) fb.setAttribute('aria-expanded', 'false');
+    const openDd = root.querySelector('[data-tag-dropdown]:not([hidden]),[data-status-dropdown]:not([hidden])');
+    if (openDd && !(e.target.closest && e.target.closest('[data-tag-dropdown],[data-tag-filter],[data-status-dropdown],[data-status-filter]'))) {
+      closeDd('data-tag-dropdown', 'data-tag-filter');
+      closeDd('data-status-dropdown', 'data-status-filter');
     }
     // Checkbox in filter dropdown
     const topt = e.target.closest('[data-tag-opt]');
@@ -920,14 +934,17 @@ export function bindChangelogEvents(root, st, helpers) {
       if (t) { st.active.has(t) ? st.active.delete(t) : st.active.add(t); }
       st.sel = [0, 0]; doPaint(root); return;
     }
-    // Incomplete-only toggle in filter dropdown (shares the plan-card seal)
-    if (e.target.closest('[data-incomplete-opt]')) {
-      st.incompleteOnly = !st.incompleteOnly;
+    // Status radio in the status dropdown (re-click toggles off; shares the
+    // planStatus rule with the cards). Replaces the old Incomplete checkbox.
+    const sopt = e.target.closest('[data-status-opt]');
+    if (sopt) {
+      const v = sopt.dataset.statusOpt;
+      st.statusFilter = st.statusFilter === v ? '' : v;
       st.sel = [0, 0]; doPaint(root); return;
     }
     // Clear all filters
     if (e.target.closest('[data-tag-clear]')) {
-      st.active = new Set(); st.incompleteOnly = false; st.day = ''; st.sel = [0, 0]; doPaint(root); return;
+      st.active = new Set(); st.statusFilter = ''; st.day = ''; st.sel = [0, 0]; doPaint(root); return;
     }
     // Tags more expansion
     const moreBtn = e.target.closest('[data-tags-more]');
