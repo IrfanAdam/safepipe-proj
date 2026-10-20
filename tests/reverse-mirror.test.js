@@ -226,7 +226,44 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
   assert.ok(!main.includes(', 2500);'), '2500ms fallback timer is gone');
   assert.ok(main.includes('lastPostedStagedS = null; // symmetric unwind'), 'staged exit unwinds the S stream');
   assert.ok(main.includes('if (receding && needsHandoff(z))'), 'scrolling back in disarms the recede');
-  assert.ok(main.includes('(prox.near || isoScrubOwned || z >= Z_TOP)'), 'iso scrub engages on z past the top gate even unaimed, owned tilt restores even after pan-away');
+  // GATE-3 REVISION: the engagement gained the STRAND case. The old test
+  // (z past the top gate, even unaimed) is still true — but the reverse leg
+  // dropped below Z_TOP, the law stopped driving, and the tilt sat at 45deg
+  // for the whole way home. `isoRestoreDue` is now part of the engagement,
+  // so the journey keeps the tilt until the law has actually flattened it.
+  assert.ok(
+    main.includes('(prox.near || isoScrubOwned || z >= Z_TOP || isoRestoreDue)'),
+    'iso scrub engages past the top gate, and keeps the tilt while the reverse still owes a flatten',
+  );
+  // The release waits for the law's value, not just the zoom.
+  assert.ok(
+    main.includes('z < Z_TOP - ISO_SCRUB_RELEASE && Math.abs(pCur) <= ISO_SCRUB_EPS_DEG'),
+    'the journey releases the tilt only once the law has flattened it (no mid-retrace strand)',
+  );
+  // The per-frame hook applies the law on BOTH sides of the band — the
+  // reverse must be able to flatten the tilt, so the slack guard cannot
+  // apply once the journey owns the tilt.
+  assert.ok(
+    main.includes('if (!isoScrubOwned && pCur > pLaw + ISO_SCRUB_SLACK_DEG) return next;'),
+    'the camera hook owns the tilt unconditionally once the journey took it',
+  );
+  assert.ok(
+    !/transformCameraUpdate:[\s\S]{0,600}?if \(z < Z_TOP\) return next;/.test(main),
+    'the camera hook is not gated to z >= Z_TOP (that gated out the reverse flatten)',
+  );
+  // KNOWN OPEN, pre-existing: the camera pitch still snaps 45 -> 0 at the
+  // twin-open frame (a measured -45deg step). Two camera-write fixes were
+  // tried and reverted (they did not hold), so the seam is NOT claimed fixed
+  // here. The regression guard is that no half-finished attempt is left in
+  // the tree: the twin-open hold must NOT be present.
+  assert.ok(
+    !main.includes('holdIsoPoseForTwin'),
+    'no half-finished twin-open camera hold is left in the tree (the seam is OPEN, not fixed)',
+  );
+  assert.ok(
+    !main.includes('mapRef.stop('),
+    'no abandoned camera-stop experiment is left in the tree',
+  );
 });
 
 test('map vignette: radius from projected R, brackets ride the same law', () => {

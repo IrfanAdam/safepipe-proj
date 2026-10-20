@@ -1093,7 +1093,17 @@ function onNativeZoomStep(snap, source) {
     // Twin paths own the camera while open. Task-37: the gesture recede
     // does NOT block this — pitch 45->0 IS the mirrored checkpoint on the
     // way out, ridden by the same law.
-    if (!twinOpen && !busyNoRecede && prox && (prox.near || isoScrubOwned || z >= Z_TOP)) {
+    // GATE-3 REVISION: the scrub owns the tilt on the way OUT too. The
+    // engagement test used to require z >= Z_TOP, so once the reverse leg
+    // dropped below the top-down checkpoint the law stopped driving and the
+    // tilt sat at ISO_PITCH_DEG for the whole way home (the settle-reconcile
+    // only fires on zoomend, i.e. after the gesture stops). The engagement
+    // is now: the journey owns the tilt if it owned it going in
+    // (isoScrubOwned) OR the law currently asks for a non-zero tilt
+    // (z >= Z_TOP) OR the tilt is still stranded above the law's target
+    // (the flatten case). The law is ONE law — pitchTargetForZoom(z) —
+    // and it is 0 below the band, so the reverse retraces it exactly.
+    if (!twinOpen && !busyNoRecede && prox && (prox.near || isoScrubOwned || z >= Z_TOP || isoRestoreDue)) {
       const pLaw = pitchTargetForZoom(z);
       let pCur = null;
       try {
@@ -1109,7 +1119,13 @@ function onNativeZoomStep(snap, source) {
               pumpIsoPitch(); // per-frame carry from here — cadence-independent tilt
             } catch { /* pump is best-effort */ }
           }
-        } else if (z < Z_TOP - ISO_SCRUB_RELEASE) {
+        } else if (z < Z_TOP - ISO_SCRUB_RELEASE && Math.abs(pCur) <= ISO_SCRUB_EPS_DEG) {
+          // GATE-3 REVISION: the journey releases the tilt only once the law
+          // has actually flattened it. The old test released on ZOOM alone
+          // (z < Z_TOP - release), which handed the camera back mid-retrace
+          // with the tilt still at ISO_PITCH_DEG — the strand. The law is
+          // 0 below the band, so the release is now "the law's value is
+          // reached", which is the same condition the write enforces.
           isoScrubOwned = false;
           releaseNow = true;
         }
@@ -2894,28 +2910,38 @@ async function boot() {
     // LANE A naked view: no default attribution pill / info (ⓘ) button.
     // A minimal micro credit is mounted instead (mountMicroCredit).
     attributionControl: false,
-    // GATE-3 REVISION: the iso must GLIDE, never stair-step.
-    // MapLibre's native zoom animation re-applies the gesture-start pitch
-    // on EVERY frame, so a per-tick write only lands on settle — the tilt
-    // then becomes a function of gesture cadence (0deg at the gate for
-    // 60/120ms, ~30deg at 250ms, 44.85deg only at 800ms, in 8-27deg
+    // GATE-3 REVISION: the iso must GLIDE, never stair-step, IN BOTH
+    // directions. MapLibre's native zoom animation re-applies the gesture-
+    // start pitch on EVERY frame, so a per-tick write only lands on settle —
+    // the tilt then becomes a function of gesture cadence (0deg at the gate
+    // for 60/120ms, ~30deg at 250ms, 44.85deg only at 800ms, in 8-27deg
     // stair-steps). This hook runs BEFORE the camera moves, so the law's
-    // target wins by construction on every frame of the native zoom — the
-    // per-tick write and the per-frame pump both become redundant.
-    // One law: pitchTargetForZoom(z). Zoom is never touched here.
+    // target wins by construction on every frame of the native zoom.
+    // One law: pitchTargetForZoom(z) — 0 at/below Z_TOP, ISO_PITCH_DEG at
+    // the handoff, and it RETRACES on the way out.
+    //
+    // The law applies on BOTH sides of the band. Gating it to z >= Z_TOP
+    // stranded the tilt: the reverse leg dropped below Z_TOP, the law
+    // stopped writing, and the pitch sat at 45deg for the whole way home
+    // (the settle-reconcile only fires on zoomend, i.e. after the gesture
+    // stops — so during a continuous scroll-out nothing owned the pitch).
+    // The law's value below Z_TOP is 0, so writing it there is the flatten,
+    // not a yank.
     transformCameraUpdate: (next) => {
       try {
         if (twinOpen || transitId || pendingReveal || reverseWait) return next;
         const z = +next.zoom;
         if (!Number.isFinite(z)) return next;
-        if (z < Z_TOP) return next;
-        // Ownership: the scrub only takes the tilt when the live pitch sits
-        // at/below the law target (+slack), so a user-set oblique is never
-        // yanked. A user who pitched past the target keeps their angle.
         const pLaw = pitchTargetForZoom(z);
         const pCur = +next.pitch;
         if (!Number.isFinite(pCur)) return next;
-        if (pCur > pLaw + ISO_SCRUB_SLACK_DEG) return next;
+        // Ownership — the journey's own tilt vs the user's.
+        // If the journey took the tilt (isoScrubOwned), the law owns it and
+        // writes unconditionally: the reverse leg must be able to flatten a
+        // 45deg tilt, and the slack guard would otherwise block exactly
+        // that (45 > 0 + slack). If the journey never took it, the guard
+        // applies and a user-set oblique is never yanked.
+        if (!isoScrubOwned && pCur > pLaw + ISO_SCRUB_SLACK_DEG) return next;
         return { ...next, pitch: pLaw };
       } catch {
         return next;
