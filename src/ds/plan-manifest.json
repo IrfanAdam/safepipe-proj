@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-20T12:24:20.519Z",
+  "generated": "2026-10-20T12:26:31.897Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,24 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "a29dabf",
+      "full": "a29dabf6e31a9f3a8cafe1710fc5b692617736c0",
+      "date": "2026-10-20",
+      "time": "17:56",
+      "subject": "style(tokens): map page on the ops token chain, exact values, no visual change [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "e870a76",
+      "full": "e870a76607c0b8a249c6ccc620f77d83dffae7dc",
+      "date": "2026-10-20",
+      "time": "17:56",
+      "subject": "fix(journey): live-hold travel past the gate, fingers never freeze [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "621dfb2",
       "full": "621dfb222fc392b2a774b09003df452b62dd292e",
@@ -5745,11 +5763,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "design-system/ops-tokens.css",
-    "ops3d-map.html",
-    "public/version.json",
-    "src/map/main.js",
-    "src/map/scrolltrigger.js"
-  ]
+  "wip": []
 }
