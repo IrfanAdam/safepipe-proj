@@ -1,6 +1,6 @@
 // scripts/process-osm.mjs — Phase 01 Tasks 7,10: Overpass cache -> compact browser vectors.
 //
-// Reads the read-only cached Overpass responses (/tmp/phase01-*.json,
+// Reads the read-only cached Overpass responses (scripts/data-pipe/out/phase01-*.json,
 // Overpass JSON with `geometry` per way — never moved, never mutated) and
 // emits:
 //   public/data/sangachal-vectors.json  compact world-space polylines for the twin
@@ -41,7 +41,7 @@ export const AOI = Object.freeze({
 });
 
 const LAYERS = ['roads', 'tracks', 'paths', 'coastline', 'terminal'];
-const SRC = (layer) => `/tmp/phase01-${layer}.json`;
+const SRC = (layer) => `scripts/data-pipe/out/phase01-${layer}.json`;
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -224,7 +224,7 @@ const manifest = {
       counts,
       counts_total: { elements, vertices },
       steps: [
-        'read cached Overpass JSON (/tmp/phase01-<layer>.json, geometry per way)',
+        'read cached Overpass JSON (scripts/data-pipe/out/phase01-<layer>.json, geometry per way)',
         'clip each vertex to AOI rect (clamp + clipped flag, features preserved)',
         'project lon/lat -> world metres via src/ring2/site.js geoToWorld',
         `clip every segment to the twin disc (DISC_R = RING_RADIUS_M - 150 = ${DISC_R} m; split at crossings, drop fully-outside runs)`,
