@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { split } from '../src/changelog/changelog-parse.js';
 import { parseGates } from '../src/changelog/changelog-parse.js';
 import { norm, state, isDone } from '../src/changelog/changelog-parse.js';
+import { planSealed } from '../src/changelog/changelog/raw-detail.js';
 import {
   sectionRaw, stripGateThread, renderSection, anchorOwners, gateSuffix, fmtInline, shipGatesShut,
 } from '../src/changelog/changelog/raw-detail.js';
@@ -531,6 +532,23 @@ describe('ship-gate seal', () => {
     assert.equal(shipGatesShut(gSmooth), true);
     const gTimeline = parseGates(read('2026-10-15_120000-safepipe-changelog-timeline.md'));
     assert.equal(shipGatesShut(gTimeline), true);
+  });
+});
+
+describe('plan seal (Incomplete filter shares the card rule)', () => {
+  const done = [{ head: '## Phase 1', body: '- [x] a\n- [x] b' }];
+  it('full fractions + passed ship gate reads sealed', () => {
+    assert.equal(planSealed({ sprints: done, raw: '- REF GATE 1 (ship): x. Verdict: ✓ PASSED' }), true);
+  });
+  it('full fractions + open ship gate reads open', () => {
+    assert.equal(planSealed({ sprints: done, raw: '- REF GATE 1 (ship, OPEN, by owner): x' }), false);
+  });
+  it('partial fractions read open even with no gates', () => {
+    assert.equal(planSealed({ sprints: [{ head: '## Phase 1', body: '- [x] a\n- [ ] b' }], raw: '' }), false);
+  });
+  it('never throws on empty input', () => {
+    assert.equal(planSealed(null), false);
+    assert.equal(planSealed({}), false);
   });
 });
 

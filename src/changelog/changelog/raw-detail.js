@@ -4,7 +4,7 @@
 // as <pre>. norm()/hashes/anchors are untouched — this is display only, so
 // plan history gains no churn.
 // [plan:2026-10-19_150735-changelog-readability.md#phase-1]
-import { chunks, anchorOf } from '../changelog-parse.js';
+import { chunks, anchorOf, buildState, state, isDone, parseGates } from '../changelog-parse.js';
 import { esc as escAttr } from './esc.js';
 
 const esc = (t) => String(t || '')
@@ -178,6 +178,35 @@ export const shipGatesShut = (gates) => {
   const bases = ships.filter((x) => !/·\s*rev\b/i.test(x.note || ''));
   if (!bases.length) return true;
   return bases.every((x) => x.state === 'passed' || x.state === 'waiver');
+};
+
+// Plan-card seal in one place: fractions full AND every non-rev (ship)
+// gate passed or waived. Plan cards and the Incomplete filter share this —
+// a plan never reads sealed in one place and open in the other.
+export const planSealed = (p) => {
+  try {
+    let frac = '';
+    try { frac = buildState((p && p.sprints) || []); } catch { frac = ''; }
+    if (!frac && p && p.raw) {
+      let d = 0, t = 0;
+      for (const s of (p.sprints || [])) {
+        let f = '';
+        try { f = state(s.body); } catch { f = ''; }
+        if (f) {
+          const m = f.match(/(\d+)\/(\d+)/);
+          if (m) { d += Number(m[1]); t += Number(m[2]); continue; }
+        }
+        const raw = sectionRaw(p.raw, s.head);
+        if (!raw) continue;
+        const lines = raw.split('\n').filter((l) => /^###\s+(Task|Step|Phase)\b/i.test(l.trim()));
+        if (!lines.length) continue;
+        d += lines.filter((l) => /[✓✗]/.test(l)).length;
+        t += lines.length;
+      }
+      if (t) frac = `${d}/${t}`;
+    }
+    return isDone(frac) && shipGatesShut(parseGates((p && p.raw) || ''));
+  } catch { return false; }
 };
 
 // First section per anchor owns its commits; a repeated anchor (e.g. a prose

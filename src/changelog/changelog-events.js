@@ -903,9 +903,14 @@ export function bindChangelogEvents(root, st, helpers) {
       if (t) { st.active.has(t) ? st.active.delete(t) : st.active.add(t); }
       st.sel = [0, 0]; doPaint(root); return;
     }
+    // Incomplete-only toggle in filter dropdown (shares the plan-card seal)
+    if (e.target.closest('[data-incomplete-opt]')) {
+      st.incompleteOnly = !st.incompleteOnly;
+      st.sel = [0, 0]; doPaint(root); return;
+    }
     // Clear all filters
     if (e.target.closest('[data-tag-clear]')) {
-      st.active = new Set(); st.day = ''; st.sel = [0, 0]; doPaint(root); return;
+      st.active = new Set(); st.incompleteOnly = false; st.day = ''; st.sel = [0, 0]; doPaint(root); return;
     }
     // Tags more expansion
     const moreBtn = e.target.closest('[data-tags-more]');
