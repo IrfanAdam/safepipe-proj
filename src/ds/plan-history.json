@@ -5350,6 +5350,29 @@
      "state": "1/1"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-20",
+   "time": "13:53",
+   "hash": "1711bfa1",
+   "sections": [
+    {
+     "head": "Task 1: Sticky login — log in once per device, never auto-nag {#task-1}",
+     "hash": "58ef4542",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 2: Optimistic save — Saved instantly, commit in background, no freeze {#tas",
+     "hash": "4c7a8272",
+     "state": "1/1"
+    },
+    {
+     "head": "Task 3: Fast cross-device sync — no reload, seconds not minutes {#task-3}",
+     "hash": "1188f457",
+     "state": "1/1"
+    }
+   ]
   }
  ],
  "2026-10-18_172008-supabase-scheduling-migration.md": [

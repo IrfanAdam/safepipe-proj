@@ -59,7 +59,7 @@
 
 **Verify:** laptop pick → phone shows in <30s with zero touches; backgrounded phone refreshes on foreground; offline→online refreshes; second run of tracker/build unaffected (no manifest shape change).
 
-- REF GATE 3 (ship): two-device drill (laptop pick → phone converges, no reload, no login prompt), chromium + webkit screenshots, zero page errors, `npm run build` green.
+- REF GATE 3 (ship): two-device drill (laptop pick → phone converges, no reload, no login prompt), chromium + webkit screenshots, zero page errors, `npm run build` green. Verdict: ✓ PASSED 2026-10-20 (owner) — two-device drill owner-confirmed from their end.
 
 ### Task 3 ✓ done d65bcdb
 
