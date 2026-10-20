@@ -376,5 +376,11 @@
   "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
   "anchor": "task-2",
   "note": "sticky month badge \u2014 trailer cited #phase-3 but plan is flat Tasks; Task 2 owns the timeline view"
+ },
+ {
+  "sha": "00656ad",
+  "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
+  "anchor": "task-2",
+  "note": "empty deploy trigger \u2014 rebuilt production after manifest purge, no code"
  }
 ]
