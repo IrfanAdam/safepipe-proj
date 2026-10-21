@@ -131,7 +131,7 @@ test('driver: timed flight gone, staged scrub owns the outbound path', () => {
   assert.equal(forcedOn, 1, 'one setSatForced(true) left — the twin recede:true reverse handler');
 });
 
-test('zoom-driven reveal: S maps Z_TOP..Z_HANDOFF onto the reveal band; hold extras are zero', () => {
+test('accumulator-owned reveal: S seeds from live zoom at entry, wheel owns it after; hold extras are zero', () => {
   // GATE-3 REVISION: the S-driven tilt/ring extras are gone. Starting the
   // reveal at Z_TOP and driving it by zoom is what carries the motion; an
   // extra hold tilt would overshoot the 45deg pole and an extra ring close
@@ -145,13 +145,13 @@ test('zoom-driven reveal: S maps Z_TOP..Z_HANDOFF onto the reveal band; hold ext
   // The reveal band starts at the iso checkpoint: seed S is S_MAX - reveal.
   assert.equal(HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX, 750, 'reveal starts at S=750');
   const main = srcOf('../src/map/main.js');
+  // S OWNERSHIP: the wheel accumulator owns S after entry (KEEP +100/tick).
+  // No per-step zoom re-derivation may exist: the clamp freezes zoom
+  // post-gate, so a zoom law cannot express finger progress, and every zoom
+  // event would silently discard accumulated wheel intent.
   assert.ok(
-    main.includes('smooth01((z - Z_TOP) / (Z_HANDOFF - Z_TOP))'),
-    'the dissolve is a zoom law inside the Z_TOP..Z_HANDOFF band',
-  );
-  assert.ok(
-    main.includes('stagedS = revealStart + (HANDOFF_STAGED_S_MAX - revealStart) * tBand'),
-    'S maps the zoom band onto the reveal band',
+    !main.includes('stagedS = revealStart + (HANDOFF_STAGED_S_MAX - revealStart) * tBand'),
+    'no per-step zoom re-derivation of S — the accumulator is the sole writer',
   );
   assert.ok(
     main.includes('const revealStart = Math.max(0, HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX);'),

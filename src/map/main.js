@@ -1239,20 +1239,14 @@ function onNativeZoomStep(snap, source) {
       scrubFired = false; // re-arm: a fresh deep zoom may hand off again
       isoScrubOwned = false;
     }
-    // GATE-3 REVISION: the iso->twin dissolve is a ZOOM law inside the
-    // Z_TOP..Z_HANDOFF band, not a post-gate wheel accumulator. Mapping z to
-    // the S reveal band makes the twin dissolve in as the map zooms, and it
-    // reaches full at the handoff without extra scrolling — the owner's
-    // "stuck at terrain iso, never reaches the twin" failure. The wheel S
-    // still owns the clamped post-gate hold and the reverse retrace.
-    if (stagedActive && !stagedCommitted && Number.isFinite(z) && z >= Z_TOP) {
-      const tBand = smooth01((z - Z_TOP) / (Z_HANDOFF - Z_TOP));
-      const revealStart = Math.max(0, HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX);
-      stagedS = revealStart + (HANDOFF_STAGED_S_MAX - revealStart) * tBand;
-      try {
-        driveStagedOverlay();
-      } catch { /* overlay drive is best-effort */ }
-    }
+    // S OWNERSHIP: the wheel accumulator owns S after staged entry (the KEEP
+    // +100/tick law). S is NOT re-derived from zoom per step: the clamp
+    // freezes zoom post-gate, so a zoom law cannot express finger progress
+    // where the fingers actually are — and every zoom event would silently
+    // discard accumulated wheel intent, making dwell/commit depend on event
+    // interleaving instead of either law. The entry seed below maps live
+    // zoom onto the reveal band once; the accumulator carries it from there,
+    // including the clamped post-gate hold and the reverse retrace.
     // Task-35 staged exit (reverse): zoomend settle below the iso checkpoint
     // unwinds the hold — unclamp, drop accumulated scroll, quietly tear down
     // the uncommitted prewarm. Settle inside the band holds (no-op). Forward
