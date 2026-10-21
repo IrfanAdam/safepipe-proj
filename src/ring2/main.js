@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage, TWIN_FWD_REVEAL_START_PX } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -1239,9 +1239,9 @@ async function boot() {
           // zoom-out reverse stayed scrubbed. Legs start from the live pose,
           // so the release is jump-free and scroll-up retraces it
           // symmetrically. Shallow click frames keep the autoplay intro.
-          const hasStagedSeed = handoff.fwdStagedS !== null && handoff.fwdStagedS !== undefined
-            && Number.isFinite(Number(handoff.fwdStagedS));
-          const staged = hasStagedSeed || frameDeep;
+          // Lane T: fwdStagedOwnsIntro is the single source for the
+          // staged-vs-autoplay release decision (seed OR deep frame).
+          const staged = fwdStagedOwnsIntro({ stagedS: handoff.fwdStagedS, deepFrame: frameDeep });
           handoff.fwd = {
             legs,
             progress: fwdProgressForStagedS(handoff.fwdStagedS ?? 0),
@@ -1266,7 +1266,7 @@ async function boot() {
           endHandoffFlight();
           return;
         }
-        if (fwd.staged) {
+        if (fwdAutoplayHeld({ staged: fwd.staged, stagedS: handoff.fwdStagedS })) {
           fwd.progress = fwdProgressForStagedS(handoff.fwdStagedS ?? 0);
         } else {
           const total = scrubTotalMs(fwd.legs);
@@ -1833,6 +1833,10 @@ async function boot() {
     // the listener is alive; a painted-but-black canvas is the exact failure
     // the gate must never commit on. Expose the same signals the first-paint
     // post already computes: painted frames, basemap tile-idle, terrain live.
+    // Lane T: coverage/spread ride alongside (same synchronous frame the
+    // twin sampled right after render — null until the first sample lands,
+    // so the map side withholds instead of guessing). Shape stays a
+    // superset: frames/mapIdle/sceneLive keep their names and meaning.
     content: () => {
       let mapIdle = false;
       try {
@@ -1842,7 +1846,16 @@ async function boot() {
       try {
         sceneLive = typeof terrainState === 'function' ? terrainState() === 'vex' : false;
       } catch { sceneLive = false; }
-      return { frames: twinFrames, mapIdle, sceneLive };
+      let coverage = null;
+      let spread = null;
+      try {
+        const s = typeof twin.sampleContent === 'function' ? twin.sampleContent() : null;
+        const cov = Number(s?.coverage);
+        const spr = Number(s?.spread);
+        coverage = Number.isFinite(cov) ? cov : null;
+        spread = Number.isFinite(spr) ? spr : null;
+      } catch { coverage = null; spread = null; }
+      return { frames: twinFrames, mapIdle, sceneLive, coverage, spread };
     },
     handoff,
     requestTwinClose,
@@ -1882,10 +1895,13 @@ async function boot() {
       }
     },
     // Task-36 intro-scrub probe: forward progress + staged driver state.
+    // Lane T: held reports the autoplay-hold decision (same law the frame
+    // advance reads), so the probe lane can assert parked-vs-clock.
     fwd: () => ({
       phase: handoff.phase,
       progress: handoff.fwd?.progress ?? null,
       staged: !!handoff.fwd?.staged,
+      held: fwdAutoplayHeld({ staged: !!handoff.fwd?.staged, stagedS: handoff.fwdStagedS ?? null }),
       stagedS: handoff.fwdStagedS ?? null,
       capExpired: !!handoff.capExpired,
       legs: handoff.fwd ? handoff.fwd.legs.map((l) => l.name) : null,

@@ -25,6 +25,16 @@ import {
   fwdProgressForStagedS,
   forwardRingPForProgress,
   isTwinStagedMessage,
+  twinContentFromRgba,
+  twinContentPass,
+  fwdStagedOwnsIntro,
+  fwdAutoplayHeld,
+  TWIN_CONTENT_SAMPLE_N,
+  TWIN_RGBA_STRIDE,
+  TWIN_BYTE_MAX,
+  TWIN_CONTENT_DARK_FLOOR,
+  TWIN_CONTENT_MIN_COVERAGE,
+  TWIN_CONTENT_MIN_SPREAD,
   TWIN_STAGED_MSG,
   TWIN_FWD_REVEAL_START_PX,
   TWIN_FWD_STAGED_MAX_PX,
@@ -235,4 +245,96 @@ test('twin wiring: scrub-owned forward, shelved cap, staged consumer, idle-gated
   assert.ok(main.includes('isFlightIdle'), 'flight-idle feed passed to the twin');
   const overlays = srcOf('../src/ring2/overlays.js');
   assert.ok(overlays.includes('flightIdle: flightIdle()'), 'redrape consults flight-idle');
+});
+
+// Lane T, Part A: the pixel fold. A transparent/blank twin (all zeros —
+// exactly what an unpainted RGBA buffer reads) withholds: coverage 0,
+// spread 0, ok false. A sparse bright cluster on black (the amber-arc
+// case) passes. A flat wash — mid grey everywhere, coverage 1 — still
+// fails on spread. Malformed input returns null, never a guess.
+test('twin content fold: blank withholds, sparse arc passes, flat wash fails', () => {
+  assert.equal(TWIN_CONTENT_SAMPLE_N, 64);
+  assert.equal(TWIN_RGBA_STRIDE, 4);
+  assert.equal(TWIN_BYTE_MAX, 255);
+  const px2 = TWIN_CONTENT_SAMPLE_N * 2; // center cross: row + column
+  const blank = new Uint8Array(px2 * TWIN_RGBA_STRIDE);
+  const b = twinContentFromRgba(blank);
+  assert.deepEqual(b, { coverage: 0, spread: 0, ok: false });
+  // Sparse arc: mostly black, one bright amber-ish run.
+  const arc = new Uint8Array(px2 * TWIN_RGBA_STRIDE);
+  for (let i = 0; i < 8 * TWIN_RGBA_STRIDE; i += TWIN_RGBA_STRIDE) {
+    arc[i] = TWIN_BYTE_MAX;
+    arc[i + 1] = 180;
+    arc[i + 2] = 80;
+    arc[i + 3] = TWIN_BYTE_MAX;
+  }
+  const a = twinContentFromRgba(arc);
+  assert.ok(a.coverage >= TWIN_CONTENT_MIN_COVERAGE, `arc coverage ${a.coverage}`);
+  assert.ok(a.spread >= TWIN_CONTENT_MIN_SPREAD, `arc spread ${a.spread}`);
+  assert.equal(a.ok, true);
+  // Flat wash: every pixel mid grey — lit, but zero variation.
+  const flat = new Uint8Array(px2 * TWIN_RGBA_STRIDE).fill(128);
+  const f = twinContentFromRgba(flat);
+  assert.equal(f.coverage, 1);
+  assert.ok(f.spread < TWIN_CONTENT_MIN_SPREAD, `flat spread ${f.spread} below the floor`);
+  assert.equal(f.ok, false);
+  // Dark floor: near-black noise stays dark.
+  assert.ok(TWIN_CONTENT_DARK_FLOOR > 8 / TWIN_BYTE_MAX, 'floor sits above near-black noise');
+  // Malformed input withholds.
+  assert.equal(twinContentFromRgba(null), null);
+  assert.equal(twinContentFromRgba(undefined), null);
+  assert.equal(twinContentFromRgba(new Uint8Array(0)), null);
+  assert.equal(twinContentFromRgba(new Uint8Array(7)), null);
+  assert.equal(twinContentFromRgba([0, 0, NaN, 255]), null);
+});
+
+test('twin content gate: frames/idle/live/pixels all required, non-finite withholds', () => {
+  const good = { frames: 3, mapIdle: true, sceneLive: true, coverage: 0.5, spread: 0.2 };
+  assert.equal(twinContentPass(good), true);
+  assert.equal(twinContentPass({ ...good, frames: 2 }), false, 'below prewarm floor withholds');
+  assert.equal(twinContentPass({ ...good, mapIdle: false }), false);
+  assert.equal(twinContentPass({ ...good, sceneLive: false }), false);
+  assert.equal(twinContentPass({ ...good, coverage: 0 }), false, 'blank withholds');
+  assert.equal(twinContentPass({ ...good, spread: 0 }), false, 'flat wash withholds');
+  assert.equal(twinContentPass({ ...good, coverage: null }), false, 'unsampled withholds');
+  assert.equal(twinContentPass({ ...good, coverage: NaN }), false, 'non-finite withholds');
+  assert.equal(twinContentPass({ ...good, spread: NaN }), false, 'non-finite withholds');
+  assert.equal(twinContentPass({ ...good, frames: NaN }), false, 'non-finite withholds');
+  assert.equal(twinContentPass(), false);
+  assert.equal(twinContentPass({}), false);
+});
+
+// Lane T, Part B: ownership of the intro scalar. Any finite staged seed
+// (even 0 — the map posts S=0 on first drive) or a deep handed frame
+// parks the scalar on the fingers; the shallow click path with no seed
+// keeps the autoplay clock.
+test('autoplay hold: staged owns the scalar, absent driver releases the clock', () => {
+  assert.equal(fwdStagedOwnsIntro({ stagedS: 0, deepFrame: false }), true, 'S=0 seed owns');
+  assert.equal(fwdStagedOwnsIntro({ stagedS: 750, deepFrame: false }), true);
+  assert.equal(fwdStagedOwnsIntro({ stagedS: null, deepFrame: true }), true, 'deep frame parks without a seed');
+  assert.equal(fwdStagedOwnsIntro({ stagedS: null, deepFrame: false }), false, 'shallow click autoplays');
+  assert.equal(fwdStagedOwnsIntro({ stagedS: NaN, deepFrame: false }), false, 'non-finite seed is no driver');
+  assert.equal(fwdStagedOwnsIntro(), false);
+  assert.equal(fwdAutoplayHeld({ staged: true, stagedS: null }), true, 'flagged flight holds');
+  assert.equal(fwdAutoplayHeld({ staged: false, stagedS: 375 }), true, 'seed alone holds the clock');
+  assert.equal(fwdAutoplayHeld({ staged: false, stagedS: 0 }), true, 'S=0 seed holds');
+  assert.equal(fwdAutoplayHeld({ staged: false, stagedS: null }), false, 'no driver releases the clock');
+  assert.equal(fwdAutoplayHeld({ staged: false, stagedS: NaN }), false);
+  assert.equal(fwdAutoplayHeld(), false);
+});
+
+test('twin wiring: pixel sample after render + autoplay hold (Lane T)', () => {
+  const main = srcOf('../src/ring2/main.js');
+  assert.ok(main.includes('fwdStagedOwnsIntro({ stagedS:'), 'release reads the single ownership law');
+  assert.ok(main.includes('fwdAutoplayHeld({ staged:'), 'advance holds the clock while staged owns it');
+  assert.ok(main.includes('coverage, spread }'), 'content() exposes the pixel fold');
+  assert.ok(main.includes('twin.sampleContent()'), 'content() reads the twin sampler');
+  assert.ok(main.includes('isTwinStagedMessage(e?.data)'), 'staged listener still receives the map-side channel');
+  assert.ok(main.includes('setStagedS: (s) => applyTwinStagedS(s)'), 'staged probe setter intact');
+  const overlays = srcOf('../src/ring2/overlays.js');
+  assert.ok(overlays.includes('gl.readPixels'), 'pixels read from the live GL buffer');
+  assert.ok(overlays.includes('sampleFreshContent()'), 'sampled synchronously after render');
+  assert.ok(overlays.includes('twinContentFromRgba(joined)'), 'sample folded through the pure law');
+  assert.ok(overlays.includes('sampleContent,'), 'sampler exposed on the twin object');
+  assert.ok(!overlays.includes('preserveDrawingBuffer'), 'no backbuffer retention — sync read is the only honest path');
 });

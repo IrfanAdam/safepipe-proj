@@ -32,7 +32,7 @@ import { SANGACHAL, VEX, RING_RADIUS_M, EXTENT_M } from './site.js';
 import { MAP_MAX_PITCH_DEG, MAP_TRUE_FOV_DEG, TWIN_MIN_RANGE_M, TWIN_MAX_RANGE_M, tiltFadeForPitch } from './sync.js';
 import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
 import { DRAPE_LIFTS, RIM_FADE_IN, RIM_TILT_GAIN } from './drape.js';
-import { ringRevealForProgress } from './sector.js';
+import { ringRevealForProgress, TWIN_CONTENT_SAMPLE_N, TWIN_CONTENT_MID_DIV, TWIN_RGBA_STRIDE, TWIN_PIXEL_FIRST, TWIN_PIXEL_STEP, twinContentFromRgba } from './sector.js';
 import { TIER } from './facilities/dims.js';
 
 /* REF GATE 2: every overlay renderable carries userData.tier. All overlay
@@ -1260,6 +1260,44 @@ function edgeFade(x, z) {
 
   function renderTwin() {
     renderer.render(scene, camera);
+    sampleFreshContent();
+  }
+
+  /* Per-frame content sample (Lane T, Part A): the renderer keeps no
+   * backbuffer after present, so the only honest pixel read is gl.readPixels
+   * synchronously right after renderer.render in the same frame — before
+   * compositing clears the buffer. Samples a center cross (one N-px row +
+   * one N-px column) and folds it through the pure twinContentFromRgba
+   * law; any GL failure keeps the last reading (withhold, never guess).
+   * Two tiny rect reads — no full-frame download. Never throws. */
+  let lastContent = { coverage: null, spread: null };
+  function sampleFreshContent() {
+    try {
+      const gl = renderer.getContext();
+      if (!gl) return;
+      const bw = gl.drawingBufferWidth;
+      const bh = gl.drawingBufferHeight;
+      if (!Number.isFinite(bw) || !Number.isFinite(bh)) return;
+      if (bw <= TWIN_PIXEL_FIRST || bh <= TWIN_PIXEL_FIRST) return;
+      const n = Math.min(TWIN_CONTENT_SAMPLE_N, bw, bh);
+      if (!Number.isFinite(n) || n <= TWIN_PIXEL_FIRST) return;
+      const cxMid = Math.floor(bw / TWIN_CONTENT_MID_DIV);
+      const cyMid = Math.floor(bh / TWIN_CONTENT_MID_DIV);
+      const x0 = Math.max(TWIN_PIXEL_FIRST, Math.floor((bw - n) / TWIN_CONTENT_MID_DIV));
+      const y0 = Math.max(TWIN_PIXEL_FIRST, Math.floor((bh - n) / TWIN_CONTENT_MID_DIV));
+      const row = new Uint8Array(n * TWIN_RGBA_STRIDE);
+      const col = new Uint8Array(n * TWIN_RGBA_STRIDE);
+      gl.readPixels(x0, cyMid, n, TWIN_PIXEL_STEP, gl.RGBA, gl.UNSIGNED_BYTE, row);
+      gl.readPixels(cxMid, y0, TWIN_PIXEL_STEP, n, gl.RGBA, gl.UNSIGNED_BYTE, col);
+      const joined = new Uint8Array(row.length + col.length);
+      joined.set(row, TWIN_PIXEL_FIRST);
+      joined.set(col, row.length);
+      const stat = twinContentFromRgba(joined);
+      if (stat) lastContent = { coverage: stat.coverage, spread: stat.spread };
+    } catch { /* torn-down GL never poisons the signal — last reading stands */ }
+  }
+  function sampleContent() {
+    return { coverage: lastContent.coverage, spread: lastContent.spread };
   }
 
   function update() {
@@ -1293,6 +1331,7 @@ function edgeFade(x, z) {
   return {
     renderer, scene, camera, controls, canvas,
     rebuild, setEmphasis, setTiltFade, setTakeover, addEmphasisMats, update, updateControls, renderTwin,
+    sampleContent,
     setToneGrade, setRingReveal,
     getPose, dispose, onResize,
     getInfo: () => ({ ...(lastInfo ?? {}), takeoverU: lastU, status: getStatus(), pills: getPillState() }),

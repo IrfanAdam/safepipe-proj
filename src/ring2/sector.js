@@ -769,3 +769,142 @@ export function resolveSector(key) {
   const hit = sector.assets.find((a) => (HEALTH_RANK[a.health] ?? 0) === rank);
   return { sector, h3, worstAsset: hit ? hit.id : (sector.assets[0]?.id ?? null), worst: w };
 }
+
+/* TWIN CONTENT SIGNAL + AUTOPLAY HOLD (Lane T) — pure, node-checkable.
+ * Part A: the map-side commit gate must never land on a blank twin. The
+ * renderer keeps no backbuffer after present, so the only honest pixel
+ * read is gl.readPixels synchronously right after renderTwin in the same
+ * frame (overlays.js sampleFreshContent); the fold from raw RGBA bytes to
+ * { coverage, spread, ok } lives here so node tests pin the law.
+ * Coverage = fraction of sampled pixels brighter than DARK_FLOOR (lit
+ * imagery present); spread = luma stddev (rejects the flat near-black
+ * wash that coverage alone would pass). Null on any malformed input —
+ * withhold, never guess. Part B helpers below decide who owns the intro
+ * scalar (finger-driven staged S vs the autoplay clock). */
+
+/** Pixels sampled per readPixels strip (center row + center column cross). */
+export const TWIN_CONTENT_SAMPLE_N = 64;
+/** Divisor for centering a strip inside the drawing buffer. */
+export const TWIN_CONTENT_MID_DIV = 2;
+/** Bytes per pixel in readPixels RGBA/UNSIGNED_BYTE output. */
+export const TWIN_RGBA_STRIDE = 4;
+/** Channel offsets inside one RGBA pixel. */
+export const TWIN_RGBA_OFF_R = 0;
+export const TWIN_RGBA_OFF_G = 1;
+export const TWIN_RGBA_OFF_B = 2;
+/** Byte channel ceiling — luma scale is 1 / this. */
+export const TWIN_BYTE_MAX = 255;
+/** First pixel index / pixel index step for the sample fold. */
+export const TWIN_PIXEL_FIRST = 0;
+export const TWIN_PIXEL_STEP = 1;
+/** Unit increment for the lit/total tallies. */
+export const TWIN_COUNT_ONE = 1;
+/** Variance floor (numeric guard — variance is never negative). */
+export const TWIN_VARIANCE_FLOOR = 0;
+/** Rec.709 luma weights (single source for the content fold). */
+export const TWIN_LUMA_R = 0.2126;
+export const TWIN_LUMA_G = 0.7152;
+export const TWIN_LUMA_B = 0.0722;
+/** Luma at/below this counts dark (~10/255 — above near-black noise). */
+export const TWIN_CONTENT_DARK_FLOOR = 0.04;
+/** Minimum lit fraction for a frame to count as content. */
+export const TWIN_CONTENT_MIN_COVERAGE = 0.02;
+/** Minimum luma stddev — a uniform wash (lit or not) never commits. */
+export const TWIN_CONTENT_MIN_SPREAD = 0.02;
+
+/** Pure: RGBA bytes (array-like, length a multiple of the RGBA stride)
+ * -> { coverage, spread, ok }. Null on empty/misaligned/non-finite
+ * input — withhold, never guess. Never throws. */
+export function twinContentFromRgba(rgba) {
+  try {
+    if (!rgba || typeof rgba.length !== 'number') return null;
+    const n = rgba.length;
+    if (!Number.isFinite(n) || n <= TWIN_PIXEL_FIRST) return null;
+    if (n % TWIN_RGBA_STRIDE !== TWIN_PIXEL_FIRST) return null;
+    const px = n / TWIN_RGBA_STRIDE;
+    if (!Number.isFinite(px) || px <= TWIN_PIXEL_FIRST) return null;
+    let lit = TWIN_PIXEL_FIRST;
+    let count = TWIN_PIXEL_FIRST;
+    let sum = TWIN_PIXEL_FIRST;
+    let sumSq = TWIN_PIXEL_FIRST;
+    for (let p = TWIN_PIXEL_FIRST; p < px; p = p + TWIN_PIXEL_STEP) {
+      const base = p * TWIN_RGBA_STRIDE;
+      const r = Number(rgba[base + TWIN_RGBA_OFF_R]);
+      const g = Number(rgba[base + TWIN_RGBA_OFF_G]);
+      const b = Number(rgba[base + TWIN_RGBA_OFF_B]);
+      if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) return null;
+      const luma = (TWIN_LUMA_R * r + TWIN_LUMA_G * g + TWIN_LUMA_B * b) / TWIN_BYTE_MAX;
+      if (!Number.isFinite(luma)) return null;
+      count = count + TWIN_COUNT_ONE;
+      sum = sum + luma;
+      sumSq = sumSq + luma * luma;
+      if (luma > TWIN_CONTENT_DARK_FLOOR) lit = lit + TWIN_COUNT_ONE;
+    }
+    if (count <= TWIN_PIXEL_FIRST) return null;
+    const coverage = lit / count;
+    const mean = sum / count;
+    const variance = Math.max(TWIN_VARIANCE_FLOOR, sumSq / count - mean * mean);
+    const spread = Math.sqrt(variance);
+    if (!Number.isFinite(coverage) || !Number.isFinite(spread)) return null;
+    const ok = coverage >= TWIN_CONTENT_MIN_COVERAGE && spread >= TWIN_CONTENT_MIN_SPREAD;
+    return { coverage, spread, ok };
+  } catch {
+    return null;
+  }
+}
+
+/** Pure: full commit-gate predicate over the twin-reported signals plus
+ * the pixel fold. minFrames defaults to the twin-side prewarm floor —
+ * the map-side gate applies its own floor to the same raw fields, this
+ * only pins the shape (frames + mapIdle + sceneLive + coverage/spread).
+ * False on any non-finite/missing input — withhold, never guess. */
+export function twinContentPass({
+  frames = 0,
+  mapIdle = false,
+  sceneLive = false,
+  coverage = null,
+  spread = null,
+  minFrames = HANDOFF_PREWARM_MIN_FRAMES,
+} = {}) {
+  try {
+    const f = Number(frames);
+    const floor = Number(minFrames);
+    if (!Number.isFinite(f) || !Number.isFinite(floor) || f < floor) return false;
+    if (mapIdle !== true || sceneLive !== true) return false;
+    const cov = Number(coverage);
+    const spr = Number(spread);
+    if (!Number.isFinite(cov) || !Number.isFinite(spr)) return false;
+    return cov >= TWIN_CONTENT_MIN_COVERAGE && spr >= TWIN_CONTENT_MIN_SPREAD;
+  } catch {
+    return false;
+  }
+}
+
+/** Pure: does finger-driven staged S own the intro scalar at release?
+ * True on any finite staged seed (clamped >= 0 upstream) or a deep handed
+ * frame (scroll-path release parks for the fingers even when the seed
+ * lost the iframe-boot race). False otherwise — the shallow click path
+ * keeps its autoplay intro. Never throws. */
+export function fwdStagedOwnsIntro({ stagedS = null, deepFrame = false } = {}) {
+  try {
+    if (deepFrame === true) return true;
+    if (stagedS === null || stagedS === undefined) return false;
+    return Number.isFinite(Number(stagedS));
+  } catch {
+    return false;
+  }
+}
+
+/** Pure: hold the autoplay clock this frame? True while staged S owns the
+ * intro (flagged staged flight OR any finite seed — the seed alone parks
+ * the scalar even before the flag flips), false when no staged driver
+ * exists so the clock releases cleanly. Never throws. */
+export function fwdAutoplayHeld({ staged = false, stagedS = null } = {}) {
+  try {
+    if (staged === true) return true;
+    if (stagedS === null || stagedS === undefined) return false;
+    return Number.isFinite(Number(stagedS));
+  } catch {
+    return false;
+  }
+}
