@@ -152,8 +152,8 @@ test('the enclosure is black-only — no amber rim or wash', () => {
   const vig = /#map-vignette\s*\{[^}]*\}/.exec(html);
   assert.ok(vig, 'the vignette rule exists');
   assert.ok(
-    /radial-gradient\(circle var\(--vr\)/.test(vig[0]),
-    'the surround is a radial gradient on --vr',
+    /radial-gradient\(ellipse var\(--vr\) var\(--vr-y, var\(--vr\)\)/.test(vig[0]),
+    'the surround is an elliptical radial gradient on --vr / --vr-y',
   );
   // The gradient's stops carry black (rgba(0,0,0,..) / var(--ops-bg)) only.
   const stops = /#map-vignette\s*\{[^}]*\}/.exec(html)[0];

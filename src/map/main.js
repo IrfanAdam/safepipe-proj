@@ -34,7 +34,7 @@ import {
   accumStagedS,
   stagedHoldPitchForS,
   stagedHoldRingCloseForS,
-  enclosureRadiusPxForZoom,
+  enclosureEllipsePxForZoom,
   MAP_VIGNETTE_RING_M,
   isHomeZoom,
   flipWheelDelta,
@@ -922,17 +922,18 @@ function onNativeZoomStep(snap, source) {
     // far away it rests at the canvas edges (k=0) so zoom reads the same.
     const clipK = prox && prox.near ? blend : 0;
     updateRingClip(clipK, prox);
-    // Journey enclosure: the vignette circle starts at the hotspot's farthest
+    // Journey enclosure: the vignette ellipse starts at the hotspot's farthest
     // screen corner (clear frame, darkness biasing in from the edges) and
     // closes onto the PROJECTED ring radius across the shared enclosure
-    // span Z_CENTER..Z_HANDOFF (enclosureRadiusPxForZoom: corner*(1-t) +
-    // R/mpp*t — the SAME law as the bracket clip-k, so circle and brackets
-    // stay in sync — exact R at/above Z_HANDOFF: the same ground circle the
-    // twin clip cuts), so the enclosing coincides with the twin clip exactly
-    // at handoff and never shrinks past it. The
-    // corner brackets ride the SAME --vx/--vy/--vr (their glyph centres sit
-    // on the ring bounding-square corners), so one write moves both — the
-    // old canvas-percentage corner law is gone. Gate: blend>0 (z>7) — below
+    // span Z_CENTER..Z_HANDOFF (enclosureEllipsePxForZoom: rx is the forming
+    // law circle corner*(1-t) + R/mpp*t — the SAME law as the bracket
+    // clip-k, so ellipse and brackets stay in sync — ry is rx squashed by
+    // the tilt projection cos(pitch), exact R at/above Z_HANDOFF: the same
+    // ground circle the twin clip cuts), so the enclosing coincides with
+    // the twin clip exactly at handoff and never shrinks past it. The
+    // corner brackets ride the SAME --vx/--vy/--vr/--vr-y (lefts on the
+    // horizontal axis, tops on the vertical axis), so one write moves
+    // both — the old canvas-percentage corner law is gone. Gate: blend>0 (z>7) — below
     // that the ring is sub-pixel and the surround would black the frame.
     // Zoom-out retraces it symmetrically (pure function of z + viewport).
     // Twin paths own it while open.
@@ -953,14 +954,17 @@ function onNativeZoomStep(snap, source) {
             const fy = Math.max(prox.sy, h - prox.sy);
             corner = Math.sqrt(fx * fx + fy * fy);
           } catch { corner = null; }
-          const vr = enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, corner);
-          if (Number.isFinite(vr)) {
-            app.style.setProperty('--vr', vr.toFixed(1) + 'px');
+          const ellipse = enclosureEllipsePxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, corner);
+          if (ellipse && Number.isFinite(ellipse.rx) && Number.isFinite(ellipse.ry)) {
+            app.style.setProperty('--vr', ellipse.rx.toFixed(1) + 'px');
+            app.style.setProperty('--vr-y', ellipse.ry.toFixed(1) + 'px');
             try {
-              window.__mapProbe.vignetteR = +vr.toFixed(1);
+              window.__mapProbe.vignetteR = +ellipse.rx.toFixed(1);
+              window.__mapProbe.vignetteRy = +ellipse.ry.toFixed(1);
             } catch { /* probe cosmetic */ }
           } else {
             app.style.removeProperty('--vr'); // park at the registered initial; brackets hide with .on anyway
+            app.style.removeProperty('--vr-y');
           }
         }
       } catch { /* cosmetic */ }
@@ -1673,7 +1677,7 @@ function driveStagedHold(st) {
       }
     }
   } catch { /* hold tilt is best-effort */ }
-  // (b) ring travel: the enclosure circle closes onto the ring across the
+  // (b) ring travel: the enclosure ellipse closes onto the ring across the
   // ring band — the staged ring law made visible while depth is clamped.
   try {
     const app = document.getElementById('app');
@@ -1696,14 +1700,17 @@ function driveStagedHold(st) {
       try {
         zNow = +mapRef.getZoom();
       } catch { zNow = null; }
-      const base = enclosureRadiusPxForZoom(
+      const base = enclosureEllipsePxForZoom(
         Number.isFinite(zNow) ? zNow : Z_HANDOFF, SITE.lat, MAP_VIGNETTE_RING_M, corner,
       );
-      if (Number.isFinite(base) && base > 0) {
-        const vr = base * (1 - ringClose);
-        app.style.setProperty('--vr', vr.toFixed(1) + 'px');
+      if (base && Number.isFinite(base.rx) && Number.isFinite(base.ry) && base.rx > 0) {
+        const rx = base.rx * (1 - ringClose);
+        const ry = base.ry * (1 - ringClose);
+        app.style.setProperty('--vr', rx.toFixed(1) + 'px');
+        app.style.setProperty('--vr-y', ry.toFixed(1) + 'px');
         try {
-          window.__mapProbe.vignetteR = +vr.toFixed(1);
+          window.__mapProbe.vignetteR = +rx.toFixed(1);
+          window.__mapProbe.vignetteRy = +ry.toFixed(1);
         } catch { /* probe cosmetic */ }
       }
     }

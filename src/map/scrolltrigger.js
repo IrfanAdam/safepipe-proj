@@ -94,6 +94,27 @@ export function pitchTargetForZoom(z) {
   if (!Number.isFinite(n)) return 0;
   return ISO_PITCH_DEG * smooth01((n - Z_ISO_START) / (Z_TOP - Z_ISO_START));
 }
+/** Degrees-to-radians factor for the tilt->squash projection (named, never bare). */
+export const DEG2RAD = Math.PI / 180;
+/** Mask squash for the pitched ground circle: the CSS enclosure mask is a
+ * fixed circle but the pitched ground circle projects to an ellipse,
+ * vertical x cos(pitch). 1 at/below Z_ISO_START (flat grade), cos(45deg)
+ * at/above Z_TOP (the iso pole holds through the handoff). Pure +
+ * node-checkable; zoom-out retraces it. */
+export function maskSquashForZoom(z) {
+  return Math.cos(pitchTargetForZoom(z) * DEG2RAD);
+}
+/** Enclosure ellipse: rx is the forming-law circle radius unchanged, ry is
+ * rx squashed by the tilt projection. Null wherever the circle parks
+ * (below the band / no viewport corner). Pure in (z, corner), symmetric on
+ * zoom-out. */
+export function enclosureEllipsePxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M, cornerPx = null) {
+  const rx = enclosureRadiusPxForZoom(zoom, latDeg, ringM, cornerPx);
+  if (!Number.isFinite(rx)) return null;
+  const squash = maskSquashForZoom(zoom);
+  if (!Number.isFinite(squash)) return null;
+  return { rx, ry: rx * squash, squash };
+}
 /** Top-down checkpoint reached (bearing/pitch -> 0). */
 export function isTopDown(z) {
   return Number.isFinite(+z) && +z >= Z_TOP;

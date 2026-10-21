@@ -266,19 +266,22 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
   );
 });
 
-test('map vignette: radius from projected R, brackets ride the same law', () => {
+test('map vignette: ellipse from projected R, brackets ride the same law', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(main.includes("app.style.setProperty('--vr'"), 'journey writes the vignette radius');
-  assert.ok(main.includes('enclosureRadiusPxForZoom(z, SITE.lat'), 'display radius rides the forming law');
+  assert.ok(main.includes("app.style.setProperty('--vr-y'"), 'journey writes the squashed vertical radius');
+  assert.ok(main.includes('enclosureEllipsePxForZoom(z, SITE.lat'), 'display ellipse rides the forming law');
   assert.ok(main.includes('showVignette(prox.near && blend > 0)'), 'enclosure gated past z=8: sub-pixel ring never blacks the frame');
   assert.ok(!main.includes('showVignette(prox.near);'), 'ungated proximity enclosure is gone');
   const html = srcOf('../ops3d-map.html');
   assert.ok(html.includes('@property --vr'), 'radius is registered animatable so the close-in glides');
-  assert.ok(html.includes('circle var(--vr)'), 'enclosure circle rides the projected radius');
-  assert.equal((html.match(/260px/g) || []).length, 1, '260px lives in exactly one place (the @property initial-value)');
+  assert.ok(html.includes('@property --vr-y'), 'vertical radius is registered too');
+  assert.ok(html.includes('ellipse var(--vr) var(--vr-y, var(--vr))'), 'enclosure ellipse rides the projected radii');
+  assert.equal((html.match(/260px/g) || []).length, 2, '260px lives in exactly two places (the @property initial-values)');
   assert.ok(html.includes('at var(--vx, 50%) var(--vy, 50%)'), 'enclosure stays hotspot-centered');
   assert.ok(html.includes('--rc-axis: calc(var(--vr) * 0.7071067811865476)'), 'bracket axis derives from the ring radius (1/sqrt(2), centre on the ring)');
-  assert.equal((html.match(/var\(--rc-axis\)/g) || []).length, 8, 'all four corners anchor to --rc-axis (left+top each)');
+  assert.equal((html.match(/var\(--rc-axis\)(?!-y)/g) || []).length, 4, 'lefts ride --rc-axis (four)');
+  assert.equal((html.match(/var\(--rc-axis-y\)/g) || []).length, 4, 'tops ride --rc-axis-y (four)');
   assert.ok(!html.includes('- var(--vr) - var(--rc-half)'), 'no corner rides the bounding square anymore');
 });
 

@@ -15,12 +15,13 @@
      * MapLibre receive the two-finger pinch natively. */
     touch-action: none; }
   /* GATE-12-A: map-side ring clip — corner brackets mark the hotspot ring.
-   * The four marks sit ON the ring bounding-square corners: each glyph
-   * centre is anchored at centre±radius ((--vx,--vy) ± --vr) minus half the
-   * glyph size, so all four centres are equidistant from the hotspot by
-   * construction — the SAME --vx/--vy/--vr the vignette circle rides (one
-   * law writes both; see the journey driver). Each bracket CENTRE sits ON
-   * the ring: the axis offset --rc-axis = --vr / sqrt(2) (1/sqrt(2) is the
+   * The four marks sit ON the ring bounding-ellipse corners: each glyph
+   * centre is anchored at centre±axis (--vx,--vy) ± (--rc-axis,--rc-axis-y)
+   * minus half the glyph size, so all four centres are equidistant from the
+   * hotspot by construction — the SAME --vx/--vy/--vr/--vr-y the vignette
+   * ellipse rides (one law writes both; see the journey driver). Each
+   * bracket CENTRE sits ON the ring: the axis offsets --rc-axis = --vr /
+   * sqrt(2) and --rc-axis-y = --vr-y / sqrt(2) (1/sqrt(2) is the
    * mathematical constant that puts a point at (a,a) exactly on a circle
    * of radius r), so the ink straddles the edge. --clip drives APPEARANCE
    * only (.on fades the layer in); it no longer positions anything, so the
@@ -36,22 +37,23 @@
     opacity: 0; transition: opacity 0.3s ease; --clip: 0;
     --rc-mark: 26px; --rc-line: 2px;
     --rc-half: calc((var(--rc-mark) + var(--rc-line) * 2) / 2);
-    --rc-axis: calc(var(--vr) * 0.7071067811865476); }
+    --rc-axis: calc(var(--vr) * 0.7071067811865476);
+    --rc-axis-y: calc(var(--vr-y, var(--vr)) * 0.7071067811865476); }
   #ring-clip.on { opacity: 1; }
   #ring-clip i { position: absolute; width: var(--rc-mark); height: var(--rc-mark);
     border: var(--rc-line) solid var(--ops-amber); opacity: 0.9;
     box-sizing: content-box; }
   #ring-clip .rc-tl { left: calc(var(--vx, 50%) - var(--rc-axis) - var(--rc-half));
-    top: calc(var(--vy, 50%) - var(--rc-axis) - var(--rc-half));
+    top: calc(var(--vy, 50%) - var(--rc-axis-y) - var(--rc-half));
     border-right-color: transparent; border-bottom-color: transparent; }
   #ring-clip .rc-tr { left: calc(var(--vx, 50%) + var(--rc-axis) - var(--rc-half));
-    top: calc(var(--vy, 50%) - var(--rc-axis) - var(--rc-half));
+    top: calc(var(--vy, 50%) - var(--rc-axis-y) - var(--rc-half));
     border-left-color: transparent; border-bottom-color: transparent; }
   #ring-clip .rc-bl { left: calc(var(--vx, 50%) - var(--rc-axis) - var(--rc-half));
-    top: calc(var(--vy, 50%) + var(--rc-axis) - var(--rc-half));
+    top: calc(var(--vy, 50%) + var(--rc-axis-y) - var(--rc-half));
     border-right-color: transparent; border-top-color: transparent; }
   #ring-clip .rc-br { left: calc(var(--vx, 50%) + var(--rc-axis) - var(--rc-half));
-    top: calc(var(--vy, 50%) + var(--rc-axis) - var(--rc-half));
+    top: calc(var(--vy, 50%) + var(--rc-axis-y) - var(--rc-half));
     border-left-color: transparent; border-top-color: transparent; }
   @media (prefers-reduced-motion: reduce) {
     #ring-clip { transition: none; }
@@ -161,24 +163,25 @@
   #twin-overlay:fullscreen { background: var(--ops-bg); }
   #twin-overlay:fullscreen .twin-overlay__bar { display: flex; }
   #twin-overlay::backdrop { background: var(--ops-bg); }
-  /* T2 handoff: hotspot-centered circular enclosure staging the twin open.
-   * Radius rides --vr (projected RING_RADIUS_M at the live zoom, set by the
-   * journey driver; initial-value fallback) so the enclosing coincides with the
-   * twin clip circle at handoff. Token-only where
+  /* T2 handoff: hotspot-centered elliptical enclosure staging the twin open.
+   * Radii ride --vr (horizontal) and --vr-y (vertical, squashed by the tilt
+   * projection; falls back to --vr pre-write) so the enclosing coincides
+   * with the pitched twin clip at handoff. Token-only where
    * possible (outer wash falls back to --ops-bg); pointer-transparent
    * so blip hit-testing is unchanged. Sits above pins, below twin.
-   * --vr is a registered property (typed <length>) so per-step radius writes
-   * always resolve to a length — never fall back mid-gesture. NOTE:
-   * do NOT put --vr in `transition`: a transition on the property freezes
+   * --vr / --vr-y are registered properties (typed <length>) so per-step
+   * radius writes always resolve to a length — never fall back mid-gesture. NOTE:
+   * do NOT put --vr / --vr-y in `transition`: a transition on the property freezes
    * the gradient at its start value instead of gliding (verified headless).
    * The close-in reads as animation because the gesture streams steps.
-   * Colorless edge: transparent core runs to --vr, a hard stop pair cuts
-   * to black AT --vr (crisp boundary, no color stroke), then darkness
+   * Colorless edge: transparent core runs to --vr / --vr-y, a hard stop pair cuts
+   * to black AT the ellipse edge (crisp boundary, no color stroke), then darkness
    * feathers outward to the solid surround. */
   @property --vr { syntax: '<length>'; inherits: true; initial-value: 260px; }
+  @property --vr-y { syntax: '<length>'; inherits: true; initial-value: 260px; }
   #map-vignette {
     position: absolute; inset: 0; z-index: 3; pointer-events: none;
-    background: radial-gradient(circle var(--vr) at var(--vx, 50%) var(--vy, 50%),
+    background: radial-gradient(ellipse var(--vr) var(--vr-y, var(--vr)) at var(--vx, 50%) var(--vy, 50%),
       transparent 0,
       transparent var(--vr),
       rgba(0, 0, 0, var(--ops-vignette-alpha)) var(--vr),
