@@ -34,6 +34,7 @@ import {
   accumStagedS,
   stagedHoldPitchForS,
   stagedHoldRingCloseForS,
+  seamHoldEllipseForS,
   enclosureEllipsePxForZoom,
   MAP_VIGNETTE_RING_M,
   isHomeZoom,
@@ -514,6 +515,35 @@ function setFrameUrl(frame, url) {
   } catch { /* introspection attr is best-effort */ }
 }
 
+/* Twin-open snap guard (map side): the camera hook keeps owning pitch until
+ * the twin overlay is actually opaque. Releasing at dissolve start
+ * (twinOpen set, overlay still translucent) lets the native ease re-apply
+ * the gesture-start pitch 0 on every frame — a minus-45 snap behind the
+ * fading overlay. Computed opacity is the single source: it covers the
+ * staged scrubbed leg (inline opacity) and the timed crossfade leg (the
+ * stylesheet value easing 0->1). Never throws; unreadable state keeps
+ * ownership (the safe direction — the hook's law already holds the pole). */
+const TWIN_OVERLAY_OPAQUE = 1; // computed overlay opacity at which the twin owns the frame and the hook releases
+const TWIN_OVERLAY_OPAQUE_EPS = 0.01; // float slack on the opaque comparison
+function twinOverlayOpaque() {
+  try {
+    const root = overlayEls && overlayEls.root;
+    if (!root || root.hidden) return false;
+    let o = NaN;
+    try {
+      const cs = typeof window.getComputedStyle === 'function' ? window.getComputedStyle(root) : null;
+      o = cs ? parseFloat(cs.opacity) : NaN;
+    } catch { o = NaN; }
+    if (!Number.isFinite(o)) {
+      try { o = parseFloat(root.style.opacity); } catch { o = NaN; }
+    }
+    if (!Number.isFinite(o)) return false;
+    return o >= TWIN_OVERLAY_OPAQUE - TWIN_OVERLAY_OPAQUE_EPS;
+  } catch {
+    return false;
+  }
+}
+
 function mapUrlWithSector(h3) {
   try {
     const u = new URL(location.href);
@@ -641,6 +671,7 @@ const ISO_SCRUB_RELEASE = 0.3; // zoom below Z_TOP-this releases ownership
 const ISO_SETTLE_TOL_DEG = 0.5; // settle landings treat bearing/pitch inside this of target as arrived — never fights damping
 const SETTLE_EASE_MS = 250; // every settle-landing glide (center-ease, reconcile, catch-up) shares this tempo
 const STAGED_EXIT_BELOW = 0.05; // zoomend settle this far below Z_TOP unwinds the staged hold (at-gate holds)
+const STAGED_COMMIT_Z_TOL = 0.05; // commit-time scale nearness: live zoom must read at the handoff gate (the clamp holds it there — drift means the ceiling lost and S no longer matches the staged frame)
 let isoPumpOn = false; // per-frame tilt pump flight flag (single rAF loop while the band owns pitch)
 /** Per-frame tilt pump: while the iso band owns pitch, drive it toward the
  * LIVE law target every animation frame — not per zoom tick. Mid-glide the
@@ -1677,35 +1708,20 @@ function driveStagedHold(st) {
       }
     }
   } catch { /* hold tilt is best-effort */ }
-  // (b) ring travel: the enclosure ellipse closes onto the ring across the
-  // ring band — the staged ring law made visible while depth is clamped.
+  // (b) ring travel: the V7 seam hold parks the enclosure ellipse EXACTLY on
+  // the handoff radius (seamHoldEllipseForS — rx SEAM_HOLD_RX_PX, ry squashed
+  // by the iso-pole projection) instead of re-deriving it from the frozen
+  // live zoom, so the seam is identical at/above Z_HANDOFF and repaints on
+  // every staged tick under finger control. The staged ring law still rides
+  // through the (1 - ringClose) multiplier (zero today — the seam already
+  // lands on the twin clip, no extra shrink).
   try {
     const app = document.getElementById('app');
-    const prox = proximityInfo();
-    if (app && prox && mapRef) {
-      let w = 0;
-      let h = 0;
-      try {
-        const el = mapRef.getContainer();
-        w = (el && el.clientWidth) || window.innerWidth || 800;
-        h = (el && el.clientHeight) || window.innerHeight || 600;
-      } catch { w = 800; h = 600; }
-      let corner = null;
-      try {
-        const fx = Math.max(prox.sx, w - prox.sx);
-        const fy = Math.max(prox.sy, h - prox.sy);
-        corner = Math.sqrt(fx * fx + fy * fy);
-      } catch { corner = null; }
-      let zNow = null;
-      try {
-        zNow = +mapRef.getZoom();
-      } catch { zNow = null; }
-      const base = enclosureEllipsePxForZoom(
-        Number.isFinite(zNow) ? zNow : Z_HANDOFF, SITE.lat, MAP_VIGNETTE_RING_M, corner,
-      );
-      if (base && Number.isFinite(base.rx) && Number.isFinite(base.ry) && base.rx > 0) {
-        const rx = base.rx * (1 - ringClose);
-        const ry = base.ry * (1 - ringClose);
+    if (app && mapRef) {
+      const seam = seamHoldEllipseForS(stagedS);
+      if (seam && Number.isFinite(seam.rx) && Number.isFinite(seam.ry) && seam.rx > 0) {
+        const rx = seam.rx * (1 - ringClose);
+        const ry = seam.ry * (1 - ringClose);
         app.style.setProperty('--vr', rx.toFixed(1) + 'px');
         app.style.setProperty('--vr-y', ry.toFixed(1) + 'px');
         try {
@@ -1787,27 +1803,56 @@ function driveStagedOverlay() {
     } catch { /* cosmetic */ }
     return;
   }
-  // GATE-3 REVISION: never commit on a BLANK twin. A painted-but-black
-  // overlay is the exact failure (off-centre runs: the twin canvas held
-  // 97.4% #0b0c0c, luma 94.7 -> 15.7, and never recovered) — `ready`
-  // only proves the twin LISTENER is alive, not that it drew anything.
-  // The commit requires REAL CONTENT. Proximity no longer gates the commit:
-  // the owner's scroll must reach the twin, and the deep arrival already
-  // clamps the camera; holding the map because the cursor is not near is
-  // what left the journey stuck at terrain iso.
+  // Commit gate (gaps direction: near-and-non-blank): the fingers dissolved
+  // the twin to full, but the commit lands only when the map side is still
+  // NEAR the staged frame and the twin holds REAL CONTENT. `ready` only
+  // proves the twin LISTENER is alive, not that it drew anything — a
+  // painted-but-black overlay is the exact failure (off-centre runs: the
+  // twin canvas held 97.4% #0b0c0c, luma 94.7 -> 15.7, and never
+  // recovered). Nearness is two-sided: proximity-near (the spot reads near
+  // cursor or canvas center — an off-frame commit lands the mixed-rectangle
+  // cut) and scale-near (live zoom still at the handoff gate — the clamp
+  // holds it there; drift means the ceiling lost and S no longer matches
+  // the staged frame). A failed gate HOLDS the map at opacity 0 and retries
+  // on the next tick/timer — never commits blind, never strands.
   if (st.reveal >= 1) {
     const hasContent = twinFrameHasContent();
+    let proxNear = false;
+    try {
+      const proxGate = proximityInfo();
+      proxNear = !!(proxGate && proxGate.near);
+    } catch { proxNear = false; }
+    let scaleNear = false;
+    try {
+      const zGate = mapRef ? +mapRef.getZoom() : NaN;
+      scaleNear = Number.isFinite(zGate) && Math.abs(zGate - Z_HANDOFF) <= STAGED_COMMIT_Z_TOL;
+    } catch { scaleNear = false; }
     if (!hasContent) {
       try {
         if (root.style.opacity !== '0') root.style.opacity = '0';
       } catch { /* cosmetic */ }
       try {
         window.__mapProbe.staged.blankTwin = true;
+        window.__mapProbe.staged.notNear = !proxNear;
+        window.__mapProbe.staged.scaleFar = !scaleNear;
       } catch { /* probe cosmetic */ }
       return; // no commit — hold the map, retry when the twin reports content
     }
+    if (!proxNear || !scaleNear) {
+      try {
+        if (root.style.opacity !== '0') root.style.opacity = '0';
+      } catch { /* cosmetic */ }
+      try {
+        window.__mapProbe.staged.blankTwin = false;
+        window.__mapProbe.staged.notNear = !proxNear;
+        window.__mapProbe.staged.scaleFar = !scaleNear;
+      } catch { /* probe cosmetic */ }
+      return; // no commit — hold the map, retry when the frame is near again
+    }
     try {
       window.__mapProbe.staged.blankTwin = false;
+      window.__mapProbe.staged.notNear = false;
+      window.__mapProbe.staged.scaleFar = false;
     } catch { /* probe cosmetic */ }
     finalizeStagedReveal(root);
     return;
@@ -2960,7 +3005,16 @@ async function boot() {
     // not a yank.
     transformCameraUpdate: (next) => {
       try {
-        if (twinOpen || transitId || pendingReveal || reverseWait) return next;
+        // Twin-open snap guard: keep hook ownership while the overlay is
+        // still translucent (dissolve start) — releasing then lets the
+        // native ease re-apply gesture-start pitch 0 under the fade (a
+        // minus-45 snap). The hook releases once the overlay reads opaque;
+        // the twin owns the pose from there.
+        let dissolving = false;
+        try {
+          dissolving = !!((twinOpen || pendingReveal) && !twinOverlayOpaque());
+        } catch { dissolving = false; }
+        if (!dissolving && (twinOpen || transitId || pendingReveal || reverseWait)) return next;
         const z = +next.zoom;
         if (!Number.isFinite(z)) return next;
         const pLaw = pitchTargetForZoom(z);

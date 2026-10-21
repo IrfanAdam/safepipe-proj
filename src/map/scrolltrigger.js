@@ -198,6 +198,22 @@ export function stagedHoldRingCloseForS(s) {
   return STAGED_HOLD_RING_CLOSE * handoffStagesForScroll(s).ring;
 }
 
+/* V7 seam hold (map side): while z clamps at Z_HANDOFF and the twin boots,
+ * the hold leg parks the enclosure ellipse EXACTLY on the handoff radius —
+ * rx SEAM_HOLD_RX_PX with ry squashed by the iso-pole tilt projection
+ * (rx * cos(ISO_PITCH_DEG)) — instead of re-deriving it from the frozen
+ * live zoom. Pure fn of S: identical at/above Z_HANDOFF (no zoom input, so
+ * no zoom dependence past the gate) and repainted on every staged tick, so
+ * the seam stays under finger control while depth is clamped. Constant
+ * across S by design (a hold, not travel — scroll-up retraces it
+ * trivially); non-finite S still parks the seam, never blanks the chrome. */
+export const SEAM_HOLD_RX_PX = 242.2; // ring ground radius projected at Z_HANDOFF over the site parallel, CSS px
+export function seamHoldEllipseForS(s) {
+  void s; // the value is the seam itself — S owns the repaint cadence, not the radius
+  const rx = SEAM_HOLD_RX_PX;
+  return { rx, ry: rx * Math.cos(ISO_PITCH_DEG * DEG2RAD) };
+}
+
 /* Journey-enclosure radius (Task 37, map side): the ground ring the twin
  * clip cuts at — RING_RADIUS_M, imported from src/ring2/site.js (single
  * source of truth; the node suite pins them equal). No literal here, so

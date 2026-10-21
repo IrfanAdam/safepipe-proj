@@ -72,8 +72,10 @@ test('FIX 2: the deep handoff clamps regardless of `near`', () => {
     'a deep arrival always clamps',
   );
   assert.ok(MAIN.includes('mapRef.setMaxZoom(Z_HANDOFF)'), 'the clamp is the handoff zoom');
-  // The commit gate requires REAL CONTENT. Proximity must not gate it: the
-  // owner's scroll has to reach the twin even with the cursor off the spot.
+  // The commit gate requires NEAR + SCALE-NEAR + REAL CONTENT (V7 seam law:
+  // an off-frame or drifted commit lands the mixed-rectangle cut, and a
+  // painted-but-black overlay is the off-centre failure). Hold-at-0 + retry
+  // while any leg fails; the S stages stay visible through driveStagedHold.
   assert.ok(MAIN.includes('twinFrameHasContent'), 'the commit gate checks the twin for content');
   assert.ok(
     /const hasContent = twinFrameHasContent\(\);/.test(MAIN),
@@ -84,8 +86,12 @@ test('FIX 2: the deep handoff clamps regardless of `near`', () => {
     'the commit requires non-blank twin content',
   );
   assert.ok(
-    !/if \(!nearNow \|\| !hasContent\)/.test(MAIN),
-    'proximity no longer blocks the commit',
+    /if \(!proxNear \|\| !scaleNear\)/.test(MAIN),
+    'the commit holds while off-frame or drifted (V7 seam law)',
+  );
+  assert.ok(
+    MAIN.includes('STAGED_COMMIT_Z_TOL'),
+    'scale-near is a named tolerance, not a literal',
   );
   // The twin reports the content signals the gate reads.
   assert.ok(RING2.includes('content: () => {'), 'the twin exposes its content state');

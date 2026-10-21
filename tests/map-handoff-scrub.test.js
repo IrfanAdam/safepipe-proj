@@ -28,8 +28,12 @@ import {
   STAGED_HOLD_RING_CLOSE,
   stagedHoldPitchForS,
   stagedHoldRingCloseForS,
+  SEAM_HOLD_RX_PX,
+  seamHoldEllipseForS,
+  vignetteRadiusPxForZoom,
 } from '../src/map/scrolltrigger.js';
 import { HANDOFF_ISO_POLAR_DEG } from '../src/ring2/sector.js';
+import { SITE } from '../src/map/feed.js';
 
 const srcOf = (rel) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), rel), 'utf8');
 
@@ -174,4 +178,63 @@ test('driver: live hold drives visible travel on every staged tick, pre-grant', 
   assert.ok(main.includes('stagedHoldRingCloseForS(stagedS)'), 'hold ring rides the S law');
   assert.ok(main.includes('holdOwned'), 'tilt pump carries the hold instead of parking on the prewarm');
   assert.ok(main.includes('pumpIsoPitch(); // live-hold carry'), 'staged entry restarts the tilt pump under the clamp');
+  assert.ok(main.includes('seamHoldEllipseForS(stagedS)'), 'hold ring parks the V7 seam ellipse, finger-driven');
+});
+
+test('V7 seam hold: the ellipse parks on the handoff radius, identical at/above the gate', () => {
+  // rx is the ring ground radius projected at Z_HANDOFF over the site
+  // parallel — the same value the forming law converges to (to 0.1px).
+  assert.equal(SEAM_HOLD_RX_PX, 242.2, 'seam rx pins the handoff radius');
+  assert.equal(
+    +vignetteRadiusPxForZoom(Z_HANDOFF, SITE.lat).toFixed(1),
+    SEAM_HOLD_RX_PX,
+    'seam rx matches the projected ring at the handoff',
+  );
+  const seam = seamHoldEllipseForS(0);
+  assert.equal(seam.rx, SEAM_HOLD_RX_PX, 'rx is the seam constant');
+  assert.ok(
+    Math.abs(seam.ry - SEAM_HOLD_RX_PX * Math.cos(ISO_PITCH_DEG * (Math.PI / 180))) < 1e-9,
+    `ry is rx times cos45 (got ${seam.ry})`,
+  );
+  assert.equal(+seam.rx.toFixed(1), 242.2, 'written --vr reads 242.2px');
+  assert.equal(+seam.ry.toFixed(1), 171.3, 'written --vr-y reads 171.3px');
+  // Pure fn of S with no zoom input: identical from Z_HANDOFF up, constant
+  // across the whole staged band (a hold, not travel), parks on non-finite.
+  for (const s of [0, 125, 250, 500, 750, 1000, HANDOFF_STAGED_S_MAX, HANDOFF_STAGED_S_MAX + 9999, NaN]) {
+    assert.deepEqual(seamHoldEllipseForS(s), seam, `S=${s} holds the same seam ellipse`);
+  }
+});
+
+test('driver: twin-open keeps hook ownership until the overlay is opaque', () => {
+  const main = srcOf('../src/map/main.js');
+  assert.ok(main.includes('function twinOverlayOpaque()'), 'opacity guard exists');
+  assert.ok(main.includes('TWIN_OVERLAY_OPAQUE'), 'opaque threshold is a named constant');
+  assert.ok(main.includes('twinOverlayOpaque()'), 'the hook consults the guard');
+  assert.ok(
+    main.includes('if (!dissolving && (twinOpen || transitId || pendingReveal || reverseWait)) return next;'),
+    'the hook releases only past opaque — dissolving keeps ownership',
+  );
+  assert.ok(main.includes('TWIN_READY_MSG'), 'twin-ready wire still owned by twinlink');
+  assert.ok(main.includes('parseTwinPaintedMessage'), 'twin-painted wire still owned by twinlink');
+});
+
+test('driver: commit requires near-and-non-blank (scale-seeded S, gated landing)', () => {
+  const main = srcOf('../src/map/main.js');
+  // Preserved shapes: the S producer throttle and the content sampling.
+  assert.ok(main.includes('win.postMessage(buildTwinStagedMessage(s)'), 'staged-S throttle shape untouched');
+  assert.ok(main.includes('const hasContent = twinFrameHasContent();'), 'content sampled once');
+  assert.ok(main.includes('if (!hasContent)'), 'blank twin still holds the commit');
+  assert.ok(
+    main.includes('if (!c || typeof c !== \'object\') return false;'),
+    'content-gate shape untouched (unreadable twin never commits)',
+  );
+  assert.ok(main.includes('c.frames >= TWIN_MIN_CONTENT_FRAMES'), 'frame-floor threshold untouched');
+  // The near gates: proximity-near (spot reads near) and scale-near (live
+  // zoom still at the handoff gate — S was seeded from that scale).
+  assert.ok(main.includes('STAGED_COMMIT_Z_TOL'), 'scale nearness is a named tolerance');
+  assert.ok(main.includes('proxNear'), 'proximity nearness sampled at the commit');
+  assert.ok(main.includes('scaleNear'), 'scale nearness sampled at the commit');
+  assert.ok(main.includes('if (!proxNear || !scaleNear)'), 'off-frame holds the commit, retries next tick');
+  assert.ok(main.includes('staged.notNear'), 'off-frame probe reports which gate held');
+  assert.ok(main.includes('staged.scaleFar'), 'off-scale probe reports which gate held');
 });
