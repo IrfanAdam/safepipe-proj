@@ -192,15 +192,14 @@ test('the staged dissolve is scrubbed, not chased by a CSS transition', () => {
     /classList\.remove\('scrubbing'\)/.test(MAIN),
     'the commit and the timed reveal restore the transition',
   );
-  // The commit must release the inline opacity only AFTER the transition is
-  // live, and only when the law has reached 1 (so the hand-off is 1 -> 1).
+  // The commit releases the inline opacity unconditionally AFTER the transition
+  // is live: this is a content-verified commit, so the twin holds real pixels
+  // and a stale inline "0" (the blank guard's hold value) must never survive —
+  // preserving it left committed-but-invisible twins. The live transition
+  // eases from the rendered value to the stylesheet's 1: a fade, never a snap.
   assert.ok(
-    /const committed = Number\.isFinite\(at\) \? at : 1;/.test(MAIN),
-    'the commit carries the law value across',
-  );
-  assert.ok(
-    /root\.style\.opacity = committed >= 1 \? '' : String\(committed\);/.test(MAIN),
-    'the inline value is released only at 1 — never a snap',
+    /root\.style\.opacity = ''/.test(MAIN),
+    'the commit releases the inline opacity — a stale 0 can never survive',
   );
   // The reverse leg is TIMED, not scrubbed: it keeps its own transition.
   assert.ok(

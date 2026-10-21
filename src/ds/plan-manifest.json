@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-21T10:04:44.553Z",
+  "generated": "2026-10-21T10:18:35.463Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "deae0a5",
+      "full": "deae0a59633d29957b193c63a354cda46cada71f",
+      "date": "2026-10-21",
+      "time": "15:36",
+      "subject": "fix(journey): slew cap inside transform hook, stamp repair forward [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "064d4b3",
       "full": "064d4b3bef8ed7ffb5e36d65a32492c8e96179a7",
@@ -5962,6 +5971,7 @@
     }
   ],
   "wip": [
+    "public/version.json",
     "src/map/main.js"
   ]
 }

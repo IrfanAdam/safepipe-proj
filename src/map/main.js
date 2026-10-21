@@ -1952,15 +1952,18 @@ function finalizeStagedReveal(root) {
   // transition, and the inline release then eases from 1 to 1 (no change).
   try {
     if (root) {
-      const at = parseFloat(root.style.opacity);
-      const committed = Number.isFinite(at) ? at : 1;
+      // Content-verified commit: the twin holds real pixels, so a stale
+      // inline opacity (the blank guard's "0") must never survive — it left
+      // committed-but-invisible twins. The scrub suspended the transition and
+      // revealTwin just restored it, so releasing the inline value eases from
+      // the rendered value to the stylesheet's 1: a fade, never a snap.
       root.classList.remove('scrubbing');
-      // The dissolve ends at 1: the inline value is released only after the
-      // transition is live, so the hand-off is 1 -> 1 and reads as nothing.
-      root.style.opacity = committed >= 1 ? '' : String(committed);
+      root.style.opacity = '';
     }
   } catch { /* cosmetic */ }
-  restoreMaxZoom();
+  // The ceiling stays clamped while the twin owns the frame — restoring here
+  // handed post-gate wheel ticks a runaway (measured 11.651, one 14.0).
+  // doCloseTwin releases it on close; exitStaged on unwind.
   try {
     window.__mapProbe.staged = { active: false, s: +stagedS.toFixed(1), committed: true };
   } catch { /* probe cosmetic */ }
@@ -2167,6 +2170,17 @@ function armRevealFallback() {
           pendingReveal.tries = tries;
           if (tries <= REVEAL_PAINT_TRIES) {
             armRevealFallback();
+            return;
+          }
+          // Unwind guard: never exit while deep with a staged hold alive —
+          // unclamping at z>=band handed runaways to Z_MAX (measured 14.0).
+          // Below the band the exit is the normal unwind; deep, the hold
+          // stays (opacity 0, clamp on) and a zoom-out unwinds it through the
+          // native-zoomend path — a stranded twin that still unwinds cleanly.
+          let zExit = NaN;
+          try { zExit = mapRef ? +mapRef.getZoom() : NaN; } catch { zExit = NaN; }
+          if (Number.isFinite(zExit) && zExit >= Z_TOP - STAGED_EXIT_BELOW) {
+            try { window.__mapProbe.staged.deepHold = true; } catch { /* probe cosmetic */ }
             return;
           }
           try {
@@ -2380,6 +2394,10 @@ function doCloseTwin() {
   } catch { /* chrome class is cosmetic */ }
   twinOpen = false;
   window.__mapProbe.twinOpen = false;
+  // The commit keeps the ceiling clamped while the twin owns the frame; the
+  // close releases it so the next journey can climb again (and a post-close
+  // recede only ever zooms out, which the clamp never blocks).
+  try { restoreMaxZoom(); } catch { /* unclamp is best-effort */ }
 }
 
 /** Task 19: X/Esc/twin-Esc close. Direct teardown + replaceState — never
