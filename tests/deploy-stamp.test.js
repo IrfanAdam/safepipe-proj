@@ -44,8 +44,14 @@ test('deploy stamp: every committed new-format stamp differs from its parent dep
   // pass: any repeat OUTSIDE this pair still fails. The pair (c82bf08,
   // 433bc3b) published d9bd50c:756 twice when a mid-pair rebuild did not
   // refresh version.json; the repair commit publishes 433bc3b:758.
+  // Second incident (064d4b3): two content commits (8ea82f0, 064d4b3) stacked
+  // on one build, so both publish 6653eee27f6ae8f1d22c8ea38eee6c77f725d3b6:760.
+  // Rule from here: build before every commit so each commit's version.json
+  // is fresh — never stack a second content commit on one build's stamp.
   const KNOWN_REPEAT = new Set([
     '433bc3b0164d4603a1d9ade3642e0555f4576489',
+    '8ea82f0568840990bb9848eca7dde1f7082a4107',
+    '064d4b3bef8ed7ffb5e36d65a32492c8e96179a7',
   ]);
   let checked = 0;
   for (let i = 0; i < stamps.length - 1; i++) {

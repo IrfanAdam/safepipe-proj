@@ -3027,7 +3027,14 @@ async function boot() {
         // that (45 > 0 + slack). If the journey never took it, the guard
         // applies and a user-set oblique is never yanked.
         if (!isoScrubOwned && pCur > pLaw + ISO_SCRUB_SLACK_DEG) return next;
-        return { ...next, pitch: pLaw };
+        // Slew cap inside the hook: the per-write path above can land several
+        // wheel deltas in one painted frame (23.4 deg observed at 60 ms), so the
+        // raw law write would bypass ISO_SCRUB_SLEW_DEG. Cap the step here and
+        // the jump glides over following hook calls instead of snapping.
+        const pStep = pLaw - pCur;
+        const pCapped =
+          Math.abs(pStep) > ISO_SCRUB_SLEW_DEG ? pCur + Math.sign(pStep) * ISO_SCRUB_SLEW_DEG : pLaw;
+        return { ...next, pitch: pCapped };
       } catch {
         return next;
       }
