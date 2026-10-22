@@ -1889,6 +1889,45 @@ function driveStagedHold(st) {
   try {
     const app = document.getElementById('app');
     if (app && mapRef) {
+      // Round-7 sync audit: while the hold is parked pre-grant (S capped at
+      // the reveal gate, rev 0), the blend's entry endpoint MUST track the
+      // live zoom — the ceiling clamps at 11.5 but zoom still travels under
+      // it (measured 10.94->11.48 over 3 ticks with the ring frozen at 286:
+      // static circle, zooming terrain = the owner's report). Refreshing the
+      // entry from the live law keeps blend==driver==zoom; at grant the entry
+      // freezes and the S-sweep continues from exactly what the ring shows.
+      try {
+        const grantedHold = !!(window.__mapProbe && (window.__mapProbe.twinReady || window.__mapProbe.twinPainted));
+        if (!grantedHold) {
+          let zLive = NaN;
+          try { zLive = +mapRef.getZoom(); } catch { zLive = NaN; }
+          const proxLive = proximityInfo();
+          if (Number.isFinite(zLive) && proxLive) {
+            if (proxLive.near) {
+              const e = writeEnclosureEllipse(proxLive, zLive);
+              if (e && Number.isFinite(e.rx) && e.rx > 0) { entryRx = +e.rx.toFixed(1); entryRy = +e.ry.toFixed(1); }
+            } else {
+              // Off-centre: the true spot inflates the corner law 100x, so
+              // evaluate it with the spot clamped to the viewport — bounded,
+              // smooth, and tracking zoom (converges exact as t->1). Center
+              // stays parked at last-near (untouched here, as before).
+              let cw = 0, chh = 0;
+              try {
+                const el = mapRef.getContainer();
+                cw = (el && el.clientWidth) || window.innerWidth || 800;
+                chh = (el && el.clientHeight) || window.innerHeight || 600;
+              } catch { cw = 800; chh = 600; }
+              const csx = Math.min(Math.max(proxLive.sx, 0), cw);
+              const csy = Math.min(Math.max(proxLive.sy, 0), chh);
+              const fx = Math.max(csx, cw - csx);
+              const fy = Math.max(csy, chh - csy);
+              const corner = Math.sqrt(fx * fx + fy * fy);
+              const ec = enclosureEllipsePxForZoom(zLive, SITE.lat, MAP_VIGNETTE_RING_M, corner);
+              if (ec && Number.isFinite(ec.rx) && ec.rx > 0) { entryRx = +ec.rx.toFixed(1); entryRy = +ec.ry.toFixed(1); }
+            }
+          }
+        }
+      } catch { /* entry refresh is best-effort; stale entry still blends */ }
       const seam = seamHoldEllipseForS(stagedS);
       if (seam && Number.isFinite(seam.rx) && Number.isFinite(seam.ry) && seam.rx > 0) {
         const rev = clamp01(st && Number.isFinite(st.reveal) ? st.reveal : 0);

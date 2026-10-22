@@ -192,6 +192,26 @@ test('round-6 way-in continuity: S waits at the reveal gate until the twin grant
   );
 });
 
+test('round-7 sync audit: parked pre-grant entry tracks the live zoom', () => {
+  // Measured: zoom 10.94->11.48 over 3 ticks with the ring frozen at the
+  // arrival entry (286px) — static circle, zooming terrain. The ceiling
+  // clamps at 11.5 but zoom still travels under it while S is parked, so
+  // the blend's rev-0 endpoint must be the live law, not the stale entry.
+  const main = srcOf('../src/map/main.js');
+  assert.ok(
+    main.includes('if (!grantedHold) {'),
+    'the hold refreshes its entry while the twin is still booting',
+  );
+  assert.ok(
+    main.includes('entryRx = +e.rx.toFixed(1); entryRy = +e.ry.toFixed(1);'),
+    'the near entry refreshes from the live enclosure law (blend==driver)',
+  );
+  assert.ok(
+    main.includes('with the spot clamped to the viewport'),
+    'the off-centre entry refreshes from a viewport-clamped law (no 100x blowup), center untouched',
+  );
+});
+
 test('driver: live hold drives visible travel on every staged tick, pre-grant', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(main.includes('driveStagedHold(st)'), 'staged driver paints hold travel before the grant check');
