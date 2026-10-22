@@ -3852,6 +3852,39 @@
      "state": "0/3"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-22",
+   "time": "14:39",
+   "hash": "bb56da2a",
+   "sections": [
+    {
+     "head": "Phase 00 — Control panels reach parity with v1 ✓ done",
+     "hash": "8ceae064",
+     "state": "2/2"
+    },
+    {
+     "head": "Phase 01 — The ground becomes the real Sangachal coast ✓ done",
+     "hash": "f93d185e",
+     "state": "7/7"
+    },
+    {
+     "head": "Phase 02 — Raise the terminal (ordered reconstruction, evidence loops)",
+     "hash": "3222adb3",
+     "state": "6/6"
+    },
+    {
+     "head": "Phase 03 — Hotspot launcher map",
+     "hash": "8a5a127a",
+     "state": "8/8"
+    },
+    {
+     "head": "Phase 06 — Lock",
+     "hash": "06e99a53",
+     "state": "0/3"
+    }
+   ]
   }
  ],
  "2026-10-12_175646-ops3d-geo-triangulation.md": [
@@ -6564,6 +6597,34 @@
      "head": "Phase 4 — Polish: ship-gate, stamps, titles, heads, ticks, lone-task, reconcilia",
      "hash": "d5f9b544",
      "state": "7/7"
+    }
+   ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-22",
+   "time": "14:38",
+   "hash": "c9391a5b",
+   "sections": [
+    {
+     "head": "Phase 1 — Renderer: block structure, honest done, owned gates {#phase-1}",
+     "hash": "f5ef5410",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Grammar rollout: normalize gates + labels across plans {#phase-2}",
+     "hash": "c821d1cb",
+     "state": "2/2"
+    },
+    {
+     "head": "Phase 3 — Task headers, accordions, compact metadata {#phase-3}",
+     "hash": "fb5c2d8a",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Polish: ship-gate, stamps, titles, heads, ticks, lone-task, reconcilia",
+     "hash": "b084feb2",
+     "state": "8/8"
     }
    ]
   }

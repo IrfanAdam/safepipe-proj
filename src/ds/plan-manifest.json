@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-22T08:26:04.623Z",
+  "generated": "2026-10-22T09:09:12.789Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,42 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "97ed16b",
+      "full": "97ed16b539f378e231bd0616d8bd2c673ee05d9a",
+      "date": "2026-10-22",
+      "time": "14:21",
+      "subject": "chore(plan): stamp Task 16 sha [plan:2026-10-19_150735-changelog-readability.md#phase-12]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-12"
+    },
+    {
+      "sha": "63867b3",
+      "full": "63867b34838be6f64ee3be1ffe1d2ede6c2c9eac",
+      "date": "2026-10-22",
+      "time": "14:21",
+      "subject": "fix(changelog): mobile filter drawer tabs Tags/Status, hidden on open [plan:2026-10-19_150735-changelog-readability.md#phase-12]",
+      "plan": "2026-10-19_150735-changelog-readability.md",
+      "anchor": "phase-12"
+    },
+    {
+      "sha": "2a64853",
+      "full": "2a648530dadcf6487b455522bffd48408406a1ef",
+      "date": "2026-10-22",
+      "time": "14:00",
+      "subject": "docs(plan): owner-feedback eval + fan-out record [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "512508c",
+      "full": "512508c0f9e44a84292ac53701a0089bac7909cd",
+      "date": "2026-10-22",
+      "time": "14:00",
+      "subject": "fix(journey): tilt keeps ownership to flat, feathered mask, live enclosure, faster reverse [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "e3eb388",
       "full": "e3eb3880ebbefccfc5cc978d636261825910c57f",
@@ -5990,7 +6026,6 @@
   ],
   "wip": [
     ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md",
-    "ops3d-map.html",
     "public/version.json",
     "src/map/main.js"
   ]
