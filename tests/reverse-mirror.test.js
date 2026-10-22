@@ -260,10 +260,48 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
     !main.includes('holdIsoPoseForTwin'),
     'no half-finished twin-open camera hold is left in the tree (the seam is OPEN, not fixed)',
   );
+  // mapRef.stop() is allowed in exactly one place: the idle-auto recede
+  // cancel, where the first gesture stops the programmatic leg and owns the
+  // rest. Any other stop() (e.g. a twin-open seam experiment) is banned.
+  const stops = (main.match(/mapRef\.stop\(\)/g) || []).length;
+  assert.equal(stops, 1, `mapRef.stop() appears exactly once (idle-auto cancel), found ${stops}`);
   assert.ok(
-    !main.includes('mapRef.stop('),
-    'no abandoned camera-stop experiment is left in the tree',
+    main.includes('autoReceding'),
+    'the single stop() is gated on the idle-auto recede leg',
   );
+  // Idle-auto recede: a close with no following gesture must still move —
+  // the auto leg eases home and any gesture cancels it.
+  assert.ok(
+    main.includes("window.__mapProbe.recede = 'auto'"),
+    'the programmatic recede leg probes as auto',
+  );
+  assert.ok(
+    main.includes('recedeIdleT = setTimeout'),
+    'the idle window arms the auto leg',
+  );
+  // Band takeover: one easeTo carries zoom + pitch + around per aimed
+  // in-band wheel tick, so in-flight tilt cannot be clobbered.
+  assert.ok(
+    main.includes('function installBandTakeover()'),
+    'the tilt band owns aimed wheel ticks through a single-writer ease',
+  );
+  assert.ok(
+    main.includes('pitch: pitchTargetForZoom(target)'),
+    'takeover ease carries the law pitch with the tick zoom',
+  );
+  // Shared flatten guarantor: every teardown that moves no camera flattens
+  // a journey-owned tilt onto the law.
+  assert.ok(
+    main.includes('function flattenJourneyTiltToLaw(reason)'),
+    'one shared guarantor owns teardown flattening',
+  );
+  assert.ok(
+    main.includes("flattenJourneyTiltToLaw('exit-staged')"),
+    'the staged unwind flattens a twin killed outside the close chain',
+  );
+  // Fork guard: a commit resolves an armed staged hold at both commit sites.
+  const forks = (main.match(/if \(stagedActive && !stagedCommitted\) \{\n    stagedActive = false;/g) || []).length;
+  assert.ok(forks >= 2, `both commit sites resolve an armed hold (found ${forks})`);
 });
 
 test('map vignette: ellipse from projected R, brackets ride the same law', () => {

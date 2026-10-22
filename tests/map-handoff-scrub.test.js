@@ -211,8 +211,8 @@ test('driver: twin-open keeps hook ownership until the overlay is opaque', () =>
   assert.ok(main.includes('TWIN_OVERLAY_OPAQUE'), 'opaque threshold is a named constant');
   assert.ok(main.includes('twinOverlayOpaque()'), 'the hook consults the guard');
   assert.ok(
-    main.includes('if (!dissolving && ((twinOpen && !hookRevThrough) || transitId || pendingReveal || (reverseWait && !hookRevThrough))) return next;'),
-    'the hook releases only past opaque — dissolving keeps ownership; reverse-wait past the dissolve lets the pitch law flatten underneath',
+    main.includes('if (!dissolving && (twinOpen && !hookRevThrough)) return next;'),
+    'the hook owns the pitch law everywhere except under an opaque twin; dissolving keeps ownership, flights/prewarm/recede keep the law',
   );
   assert.ok(main.includes('TWIN_READY_MSG'), 'twin-ready wire still owned by twinlink');
   assert.ok(main.includes('parseTwinPaintedMessage'), 'twin-painted wire still owned by twinlink');
@@ -250,7 +250,11 @@ test('reverse: re-arm and home arrival keep tilt ownership until the pitch flatt
     'the home arrival never parks a tilt at world zoom',
   );
   assert.ok(
-    main.includes('const busyPitch = !!(transitId || pendingReveal);'),
-    'the pitch-only scrub gate is exempt from the reverse-wait park',
+    main.includes('const busyFlight = !!transitId;'),
+    'pitch drivers park on flights only — prewarm/reverse/recede keep tracking the law',
+  );
+  assert.ok(
+    main.includes('mapRef.easeTo({ pitch: gLaw, duration: SETTLE_EASE_MS });'),
+    'teardown eases a journey-owned tilt onto the law (close-time flatten guarantor)',
   );
 });
