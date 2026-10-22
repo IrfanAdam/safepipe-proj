@@ -882,7 +882,7 @@ export function bindChangelogEvents(root, st, helpers) {
     const lead = new Date(y, mo - 1, 1).getDay();
     const days = new Date(y, mo, 0).getDate();
     const today = dueToday();
-    let cells = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+    let cells = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
       .map((d) => `<span class="ds-due-cal__dow" aria-hidden="true">${d}</span>`).join('');
     for (let i = 0; i < lead; i++) cells += '<span aria-hidden="true"></span>';
     for (let d = 1; d <= days; d++) {

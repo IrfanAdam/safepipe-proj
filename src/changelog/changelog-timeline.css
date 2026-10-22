@@ -85,7 +85,7 @@ aside.ds-timeline .ds-tl-tick.is-month{color:var(--color-ink);font-weight:700}
 .ds-tl-pop__sub{display:block;font-size:calc(var(--text-micro) - 2px);line-height:1.5;color:var(--color-ink-muted);white-space:pre-line}
 .ds-tl-fallback{padding:var(--cl-16);font-size:var(--sp-text-sm);color:var(--color-ink-muted)}
 @media (max-width:720px){
-  aside.ds-timeline{width:100vw}
+  aside.ds-timeline{width:100%;max-width:100%;box-sizing:border-box;overflow-x:clip}
   .ds-tl-head{flex-wrap:wrap}
   /* Phone close: ≥32px tap target (was 25×24). The head still fits one row —
      the title's flex slack absorbs the extra width, so no ellipsis and the

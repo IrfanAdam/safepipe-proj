@@ -13,9 +13,17 @@
 @media (prefers-reduced-motion:reduce){.ds-drawer,.ds-scrim{transition:none;animation:none}}
 @media (max-width:720px){
   .ds-scrim{inset:0;z-index:var(--z-ds-scrim)}
-  .ds-drawer{inset:0;left:0;right:0;top:0;bottom:0;width:100vw;max-width:100vw;height:100vh;height:100dvh;max-height:100dvh;flex-direction:column;z-index:var(--z-ds-drawer)}
-  /* keep drawer header/nav always on top of pane scroll */
-  .ds-drawer.is-open .ds-drawer-head{position:sticky;top:0;z-index:1;background:var(--color-bg)}
+  .ds-drawer{inset:0;width:100%;max-width:100%;height:100vh;height:100dvh;max-height:100dvh;flex-direction:column;z-index:var(--z-ds-drawer);box-sizing:border-box;overflow-x:clip}
+  /* keep drawer header/nav always on top of pane scroll — flush to top (no offset) */
+  .ds-task{padding:0}
+  .ds-rail{padding:0}
+  .ds-drawer.is-open .ds-drawer-head{position:sticky;top:0;z-index:2;background:var(--color-bg);margin:0;padding:var(--cl-8) var(--cl-16);border-bottom:var(--border-hairline);box-sizing:border-box;width:100%}
+  .ds-drawer.is-open .ds-rail-head{position:sticky;top:0;z-index:2;background:var(--color-bg);margin:0;padding:var(--cl-8) var(--cl-16);border-bottom:var(--border-hairline);box-sizing:border-box;width:100%}
+  /* rail head inner plan: no double padding/divider — match task header's simple row */
+  .ds-drawer.is-open .ds-rail-head .ds-rail-plan{padding:0;border:0;margin:0;white-space:normal;overflow:visible;text-overflow:clip;background:transparent}
+  /* content after sticky header keeps its rhythm — no peek under header */
+  .ds-task .ds-md{padding:var(--cl-12) var(--cl-16) var(--cl-30)}
+  .ds-rail .ds-pick:first-of-type{margin-top:var(--cl-8)}
 }
 /* drawer head + picks */
 .ds-drawer-head{display:flex;gap:var(--cl-8);align-items:center;padding-top:var(--cl-6);margin-bottom:var(--cl-4)}
@@ -99,6 +107,7 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-item-index{color:var(--color-accent);font-family:var(--font-mono);font-size:var(--text-micro);font-weight:800;margin-right:var(--cl-4);flex:none}
 .ds-caret{color:var(--color-ink);font-weight:900;font-size:12px;line-height:1;letter-spacing:-1px;margin-right:var(--cl-2);display:inline-block;transition:transform 0.15s ease;transform:rotate(90deg)}
 .ds-timeline-group:not([open]) .ds-caret{transform:rotate(0deg)}
+.ds-panel:not([open]) > .ds-panel-title .ds-caret{transform:rotate(0deg)}
 .ds-rev{border-top:var(--border-hairline);padding:var(--cl-4) 0}
 .ds-rev-date{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted)}
 .ds-rev-secs{list-style:none;margin:var(--cl-2) 0 0;padding:0}
@@ -121,6 +130,27 @@ body:not(.is-sched-auth) [data-requires-auth]{display:none}
 .ds-timeline-group > .ds-timeline-date::marker{content:""}
 .ds-timeline-date{color:var(--color-ink-muted)}
 .ds-timeline-items{margin:0}
+/* per-item accordions — each eval / commit is its own collapsible row */
+.ds-timeline-item-accordion{margin:0 0 var(--cl-4);padding:0;border:none}
+.ds-timeline-item-accordion__summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:var(--cl-4);padding:var(--cl-2) 0;font-size:var(--text-ds-body);color:var(--color-ink);overflow-wrap:anywhere;user-select:none}
+.ds-timeline-item-accordion__summary::-webkit-details-marker{display:none}
+.ds-timeline-item-accordion__summary::marker{content:""}
+.ds-timeline-item-accordion__summary .ds-caret{flex:none;margin-right:0;transform:rotate(0deg);transition:transform 0.15s ease}
+.ds-timeline-item-accordion[open] > .ds-timeline-item-accordion__summary .ds-caret{transform:rotate(90deg)}
+.ds-timeline-item-accordion__summary span{font-size:var(--text-ds-body);color:var(--color-ink);overflow-wrap:anywhere;min-width:0}
+.ds-timeline-item-accordion__summary a{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink);text-decoration:underline;text-underline-offset:var(--cl-1);font-weight:600;margin-right:var(--cl-4);flex:none;overflow-wrap:anywhere}
+.ds-timeline-item-accordion__body{padding:var(--cl-2) 0 var(--cl-1) calc(var(--cl-12) + var(--cl-4));font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);line-height:var(--leading-mono);overflow-wrap:anywhere}
+.ds-timeline-item-accordion__body small{display:block;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);line-height:var(--leading-mono)}
+/* keep eval dot / iter branch visuals on the accordion wrapper */
+.ds-timeline-item-accordion--eval{position:relative}
+.ds-timeline-item-accordion--eval::before{content:"";position:absolute;left:calc(-1 * var(--cl-12) - var(--cl-4));top:calc(var(--cl-8));width:var(--cl-7);height:var(--cl-7);background:var(--color-bg);border:var(--cl-1) solid var(--color-accent);border-radius:50%;box-sizing:border-box}
+.ds-timeline-item-accordion--iter{margin-left:var(--cl-12);padding-left:var(--cl-8);border-left:var(--border-hairline);position:relative}
+.ds-timeline-item-accordion--iter::before{content:"";position:absolute;left:calc(-1 * var(--cl-1) - var(--cl-3));top:calc(var(--cl-7));width:var(--cl-4);height:var(--cl-1);background:var(--color-border)}
+.ds-timeline-item-accordion--commit{position:relative}
+@media (max-width:720px){
+  .ds-timeline-item-accordion__summary{padding:var(--cl-4) 0}
+  .ds-timeline-item-accordion__body{padding-left:calc(var(--cl-12) + var(--cl-2))}
+}
 /* inline gate tag (Task 12): quiet mono micro verdict after DONE in the phase
    head — same treatment as DONE, token-only, no rail/seals/popovers. */
 .ds-drawer-head .ds-done{color:var(--color-accent)}
@@ -157,7 +187,7 @@ button.ds-due-status{background:none;border:0;padding:0;text-align:left;cursor:p
    spinner, landed steps show dots, upcoming steps sit dimmed. Saving stays
    silent (parked); failures park the card and hand to the inline Retry.
    Non-modal — pointer-events:none, auto-dismissed. Token-only. */
-.ds-due-progress{position:fixed;left:50%;bottom:var(--cl-22);transform:translateX(-50%);z-index:calc(var(--z-ds-controls) + 10);background:var(--color-surface);border:var(--border-hairline);border-radius:var(--sp-radius-md);box-shadow:var(--sp-elevation-2);padding:var(--cl-12) var(--cl-16);pointer-events:none;max-width:calc(100vw - var(--cl-32))}
+.ds-due-progress{position:fixed;left:50%;bottom:var(--cl-22);transform:translateX(-50%);z-index:calc(var(--z-ds-controls) + 10);background:var(--color-surface);border:var(--border-hairline);border-radius:var(--sp-radius-md);box-shadow:var(--sp-elevation-2);padding:var(--cl-12) var(--cl-16);pointer-events:none;width:auto;max-width:calc(100% - var(--cl-32));box-sizing:border-box;overflow-x:clip}
 .ds-due-progress[hidden]{display:none}
 .ds-due-progress{display:flex;flex-direction:row;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink)}
 .ds-due-progress__track{display:flex;flex-direction:row;align-items:center;gap:var(--cl-8)}
@@ -198,7 +228,9 @@ button.ds-due-status{background:none;border:0;padding:0;text-align:left;cursor:p
    only its hit box grows to a ≥32px tap target (was 27×24). */
 @media (max-width:720px){
   .ds-drawer-head button{min-width:var(--cl-32);min-height:var(--cl-32);display:inline-flex;align-items:center;justify-content:center;padding:0}
-  .ds-rail .ds-pick .ds-row b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;white-space:normal}
+  /* phases card: number on its own line so title goes next line — mobile only, desktop stays inline row */
+  .ds-rail .ds-pick .ds-row{flex-direction:column;align-items:flex-start;gap:var(--cl-2)}
+  .ds-rail .ds-pick .ds-row b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;white-space:normal;flex:none;width:100%;min-width:0;overflow:hidden;overflow-wrap:anywhere}
   /* due picker on a phone: every control was far under a comfortable tap size
      (measured 390px: trigger 159×14, nav 13×16, day cell 26×26, Clear 30×19).
      Day cells go to 36px — 7×36 + 6×gap(cl-2) + 2×cl-8 padding = 280px, inside

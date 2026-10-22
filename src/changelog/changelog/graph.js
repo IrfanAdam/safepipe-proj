@@ -34,7 +34,7 @@ export function graph({ plans, day }) {
     for (let i = 0; i < 7; i++) { const d = new Date(ws); d.setDate(d.getDate() + i); col.push(d); }
     weeks.push(col); ws.setDate(ws.getDate() + 7);
   }
-  const DOWS = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+  const DOWS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const spans = []; let lead = 0; let leadIn = 0;
   weeks.forEach((col) => {
     const f = col.find((d) => d.getDate() === 1);

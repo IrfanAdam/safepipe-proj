@@ -263,11 +263,11 @@ export function paintRevs(revs, scope){
     timeline.push(`<details class="ds-timeline-group" open><summary class="ds-timeline-date">${dayLabel}</summary><div class="ds-timeline-items">${groupInner}</div></details>`);
   }
   return [
-    `<hr class="ds-hr"><div class="ds-evals ds-revs ds-panel" data-evals="${n}" data-revs="${n}">`,
-    `<div class="ds-revs-title ds-panel-title">Evals · <span class="ds-panel-num">${n}</span></div>`,
+    `<hr class="ds-hr"><details class="ds-evals ds-revs ds-panel" data-evals="${n}" data-revs="${n}" open>`,
+    `<summary class="ds-revs-title ds-panel-title"><span class="ds-caret">‹›</span>Evals · <span class="ds-panel-num">${n}</span></summary>`,
     `<div class="ds-timeline">`,
     timeline.join(''),
-    `</div></div>`,
+    `</div></details>`,
   ].join('');
 }
 export const paintEvals = paintRevs;
