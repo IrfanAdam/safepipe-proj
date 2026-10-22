@@ -358,3 +358,63 @@ test('reverse: re-arm and home arrival keep tilt ownership until the pitch flatt
     'teardown snaps a journey-owned tilt onto the law (close-time flatten guarantor, instant — no timers)',
   );
 });
+
+test('round-10 dive-start prewarm: early boot fires once per dive with no state flips', () => {
+  // The twin boots at first aimed takeover engagement so grant+release land
+  // near arrival. The early frame mounts at opacity 0 (still painting —
+  // display:none suspends rAF) with zero open-state side effects.
+  const main = srcOf('../src/map/main.js');
+  assert.ok(main.includes('function earlyBootTwin()'), 'dive-start boot exists');
+  assert.ok(main.includes('if (prox && prox.near)'), 'takeover fires the boot on aimed engagement');
+  assert.ok(
+    main.includes('earlyTwinArmed || twinOpen'),
+    'the boot fires once per dive and never under an open/staged twin',
+  );
+  const body = main.slice(main.indexOf('function earlyBootTwin()'), main.indexOf('function abortEarlyBootTwin()'));
+  for (const flip of ['twinOpen = true', 'pendingReveal = {', 'setMaxZoom', 'pushState', 'setTimeout']) {
+    assert.ok(!body.includes(flip), `early boot sets no ${flip} — boot only, no state flips`);
+  }
+  assert.ok(main.includes('function abortEarlyBootTwin()'), 'retreat abort exists');
+  assert.ok(main.includes('abortEarlyBootTwin();'), 'the zoom step aborts a retreated dive-start boot');
+  assert.ok(
+    main.includes('z < Z_ISO_START - 1'),
+    'the abort fires on band exit, before the staged unwind band',
+  );
+  const abortStart = main.indexOf('function abortEarlyBootTwin()');
+  const abortEnd = main.indexOf('Handoff-4 Lane A seeded reveal', abortStart);
+  const abort = main.slice(abortStart, abortEnd);
+  assert.ok(abort.includes('about:blank'), 'the abort blanks the frame so no boot leaks');
+  assert.ok(
+    (main.match(/earlyTwinArmed = false/g) || []).length >= 3,
+    'arrival, direct open, and abort all consume the armed boot',
+  );
+});
+
+test('round-10 grant semantics preserved: once-ever paint, per-handoff ready, release gate intact', () => {
+  // Paint posts once per boot (an early boot eats it) while ready re-arms
+  // per handoff — so arrival must reload on the warm cache, never reuse the
+  // early frame. Pre-open grants stay dropped, round-9 gates stay identical.
+  const main = srcOf('../src/map/main.js');
+  const twin = srcOf('../src/ring2/main.js');
+  assert.equal(
+    (twin.match(/paintedPosted = true/g) || []).length,
+    1,
+    'paint posts once ever per boot — the early boot eats it, arrival reloads',
+  );
+  assert.ok(twin.includes('handoff.readyPosted = false'), 'ready re-arms per handoff');
+  assert.ok(
+    (main.match(/staleCloseGuardUntil/g) || []).length >= 4,
+    'stale-echo guard declared, armed on early-consume, consulted on close',
+  );
+  assert.ok(
+    (main.match(/if \(!twinOpen\) return;/g) || []).length >= 2,
+    'pre-open ready/paint grants stay dropped (early posts never latch)',
+  );
+  assert.ok(main.includes('setFrameUrl(frameEl, url)'), 'arrival still sets its URL — reload on warm cache, never reuse');
+  assert.ok(main.includes('function twinReleased()'), 'release signal intact');
+  assert.ok(main.includes('if (!ready || !released) {'), 'dissolve still holds at 0 until grant AND release');
+  assert.ok(
+    main.includes('if (!releasedFeed && stagedS > gateS && (releaseKnown || !grantedFeed)) stagedS = gateS;'),
+    'the S cap still holds to release with grant fallback when unreadable',
+  );
+});

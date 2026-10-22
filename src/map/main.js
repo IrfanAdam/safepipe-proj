@@ -157,6 +157,8 @@ let closeSeq = 0;
 let pendingReveal = null;
 const REVEAL_TIMEOUT_MS = 4000;
 let lastFallbackArmT = 0; // staged fallback re-arms at most once/sec while the hold flows: every-tick clear+set churns a 4000ms timer that only matters after S stalls
+let earlyTwinArmed = false; // round-10 dive-start prewarm: early iframe boot armed, consumed at arrival or aborted on retreat
+let staleCloseGuardUntil = 0; // round-10 stale-echo guard: arrival replaces a LIVE early twin, whose pagehide posts a close echo that lands after twinOpen flips and would tear down the fresh prewarm — closes inside this window are dropped (set only when consuming an armed early boot, so plain opens keep exact Esc behavior)
 
 window.__mapProbe = {
   ready: false, base: 'positron', satOn: false,
@@ -1373,6 +1375,13 @@ function onNativeZoomStep(snap, source) {
     // unwinds the hold — unclamp, drop accumulated scroll, quietly tear down
     // the uncommitted prewarm. Settle inside the band holds (no-op). Forward
     // exit is twin-ready + S-commit (driveStagedOverlay/finalizeStagedReveal).
+    // Round-10: a dive-start boot that retreats below the band before
+    // arrival aborts here — frame blanked, overlay re-hidden, map untouched.
+    if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && z < Z_ISO_START - 1) {
+      try {
+        abortEarlyBootTwin();
+      } catch { /* abort is best-effort */ }
+    }
     if (stagedActive && source === 'native-zoomend' && z < Z_TOP - STAGED_EXIT_BELOW) {
       try {
         exitStaged();
@@ -2322,6 +2331,61 @@ function exitStaged() {
   } catch { /* guarantor never breaks teardown */ }
 }
 
+/** Round-10 dive-start prewarm: boot the twin iframe EARLY at first aimed
+ * takeover engagement so grant+release land near arrival. Mounts the
+ * overlay at opacity 0 (.prewarm still paints — display:none suspends rAF
+ * so a hidden frame never paints or posts) with the live frame, but sets
+ * no twinOpen, no pendingReveal, no clamp, no history, no timers. The
+ * arrival URL always differs (dive-start zoom vs arrival zoom), so arrival
+ * reloads on the warm tile/compile cache with re-armed once-ever grants. */
+function earlyBootTwin() {
+  try {
+    if (earlyTwinArmed || twinOpen || transitId || pendingReveal || stagedActive) return false;
+    if (!mapRef) return false;
+    const frame = liveFrame();
+    if (!frame) return false;
+    const h3 = h3map[siteSector];
+    if (!h3) return false;
+    const ov = ensureOverlay();
+    try {
+      ov.root.classList.remove('closing');
+      ov.root.classList.add('prewarm');
+    } catch { /* cosmetic */ }
+    try {
+      void ov.root.offsetWidth;
+    } catch { /* reflow nudge is best-effort */ }
+    setFrameUrl(ov.frame, twinUrl(h3, frame));
+    ov.root.hidden = false;
+    earlyTwinArmed = true;
+    try {
+      window.__mapProbe.earlyPrewarm = true;
+    } catch { /* probe cosmetic */ }
+    return true;
+  } catch { return false; }
+}
+
+/** Abort a dive-start prewarm that never reached arrival: blank the frame
+ * and re-hide the overlay. Touches nothing else — twinOpen stays false,
+ * no timers (none armed), no clamp (never set), no history, probe flag
+ * cleared so no aborted-boot state leaks. */
+function abortEarlyBootTwin() {
+  if (!earlyTwinArmed) return false;
+  earlyTwinArmed = false;
+  try {
+    if (overlayEls && overlayEls.frame) setFrameUrl(overlayEls.frame, 'about:blank');
+  } catch { /* frame teardown is best-effort */ }
+  try {
+    if (overlayEls && overlayEls.root) {
+      overlayEls.root.classList.remove('prewarm');
+      overlayEls.root.hidden = true;
+    }
+  } catch { /* cosmetic */ }
+  try {
+    window.__mapProbe.earlyPrewarm = false;
+  } catch { /* probe cosmetic */ }
+  return true;
+}
+
 /** Handoff-4 Lane A seeded reveal: PRE-WARM the twin at the ring frame —
  * create the overlay iframe hidden (opacity 0 via .prewarm, still loading
  * ?sector&cx&cy&z&embed=1) and HOLD the map end-frame until the twin posts
@@ -2356,6 +2420,16 @@ function prewarmThenReveal(id, frame, opts = {}) {
   window.__mapProbe.twinReady = false;
   window.__mapProbe.twinPainted = false;
   window.__mapProbe.reveal = 'prewarm';
+  if (earlyTwinArmed) {
+    try {
+      const nowG = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+      staleCloseGuardUntil = nowG + 1500; // the replaced early twin's pagehide echo lands in this window — drop it
+    } catch { /* guard is best-effort */ }
+  }
+  earlyTwinArmed = false; // arrival consumes the dive-start boot (reloads warm with re-armed grants)
+  try {
+    window.__mapProbe.earlyPrewarm = false;
+  } catch { /* probe cosmetic */ }
   window.__mapProbe.revealFallback = false;
   window.__mapProbe.revealLate = false;
   window.__mapProbe.revealPaint = false;
@@ -2587,6 +2661,16 @@ function openTwin(id, opts = {}) {
   window.__mapProbe.twinReady = false;
   window.__mapProbe.twinPainted = false;
   window.__mapProbe.reveal = 'revealed';
+  if (earlyTwinArmed) {
+    try {
+      const nowG = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+      staleCloseGuardUntil = nowG + 1500; // the replaced early twin's pagehide echo lands in this window — drop it
+    } catch { /* guard is best-effort */ }
+  }
+  earlyTwinArmed = false; // direct open consumes any dive-start boot
+  try {
+    window.__mapProbe.earlyPrewarm = false;
+  } catch { /* probe cosmetic */ }
   window.__mapProbe.revealFallback = false;
   window.__mapProbe.revealLate = false;
   try {
@@ -3043,6 +3127,13 @@ window.addEventListener('message', (e) => {
 });
 window.addEventListener('message', (e) => {
   if (!twinOpen || !isTwinCloseData(e && e.data)) return;
+  // Round-10 stale-echo guard: the replaced early twin's pagehide echo is
+  // already in flight when arrival flips twinOpen — it must not tear down
+  // the fresh prewarm. Genuine closes land outside this window.
+  try {
+    const nowE = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+    if (nowE < staleCloseGuardUntil) return;
+  } catch { /* guard never blocks the close */ }
   const recede = !!(e.data && typeof e.data === 'object' && e.data.recede);
   if (recede) {
     // Handoff-5-close: the twin already returned to ring-iso sat — keep
@@ -3275,6 +3366,13 @@ function installBandTakeover() {
       let journeying = false;
       try { journeying = isoScrubOwned || isoRestoreDue || scrubProgress > 0; } catch { journeying = false; }
       if (!prox || !(prox.near || (z >= Z_ISO_START && journeying))) return;
+      // Round-10 dive-start prewarm: first aimed engagement boots the twin
+      // iframe early (once per dive — guarded inside). No state flips.
+      if (prox && prox.near) {
+        try {
+          earlyBootTwin();
+        } catch { /* prewarm never breaks input */ }
+      }
       e.preventDefault();
       e.stopPropagation();
       const rate = Math.abs(dy) < 4 ? TRACK_RATE : WHEEL_RATE;
