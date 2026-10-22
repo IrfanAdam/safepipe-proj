@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import {
   HANDOFF_SWOOP_MS,
   HANDOFF_PUSH_MS,
+  HANDOFF_MORPH_MS,
   HANDOFF_START_MIX,
   HANDOFF_END_MIX,
   HANDOFF_ISO_POLAR_DEG,
@@ -55,7 +56,10 @@ const C = Math.SQRT1_2;
 const START_POSE = { eye: { x: 0, y: R0, z: 0.01 }, target: { x: 0, y: 0, z: 0 } };
 const MID = { eye: { x: 0, y: R0 * C, z: R0 * C }, target: { x: 0, y: 0, z: 0 } };
 const TERM = { eye: { x: 1000, y: 18000 * C, z: 500 + 18000 * C }, target: { x: 1000, y: 0, z: 500 } };
-const SWOOP_W = HANDOFF_SWOOP_MS / (HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS);
+const SWOOP_W = HANDOFF_SWOOP_MS / (HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS + HANDOFF_MORPH_MS);
+const PUSH_W = (HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS) / (HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS + HANDOFF_MORPH_MS);
+const PUSH_END_S = TWIN_FWD_REVEAL_START_PX
+  + ((TWIN_FWD_STAGED_MAX_PX - TWIN_FWD_REVEAL_START_PX) * HANDOFF_PUSH_MS) / (HANDOFF_PUSH_MS + HANDOFF_MORPH_MS);
 
 const rangeOf = (eye, target) => Math.hypot(eye.x - target.x, eye.y - target.y, eye.z - target.z);
 const polarDegOf = (eye, target) => {
@@ -68,21 +72,26 @@ test('iso pole verified at 45 (map holds 45 through the cut — no snap)', () =>
   assert.equal(HANDOFF_ISO_POLAR_DEG, 45);
 });
 
-test('buildForwardLegs: swoop+push legs, ms weights, from-chained, mix 0->0->100', () => {
+test('buildForwardLegs: swoop+push+settle legs, ms weights, from-chained, mix 0->0->0->100', () => {
   const l = legs();
-  assert.equal(l.length, 2);
-  assert.deepEqual(l.map((x) => x.name), ['swoop', 'push']);
+  assert.equal(l.length, 3);
+  assert.deepEqual(l.map((x) => x.name), ['swoop', 'push', 'settle']);
   assert.equal(l[0].ms, HANDOFF_SWOOP_MS);
   assert.equal(l[1].ms, HANDOFF_PUSH_MS);
-  assert.equal(scrubTotalMs(l), HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS);
+  assert.equal(l[2].ms, HANDOFF_MORPH_MS);
+  assert.equal(scrubTotalMs(l), HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS + HANDOFF_MORPH_MS);
   assert.deepEqual(l[0].from, { eye: START_POSE.eye, target: START_POSE.target });
   assert.deepEqual(l[0].eye, MID.eye);
   assert.deepEqual(l[1].from, { eye: MID.eye, target: MID.target });
   assert.deepEqual(l[1].eye, TERM.eye);
+  assert.deepEqual(l[2].from, { eye: TERM.eye, target: TERM.target });
+  assert.deepEqual(l[2].eye, TERM.eye);
   assert.equal(l[0].mix, HANDOFF_START_MIX);
   assert.equal(l[0].fromMix, HANDOFF_START_MIX);
   assert.equal(l[1].fromMix, HANDOFF_START_MIX);
-  assert.equal(l[1].mix, HANDOFF_END_MIX);
+  assert.equal(l[1].mix, HANDOFF_START_MIX);
+  assert.equal(l[2].fromMix, HANDOFF_START_MIX);
+  assert.equal(l[2].mix, HANDOFF_END_MIX);
 });
 
 test('buildForwardLegs: null on missing/non-finite anchors (never a canned pose)', () => {
@@ -155,11 +164,21 @@ test('ring reveal reads the same progress: 0 at hold, eased in swoop, 1 in push'
   assert.equal(forwardRingPForProgress([], 0.5), null);
 });
 
-test('staged-S consumer: swoop completes at reveal start, push at commit', () => {
+test('staged-S consumer: swoop completes at reveal start, push rigid, settle morphs at commit', () => {
   assert.equal(fwdProgressForStagedS(0), 0);
   assert.equal(fwdProgressForStagedS(TWIN_FWD_REVEAL_START_PX), SWOOP_W);
+  assert.ok(Math.abs(fwdProgressForStagedS(PUSH_END_S) - PUSH_W) < 1e-9, 'push band ends exactly on the settle boundary');
   assert.equal(fwdProgressForStagedS(TWIN_FWD_STAGED_MAX_PX), 1);
   assert.ok(Math.abs(fwdProgressForStagedS(375) - SWOOP_W / 2) < 1e-9, 'swoop leg tracks S linearly');
+  // Round-6: the visible push carries no imagery change (rigid satellite),
+  // the morph rides a static terminal pose.
+  const l = legs();
+  const atPush = poseForScrubProgress(l, (SWOOP_W + PUSH_W) / 2);
+  assert.equal(atPush.mix, HANDOFF_START_MIX);
+  assert.equal(atPush.legIndex, 1);
+  const atMorph = poseForScrubProgress(l, (PUSH_W + 1) / 2);
+  assert.deepEqual(atMorph.eye, TERM.eye);
+  assert.ok(atMorph.mix > HANDOFF_START_MIX && atMorph.mix < HANDOFF_END_MIX);
   let prev = -1;
   for (let s = 0; s <= TWIN_FWD_STAGED_MAX_PX + 250; s += 25) {
     const p = fwdProgressForStagedS(s);

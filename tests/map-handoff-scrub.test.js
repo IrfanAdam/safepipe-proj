@@ -171,6 +171,27 @@ test('accumulator-owned reveal: S seeds from live zoom at entry, wheel owns it a
   );
 });
 
+test('round-6 way-in continuity: S waits at the reveal gate until the twin grants', () => {
+  // The twin intro is scroll-scrubbed: saturating S before the twin is awake
+  // slams its release progress 0->1 and the commit teleports to the
+  // terminal. Both the prewarm seed and the wheel feed park at the reveal
+  // gate (750) while ungranted; the first post-grant tick resumes on
+  // fingers. Scroll-up drains symmetrically (the clamp only ever lowers).
+  const main = srcOf('../src/map/main.js');
+  assert.ok(
+    main.includes('if (!grantedSeed && stagedS > revealStart) stagedS = revealStart;'),
+    'the prewarm seed parks at the reveal gate while the twin boots',
+  );
+  assert.ok(
+    main.includes('if (!grantedFeed && stagedS > gateS) stagedS = gateS;'),
+    'the wheel feed parks at the reveal gate while the twin boots',
+  );
+  assert.ok(
+    main.includes('window.__mapProbe.twinReady || window.__mapProbe.twinPainted'),
+    'the park lifts on either grant',
+  );
+});
+
 test('driver: live hold drives visible travel on every staged tick, pre-grant', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(main.includes('driveStagedHold(st)'), 'staged driver paints hold travel before the grant check');

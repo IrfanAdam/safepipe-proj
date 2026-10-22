@@ -62,6 +62,7 @@ export const TWIN_FULLSCREEN_MSG = MAP_TWIN_FS_MSG;
 export const HANDOFF_HOLD_MS = 900;
 export const HANDOFF_SWOOP_MS = 2600;
 export const HANDOFF_PUSH_MS = 2400;
+export const HANDOFF_MORPH_MS = 1200;
 /* Reverse is the exact two-segment mirror: pull (PUSH_MS) then pitch-back
  * (SWOOP_MS). Single source of truth for the total so the flight and any
  * probe margin agree. */
@@ -530,7 +531,7 @@ export function isTwinStagedMessage(data) {
  * Non-finite S parks at 0. Never throws. */
 export function fwdProgressForStagedS(
   s,
-  { revealStartPx = TWIN_FWD_REVEAL_START_PX, stagedMaxPx = TWIN_FWD_STAGED_MAX_PX, swoopW = null } = {},
+  { revealStartPx = TWIN_FWD_REVEAL_START_PX, pushEndPx = null, stagedMaxPx = TWIN_FWD_STAGED_MAX_PX, swoopW = null } = {},
 ) {
   try {
     const v = Number(s);
@@ -539,14 +540,29 @@ export function fwdProgressForStagedS(
     let mx = Number(stagedMaxPx);
     if (!Number.isFinite(rs) || rs <= 0) rs = TWIN_FWD_REVEAL_START_PX;
     if (!Number.isFinite(mx) || mx <= rs) mx = TWIN_FWD_STAGED_MAX_PX;
-    let w = swoopW === null || swoopW === undefined ? NaN : Number(swoopW);
-    if (!Number.isFinite(w) || w <= 0 || w >= 1) {
-      const total = HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS;
-      w = total > 0 ? HANDOFF_SWOOP_MS / total : 0.5;
+    // Round-6: three S bands — swoop (invisible convergence), rigid push
+    // (visible, satellite), settle morph at terminal (imagery change on a
+    // static pose). Band edges are ms-proportional so the scrub and autoplay
+    // clocks agree on pacing; the knees land exactly on leg boundaries.
+    const swMs = HANDOFF_SWOOP_MS;
+    const puMs = HANDOFF_PUSH_MS;
+    const moMs = HANDOFF_MORPH_MS;
+    const total = swMs + puMs + moMs;
+    const w1 = total > 0 ? swMs / total : 0.5;
+    const w2 = total > 0 ? (swMs + puMs) / total : 0.8;
+    let ps = pushEndPx === null || pushEndPx === undefined ? NaN : Number(pushEndPx);
+    if (!Number.isFinite(ps) || ps <= rs || ps >= mx) {
+      const span = puMs + moMs;
+      ps = span > 0 ? rs + ((mx - rs) * puMs) / span : (rs + mx) / 2;
     }
     if (v >= mx) return 1;
-    if (v >= rs) return w + ((v - rs) / (mx - rs)) * (1 - w);
-    return (v / rs) * w;
+    if (v >= ps) return w2 + ((v - ps) / (mx - ps)) * (1 - w2);
+    if (v >= rs) {
+      let w = swoopW === null || swoopW === undefined ? NaN : Number(swoopW);
+      if (!Number.isFinite(w) || w <= 0 || w >= 1) w = w1;
+      return w + ((v - rs) / (ps - rs)) * (w2 - w);
+    }
+    return (v / rs) * w1;
   } catch {
     return 0;
   }
@@ -555,7 +571,11 @@ export function fwdProgressForStagedS(
 /** Pure: build the forward intro legs for poseForScrubProgress from the
  * live anchors. startPose = { eye, target } top-down at the ring frame
  * (main.js startEye); mid = ring-frame iso (swoop end / push start); to =
- * terminal iso. Mix rides 0 through the swoop, 0->100 through the push.
+ * terminal iso. Round-6: mix rides 0 through swoop AND push (the visible
+ * push is a rigid satellite move the eye can track), 0->100 only through
+ * the settle leg (static terminal pose — the imagery melts while the ring
+ * closes onto it). Motion and imagery never change together, mirroring the
+ * round-5 reverse (which posts from a static matched frame).
  * Null on any missing anchor — caller ends the flight, never a canned
  * pose. Node-checkable. */
 export function buildForwardLegs({ startPose, mid, to } = {}) {
@@ -585,9 +605,18 @@ export function buildForwardLegs({ startPose, mid, to } = {}) {
         name: 'push',
         eye: { ...te },
         target: { ...tt },
-        mix: endMix,
+        mix: HANDOFF_START_MIX,
         ms: HANDOFF_PUSH_MS,
         from: { eye: { ...me }, target: { ...mt } },
+        fromMix: HANDOFF_START_MIX,
+      },
+      {
+        name: 'settle',
+        eye: { ...te },
+        target: { ...tt },
+        mix: endMix,
+        ms: HANDOFF_MORPH_MS,
+        from: { eye: { ...te }, target: { ...tt } },
         fromMix: HANDOFF_START_MIX,
       },
     ];

@@ -1768,6 +1768,15 @@ function flyToSectorThenTwin(id, opts = {}) {
         ((Number.isFinite(liveZ) ? liveZ : Z_TOP) - Z_TOP) / (Z_HANDOFF - Z_TOP),
       );
       stagedS = revealStart + (HANDOFF_STAGED_S_MAX - revealStart) * smooth01(tSeed);
+      // Round-6 way-in continuity: a fast burst can seed S to the cap while
+      // the twin is still booting (grant always false here) — saturating S
+      // before the twin is awake slams its scroll-scrubbed intro 0->1 on
+      // release and the commit teleports to the terminal. Park the seed at
+      // the reveal gate; the first post-grant tick resumes on fingers.
+      try {
+        const grantedSeed = !!(window.__mapProbe && (window.__mapProbe.twinReady || window.__mapProbe.twinPainted));
+        if (!grantedSeed && stagedS > revealStart) stagedS = revealStart;
+      } catch { /* seed cap is best-effort */ }
       stagedCommitted = false;
       lastPostedStagedS = null; // Task-37: the S producer re-arms (S=0 posts on first drive)
       try {
@@ -3329,6 +3338,15 @@ function feedStagedScroll(dyFlip) {
     const dy = +dyFlip;
     if (!Number.isFinite(dy) || dy === 0) return;
     stagedS = accumStagedS(stagedS, dy); // symmetric: scroll-up retraces the same law
+    // Round-6 way-in continuity: S waits at the reveal gate until the twin
+    // grants — same park as the prewarm seed above. Scroll-up drains
+    // symmetrically (the clamp only ever lowers); the silent-twin unwind
+    // still owns the never-grant case (exitStaged/deepHold reset S).
+    try {
+      const grantedFeed = !!(window.__mapProbe && (window.__mapProbe.twinReady || window.__mapProbe.twinPainted));
+      const gateS = Math.max(0, HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX);
+      if (!grantedFeed && stagedS > gateS) stagedS = gateS;
+    } catch { /* feed cap is best-effort */ }
     driveStagedOverlay(); // repaints the overlay AND posts S to the twin (throttled)
   } catch { /* accumulator never breaks the map */ }
 }

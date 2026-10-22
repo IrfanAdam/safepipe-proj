@@ -172,7 +172,7 @@ test('reverse pose law: live pose at 0, ring top-down at 1, symmetric mid', () =
     mid: { eye: { x: 0, y: R0 * C, z: R0 * C }, target: { x: 0, y: 0, z: 0 } },
     to: { eye: { x: 1000, y: 18000 * C, z: 500 + 18000 * C }, target: { x: 1000, y: 0, z: 500 } },
   });
-  assert.ok(legs && legs.length === 2, 'forward legs build');
+  assert.ok(legs && legs.length === 3, 'forward legs build (swoop+push+settle)');
   const atLive = poseForScrubProgress(legs, 0);
   const atHome = poseForScrubProgress(legs, 1);
   assert.deepEqual(atLive.eye, legs[0].from.eye, 'progress 0 is the live pose');
