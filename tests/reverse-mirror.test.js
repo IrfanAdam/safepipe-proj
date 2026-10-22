@@ -260,34 +260,39 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
     !main.includes('holdIsoPoseForTwin'),
     'no half-finished twin-open camera hold is left in the tree (the seam is OPEN, not fixed)',
   );
-  // mapRef.stop() is allowed in exactly one place: the idle-auto recede
-  // cancel, where the first gesture stops the programmatic leg and owns the
-  // rest. Any other stop() (e.g. a twin-open seam experiment) is banned.
+  // mapRef.stop(): banned outright — no programmatic camera leg exists for
+  // a gesture to cancel (the idle-auto recede was removed by owner rule).
+  // Any stop() (auto leg, twin-open seam experiment) fails here.
   const stops = (main.match(/mapRef\.stop\(\)/g) || []).length;
-  assert.equal(stops, 1, `mapRef.stop() appears exactly once (idle-auto cancel), found ${stops}`);
+  assert.equal(stops, 0, `mapRef.stop() must not appear (no auto leg to cancel), found ${stops}`);
+  // No auto animate of states, by owner rule: no idle timer, no auto probe,
+  // no programmatic home ease. Every motion after a close is owned by scroll.
   assert.ok(
-    main.includes('autoReceding'),
-    'the single stop() is gated on the idle-auto recede leg',
-  );
-  // Idle-auto recede: a close with no following gesture must still move —
-  // the auto leg eases home and any gesture cancels it.
-  assert.ok(
-    main.includes("window.__mapProbe.recede = 'auto'"),
-    'the programmatic recede leg probes as auto',
+    !main.includes('autoReceding'),
+    'no idle-auto recede leg remains',
   );
   assert.ok(
-    main.includes('recedeIdleT = setTimeout'),
-    'the idle window arms the auto leg',
+    !main.includes('recedeIdleT'),
+    'no idle-arm timer remains',
   );
-  // Band takeover: one easeTo carries zoom + pitch + around per aimed
-  // in-band wheel tick, so in-flight tilt cannot be clobbered.
+  // Band takeover: each aimed in-band wheel tick drives the camera
+  // INSTANTLY (duration 0 — the camera IS the scroll, no timers, no lag),
+  // so in-flight tilt cannot be clobbered.
   assert.ok(
     main.includes('function installBandTakeover()'),
-    'the tilt band owns aimed wheel ticks through a single-writer ease',
+    'the tilt band owns aimed wheel ticks through a single-writer instant drive',
   );
   assert.ok(
     main.includes('pitch: pitchTargetForZoom(target)'),
-    'takeover ease carries the law pitch with the tick zoom',
+    'takeover drive carries the law pitch with the tick zoom',
+  );
+  assert.ok(
+    main.includes('duration: 0,'),
+    'takeover drive is synchronous per tick (no lag ease)',
+  );
+  assert.ok(
+    main.includes('feedStagedScroll(-dy)'),
+    'takeover ticks feed staged S so the scrubbed dissolve advances on the fingers',
   );
   // Shared flatten guarantor: every teardown that moves no camera flattens
   // a journey-owned tilt onto the law.
@@ -302,6 +307,21 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
   // Fork guard: a commit resolves an armed staged hold at both commit sites.
   const forks = (main.match(/if \(stagedActive && !stagedCommitted\) \{\n    stagedActive = false;/g) || []).length;
   assert.ok(forks >= 2, `both commit sites resolve an armed hold (found ${forks})`);
+  // Scroll-pure commit and close: the staged commit is a cut (the S scrub
+  // already dissolved to 1 — no timed crossfade), and the close hides
+  // synchronously with no fade timer and no recede-delay timer.
+  assert.ok(
+    main.includes('revealTwin(true); // CUT'),
+    'staged commit is an instant matched cut, never a timed crossfade',
+  );
+  assert.ok(
+    !main.includes('setTimeout(finishHide'),
+    'close hides synchronously — no fade timer',
+  );
+  assert.ok(
+    !main.includes('RECEDE_DELAY_MS'),
+    'no recede-delay timer remains',
+  );
 });
 
 test('map vignette: ellipse from projected R, brackets ride the same law', () => {
@@ -360,7 +380,7 @@ test('forward path untouched: staged laws, intro legs, iso ownership, FOV', () =
   assert.ok(map.includes('prox.near || isoScrubOwned'), 'owned scrub restores pitch even after pan-away');
   assert.ok(map.includes('isoRestoreDue = true'), 'engage latches the restore due flag');
   assert.ok(map.includes("source === 'native-zoomend' && isoRestoreDue && !shouldCenter(z)"), 'below-band settle glides journey tilt home');
-  assert.ok(map.includes('mapRef.easeTo({ pitch: 0, duration: SETTLE_EASE_MS })'), 'reconcile glides pitch home on settle tempo');
+  assert.ok(map.includes('mapRef.jumpTo({ pitch: 0 })'), 'reconcile snaps pitch home instantly (no settle glide)');
   assert.ok(map.includes('prewarmThenReveal(id, liveFrame(), { ...opts, staged: true })'), 'near-gate arrival still stages');
   const twin = srcOf('../src/ring2/main.js');
   assert.ok(twin.includes('poseForScrubProgress(fwd.legs, fwd.progress)'), 'forward pose still reads the scrub law');

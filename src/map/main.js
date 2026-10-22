@@ -143,13 +143,11 @@ let twinFs = false;
 let receding = false;
 let recedeLandHome = null; // Task-37 gesture recede: arrival closure armed by recedeToHome, fired by the zoom-step home check
 let recedeDone = false;
-// Handoff-5-close: single close chain. CLOSE_FADE_MS mirrors the forward
-// reveal; RECEDE_DELAY_MS starts the gesture-owned recede arm INSIDE the fade
-// (150ms into the 450ms fade) so the arm overlaps it for one gesture.
-// GATE-3 REVISION tempo: 450ms fades overlap the recede for one gesture.
+// Handoff-5-close: single close chain. CLOSE_FADE_MS is the SAT raster
+// transition only (paint-layer fade, never camera motion) — the overlay
+// close itself is an instant cut with no timers, by owner rule.
 // closeSeq invalidates a pending hide/recede when a fresh open lands first.
 const CLOSE_FADE_MS = 450;
-const RECEDE_DELAY_MS = 150;
 const SAT_FADE_DURATION_MS = 800; // tile-level crossfade: Esri swaps source captures across zooms — fades old->new tiles instead of popping. Independent of the opacity ramp.
 const SAT_HIDE_DELAY_MS = 500; // delayed sat-layer hide tracks the 450ms ramp (same beat as the close fade)
 let closeSeq = 0;
@@ -664,9 +662,6 @@ let lastPostedStagedS = null;
 let lastStagedPostT = 0; // 60ms min interval alongside the value-change check: wheel bursts post dozens per frame otherwise
 let cachedVectorStyle = null;
 let recedeStartT = 0;
-let autoReceding = false; // idle-auto recede leg running (programmatic ease home; any gesture cancels it)
-let recedeIdleT = null; // idle window timer arming the auto leg
-let recedeIdleSeq = 0; // token so a stale recede never cancels a fresh one
 let lastCursor = null; // {x,y} client px, passive mousemove only
 let lastCenterEaseT = 0;
 let isoScrubOwned = false;
@@ -676,7 +671,6 @@ const ISO_SCRUB_EPS_DEG = 0.3; // skip transform writes inside this of target
 const ISO_SCRUB_SLEW_DEG = 10; // per-step tilt cap: a flick jumping the band glides over following steps instead of snapping 0->45 in one frame
 const ISO_SCRUB_RELEASE = 0.3; // release band below Z_ISO_START: ownership ends only once the pitch actually flattened (see the line-1159 release) — never on zoom alone
 const ISO_SETTLE_TOL_DEG = 0.5; // settle landings treat bearing/pitch inside this of target as arrived — never fights damping
-const SETTLE_EASE_MS = 250; // every settle-landing glide (center-ease, reconcile, catch-up) shares this tempo
 const STAGED_EXIT_BELOW = 0.05; // zoomend settle this far below Z_TOP unwinds the staged hold (at-gate holds)
 const STAGED_COMMIT_Z_TOL = 0.05; // commit-time scale nearness: live zoom must read at the handoff gate (the clamp holds it there — drift means the ceiling lost and S no longer matches the staged frame)
 let isoPumpOn = false; // per-frame tilt pump flight flag (single rAF loop while the band owns pitch)
@@ -1152,7 +1146,10 @@ function onNativeZoomStep(snap, source) {
       if ((far || tilt) && now - lastCenterEaseT >= CENTER_EASE_MS) {
         lastCenterEaseT = now;
         try {
-          mapRef.easeTo({ center: SITE_LNGLAT.slice(), bearing: 0, pitch: pHold, duration: SETTLE_EASE_MS });
+          // Instant snap, never a glide: no timer owns camera motion. Fires
+          // only when the frame actually drifted (far/tilt), so exact
+          // journeys no-op here.
+          mapRef.jumpTo({ center: SITE_LNGLAT.slice(), bearing: 0, pitch: pHold });
         } catch (err) {
           errors.push('CENTER-EASE: ' + (err && err.message));
         }
@@ -1186,7 +1183,9 @@ function onNativeZoomStep(snap, source) {
       if (Number.isFinite(pSet)) {
         if (Math.abs(pSet) > ISO_SETTLE_TOL_DEG) {
           try {
-            mapRef.easeTo({ pitch: 0, duration: SETTLE_EASE_MS });
+            // Instant flatten (no glide): the below-band law is flat, so this
+            // only fires when something left tilt behind — snap it, no timer.
+            mapRef.jumpTo({ pitch: 0 });
           } catch (err) {
             errors.push('SETTLE-RECONCILE: ' + (err && err.message));
           }
@@ -1294,7 +1293,9 @@ function onNativeZoomStep(snap, source) {
       const pCatchT = pitchTargetForZoom(z);
       if (Number.isFinite(pCatch) && Number.isFinite(pCatchT) && Math.abs(pCatch - pCatchT) > 1) {
         try {
-          mapRef.easeTo({ pitch: pCatchT, duration: SETTLE_EASE_MS });
+          // Instant catch-up (no glide): exact journeys never reach here
+          // (|p-law|<=1 skips); a stale pitch snaps onto the law, no timer.
+          mapRef.jumpTo({ pitch: pCatchT });
         } catch (err) {
           errors.push('SETTLE-CATCHUP: ' + (err && err.message));
         }
@@ -2054,7 +2055,7 @@ function finalizeStagedReveal(root) {
   stagedCommitted = true;
   stagedActive = false;
   lastPostedStagedS = null; // commit ends the S stream (producer guards on flags anyway)
-  revealTwin(false); // dissolve: the staged scroll already animated it — the CSS crossfade completes the commit, never a cut
+  revealTwin(true); // CUT, never the timed crossfade: the S scrub already dissolved the overlay to 1 on the fingers and the twin frame matches the staged end-frame by construction (ready gate above) — a crossfade here would re-animate a finished dissolve on a timer. The instant path keeps flags/probe/focus/unclamp identical.
   // GATE-3 REVISION: hand the opacity back to the CSS WITHOUT snapping it.
   // The scrub suspended the transition (`.scrubbing`) so the law's value was
   // the rendered value. At the commit the law has reached 1, so the inline
@@ -2457,13 +2458,15 @@ function openTwin(id, opts = {}) {
   return true;
 }
 
-/** Actual teardown: fades the overlay out (never an abrupt cut), keeps hex
+/** Actual teardown: instant cut to the map (never a timed fade), keeps hex
  * + selection (Task 19). Handoff-5-close single chain: EVERY close path
- * (X/Esc/back/twin-Esc) runs the same reverse — twin->map-sat fade over
- * CLOSE_FADE_MS (~450ms, symmetric with the forward reveal; sat stays ON
- * underneath), then sat->flat + zoom-out to the country blip view. Pending
- * hide/recede steps are seq-guarded so a fresh open inside the fade window
- * cancels them (no blanked twin, no yanked map). */
+ * (X/Esc/back/twin-Esc) runs the same reverse — overlay hidden
+ * synchronously, then the map sits at its law pose awaiting the fingers
+ * (scroll owns every following motion; no auto recede, no timed legs).
+ * Pending hide/recede steps are seq-guarded so a fresh open cancels them
+ * (no blanked twin, no yanked map). No timers anywhere on this path: the
+ * 450ms fade + recede-delay choreography is removed — the map underneath
+ * is already at the law pose, so there is nothing to blend toward. */
 function doCloseTwin() {
   // Handoff-3: if the overlay is the fullscreen element, drop fullscreen
   // silently first (flag cleared so fullscreenchange can't recede twice).
@@ -2488,15 +2491,11 @@ function doCloseTwin() {
   window.__mapProbe.revealFallback = false;
   window.__mapProbe.revealLate = false;
   window.__mapProbe.revealPaint = false;
-  // Handoff-5-close: seq-guard + reduced-motion flag for the fade/recede below.
+  // Handoff-5-close: seq-guard for the teardown below.
   const seq = ++closeSeq;
   const seqGuard = () => closeSeq;
-  let reduced = false;
-  try {
-    reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch { /* cosmetic */ }
   const finishHide = () => {
-    if (seqGuard() !== seq) return; // reopened mid-fade: leave the fresh twin alone
+    if (seqGuard() !== seq) return; // reopened mid-teardown: leave the fresh twin alone
     if (overlayEls) {
       overlayEls.root.hidden = true;
       overlayEls.root.classList.remove('closing');
@@ -2506,37 +2505,29 @@ function doCloseTwin() {
       } catch { /* frame teardown is best-effort */ }
     }
   };
-  if (overlayEls && !overlayEls.root.hidden) {
-    if (!reduced) {
-      try {
-        overlayEls.root.classList.remove('prewarm');
-        overlayEls.root.classList.add('closing');
-      } catch { /* cosmetic */ }
-      setTimeout(finishHide, CLOSE_FADE_MS + 20);
-    } else {
-      finishHide();
-    }
-  } else {
+  // Instant cut: hide synchronously — no fade class, no fade timer. The
+  // map underneath sits at its law pose, so there is no blend to run.
+  try {
     finishHide();
-  }
-  // Vignette stays through the twin->sat fade (forward-symmetric); the
-  // recede below lifts it while sat->flat + zoom-out run.
+  } catch { /* hide is best-effort */ }
+  // Vignette stays through the cut (forward-symmetric); the recede below
+  // lifts it while sat->flat + zoom-out run.
   window.__mapProbe.recede = 'fading';
-  setTimeout(() => {
-    if (seqGuard() !== seq || twinOpen) return;
-    try {
-      // Skip the forced off when the live driver re-armed the wash inside the
-      // fade window (fresh zoom steps): the driver owns it now, and forcing
-      // off restarts the 0.45s transition mid-fade — the ghost shimmer.
-      const lz = mapRef ? +mapRef.getZoom() : NaN;
-      const lp = proximityInfo();
-      const driverOwns = Number.isFinite(lz) && lp && lp.near && centerBlendForZoom(lz) > 0;
-      if (!driverOwns) showVignette(false);
-    } catch { /* cosmetic */ }
-    try {
-      recedeToHome();
-    } catch { /* recede is best-effort */ }
-  }, reduced ? 0 : RECEDE_DELAY_MS);
+  // No recede-delay timer: run the recede synchronously. With no auto leg
+  // this only asserts the frame + lands already-home arrivals; every other
+  // motion waits for the fingers.
+  try {
+    // Skip the forced off when the live driver re-armed the wash inside the
+    // teardown (fresh zoom steps): the driver owns it now, and forcing
+    // off restarts the 0.45s transition mid-fade — the ghost shimmer.
+    const lz = mapRef ? +mapRef.getZoom() : NaN;
+    const lp = proximityInfo();
+    const driverOwns = Number.isFinite(lz) && lp && lp.near && centerBlendForZoom(lz) > 0;
+    if (!driverOwns) showVignette(false);
+  } catch { /* cosmetic */ }
+  try {
+    recedeToHome();
+  } catch { /* recede is best-effort */ }
   try {
     document.body.classList.remove('twin-open');
   } catch { /* chrome class is cosmetic */ }
@@ -2554,11 +2545,11 @@ function doCloseTwin() {
  * twin was open (the settle reconcile was blocked), and teardowns move no
  * camera — so without this, a journey tilt parks at the teardown zoom
  * forever (measured: pitch 10 frozen at z=1.49, pitch 45 frozen at z=1.49,
- * through every later rest). If the journey ever owned the tilt, ease pitch
- * onto the law at the teardown zoom on the settle tempo: below-band that is
- * flat; at deep zoom it holds the handoff pose for the recede to retrace.
- * Pitch-only; zoom/center untouched; a camera the journey never tilted (due
- * false) is never yanked. At-target teardowns no-op here. */
+ * through every later rest). If the journey ever owned the tilt, SNAP pitch
+ * onto the law at the teardown zoom (jumpTo — instant, no timers): below-band
+ * that is flat; at deep zoom it holds the handoff pose for the fingers to
+ * retrace. Pitch-only; zoom/center untouched; a camera the journey never
+ * tilted (due false) is never yanked. At-target teardowns no-op here. */
 function flattenJourneyTiltToLaw(reason) {
   try {
     if (!isoRestoreDue || !mapRef) return;
@@ -2570,8 +2561,8 @@ function flattenJourneyTiltToLaw(reason) {
       const gLaw = pitchTargetForZoom(gz);
       if (Math.abs(gp - gLaw) > 1) {
         try {
-          mapRef.easeTo({ pitch: gLaw, duration: SETTLE_EASE_MS });
-        } catch { /* guarantor ease is best-effort */ }
+          mapRef.jumpTo({ pitch: gLaw });
+        } catch { /* guarantor snap is best-effort */ }
       }
     }
   } catch { /* guarantor never breaks teardown */ }
@@ -2727,10 +2718,6 @@ function recedeToHome() {
     recedeDone = true;
     receding = false;
     recedeLandHome = null;
-    autoReceding = false;
-    try {
-      if (recedeIdleT) { clearTimeout(recedeIdleT); recedeIdleT = null; }
-    } catch { /* idle timer teardown is best-effort */ }
     try {
       let ms = null;
       try {
@@ -2747,15 +2734,13 @@ function recedeToHome() {
     // Last-chance flatten: the home arrival below clears isoRestoreDue, so a
     // tilt that never retraced (fast flick over the band landing home on a
     // live step, where the zoomend-gated reconcile above cannot fire) would
-    // strand at iso at world zoom. Pitch-only, existing settle tempo — zoom
-    // and center untouched, flat arrivals no-op inside tolerance. Skipped
-    // while the idle-auto leg runs: it already targets pitch 0, and a second
-    // ease would supersede it mid-flight (measured: zoom parked at 6.43 with
-    // pitch frozen — overlapping eases stall each other).
+    // strand at iso at world zoom. Pitch-only INSTANT snap (jumpTo, no
+    // timers) — zoom and center untouched, flat arrivals no-op inside
+    // tolerance. No timer ever owns camera motion on this path.
     try {
       const pHome = mapRef ? +mapRef.getPitch() : null;
-      if (!autoReceding && Number.isFinite(pHome) && Math.abs(pHome) > ISO_SETTLE_TOL_DEG) {
-        mapRef.easeTo({ pitch: 0, duration: SETTLE_EASE_MS });
+      if (Number.isFinite(pHome) && Math.abs(pHome) > ISO_SETTLE_TOL_DEG) {
+        mapRef.jumpTo({ pitch: 0 });
       }
     } catch (err) {
       errors.push('RECEDE-HOME-PITCH: ' + (err && err.message));
@@ -2796,71 +2781,11 @@ function recedeToHome() {
         const lz = +mapRef.getZoom();
         if (Number.isFinite(lz) && isHomeZoom(lz)) landHome();
       } catch { /* arrival check is best-effort */ }
-      // IDLE-AUTO RECEDE: fingers own the way home first, but a close with no
-      // following gesture would sit tilted under the faded twin indefinitely
-      // (measured: 3s+ static at 45deg awaiting input — the zoom-out wait).
-      // If no zoom motion arrives within the idle window, run the same leg
-      // programmatically; the FIRST gesture input cancels it and manual owns
-      // the rest (the zoom-step arrival still lands home either way).
-      try {
-        const mySeq = ++recedeIdleSeq;
-        if (recedeIdleT) { try { clearTimeout(recedeIdleT); } catch {} recedeIdleT = null; }
-        // Re-arms itself while the fingers are in flight; offers the auto leg
-        // only at a true stop.
-        const armIdle = () => {
-          let armCz = null;
-          try { armCz = mapRef ? +mapRef.getZoom() : null; } catch { armCz = null; }
-          recedeIdleT = setTimeout(() => {
-            armIdleFire(mySeq, armCz);
-          }, 700);
-        };
-        const armIdleFire = (seq, az) => {
-          try {
-            if (seq !== recedeIdleSeq) return; // superseded recede
-            if (twinOpen || recedeDone || !receding) return;
-            if (!mapRef) return;
-            let cz = null;
-            try { cz = +mapRef.getZoom(); } catch { cz = null; }
-            if (!Number.isFinite(cz) || isHomeZoom(cz)) return; // fingers already landed it
-            // Fingers in flight (zoom moved since the arm): manual owns this
-            // window — push the offer out instead of fighting the gesture.
-            if (Number.isFinite(az) && Math.abs(cz - az) > 0.05) { armIdle(); return; }
-            // Cancel-on-input, armed only now that the auto leg is real: the
-            // next gesture stops the programmatic ease and owns the rest.
-            const onInput = () => {
-              try {
-                if (mySeq !== recedeIdleSeq || !autoReceding) return;
-                autoReceding = false;
-                try { if (window.__mapProbe.recede === 'auto') window.__mapProbe.recede = 'out'; } catch { /* probe cosmetic */ }
-                try {
-                  if (mapRef && typeof mapRef.stop === 'function') mapRef.stop();
-                } catch { /* stop is best-effort */ }
-              } catch { /* cancel never breaks input */ }
-            };
-            try {
-              const ctn = mapRef.getContainer();
-              if (ctn) {
-                ctn.addEventListener('wheel', onInput, { capture: true, passive: true, once: true });
-                ctn.addEventListener('mousedown', onInput, { capture: true, passive: true, once: true });
-                ctn.addEventListener('touchstart', onInput, { capture: true, passive: true, once: true });
-              }
-            } catch { /* cancel wiring is best-effort */ }
-            autoReceding = true;
-            try { window.__mapProbe.recede = 'auto'; } catch { /* probe cosmetic */ }
-            // Journey home is the country frame (COUNTRY_ZOOM = Z_MIN), not
-            // the absolute floor: landing there trips the arrival check at
-            // the END of this ease, so no second ease ever overlaps it.
-            mapRef.easeTo({
-              center: COUNTRY_CENTER.slice(),
-              zoom: COUNTRY_ZOOM,
-              bearing: 0,
-              pitch: 0,
-              duration: 1400,
-            });
-          } catch { /* auto leg is best-effort */ }
-        };
-        armIdle();
-      } catch { /* idle arm is best-effort */ }
+      // No auto leg, by owner rule: every motion after a close is owned by
+      // the fingers. A close with no following gesture sits at its law pose
+      // (flat below the band, handoff pose deep) until the next scroll tick
+      // — the takeover carries zoom + pitch exactly from there, so there is
+      // no strand to rescue and no timer to arm.
     }
   } catch (err) {
     errors.push('RECEDE: ' + (err && err.message));
@@ -3136,22 +3061,22 @@ function guardEaseQueue(map) {
     try { window.__mapProbe.easeGuard = true; } catch { /* probe cosmetic */ }
   } catch { /* guard best-effort */ }
 }
-/** Band takeover: inside the tilt band, aimed at the hotspot, ONE easeTo
- * carries zoom + pitch + zoom-to-point per wheel tick (single writer).
- * Measured reason: under the native scroll path EVERY in-flight pitch write
- * dies — hook approvals, pump setPitch, per-tick scrub writes — and only
- * settle-landings stick, so a continuous dive froze at the first slew-capped
- * write (~10deg) all the way to the commit. The ease path applies hook
- * approvals (measured: a lone easeTo tracks the law exactly), and easeTo
- * takes zoom + pitch + around in ONE call, so the tilt rides the gesture
- * exactly instead of stair-stepping on settles. Scoped tight: tilt band
- * only (z in [Z_ISO_START-1, Z_HANDOFF+0.5]), aimed or already journeying,
+/** Band takeover: inside the tilt band, aimed or journeying, each wheel tick
+ * drives the camera INSTANTLY (duration 0 — one synchronous write, no
+ * timers, no lag). Measured reason: a 120ms ease per tick supersedes the
+ * previous one, so fast scrolling completed a fraction of each leg and the
+ * dive crawled (~0.06 zoom/tick). Duration 0 keeps the exact event path the
+ * eases used (zoom events fire, the hook passes the law value through
+ * untouched, the driver runs per tick) with zero lag: the camera IS the
+ * scroll. Zoom + law pitch + around in ONE write (single writer). Rate
+ * mirrors the native wheel/trackpad rates so in-band speed == out-of-band
+ * speed. Each tick also feeds staged S (flip-space sign) so the S-scrubbed
+ * hold, dissolve, and commit advance on the fingers even though this
+ * listener stopPropagations the canvas lane. Scoped tight: tilt band only,
  * no twin, no flight, no twin-busy states; the gesture-owned recede keeps
- * its ticks (they execute exactly instead of approximately). Everything else
- * stays native (the flip lane, out-of-band zoom, below-band retreat, pinch). Window-capture so
- * it runs before the flip clone; preventDefault + stopPropagation so the
- * native handler never double-drives the tick. Rate matches the native wheel
- * rate so in-band speed == out-of-band speed. */
+ * its ticks (they execute exactly). Everything else stays native.
+ * Window-capture so it runs before the flip clone; preventDefault +
+ * stopPropagation so the native handler never double-drives the tick. */
 function installBandTakeover() {
   // Native rates, mirrored from the scroll handler so in-band speed matches:
   // trackpad ticks are small and fast, wheel ticks large and slow; line-mode
@@ -3193,14 +3118,22 @@ function installBandTakeover() {
         }
       } catch { around = null; }
       try {
+        // Instant drive: duration 0 writes synchronously on this tick — the
+        // camera cannot lag the fingers and no timer ever owns the motion.
         const opts = {
           zoom: target,
           pitch: pitchTargetForZoom(target),
-          duration: 120,
+          duration: 0,
         };
         if (around) opts.around = around;
         mapRef.easeTo(opts);
       } catch { /* drive is best-effort */ }
+      // Feed staged S in flip-space sign (dive is negative there): the
+      // stopPropagation above starves the canvas accumulator, and without
+      // this S sticks at 0 and the commit falls back to timeouts.
+      try {
+        feedStagedScroll(-dy);
+      } catch { /* S feed is best-effort */ }
       try { window.__mapProbe.takeover = true; } catch { /* probe cosmetic */ }
     } catch { /* takeover never breaks input */ }
   };
@@ -3292,20 +3225,31 @@ function installStagedAccum(laneEl) {
   try { laneEl.__stagedAccumInstalled = true; } catch { /* flag best-effort */ }
   laneEl.addEventListener('wheel', (e) => {
     try {
-      if (!stagedActive || stagedCommitted) return;
-      if (!pendingReveal || pendingReveal.revealed) {
-        // A close tore the prewarm down mid-hold — unwind, never drive.
-        try {
-          exitStaged();
-        } catch { /* unwind is best-effort */ }
-        return;
-      }
-      const dy = +e.deltaY;
-      if (!Number.isFinite(dy) || dy === 0) return;
-      stagedS = accumStagedS(stagedS, dy); // symmetric: scroll-up retraces the same law
-      driveStagedOverlay(); // repaints the overlay AND posts S to the twin (throttled)
+      feedStagedScroll(+e.deltaY);
     } catch { /* accumulator never breaks the map */ }
   }, { passive: true });
+}
+/** Shared S feeder (flip-space delta: forward/dive is negative — the flip
+ * lane negates raw wheel so intent is -deltaY in both conventions). Called
+ * from the passive canvas listener AND from the band takeover (whose
+ * stopPropagation would otherwise starve S: measured S=0 through whole
+ * dives, so the S-scrubbed dissolve/hold/commit never advanced and the
+ * commit fell back to timeouts). Same guards, same drive, both lanes. */
+function feedStagedScroll(dyFlip) {
+  try {
+    if (!stagedActive || stagedCommitted) return;
+    if (!pendingReveal || pendingReveal.revealed) {
+      // A close tore the prewarm down mid-hold — unwind, never drive.
+      try {
+        exitStaged();
+      } catch { /* unwind is best-effort */ }
+      return;
+    }
+    const dy = +dyFlip;
+    if (!Number.isFinite(dy) || dy === 0) return;
+    stagedS = accumStagedS(stagedS, dy); // symmetric: scroll-up retraces the same law
+    driveStagedOverlay(); // repaints the overlay AND posts S to the twin (throttled)
+  } catch { /* accumulator never breaks the map */ }
 }
 
 async function boot() {
@@ -3317,8 +3261,10 @@ async function boot() {
     zoom: MAP_FLOOR, // first-load frame: full map, hotspot centered
     // GATE-12-A NATIVE-ZOOM: native zoom STAYS ON everywhere (wheel
     // scrollZoom + touch pinch). The journey RIDES on zoom/zoomend/move
-    // events and never hijacks gestures — no preventDefault capture path.
-    // First load sits AT the floor (full map); zoom-in travels the whole
+    // events; the ONLY capture is the band takeover's in-band aimed ticks
+    // (instant duration-0 drive per tick — the camera IS the scroll, no
+    // timers, no lag) plus the flip's direction clone. First load sits AT
+    // the floor (full map); zoom-in travels the whole
     // journey from flat over warming tiles. Home stays the journey rest
     // below the fade start, the floor is the clamp.
     scrollZoom: true,

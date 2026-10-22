@@ -254,7 +254,7 @@ test('reverse: re-arm and home arrival keep tilt ownership until the pitch flatt
     'pitch drivers park on flights only — prewarm/reverse/recede keep tracking the law',
   );
   assert.ok(
-    main.includes('mapRef.easeTo({ pitch: gLaw, duration: SETTLE_EASE_MS });'),
-    'teardown eases a journey-owned tilt onto the law (close-time flatten guarantor)',
+    main.includes('mapRef.jumpTo({ pitch: gLaw });'),
+    'teardown snaps a journey-owned tilt onto the law (close-time flatten guarantor, instant — no timers)',
   );
 });
