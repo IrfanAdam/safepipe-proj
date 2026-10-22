@@ -2956,7 +2956,7 @@ window.addEventListener('message', (e) => {
   if (!twinOpen || !isTwinCloseData(e && e.data)) return;
   const recede = !!(e.data && typeof e.data === 'object' && e.data.recede);
   if (recede) {
-    // Handoff-5-close: the twin already returned to top-down sat — keep
+    // Handoff-5-close: the twin already returned to ring-iso sat — keep
     // map-sat ON underneath the twin fade, then finishTwinClose() runs the
     // single close chain (fade ~450ms, then sat->flat + zoom out to the
     // blip). Never cut, never fade over flat. Handoff-6-retrace: the reply

@@ -245,6 +245,15 @@ test('twin wiring: scrub-owned forward, shelved cap, staged consumer, idle-gated
   assert.ok(main.includes('isFlightIdle'), 'flight-idle feed passed to the twin');
   const overlays = srcOf('../src/ring2/overlays.js');
   assert.ok(overlays.includes('flightIdle: flightIdle()'), 'redrape consults flight-idle');
+  // Round-5 way-back lockstep: every close posts from ring-iso at mix 0
+  // (matches the parent cut) — never the top-down hold frame.
+  assert.ok(main.includes('function pinReverseEnd()'), 'reverse end pin helper exists');
+  assert.ok(
+    (main.match(/pinReverseEnd\(\)/g) || []).length >= 4,
+    'all three completion sites + helper pin the ring-iso end',
+  );
+  assert.ok(main.includes("=== 'swoop'"), 'reverse legs truncate at the ring-iso leg');
+  assert.ok(main.includes('handoff.mid'), 'reverse end reads the live mid anchor');
 });
 
 // Lane T, Part A: the pixel fold. A transparent/blank twin (all zeros —

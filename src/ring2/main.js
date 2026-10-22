@@ -628,9 +628,11 @@ async function boot() {
    * satellite), hold a beat, ease to iso at the attached angle (same
    * ring center/range, slider STAYS at 0), then a tiny push-in to the
    * terminal while the SAT->TWIN slider drives satellite->twin — the
-   * push-in and the slider move together. Close plays the exact mirror:
-   * pull back to the ring frame + slider->0 + pitch->0 (pull segment, then
-   * pitch-back segment), then posts the close message with {recede:true}
+   * push-in and the slider move together. Close plays the mirror back to the
+   * ring-iso waypoint only (pull segment + slider->0, NO pitch-back leg):
+   * the parent cuts to its tilted-satellite law pose there, so ending
+   * top-down would snap the cut 45° (round-5 way-back lockstep — the twin
+   * posts {recede:true} from ring-iso at mix 0).
    * so the parent fades sat->flat + zooms back out.
    * Pure math (parse/ease/message) lives in sector.js (node-checkable);
    * this block owns the camera/slider flight. Never breaks boot. */
@@ -707,6 +709,33 @@ async function boot() {
       twin.updateControls();
     } catch { /* flight steps pin per-frame anyway */ }
     return s;
+  }
+  /* Reverse end pin (round-5 way-back lockstep): every close posts from the
+   * RING-ISO waypoint (mid) at mix 0 — never the top-down hold frame. The
+   * parent cuts to the map at its law pose (site center, handoff zoom, 45°
+   * tilt, satellite), which IS ring-iso at mix 0 (same handed anchors, same
+   * 45° HANDOFF_ISO_POLAR_DEG, same Esri imagery) — so the cut is seamless.
+   * Posting from top-down used to snap the cut 45° (the way-back mismatch:
+   * the twin walked an extra leg the map never follows). Falls back to the
+   * top-down pin when the mid anchor is unknown. */
+  function pinReverseEnd() {
+    try {
+      const mid = handoff.mid;
+      if (mid && mid.eye && mid.target) {
+        applyFlightPose(
+          { x: mid.eye.x, y: mid.eye.y, z: mid.eye.z },
+          { x: mid.target.x, y: mid.target.y, z: mid.target.z },
+        );
+        driveMix(HANDOFF_START_MIX);
+        return true;
+      }
+    } catch { /* top-down fallback below */ }
+    try {
+      const s = handoff.start;
+      if (s) pinTopDown(s.tx, s.tz, s.range, s.bearing);
+    } catch { /* pin is best-effort */ }
+    driveMix(HANDOFF_START_MIX);
+    return false;
   }
   function poseAt(tx, ty, tz, range, polarDeg, azimRad) {
     const pol = (polarDeg * Math.PI) / 180;
@@ -1035,6 +1064,23 @@ async function boot() {
       from = { eye: { ...pose.eye }, target: { ...pose.target } };
       fromMix = pose.mix;
     }
+    // Round-5 way-back lockstep: the reverse ENDS at the ring-iso waypoint
+    // (legs through the first 'swoop' leg) — never the top-down hold frame.
+    // The parent cuts to its tilted-satellite law pose there, so a top-down
+    // end snaps the cut 45°. Closes that never reached ring-iso (hold, or
+    // mid-swoop) complete FORWARD to it instead of undoing away from the map.
+    try {
+      const si = legs.findIndex((l) => String(l && l.name).toLowerCase() === 'swoop');
+      if (si >= 0) {
+        legs.length = si + 1;
+      } else {
+        const sw = stagePose('swoop');
+        if (sw) {
+          legs.length = 0;
+          legs.push({ ...sw, ms: stageUndoMs('swoop'), from: cur, fromMix: curMix });
+        }
+      }
+    } catch { /* keep the built legs */ }
     return { legs, order: order.slice(0, idx), from: cur };
   }
   /* GATE-3 ring-from-corners (defect 5, twin side): flight-phase -> ring
@@ -1327,13 +1373,8 @@ async function boot() {
           } catch { /* pose drive is best-effort */ }
           driveMix(s.mix);
           if (handoff.scrub.progress >= 1) {
-            const sd = handoff.start;
-            if (sd) {
-              try {
-                pinTopDown(sd.tx, sd.tz, sd.range, sd.bearing);
-              } catch { /* pin is best-effort */ }
-            }
-            driveMix(HANDOFF_START_MIX);
+            // Round-5: post from ring-iso (matches the parent cut) — never top-down.
+            pinReverseEnd();
             handoff.scrub = null;
             endHandoffFlight();
             postTwinClose();
@@ -1348,13 +1389,8 @@ async function boot() {
         // missing mid-walk — then the {recede:true} close posts.
         const walk = handoff.walk;
         if (!walk || !Array.isArray(walk.legs) || walk.i >= walk.legs.length) {
-          const s = handoff.start;
-          if (s) {
-            try {
-              pinTopDown(s.tx, s.tz, s.range, s.bearing);
-            } catch { /* pin is best-effort */ }
-          }
-          driveMix(HANDOFF_START_MIX);
+          // Round-5: post from ring-iso (matches the parent cut) — never top-down.
+          pinReverseEnd();
           endHandoffFlight();
           postTwinClose();
           return;
@@ -1575,15 +1611,8 @@ async function boot() {
     }
   }
   function finishScrubReverse() {
-    try {
-      const s = handoff.start;
-      if (s) {
-        try {
-          pinTopDown(s.tx, s.tz, s.range, s.bearing);
-        } catch { /* pin is best-effort */ }
-      }
-      driveMix(HANDOFF_START_MIX);
-    } catch { /* pin is best-effort */ }
+    // Round-5: post from ring-iso (matches the parent cut) — never top-down.
+    pinReverseEnd();
     handoff.scrub = null;
     endHandoffFlight();
     postTwinClose();
