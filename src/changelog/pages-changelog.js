@@ -532,7 +532,7 @@ function startLiveRefresh() {
 }
 const st = { active: new Set(), statusFilter: '', day: '', sel: [0, 0], open: false, stage: 'list',
   mlevel: 1,
-  view: 'list', tlSel: null, tlLast: null, tlSort: '', returnView: null, tlDate: '' };
+  view: 'list', tlSel: null, tlLast: null, tlSort: '', returnView: null, tlDate: '', filterTab: 'tags' };
 let tlToken = 0;
 const dueOnDay = (p, day) => (p.sprints || []).some((s) => { try { return dueOf(s) === day; } catch { return false; } });
 const visiblePlans = () => plans
@@ -636,7 +636,7 @@ function doPaint(root) {
   if (isMobile() && st.open && st.mlevel === 1 && st.sel[1] < 0) st.sel = [pi, -1];
   else st.sel = [pi, Math.max(si, 0)];
   paint(root, { list, pi, plan, sprints, si: st.sel[1], active: st.active, day: st.day,
-    statusFilter: st.statusFilter,
+    statusFilter: st.statusFilter, filterTab: st.filterTab || 'tags',
     sel: st.sel, open: st.open, stage: st.stage, mlevel: st.mlevel || 1, counts, plans, texts,
     dueCommit: st.dueCommit || null,
     rev: plan ? revOf(plan.file) : null, revOf, edited: plan ? (s) => sectionEdited(plan.file, s) : () => false,
@@ -714,9 +714,14 @@ export function mount(root) {
       const f = q.get('plan'), b = q.get('bout');
       if (f && plans.some((p) => p.file === f)) {
         const li = visiblePlans().findIndex((p) => p.file === f);
-        st.sel = [Math.max(li, 0), 0]; st.open = true; st.openFile = f; st.stage = 'tasks'; st.returnView = 'timeline';
-        // Timeline deep links land on the detail (L2) with the bout selected.
-        st.mlevel = 2;
+        // Deep link parity: mobile lands at L1 placeholder like list/timeline picks; desktop at L2.
+        if (isMobile()) {
+          st.sel = [Math.max(li, 0), -1]; st.open = true; st.openFile = f; st.stage = 'tasks'; st.returnView = 'timeline';
+          st.mlevel = 1;
+        } else {
+          st.sel = [Math.max(li, 0), 0]; st.open = true; st.openFile = f; st.stage = 'tasks'; st.returnView = 'timeline';
+          st.mlevel = 2;
+        }
         if (b !== null && b !== '' && Number.isInteger(Number(b))) {
           st.tlSel = { planFile: f, boutIdx: Number(b) };
           st.tlLast = st.tlSel;

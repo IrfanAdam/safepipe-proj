@@ -326,3 +326,12 @@
 - Evidence: Tasks 10–15 each verified screenshots + green suite.
 
 *Shipped in 2b6f5ae · Tasks 9–15 · phase-4 · anchors {#phase-4} {#phase-5} {#phase-6} {#phase-7} {#phase-8} {#phase-9} {#phase-10} {#phase-11} retained for history.*
+
+### Task 16: Mobile filter drawer tabs ✓ done `<sha>` {#phase-12}
+
+**Objective:** Owner feedback — filter drawer gets Tags/Status tabs, drawer starts hidden on mobile (no forced scroll), status stays out of the list row.
+
+**Files:**
+- Modify: `src/changelog/changelog/paint-chips.js`, `src/changelog/changelog.css`, `src/changelog/changelog-events.js`, `src/changelog/pages-changelog.js`, `src/changelog/changelog-drawer.css`, `src/changelog/changelog/paint-detail.js`
+
+**Verify:** build green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-12]`; close with `✓ done` + sha.

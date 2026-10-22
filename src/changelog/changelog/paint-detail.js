@@ -28,9 +28,10 @@ export function paintDetail(root, ctx){
   // L1 rail head owns the '‹ All plans' back button (closes the drawer via
   // [data-mback]); L2/desktop keep the plain title. tabindex gives the
   // mobile focus move a target (script-focus only, never in tab order).
-  const railHead = '<div class="ds-rail-plan"' + (atL1 ? ' tabindex="-1" data-mlevel-head="rail"' : '') + '>' +
-    (atL1 ? '<button data-mback data-mlevel="1" aria-label="Back to all plans">‹ All plans</button>' : '') +
-    esc([plan.id, plan.title || provenance(plan)].filter(Boolean).join(' · ')) + '</div>';
+  const planTitle = esc([plan.id, plan.title || provenance(plan)].filter(Boolean).join(' · '));
+  const railHead = atL1
+    ? '<div class="ds-rail-head" tabindex="-1" data-mlevel-head="rail"><div class="ds-rail-toolbar"><button data-mback data-mlevel="1" aria-label="Back to all plans">‹ All plans</button></div><div class="ds-rail-plan">' + planTitle + '</div></div>'
+    : '<div class="ds-rail-plan">' + planTitle + '</div>';
   // First section per anchor owns its commits — a repeated anchor (prose head
   // claiming another phase's token) renders none, never a duplicate list.
   const dupAnchor = anchorOwners(sprints).dup;
@@ -82,9 +83,14 @@ export function paintDetail(root, ctx){
   // Mobile L1 (or a cleared selection): the detail pane stays parked
   // off-screen with a quiet placeholder — never the first phase.
   if (showPlaceholder) {
+    const phIsL2 = mobile && open && mlevel === 2;
+    const placeholderHead = phIsL2
+      ? '<div class="ds-drawer-head" tabindex="-1" data-mlevel-head="task"><div class="ds-drawer-toolbar"><button data-mback data-mlevel="2" aria-label="Back to phases">‹ Phases</button></div><b></b></div>'
+      : (mobile && open)
+        ? '<div class="ds-drawer-head"><b></b></div>'
+        : '<div class="ds-drawer-head"><b></b><button data-close aria-label="Close detail">✕</button></div>';
     root.querySelector('[data-col="tasks"]').innerHTML = [
-      '<div class="ds-drawer-head"><b></b>',
-      '<button data-close aria-label="Close detail">✕</button></div>',
+      placeholderHead,
       '<p class="ds-empty-detail">Select a phase or task</p>',
     ].join('');
     const u0 = unlinked(texts);
@@ -168,10 +174,13 @@ export function paintDetail(root, ctx){
     ? `<b data-tip="${esc(tagsFull)}">${esc(tagsTxt)}</b>`
     : `<b></b>`;
   root.querySelector('[data-col="tasks"]').innerHTML = [
-    '<div class="ds-drawer-head"' + ((mobile && open && mlevel === 2) ? ' tabindex="-1" data-mlevel-head="task"' : '') + '>',
-    (mobile && open && mlevel === 2) ? '<button data-mback data-mlevel="2" aria-label="Back to phases">‹ Phases</button>' : '',
-    tagsHead,
-    `<button data-close aria-label="Close detail">✕</button></div>`,
+    (() => {
+      const isL2 = mobile && open && mlevel === 2;
+      const drawerHeadHTML = isL2
+        ? '<div class="ds-drawer-head" tabindex="-1" data-mlevel-head="task"><div class="ds-drawer-toolbar"><button data-mback data-mlevel="2" aria-label="Back to phases">‹ Phases</button></div>' + tagsHead + '</div>'
+        : '<div class="ds-drawer-head">' + tagsHead + '<button data-close aria-label="Close detail">✕</button></div>';
+      return drawerHeadHTML;
+    })(),
     // Due row sits directly under the section title on EVERY paint: it is
     // always the first flow element after the title INSIDE .ds-md. The head
     // comes from the raw chunk, so ghost-preview paints (Due ahead of the

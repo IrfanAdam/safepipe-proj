@@ -11,7 +11,12 @@
 .ds-rail-plan{font-family:var(--font-mono);font-size:var(--text-micro);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--sp-text-primary);font-weight:600;line-height:var(--leading-prose);padding:var(--cl-8) var(--cl-16) var(--cl-8);margin:0 0 var(--cl-6);border-bottom:var(--border-hairline);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none;height:auto}
 .ds-task{flex:1 1 auto;min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:var(--cl-18) var(--cl-16) var(--cl-30)}
 @media (prefers-reduced-motion:reduce){.ds-drawer,.ds-scrim{transition:none;animation:none}}
-@media (max-width:720px){.ds-drawer{left:0;width:100vw;height:100vh;height:100dvh;max-width:none;flex-direction:column}}
+@media (max-width:720px){
+  .ds-scrim{inset:0;z-index:var(--z-ds-scrim)}
+  .ds-drawer{inset:0;left:0;right:0;top:0;bottom:0;width:100vw;max-width:100vw;height:100vh;height:100dvh;max-height:100dvh;flex-direction:column;z-index:var(--z-ds-drawer)}
+  /* keep drawer header/nav always on top of pane scroll */
+  .ds-drawer.is-open .ds-drawer-head{position:sticky;top:0;z-index:1;background:var(--color-bg)}
+}
 /* drawer head + picks */
 .ds-drawer-head{display:flex;gap:var(--cl-8);align-items:center;padding-top:var(--cl-6);margin-bottom:var(--cl-4)}
 .ds-drawer-head b{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-mono);font-size:var(--text-micro);text-transform:uppercase;letter-spacing:var(--tracking-mono);color:var(--color-ink-muted)}
@@ -232,9 +237,15 @@ button.ds-due-status{background:none;border:0;padding:0;text-align:left;cursor:p
 }
 /* Mobile L1 parked detail: quiet placeholder (nothing pre-selected). */
 .ds-empty-detail{font-family:var(--font-mono);font-size:var(--text-micro);color:var(--color-ink-muted);padding:var(--cl-16) 0;margin:0}
-/* Mobile L1 rail head: back button gets its own row so the plan title wraps
-   across the full width instead of colliding on one 390px line. */
+/* Mobile declutter: toolbar row holds ONLY back button (no close, no title
+   inline) — content begins below. Desktop layout untouched. */
 @media (max-width:720px){
-  [data-mlevel-head="rail"]{white-space:normal}
-  [data-mlevel-head="rail"] [data-mback]{display:flex;width:fit-content;margin:0 0 var(--cl-8)}
+  .ds-drawer-head{flex-direction:column;align-items:stretch;gap:var(--cl-8)}
+  .ds-drawer-head .ds-drawer-toolbar{display:flex;align-items:center}
+  .ds-drawer-head [data-close]{display:none !important}
+  .ds-drawer-head b{white-space:normal;overflow:visible;text-overflow:clip}
+  .ds-rail-head{display:flex;flex-direction:column;gap:var(--cl-8)}
+  .ds-rail-toolbar{display:flex;align-items:center}
+  .ds-rail-head .ds-rail-plan{white-space:normal;overflow:visible;text-overflow:clip}
+  .ds-rail-toolbar [data-mback],.ds-drawer-toolbar [data-mback]{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;padding:0 var(--cl-9)}
 }

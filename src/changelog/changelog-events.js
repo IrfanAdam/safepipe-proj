@@ -463,10 +463,17 @@ export function bindChangelogEvents(root, st, helpers) {
     if (li < 0) return;
     const plan = c.list[li];
     const apply = (si) => {
-      st.sel = [li, Math.min(Math.max(si, 0), Math.max(plan.sprints.length - 1, 0))];
-      st.open = true; st.openFile = file; st.stage = 'tasks'; st.returnView = 'timeline';
-      // Timeline opens land on the detail (L2) with the bout selected.
-      st.mlevel = 2;
+      // Mobile parity: timeline opens land at L1 placeholder like list picks
+      // (mlevel=1, sel[1]=-1); desktop keeps detail (mlevel=2, phase selected).
+      if (isMobile()) {
+        st.sel = [li, -1];
+        st.open = true; st.openFile = file; st.stage = 'tasks'; st.returnView = 'timeline';
+        st.mlevel = 1;
+      } else {
+        st.sel = [li, Math.min(Math.max(si, 0), Math.max(plan.sprints.length - 1, 0))];
+        st.open = true; st.openFile = file; st.stage = 'tasks'; st.returnView = 'timeline';
+        st.mlevel = 2;
+      }
       if (boutIdx !== null && boutIdx !== undefined) {
         st.tlSel = { planFile: file, boutIdx };
         st.tlLast = st.tlSel;
@@ -474,6 +481,8 @@ export function bindChangelogEvents(root, st, helpers) {
       hidePop(); doPaint(root);
     };
     if (ghost) {
+      // Desktop ghost still resolves its section; mobile parks at L1 placeholder.
+      if (isMobile()) { apply(-1); return; }
       import('./changelog/timeline-paint.js').then((m) => {
         try { apply(m.ghostSection(plan)); } catch { apply(0); }
       }).catch(() => apply(0));
@@ -897,35 +906,67 @@ export function bindChangelogEvents(root, st, helpers) {
     const dp = root.querySelector('[data-due-pop]:not([hidden])');
     if (dp && !(e.target.closest && e.target.closest('[data-due-pop],[data-due-open]'))) dp.hidden = true;
     if (e.target.closest('[data-day-clear]')) { st.day = ''; st.sel = [0, 0]; doPaint(root); return; }
-    // Filter dropdown toggles (tag + status share the dismiss idiom; opening
-    // one closes the other)
-    const closeDd = (ddSel, btnSel) => {
-      const dd = root.querySelector(`[${ddSel}]`);
+    // Unified filter drawer: single Filter button opens tabbed drawer (Tags / Status)
+    const closeFilterDrawer = () => {
+      const dd = root.querySelector('[data-filter-drawer]') || root.querySelector('[data-tag-dropdown]');
       if (dd) dd.hidden = true;
-      const fb = root.querySelector(`[${btnSel}]`);
+      const fb = root.querySelector('[data-filter-toggle]') || root.querySelector('[data-tag-filter]');
       if (fb) fb.setAttribute('aria-expanded', 'false');
     };
-    const tf = e.target.closest('[data-tag-filter]');
+    const ensureFilterVisible = () => {
+      const dd = root.querySelector('[data-filter-drawer]') || root.querySelector('[data-tag-dropdown]');
+      if (!dd || dd.hidden) return;
+      try {
+        // Fixed bottom sheet is already viewport-anchored; on desktop ensure anchor scrolled into view
+        const btn = root.querySelector('[data-filter-toggle]') || root.querySelector('[data-tag-filter]');
+        if (btn && typeof btn.scrollIntoView === 'function') {
+          const r = btn.getBoundingClientRect();
+          if (r.top < 0 || r.bottom > (typeof innerHeight !== 'undefined' ? innerHeight : 800)) {
+            btn.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+          }
+        }
+        // Ensure drawer top is not pushed off-screen when max-height clips
+        if (dd.getBoundingClientRect) {
+          const dr = dd.getBoundingClientRect();
+          if (dr.bottom > (typeof innerHeight !== 'undefined' ? innerHeight : 800)) {
+            dd.scrollTop = 0;
+          }
+        }
+      } catch {}
+    };
+    // Filter tab switch (inside drawer, no repaint)
+    const ftab = e.target.closest('[data-filter-tab]');
+    if (ftab) {
+      const tab = ftab.dataset.filterTab;
+      if (tab === 'tags' || tab === 'status') {
+        st.filterTab = tab;
+        try {
+          const drawer = root.querySelector('[data-filter-drawer]') || root.querySelector('[data-tag-dropdown]');
+          if (drawer) {
+            drawer.querySelectorAll('[data-filter-tab]').forEach((b) => {
+              const is = b.dataset.filterTab === tab;
+              b.classList.toggle('is-active', is);
+              b.setAttribute('aria-selected', String(is));
+              if (is) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+            });
+            drawer.querySelectorAll('[data-filter-panel]').forEach((p) => {
+              p.hidden = p.dataset.filterPanel !== tab;
+            });
+          }
+        } catch {}
+      }
+      return;
+    }
+    const tf = e.target.closest('[data-filter-toggle]') || e.target.closest('[data-tag-filter]');
     if (tf) {
-      const dd = root.querySelector('[data-tag-dropdown]');
-      if (dd) { dd.hidden = !dd.hidden; tf.setAttribute('aria-expanded', String(!dd.hidden)); }
-      closeDd('data-status-dropdown', 'data-status-filter');
+      const dd = root.querySelector('[data-filter-drawer]') || root.querySelector('[data-tag-dropdown]');
+      if (dd) { dd.hidden = !dd.hidden; tf.setAttribute('aria-expanded', String(!dd.hidden)); if (!dd.hidden) ensureFilterVisible(); }
       return;
     }
-    const sf = e.target.closest('[data-status-filter]');
-    if (sf) {
-      const dd = root.querySelector('[data-status-dropdown]');
-      if (dd) { dd.hidden = !dd.hidden; sf.setAttribute('aria-expanded', String(!dd.hidden)); }
-      closeDd('data-tag-dropdown', 'data-tag-filter');
-      return;
-    }
-    // Outside-dismiss: a click outside either open dropdown and outside both
-    // buttons closes them (same idiom as the datepicker dismiss above).
-    // [plan:2026-10-15_120000-safepipe-changelog-timeline.md#scheduling]
-    const openDd = root.querySelector('[data-tag-dropdown]:not([hidden]),[data-status-dropdown]:not([hidden])');
-    if (openDd && !(e.target.closest && e.target.closest('[data-tag-dropdown],[data-tag-filter],[data-status-dropdown],[data-status-filter]'))) {
-      closeDd('data-tag-dropdown', 'data-tag-filter');
-      closeDd('data-status-dropdown', 'data-status-filter');
+    // Outside-dismiss for unified drawer
+    const openDd = root.querySelector('[data-filter-drawer]:not([hidden])') || root.querySelector('[data-tag-dropdown]:not([hidden])');
+    if (openDd && !(e.target.closest && e.target.closest('[data-filter-drawer],[data-tag-dropdown],[data-filter-toggle],[data-tag-filter]'))) {
+      closeFilterDrawer();
     }
     // Checkbox in filter dropdown
     const topt = e.target.closest('[data-tag-opt]');
