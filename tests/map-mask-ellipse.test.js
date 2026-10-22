@@ -89,7 +89,8 @@ test('driver writes --vr-y everywhere it writes --vr (both sites)', () => {
   const vryWrites = (src.match(/setProperty\('--vr-y'/g) || []).length;
   assert.ok(vrWrites >= 2, `both write sites set --vr (found ${vrWrites})`);
   assert.equal(vryWrites, vrWrites, `--vr-y is written everywhere --vr is (${vryWrites} vs ${vrWrites})`);
-  assert.ok(src.includes("removeProperty('--vr-y')"), 'the park path clears --vr-y with --vr');
+  assert.ok(!src.includes("removeProperty('--vr"), 'the park path never clears --vr/--vr-y to the 260px initial');
+  assert.ok(src.includes('parkEnclosureEllipse()'), 'the park path reuses the last live radii (else the seam constant)');
   assert.ok(src.includes('enclosureEllipsePxForZoom('), 'both sites ride the ellipse law');
 });
 

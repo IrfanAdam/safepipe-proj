@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Ops 3D — Hotspot launcher map</title>
 <link rel="icon" href="data:," />
+<link rel="preconnect" href="https://server.arcgisonline.com" crossorigin />
 <link rel="stylesheet" href="./design-system/ops-tokens.css" />
 <style>
   html, body { margin: 0; height: 100%; background: var(--ops-bg); }
@@ -174,17 +175,18 @@
    * do NOT put --vr / --vr-y in `transition`: a transition on the property freezes
    * the gradient at its start value instead of gliding (verified headless).
    * The close-in reads as animation because the gesture streams steps.
-   * Colorless edge: transparent core runs to --vr / --vr-y, a hard stop pair cuts
-   * to black AT the ellipse edge (crisp boundary, no color stroke), then darkness
-   * feathers outward to the solid surround. */
+   * Colorless edge: transparent core dissolves across a feathered band
+   * straddling --vr / --vr-y (fade starts inside the ellipse edge, full
+   * black lands just outside it), then darkness feathers outward to the
+   * solid surround — no cut, no color stroke. */
   @property --vr { syntax: '<length>'; inherits: true; initial-value: 260px; }
   @property --vr-y { syntax: '<length>'; inherits: true; initial-value: 260px; }
   #map-vignette {
     position: absolute; inset: 0; z-index: 3; pointer-events: none;
     background: radial-gradient(ellipse var(--vr) var(--vr-y, var(--vr)) at var(--vx, 50%) var(--vy, 50%),
       transparent 0,
-      transparent var(--vr),
-      rgba(0, 0, 0, var(--ops-vignette-alpha)) var(--vr),
+      transparent calc(var(--vr) - 64px),
+      rgba(0, 0, 0, var(--ops-vignette-alpha)) calc(var(--vr) + 28px),
       var(--ops-bg) 100%);
     opacity: 0; transition: opacity 0.45s ease; /* GATE-3 REVISION tempo */
   }

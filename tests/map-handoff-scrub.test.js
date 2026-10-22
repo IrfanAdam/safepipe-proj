@@ -211,8 +211,8 @@ test('driver: twin-open keeps hook ownership until the overlay is opaque', () =>
   assert.ok(main.includes('TWIN_OVERLAY_OPAQUE'), 'opaque threshold is a named constant');
   assert.ok(main.includes('twinOverlayOpaque()'), 'the hook consults the guard');
   assert.ok(
-    main.includes('if (!dissolving && (twinOpen || transitId || pendingReveal || reverseWait)) return next;'),
-    'the hook releases only past opaque — dissolving keeps ownership',
+    main.includes('if (!dissolving && ((twinOpen && !hookRevThrough) || transitId || pendingReveal || (reverseWait && !hookRevThrough))) return next;'),
+    'the hook releases only past opaque — dissolving keeps ownership; reverse-wait past the dissolve lets the pitch law flatten underneath',
   );
   assert.ok(main.includes('TWIN_READY_MSG'), 'twin-ready wire still owned by twinlink');
   assert.ok(main.includes('parseTwinPaintedMessage'), 'twin-painted wire still owned by twinlink');
@@ -237,4 +237,20 @@ test('driver: commit requires near-and-non-blank (scale-seeded S, gated landing)
   assert.ok(main.includes('if (!proxNear || !scaleNear)'), 'off-frame holds the commit, retries next tick');
   assert.ok(main.includes('staged.notNear'), 'off-frame probe reports which gate held');
   assert.ok(main.includes('staged.scaleFar'), 'off-scale probe reports which gate held');
+});
+
+test('reverse: re-arm and home arrival keep tilt ownership until the pitch flattens', () => {
+  const main = srcOf('../src/map/main.js');
+  assert.ok(
+    main.includes('if (rearmFlat) isoScrubOwned = false;'),
+    'the re-arm gate clears tilt ownership on pitch-flat, never on zoom alone',
+  );
+  assert.ok(
+    main.includes('if (homeFlat) {'),
+    'the home arrival never parks a tilt at world zoom',
+  );
+  assert.ok(
+    main.includes('const busyPitch = !!(transitId || pendingReveal);'),
+    'the pitch-only scrub gate is exempt from the reverse-wait park',
+  );
 });
