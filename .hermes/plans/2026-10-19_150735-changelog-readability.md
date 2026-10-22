@@ -327,7 +327,7 @@
 
 *Shipped in 2b6f5ae · Tasks 9–15 · phase-4 · anchors {#phase-4} {#phase-5} {#phase-6} {#phase-7} {#phase-8} {#phase-9} {#phase-10} {#phase-11} retained for history.*
 
-### Task 16: Mobile filter drawer tabs ✓ done `<sha>` {#phase-12}
+### Task 16: Mobile filter drawer tabs ✓ done `63867b3` {#phase-12}
 
 **Objective:** Owner feedback — filter drawer gets Tags/Status tabs, drawer starts hidden on mobile (no forced scroll), status stays out of the list row.
 
