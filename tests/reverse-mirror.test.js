@@ -187,7 +187,7 @@ test('reverse pose law: live pose at 0, ring top-down at 1, symmetric mid', () =
 test('map producer wired: S posts to the twin frame, value-change throttled', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(main.includes('function postTwinStagedS()'), 'producer exists');
-  assert.ok(main.includes('postMessage(buildTwinStagedMessage(s)'), 'posts the shaped payload to the frame');
+  assert.ok(main.includes('postMessage(buildTwinStagedMessage(s, zPost)'), 'posts S + live zoom to the frame (round-8 release-fresh anchors)');
   assert.ok(main.includes('lastPostedStagedS !== null && s === lastPostedStagedS'), 'throttles to value-change');
   assert.ok((main.match(/postTwinStagedS\(\)/g) || []).length >= 2, 'driver calls the producer (def + call)');
   assert.ok(main.includes('accumStagedS(stagedS, dy)'), 'accumulator owns S through the shared law');
@@ -196,7 +196,7 @@ test('map producer wired: S posts to the twin frame, value-change throttled', ()
 test('twin consumer present: staged listener feeds the intro scrub', () => {
   const main = srcOf('../src/ring2/main.js');
   assert.ok(main.includes('isTwinStagedMessage(e?.data)'), 'staged channel is received');
-  assert.ok(main.includes('applyTwinStagedS(e.data.s)'), 'S reaches the staged driver');
+  assert.ok(main.includes('applyTwinStagedS(e.data.s, e.data.z)'), 'S + zoom reach the staged driver (round-8 release-fresh anchors)');
   assert.ok(main.includes('fwdProgressForStagedS(handoff.fwdStagedS'), 'staged S still drives progress (autoplay fallback intact)');
 });
 

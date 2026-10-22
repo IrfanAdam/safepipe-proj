@@ -192,6 +192,35 @@ test('round-6 way-in continuity: S waits at the reveal gate until the twin grant
   );
 });
 
+test('round-8 sync audit: twin release re-derives mid from grant-time zoom', () => {
+  // Measured: arrival at z~10.8, grant at the 11.5 ceiling — the frozen
+  // arrival mid (10.8-scale iso) dissolved over an 11.5 map = the unsynced
+  // seam after the parked state. The release must re-derive the ring iso
+  // from the freshest posted zoom (grant-time re-emit), falling back to the
+  // handed frame, then the frozen anchor — never a canned pose.
+  const twin = srcOf('../src/ring2/main.js');
+  assert.ok(
+    twin.includes('mid: releaseFreshMid(handoff.mid),'),
+    'the release builds legs from a grant-fresh mid',
+  );
+  assert.ok(
+    twin.includes('handoff.fwdStagedZ = zz;'),
+    'the staged driver stamps the posted zoom',
+  );
+  assert.ok(
+    twin.includes('function releaseFreshMid(fallback)'),
+    'the re-derivation helper exists with a frozen-anchor fallback',
+  );
+  assert.ok(
+    twin.includes('frameRange(z, { viewportPx: viewportPxNow()'),
+    'the re-derivation mirrors the boot anchor math (range -> rails -> iso)',
+  );
+  const link = srcOf('../src/map/twinlink.js');
+  assert.ok(
+    link.includes('msg.z = zz;'),
+    'the staged wire carries the live zoom when finite, omits it otherwise',
+  );
+});
 test('round-7 sync audit: parked pre-grant entry tracks the live zoom', () => {
   // Measured: zoom 10.94->11.48 over 3 ticks with the ring frozen at the
   // arrival entry (286px) — static circle, zooming terrain. The ceiling
@@ -262,7 +291,8 @@ test('driver: twin-open keeps hook ownership until the overlay is opaque', () =>
 test('driver: commit requires near-and-non-blank (scale-seeded S, gated landing)', () => {
   const main = srcOf('../src/map/main.js');
   // Preserved shapes: the S producer throttle and the content sampling.
-  assert.ok(main.includes('win.postMessage(buildTwinStagedMessage(s)'), 'staged-S throttle shape untouched');
+  // Round-8: the live zoom rides the staged post (release-fresh anchors).
+  assert.ok(main.includes('win.postMessage(buildTwinStagedMessage(s, zPost)'), 'staged post carries S + live zoom');
   assert.ok(main.includes('const hasContent = twinFrameHasContent();'), 'content sampled once');
   assert.ok(main.includes('if (!hasContent)'), 'blank twin still holds the commit');
   assert.ok(

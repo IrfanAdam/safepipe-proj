@@ -1825,7 +1825,12 @@ function postTwinStagedS() {
     if (!fr || fr.getAttribute('data-url') === 'about:blank') return false;
     const win = fr.contentWindow;
     if (!win) return false;
-    win.postMessage(buildTwinStagedMessage(s), '*');
+    // Round-8: ride the live zoom along — the twin recomputes its release
+    // anchors from the grant-time post (the park ride stale-dates the
+    // arrival frame). Best-effort: a missing zoom still posts S.
+    let zPost = null;
+    try { zPost = mapRef ? +mapRef.getZoom() : null; } catch { zPost = null; }
+    win.postMessage(buildTwinStagedMessage(s, zPost), '*');
     lastPostedStagedS = s;
     lastStagedPostT = nowPost;
     try {

@@ -751,6 +751,41 @@ async function boot() {
       mixCtl.setMix(Math.round(v), { silent: true });
     } catch { /* slider drive never breaks the frame */ }
   }
+  /* Round-8 release-fresh ring iso: re-derive the swoop-end anchor from the
+   * freshest posted zoom instead of the arrival-frozen handoff.mid. The
+   * grant-time re-emit carries the live zoom, so the release pose matches
+   * the map frame the dissolve actually opens over. Falls back to the handed
+   * frame zoom, then to the frozen anchor (never a canned pose). */
+  function releaseFreshMid(fallback) {
+    try {
+      let z = Number(handoff.fwdStagedZ);
+      if (!Number.isFinite(z)) z = Number(handoff.frame && handoff.frame.z);
+      const a = handoff.anchor;
+      if (!Number.isFinite(z) || !a || !Number.isFinite(a.x) || !Number.isFinite(a.z)) return fallback;
+      let range = null;
+      try {
+        range = frameRange(z, { viewportPx: viewportPxNow(), lat: handoff.frame?.cy });
+      } catch { range = null; }
+      if (!Number.isFinite(range) || range <= 0) return fallback;
+      try {
+        const cl = clampHandoffRange(range);
+        if (Number.isFinite(cl) && cl > 0) range = cl;
+        else return fallback;
+      } catch { return fallback; }
+      let azim = Number(handoff.azim);
+      if (!Number.isFinite(azim)) {
+        const b = Number(handoff.frame?.bearing) || 0;
+        azim = -((b * Math.PI) / 180);
+      }
+      const aty = groundYNear(a.x, a.z);
+      return {
+        eye: poseAt(a.x, aty, a.z, range, HANDOFF_ISO_POLAR_DEG, azim),
+        target: { x: a.x, y: aty, z: a.z },
+      };
+    } catch {
+      return fallback;
+    }
+  }
   function capturePose() {
     let eye = null, tgt = null;
     try {
@@ -783,6 +818,7 @@ async function boot() {
     handoff.from = null;
     handoff.fwd = null;
     handoff.fwdStagedS = null;
+    handoff.fwdStagedZ = null;
     handoff.fwdStagedAt = null;
     handoff.capExpired = false;
     handoff.revMode = null;
@@ -1267,7 +1303,15 @@ async function boot() {
           const legs = buildForwardLegs({
             startPose: liveStart
               ?? (st ? { eye: startEye(st), target: { x: st.tx, y: st.ty, z: st.tz } } : null),
-            mid: handoff.mid,
+            // Round-8 release-fresh mid: the arrival-time anchor stale-dates
+            // across the park ride (measured: arrival at z~10.8, grant at the
+            // 11.5 ceiling — dissolving from a 10.8-scale iso over an 11.5
+            // map reads as the unsynced seam). Re-derive the ring iso from
+            // the freshest posted zoom (the grant-time re-emit proves the
+            // listener and carries the live zoom), falling back to the handed
+            // frame, then the frozen anchor. Same derivation as boot
+            // (frameRange -> clamp rails -> poseAt at the attached angle).
+            mid: releaseFreshMid(handoff.mid),
             to: handoff.to,
           });
           if (!legs) {
@@ -1618,16 +1662,23 @@ async function boot() {
     postTwinClose();
   }
   /* Task-36 staged forward driver (parent -> twin): the map-side staged
-   * scrub posts { type:'safepipe-twin-staged', s } as S accumulates past
+   * scrub posts { type:'safepipe-twin-staged', s, z } as S accumulates past
    * the gate. Receiving the first one flips the intro scrub from autoplay
    * to staged (progress follows the S mapping; symmetric on scroll-up).
    * In hold the pin never moves — S only seeds the release progress, so
-   * the ready match stays honest. Never breaks boot/input. */
-  function applyTwinStagedS(s) {
+   * the ready match stays honest. z (round-8) is the map's live zoom at
+   * post time — the release recomputes mid from the freshest z so the park
+   * ride (zoom travelling under a parked S) can't stale-date the dissolve.
+   * Never breaks boot/input. */
+  function applyTwinStagedS(s, z) {
     try {
       const v = Number(s);
       if (!Number.isFinite(v)) return false;
       handoff.fwdStagedS = Math.max(0, v);
+      try {
+        const zz = Number(z);
+        if (Number.isFinite(zz)) handoff.fwdStagedZ = zz;
+      } catch { /* zoom stamp is best-effort */ }
       try {
         handoff.fwdStagedAt = handoffNow();
       } catch { /* freshness stamp is best-effort */ }
@@ -1642,7 +1693,7 @@ async function boot() {
   window.addEventListener('message', (e) => {
     try {
       if (!isTwinStagedMessage(e?.data)) return;
-      applyTwinStagedS(e.data.s);
+      applyTwinStagedS(e.data.s, e.data.z);
     } catch { /* staged drive never breaks input */ }
   });
   /* Capture-phase wheel over the twin container (runs before OrbitControls'

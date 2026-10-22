@@ -16,17 +16,26 @@ export const TWIN_FS_MSG = 'safepipe-twin-fullscreen';
 // staged map end-frame and is ready to be revealed. Pure.
 export const TWIN_READY_MSG = 'safepipe-twin-ready';
 // Task-36/37 staged-scroll contract (parent -> twin): the map posts
-// { type: TWIN_STAGED_MSG, s } as stage scroll S (px past the handoff gate)
-// accumulates. This module OWNS the wire string; src/ring2/sector.js imports
+// { type: TWIN_STAGED_MSG, s, z } as stage scroll S (px past the handoff gate)
+// accumulates. z is the map's live zoom at post time (round-8: the twin's
+// release anchors must be grant-time fresh — the park ride moves zoom under
+// a parked S, so arrival-time anchors stale-date the dissolve). This module
+// OWNS the wire string; src/ring2/sector.js imports
 // + re-exports it (and derives the S->progress law anchors from the
 // scrolltrigger journey laws), so the channel name can never drift between
 // the producer and the consumer. Pure.
 export const TWIN_STAGED_MSG = 'safepipe-twin-staged';
 
-/** Build the staged-scroll post payload. S parks at >= 0. Pure. */
-export function buildTwinStagedMessage(s) {
+/** Build the staged-scroll post payload. S parks at >= 0; z rides along
+ * when finite, else omitted (the twin falls back to the handed frame). Pure. */
+export function buildTwinStagedMessage(s, z) {
   const v = Number(s);
-  return { type: TWIN_STAGED_MSG, s: Number.isFinite(v) ? Math.max(0, v) : 0 };
+  const msg = { type: TWIN_STAGED_MSG, s: Number.isFinite(v) ? Math.max(0, v) : 0 };
+  try {
+    const zz = Number(z);
+    if (Number.isFinite(zz)) msg.z = zz;
+  } catch { /* z is best-effort */ }
+  return msg;
 }
 
 /** Parse a twin ready message. { ready:true } when matched, else null. */
