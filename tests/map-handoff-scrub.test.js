@@ -177,14 +177,16 @@ test('round-6 way-in continuity: S waits at the reveal gate until the twin grant
   // terminal. Both the prewarm seed and the wheel feed park at the reveal
   // gate (750) while ungranted; the first post-grant tick resumes on
   // fingers. Scroll-up drains symmetrically (the clamp only ever lowers).
+  // Round-9: the feed wait extends to twin RELEASE (grant alone still shows
+  // the boot pose); unreadable still lifts on grant.
   const main = srcOf('../src/map/main.js');
   assert.ok(
     main.includes('if (!grantedSeed && stagedS > revealStart) stagedS = revealStart;'),
     'the prewarm seed parks at the reveal gate while the twin boots',
   );
   assert.ok(
-    main.includes('if (!grantedFeed && stagedS > gateS) stagedS = gateS;'),
-    'the wheel feed parks at the reveal gate while the twin boots',
+    main.includes('if (!releasedFeed && stagedS > gateS && (releaseKnown || !grantedFeed)) stagedS = gateS;'),
+    'the wheel feed parks at the reveal gate until release (grant fallback when unreadable)',
   );
   assert.ok(
     main.includes('window.__mapProbe.twinReady || window.__mapProbe.twinPainted'),
@@ -215,10 +217,37 @@ test('round-8 sync audit: twin release re-derives mid from grant-time zoom', () 
     twin.includes('frameRange(z, { viewportPx: viewportPxNow()'),
     'the re-derivation mirrors the boot anchor math (range -> rails -> iso)',
   );
+  assert.ok(
+    twin.includes('if (fwdStagedOwnsIntro({ stagedS: preStagedS, deepFrame: frameDeep })) holdFloor = 0;'),
+    'round-9: a staged release skips the 900ms hold floor (unstaged keeps it)',
+  );
   const link = srcOf('../src/map/twinlink.js');
   assert.ok(
     link.includes('msg.z = zz;'),
     'the staged wire carries the live zoom when finite, omits it otherwise',
+  );
+});
+test('round-9 junction: overlay stays 0 until the twin releases a pose', () => {
+  // The grant only proves the listener — the twin still sits at its top-down
+  // boot pose (dark, wrong scale) until release. Any overlay >0 before then
+  // composites that boot frame over the map: the measured one-frame
+  // basemap+pitch cut and the two-zooms composite.
+  const main = srcOf('../src/map/main.js');
+  assert.ok(
+    main.includes('function twinReleased()'),
+    'a release signal exists (fwd allocated / phase past hold)',
+  );
+  assert.ok(
+    main.includes('if (!ready || !released) {'),
+    'the dissolve holds at 0 until grant AND release',
+  );
+  assert.ok(
+    main.includes('released,'),
+    'the staged probe publishes release state',
+  );
+  assert.ok(
+    main.includes('if (!releasedFeed && stagedS > gateS && (releaseKnown || !grantedFeed)) stagedS = gateS;'),
+    'the S cap holds to release (unreadable still falls back to grant)',
   );
 });
 test('round-7 sync audit: parked pre-grant entry tracks the live zoom', () => {

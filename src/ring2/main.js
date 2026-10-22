@@ -1286,9 +1286,21 @@ async function boot() {
         // off-site arrival can structurally never grant.
         const frameZ = Number(handoff.frame && handoff.frame.z);
         const frameDeep = Number.isFinite(frameZ) && frameZ >= Z_HANDOFF;
-        const paintedRelease = heldMs >= HANDOFF_HOLD_MS && !handoff.readyPosted
+        // Round-9 junction fix: a STAGED release skips the 900ms hold floor —
+        // the floor only bought tile-settle time before the twin became
+        // visible, but the parent now gates overlay opacity on release
+        // itself, so an early release is invisible until the fingers move it
+        // (S is still parked at the gate). Waiting the floor with fingers
+        // flowing only lengthens the dead park, then replays as a jump.
+        // Unstaged (click/autoplay theatre) keeps the floor.
+        let holdFloor = HANDOFF_HOLD_MS;
+        try {
+          if (fwdStagedOwnsIntro({ stagedS: preStagedS, deepFrame: frameDeep })) holdFloor = 0;
+        } catch { /* floor removal is best-effort */ }
+        const grantedRelease = heldMs >= holdFloor && handoff.readyPosted;
+        const paintedStagedRelease = heldMs >= holdFloor && !handoff.readyPosted
           && paintedPosted && (stagedInReveal || frameDeep);
-        if ((heldMs >= HANDOFF_HOLD_MS && handoff.readyPosted) || paintedRelease) {
+        if (grantedRelease || paintedStagedRelease) {
           // Task-36 intro scrub: freeze the anchors into one forward leg
           // list — pose/mix/ring all read it as a pure function of progress
           // from here on. Staged scroll received during the hold only seeds

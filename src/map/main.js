@@ -1990,6 +1990,17 @@ function driveStagedOverlay() {
   } catch {
     ready = false;
   }
+  // Round-9 junction fix: the grant alone must not lift the dissolve — the
+  // twin is still sitting at its top-down boot pose until it releases, and
+  // any overlay >0 before then shows that boot frame (dark, wrong scale)
+  // composited over the map. One owner per surface: the twin owns pose
+  // readiness (release), the S law owns the opacity value.
+  let released = false;
+  try {
+    released = twinReleased();
+  } catch {
+    released = false;
+  }
   try {
     window.__mapProbe.staged = {
       active: true,
@@ -1999,6 +2010,7 @@ function driveStagedOverlay() {
       tilt: +st.tilt.toFixed(4),
       reveal: +st.reveal.toFixed(4),
       ready,
+      released,
       committed: false,
     };
   } catch { /* probe cosmetic */ }
@@ -2013,9 +2025,10 @@ function driveStagedOverlay() {
     window.__mapProbe.staged.holdPitch = hold ? +hold.pitchExtra.toFixed(3) : 0;
     window.__mapProbe.staged.ringClose = hold ? +hold.ringClose.toFixed(4) : 0;
   } catch { /* probe cosmetic */ }
-  if (!ready) {
-    // Hold at 0 until Lane B grants the frame — the prewarm keeps booting,
-    // but the S stages stay visible on the map side through driveStagedHold.
+  if (!ready || !released) {
+    // Hold at 0 until Lane B grants the frame AND the twin releases a pose —
+    // the prewarm keeps booting, but the S stages stay visible on the map
+    // side through driveStagedHold.
     try {
       if (root.style.opacity !== '0') root.style.opacity = '0';
     } catch { /* cosmetic */ }
@@ -2105,6 +2118,29 @@ function driveStagedOverlay() {
       armRevealFallback();
     }
   } catch { /* timer is best-effort */ }
+}
+
+/** Round-9 junction fix: has the twin RELEASED its intro (pose applied)?
+ * The grant (ready/painted) only proves the listener is alive — the release
+ * (handoff.fwd allocated, phase hold->swoop) proves a pose was applied. The
+ * overlay dissolve must stay at 0 until release, or the twin's top-down boot
+ * frame (dark, untextured) becomes visible mid-dissolve — the measured
+ * one-frame basemap+pitch cut (luma halving, same mask) and the two-zooms
+ * composite. Same-origin read (same pattern as twinFrameHasContent);
+ * unreadable counts as unreleased (fail-safe: invisible twin, hold persists).
+ * Never throws. */
+function twinReleased() {
+  try {
+    const fr = overlayEls && overlayEls.frame;
+    const win = fr && fr.contentWindow;
+    const h = win && win.__ring2 && win.__ring2.handoff;
+    if (!h || typeof h !== 'object') return false;
+    if (h.fwd) return true;
+    const ph = h.phase;
+    return ph === 'swoop' || ph === 'push' || ph === 'settle' || ph === 'done';
+  } catch {
+    return false;
+  }
 }
 
 /** GATE-3 REVISION: does the twin overlay have a REAL frame?
@@ -3383,13 +3419,31 @@ function feedStagedScroll(dyFlip) {
     if (!Number.isFinite(dy) || dy === 0) return;
     stagedS = accumStagedS(stagedS, dy); // symmetric: scroll-up retraces the same law
     // Round-6 way-in continuity: S waits at the reveal gate until the twin
-    // grants — same park as the prewarm seed above. Scroll-up drains
-    // symmetrically (the clamp only ever lowers); the silent-twin unwind
-    // still owns the never-grant case (exitStaged/deepHold reset S).
+    // grants — same park as the prewarm seed above. Round-9 junction fix:
+    // the wait extends to twin RELEASE, not just grant — the grant only
+    // proves the listener, and any S past the gate before release replays as
+    // an overlay jump (0->seg(S)) on the release tick. twinReleased() reads
+    // the twin's fwd allocation; when unreadable the grant still lifts (the
+    // pre-round-9 behavior — never strand the journey on a probe failure).
+    // Scroll-up drains symmetrically (the clamp only ever lowers); the
+    // silent-twin unwind still owns the never-grant case.
     try {
       const grantedFeed = !!(window.__mapProbe && (window.__mapProbe.twinReady || window.__mapProbe.twinPainted));
+      // Readable-but-unreleased holds the cap even after grant; unreadable
+      // falls back to the grant (pre-round-9 behavior, never strand).
+      let releaseKnown = false;
+      let releasedFeed = false;
+      try {
+        const fr = overlayEls && overlayEls.frame;
+        const win = fr && fr.contentWindow;
+        releaseKnown = !!(win && win.__ring2 && win.__ring2.handoff);
+        releasedFeed = releaseKnown && twinReleased();
+      } catch {
+        releaseKnown = false;
+        releasedFeed = false;
+      }
       const gateS = Math.max(0, HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX);
-      if (!grantedFeed && stagedS > gateS) stagedS = gateS;
+      if (!releasedFeed && stagedS > gateS && (releaseKnown || !grantedFeed)) stagedS = gateS;
     } catch { /* feed cap is best-effort */ }
     driveStagedOverlay(); // repaints the overlay AND posts S to the twin (throttled)
   } catch { /* accumulator never breaks the map */ }
