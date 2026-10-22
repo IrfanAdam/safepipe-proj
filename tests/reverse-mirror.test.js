@@ -304,9 +304,15 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
     main.includes("flattenJourneyTiltToLaw('exit-staged')"),
     'the staged unwind flattens a twin killed outside the close chain',
   );
-  // Fork guard: a commit resolves an armed staged hold at both commit sites.
-  const forks = (main.match(/if \(stagedActive && !stagedCommitted\) \{\n    stagedActive = false;/g) || []).length;
-  assert.ok(forks >= 2, `both commit sites resolve an armed hold (found ${forks})`);
+  // Fork guard: a STAGED arming call must not resolve its own hold at entry
+  // (that murder of the S stream is the out-of-sync/self-zoom failure) —
+  // only discrete commits resolve an armed hold.
+  assert.ok(
+    main.includes('if (stagedActive && !stagedCommitted && !opts.staged) {'),
+    'prewarm entry keeps a staged hold alive (staged:true arming skips the guard)',
+  );
+  const forks = (main.match(/stagedActive = false;\n    stagedCommitted = true;/g) || []).length;
+  assert.ok(forks >= 2, `staged holds still resolve on discrete commits + finalize (found ${forks})`);
   // Scroll-pure commit and close: the staged commit is a cut (the S scrub
   // already dissolved to 1 — no timed crossfade), and the close hides
   // synchronously with no fade timer and no recede-delay timer.
@@ -321,6 +327,44 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
   assert.ok(
     !main.includes('RECEDE_DELAY_MS'),
     'no recede-delay timer remains',
+  );
+  // Round-4 lockstep: the hold ring blends the arrival's live radii onto
+  // the seam across the reveal band (no first-tick snap), the zoom ceiling
+  // clamps synchronously on the latch tick (no clamp gap for fast dives),
+  // and the mask center never writes off-screen projections.
+  assert.ok(
+    main.includes('entryRx = entry && Number.isFinite(entry.rx)'),
+    'arrival caches its live radii as the staged-entry anchor',
+  );
+  assert.ok(
+    main.includes('(eRx * (1 - rev) + seam.rx * rev)'),
+    'hold ring blends entry->seam on the reveal band',
+  );
+  assert.ok(
+    main.includes('Clamp the ceiling SYNCHRONOUSLY on the latch tick'),
+    'the zoom ceiling lands on the latch tick, never the arrival frame',
+  );
+  assert.ok(
+    main.includes('{ scrubFired = false; restoreMaxZoom(); return; }'),
+    'a clamp that never stages is always restored',
+  );
+  assert.ok(
+    main.includes('steps PARK instead of writing'),
+    'off-centre driver steps park the last live radii (never the inflated corner law)',
+  );
+  assert.ok(
+    main.includes('Center follows proximity only'),
+    'mask center never writes off-screen projections (stays last-near)',
+  );
+  // Round-4 reveal hygiene: no stale mid-dissolve opacity survives on any
+  // discrete/timed reveal leg (inline beats the stylesheet — it would stick).
+  assert.ok(
+    main.includes("if (overlayEls.root.style.opacity !== '') overlayEls.root.style.opacity = '';"),
+    'the timed crossfade clears stale inline opacity under .prewarm',
+  );
+  assert.ok(
+    main.includes("root.classList.remove('scrubbing');") && main.includes('one short honest fade on a'),
+    'discrete opens release the scrub suspension with the hold',
   );
 });
 

@@ -934,6 +934,8 @@ function showVectorHold(on) {
 }
 let lastEllipseRx = null; // last live enclosure radii: the park fallback, so a null step reuses the ring instead of snapping to the 260px registered initial
 let lastEllipseRy = null;
+let entryRx = null; // staged-entry radii: the arrival's live-law write, cached so the hold ring blends entry->seam on scroll instead of snapping to the seam constant (cleared on unwind)
+let entryRy = null;
 /** Write the live enclosure ellipse (center + radii) onto #app from a proximity
  * read and a zoom. Returns the ellipse, or null when it parks (no corner /
  * below band / unreadable frame). Every radii write caches, so the park path
@@ -949,8 +951,14 @@ function writeEnclosureEllipse(proxArg, zArg) {
     if (!Number.isFinite(z)) return null;
     const prox = proxArg || proximityInfo();
     if (!prox) return null;
-    app.style.setProperty('--vx', Math.round(prox.sx) + 'px');
-    app.style.setProperty('--vy', Math.round(prox.sy) + 'px');
+    // Center follows proximity only: an off-screen projection parks the spot
+    // 100k+ px out, and writing it would snap the mask + brackets across the
+    // frame when nearness resumes. Radii still write (the arrival path needs
+    // true sizes off-centre); the stale center is simply left at last-near.
+    if (prox.near) {
+      app.style.setProperty('--vx', Math.round(prox.sx) + 'px');
+      app.style.setProperty('--vy', Math.round(prox.sy) + 'px');
+    }
     let corner = null;
     try {
       const el = mapRef.getContainer();
@@ -1061,8 +1069,17 @@ function onNativeZoomStep(snap, source) {
     if (!twinOpen && prox) {
       try {
         // One law writes center + radii; the park reuses the last live size
-        // instead of snapping to the 260px initial (ghost breathe).
-        if (!writeEnclosureEllipse(prox, z)) parkEnclosureEllipse();
+        // instead of snapping to the 260px initial (ghost breathe). Off-centre
+        // steps PARK instead of writing: an off-screen projection inflates the
+        // corner law 100x (measured 21000px radii) — invisible while the wash
+        // is off, but a stale giant the moment anything re-arms it. The
+        // arrival path still writes true off-centre sizes directly (its clamp
+        // must not depend on nearness); the driver only tracks nearness.
+        if (prox.near) {
+          if (!writeEnclosureEllipse(prox, z)) parkEnclosureEllipse();
+        } else {
+          parkEnclosureEllipse();
+        }
       } catch { /* cosmetic */ }
       showVignette(prox.near && blend > 0);
     }
@@ -1304,13 +1321,30 @@ function onNativeZoomStep(snap, source) {
     if (!twinOpen && !busyNow && z >= Z_TOP) {
       if (!scrubFired) {
         scrubFired = true; // latched now; staging runs next frame (afterFrame)
+        // Clamp the ceiling SYNCHRONOUSLY on the latch tick — never deferred
+        // to the arrival frame. The old order (setMaxZoom inside the
+        // afterFrame arrival) left a one-frame gap where fast wheel ticks
+        // deepened native zoom past the handoff while the mask already
+        // saturated at the seam: static circle, zooming terrain. setMaxZoom
+        // moves no camera, so it is safe mid-gesture. Mirrors the arrival's
+        // reduced-motion skip; every abort below restores, so a clamp that
+        // never stages never sticks.
+        try {
+          let reducedLatch = false;
+          try {
+            reducedLatch = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          } catch { /* cosmetic */ }
+          if (!reducedLatch && mapRef && typeof mapRef.setMaxZoom === 'function') {
+            mapRef.setMaxZoom(Z_HANDOFF);
+          }
+        } catch { /* clamp is best-effort */ }
         try {
           window.__mapProbe.deepHandoff = { z: +z.toFixed(2), scrub: +handoffScrubForZoom(z).toFixed(4) };
         } catch { /* probe cosmetic */ }
         afterFrame(() => {
           try {
-            if (twinOpen || transitId || receding) return; // twin/staging owns it
-            if (!Number.isFinite(mapRef.getZoom()) || mapRef.getZoom() < Z_TOP) { scrubFired = false; return; }
+            if (twinOpen || transitId || receding) { scrubFired = false; restoreMaxZoom(); return; } // twin/staging owns it
+            if (!Number.isFinite(mapRef.getZoom()) || mapRef.getZoom() < Z_TOP) { scrubFired = false; restoreMaxZoom(); return; }
             flyToSectorThenTwin(siteSector);
           } catch { /* handoff best-effort */ }
         });
@@ -1612,6 +1646,7 @@ function flyToSectorThenTwin(id, opts = {}) {
     errors.push('BOUNDS: ' + (err && err.message));
   }
   if (!mapRef || !bounds) {
+    restoreMaxZoom(); // latch may have clamped a frame earlier — an unstaged open must never inherit it
     return openTwin(id, opts);
   }
   if (transitId) return false;
@@ -1671,8 +1706,14 @@ function flyToSectorThenTwin(id, opts = {}) {
     if (nearNow) {
       try {
         // Wash opens at the true radius after jumps — never the stale size or
-        // the 260px initial.
-        writeEnclosureEllipse(proxNow, Number.isFinite(liveZ) ? liveZ : Z_HANDOFF);
+        // the 260px initial. The return is cached as the staged-entry radii:
+        // the hold ring blends entry->seam on scroll (no snap when arrival
+        // lands below the handoff).
+        const entry = writeEnclosureEllipse(proxNow, Number.isFinite(liveZ) ? liveZ : Z_HANDOFF);
+        try {
+          entryRx = entry && Number.isFinite(entry.rx) ? +entry.rx.toFixed(1) : null;
+          entryRy = entry && Number.isFinite(entry.ry) ? +entry.ry.toFixed(1) : null;
+        } catch { /* entry cache is best-effort */ }
       } catch { /* radii re-derive is best-effort */ }
       showVignette(true);
     }
@@ -1706,6 +1747,14 @@ function flyToSectorThenTwin(id, opts = {}) {
     // proximity behaviour — the staged hold is the only thing that owns
     // the extra scroll past the gate.
     if (deep && !reducedMotion) {
+      // Off-centre arrivals skip the wash write above (nearNow false), so a
+      // stale entry from an older arrival must not steer this hold — clear it
+      // and the ring parks the seam (previous behaviour, still synced: zoom
+      // is static while the hold owns the frame).
+      if (!nearNow) {
+        entryRx = null;
+        entryRy = null;
+      }
       try {
         if (mapRef && typeof mapRef.setMaxZoom === 'function') mapRef.setMaxZoom(Z_HANDOFF);
       } catch { /* clamp is best-effort */ }
@@ -1817,20 +1866,27 @@ function driveStagedHold(st) {
       }
     }
   } catch { /* hold tilt is best-effort */ }
-  // (b) ring travel: the V7 seam hold parks the enclosure ellipse EXACTLY on
-  // the handoff radius (seamHoldEllipseForS — rx SEAM_HOLD_RX_PX, ry squashed
-  // by the iso-pole projection) instead of re-deriving it from the frozen
-  // live zoom, so the seam is identical at/above Z_HANDOFF and repaints on
-  // every staged tick under finger control. The staged ring law still rides
-  // through the (1 - ringClose) multiplier (zero today — the seam already
-  // lands on the twin clip, no extra shrink).
+  // (b) ring travel: the hold ring blends the ARRIVAL's live radii onto the
+  // seam across the reveal band (st.reveal 0..1 — the same S the twin
+  // dissolves on), instead of snapping to the handoff constant on the first
+  // staged tick. Arrivals below the handoff (the normal case — the edge
+  // fires at Z_TOP) open at their true size and the circle breathes closed
+  // onto the twin clip AS the twin dissolves in: mask and map stay in
+  // lockstep because both are pure functions of scroll (S for the ring, the
+  // clamped zoom for everything else — nothing moves on a timer). At/above-
+  // handoff entries open on the seam already (entry==seam, zero behaviour
+  // change); scroll-up retraces the blend symmetrically. The staged ring law
+  // still rides through the (1 - ringClose) multiplier (zero today).
   try {
     const app = document.getElementById('app');
     if (app && mapRef) {
       const seam = seamHoldEllipseForS(stagedS);
       if (seam && Number.isFinite(seam.rx) && Number.isFinite(seam.ry) && seam.rx > 0) {
-        const rx = seam.rx * (1 - ringClose);
-        const ry = seam.ry * (1 - ringClose);
+        const rev = clamp01(st && Number.isFinite(st.reveal) ? st.reveal : 0);
+        const eRx = Number.isFinite(entryRx) && entryRx > 0 ? entryRx : seam.rx;
+        const eRy = Number.isFinite(entryRy) && entryRy > 0 ? entryRy : seam.ry;
+        const rx = (eRx * (1 - rev) + seam.rx * rev) * (1 - ringClose);
+        const ry = (eRy * (1 - rev) + seam.ry * rev) * (1 - ringClose);
         app.style.setProperty('--vr', rx.toFixed(1) + 'px');
         app.style.setProperty('--vr-y', ry.toFixed(1) + 'px');
         try {
@@ -2093,6 +2149,8 @@ function exitStaged() {
   stagedActive = false;
   stagedS = 0;
   stagedCommitted = false;
+  entryRx = null; // unwind clears the entry radii — the next hold re-caches its own arrival
+  entryRy = null;
   lastPostedStagedS = null; // symmetric unwind: the S stream ends with the hold
   const hadOpen = twinOpen; // an open twin killed here skips the close chain — it still needs the flatten guarantor below
   restoreMaxZoom();
@@ -2230,11 +2288,17 @@ function prewarmThenReveal(id, frame, opts = {}) {
   } catch { /* chrome class is cosmetic */ }
   if (label) label.textContent = s.name + ' — ' + worstAssetId(s) + ' · ' + h3;
   // Fork guard: a commit while a staged hold is armed resolves the hold —
-  // the twin it was holding for is revealed. Without this the hold lingers
-  // and a later retreat zoomend exitStaged()s the OPEN twin with no fade, no
-  // recede (measured silent kill). The S stream is over; the clamp stays for
-  // the close to release.
-  if (stagedActive && !stagedCommitted) {
+  // the twin it was holding for is revealed. STAGED arming calls pass
+  // staged:true and must NOT resolve their own hold here: killing it at
+  // entry murders the S stream (feeder + driver early-return on committed),
+  // so no scroll tick can ever dissolve the overlay and the commit falls
+  // back to the timed crossfade behind an autoplaying twin — the exact
+  // out-of-sync/self-zoom failure. The staged hold exits only forward
+  // (finalizeStagedReveal on S-commit) or backward (exitStaged on unwind).
+  // Without this the hold lingers and a later retreat zoomend exitStaged()s
+  // the OPEN twin with no fade, no recede (measured silent kill). The S
+  // stream is over; the clamp stays for the close to release.
+  if (stagedActive && !stagedCommitted && !opts.staged) {
     stagedActive = false;
     stagedCommitted = true;
     lastPostedStagedS = null;
@@ -2363,6 +2427,14 @@ function revealTwin(instant = false) {
       overlayEls.root.classList.remove('scrubbing');
     } catch { /* cosmetic */ }
     if (!instant) {
+      // A fork-guard-resolved staged hold can leave a stale inline opacity
+      // (mid-dissolve S value) + .scrubbing behind — inline beats the
+      // stylesheet, so the timed leg would run 0→mid and STICK there. Clear
+      // it while .prewarm (opacity 0) still applies: computed stays 0, then
+      // the prewarm removal below runs the clean 0→1 timed fade.
+      try {
+        if (overlayEls.root.style.opacity !== '') overlayEls.root.style.opacity = '';
+      } catch { /* cosmetic */ }
       // Force a frame at opacity 0, then drop .prewarm so the CSS
       // opacity transition (~450ms) crossfades map->twin with no flash.
       try {
@@ -2433,10 +2505,19 @@ function openTwin(id, opts = {}) {
   } catch { /* chrome class is cosmetic */ }
   if (label) label.textContent = s.name + ' — ' + worstAssetId(s) + ' · ' + h3;
   // Fork guard (same as above — both commit sites resolve an armed hold).
+  // A resolved hold can leave a stale inline opacity (mid-dissolve S value)
+  // with .scrubbing suspending the transition — the discrete open would sit
+  // at partial opacity forever. Release both: the transition goes live and
+  // the value eases to the stylesheet's 1 (one short honest fade on a
+  // discrete cut path, never the scroll journey).
   if (stagedActive && !stagedCommitted) {
     stagedActive = false;
     stagedCommitted = true;
     lastPostedStagedS = null;
+    try {
+      root.classList.remove('scrubbing');
+      if (root.style.opacity !== '') root.style.opacity = '';
+    } catch { /* cosmetic */ }
     try {
       window.__mapProbe.staged = { active: false, s: +stagedS.toFixed(1), committed: true };
     } catch { /* probe cosmetic */ }
