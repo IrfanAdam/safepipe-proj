@@ -2143,7 +2143,7 @@ function twinReleased() {
     if (!h || typeof h !== 'object') return false;
     if (h.fwd) return true;
     const ph = h.phase;
-    return ph === 'swoop' || ph === 'push' || ph === 'settle' || ph === 'done';
+    return ph === 'swoop' || ph === 'push' || ph === 'settle';
   } catch {
     return false;
   }

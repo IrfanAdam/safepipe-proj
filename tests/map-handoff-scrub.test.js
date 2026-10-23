@@ -249,6 +249,10 @@ test('round-9 junction: overlay stays 0 until the twin releases a pose', () => {
     main.includes('if (!releasedFeed && stagedS > gateS && (releaseKnown || !grantedFeed)) stagedS = gateS;'),
     'the S cap holds to release (unreadable still falls back to grant)',
   );
+  assert.ok(
+    !main.includes("|| ph === 'done'"),
+    "'done' (cancelled/failed flight, camera still top-down) must not authorize a dissolve",
+  );
 });
 test('round-7 sync audit: parked pre-grant entry tracks the live zoom', () => {
   // Measured: zoom 10.94->11.48 over 3 ticks with the ring frozen at the
