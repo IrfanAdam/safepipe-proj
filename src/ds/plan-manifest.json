@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-22T18:41:09.815Z",
+  "generated": "2026-10-23T08:30:15.115Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,24 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "7f91394",
+      "full": "7f91394c04b764d757d0603a70c168261da56af0",
+      "date": "2026-10-23",
+      "time": "00:11",
+      "subject": "docs(plan): round-10 earlyboot eval note [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "b8015bd",
+      "full": "b8015bd78fc9a1b379770de1fef2367ce4c482f0",
+      "date": "2026-10-23",
+      "time": "00:11",
+      "subject": "fix(journey): dive-start twin prewarm, stale-echo guard [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "1d443ef",
       "full": "1d443efb5ec8bcaed7d8be59ae6b04169eea5818",
@@ -6179,7 +6197,12 @@
   ],
   "wip": [
     ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+    "ops3d-map.html",
     "public/version.json",
-    "src/map/main.js"
+    "src/map/main.js",
+    "src/map/scrolltrigger.js",
+    "src/ring2/mix.js",
+    "src/ring2/overlays.js",
+    "src/ring2/sync.js"
   ]
 }
