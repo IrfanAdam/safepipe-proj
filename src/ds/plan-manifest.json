@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-23T08:38:54.951Z",
+  "generated": "2026-10-23T08:40:59.694Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,24 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "aa32b97",
+      "full": "aa32b97b893d4f75e09440afda6ab010457e08b5",
+      "date": "2026-10-23",
+      "time": "14:09",
+      "subject": "docs(plan): round-11 closeout, C-reconciliation + wires numbers [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "5a5f311",
+      "full": "5a5f3113b1e60c7fd4aee175c27b4332c63e733f",
+      "date": "2026-10-23",
+      "time": "14:09",
+      "subject": "fix(journey): 'done' no longer authorizes dissolve, release needs fwd or live leg [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "2fbeb74",
       "full": "2fbeb7404ddde263bc48ac5c127b71b9d103ca1f",
@@ -6214,7 +6232,6 @@
     }
   ],
   "wip": [
-    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md",
-    "src/map/main.js"
+    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ]
 }
