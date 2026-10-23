@@ -94,7 +94,12 @@ export function mountMixBar(el, opts = {}) {
   const val = bar.querySelector('.ring2-mix__val');
   slider.value = String(mix);
 
+  let lastPaintKey = null;
   function paintLabel() {
+    // Unchanged-value skip: applyGroundRule calls per frame — DOM writes only on change.
+    const key = `${mix}|${getGroundOwns() ? 1 : 0}`;
+    if (key === lastPaintKey) return;
+    lastPaintKey = key;
     val.textContent = `${mix}`;
     bar.dataset.mix = String(mix);
     bar.dataset.ground = getGroundOwns() ? 'sat' : 'twin';

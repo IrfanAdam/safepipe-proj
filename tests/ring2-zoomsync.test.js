@@ -80,19 +80,21 @@ test('applyTwinToMap forces map paint in the SAME task — resting or moving', (
   assert.deepEqual(order, ['jumpTo', 'redraw'], `redraw must follow jumpTo synchronously (got ${order})`);
 });
 
-test('authoritative re-assertion: resting pose re-pushes + repaints every frame', () => {
+test('authoritative re-assertion: resting pose skips the re-push, read-back still guards', () => {
   const log = [];
   const map = fakeMap(log);
   const opts = { viewportPx: VPX, fovDeg: FOV };
   applyTwinToMap(map, poseAt(12000), opts);
   log.length = 0;
   const mp = applyTwinToMap(map, poseAt(12000), opts);
-  // Suspect 1 fix: no pose-moved gate — a map-side-only change can never
-  // linger past the next twin frame. jumpTo is idempotent, so this is cheap.
+  // R11-TWIN dedupe: the rest fingerprint matches the last push to the same
+  // instance, so the redundant re-push + repaint are skipped — but the
+  // read-back still runs, so a map-side-only nudge snaps back on the next
+  // frame exactly as before (pinned by the snap-back test below).
   assert.deepEqual(
     log.map((e) => e.op),
-    ['jumpTo', 'redraw'],
-    'resting pose must still re-push + repaint (authoritative sync)',
+    [],
+    'resting pose must not re-push + repaint (rest fingerprint)',
   );
   assert.equal(mp.snapped, undefined, 'agreeing map must not snap-back');
 });

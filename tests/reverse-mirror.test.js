@@ -92,7 +92,7 @@ test('vignette radius: projected R, coincides with the twin clip at handoff', ()
   const mpp12 = metersPerPixel(12, SITE.lat);
   assert.equal(vignetteRadiusPxForZoom(12, SITE.lat), MAP_VIGNETTE_RING_M / mpp12, 'R / metersPerPixel, exact');
   const dia12 = 2 * vignetteRadiusPxForZoom(12, SITE.lat);
-  assert.ok(Math.abs(dia12 - 685) < 1.5, `handoff enclosing is the 685px clip circle (got ${dia12.toFixed(1)})`);
+  assert.ok(Math.abs(dia12 - 1370) < 3, `handoff enclosing is the 1370px clip circle (got ${dia12.toFixed(1)})`);
   let prev = -Infinity;
   for (let z = 6; z <= 14; z += 0.5) {
     const r = vignetteRadiusPxForZoom(z, SITE.lat);
@@ -120,7 +120,7 @@ test('enclosure forming wash: screen corners close onto the clip circle', () => 
   }
   // GATE-3 REVISION: past the HANDOFF the enclosure HOLDS at the handoff
   // value — the twin's fixed ground clip radius. Holding at the earlier
-  // Z_TOP projection over-zoomed the map (121px vs the twin's 242px).
+  // Z_TOP projection over-zoomed the map (242.2px vs the twin's 484.5px).
   const atHandoff = enclosureRadiusPxForZoom(11.5, SITE.lat, MAP_VIGNETTE_RING_M, C);
   for (const z of [11.5, 12, 12.1, 13, 13.4]) {
     assert.equal(

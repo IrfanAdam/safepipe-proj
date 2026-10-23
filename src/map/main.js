@@ -646,8 +646,6 @@ function setSatForced(on) {
 const SITE_LNGLAT = [SITE.lon, SITE.lat];
 const PROX_CURSOR_PX = 140; // cursor within this of the hotspot -> near
 const PROX_CENTER_PX = 90; // hotspot within this of canvas center -> near
-const CENTER_EASE_MS = 280; // throttle between proximity ease steps
-const CENTER_EPS_DEG = 2e-4; // skip the ease when already on the spot
 const LOCK_VIEW_M = 120; // lock engages while the blip is anywhere on screen — corner counts
 let lastDeepWarmZ = -1; // integer sat level already warmed around the spot
 let lastArriveWarmZ = -1; // arriving level already warmed (integer crossings stream it cold otherwise)
@@ -665,7 +663,6 @@ let lastStagedPostT = 0; // 60ms min interval alongside the value-change check: 
 let cachedVectorStyle = null;
 let recedeStartT = 0;
 let lastCursor = null; // {x,y} client px, passive mousemove only
-let lastCenterEaseT = 0;
 let isoScrubOwned = false;
 let isoRestoreDue = false; // latched on iso engage; cleared only when a settle glides pitch home — the strand guarantor
 const ISO_SCRUB_SLACK_DEG = 2; // engage only when pitch is at/below target+slack: never yanks a user oblique
@@ -936,6 +933,11 @@ function showVectorHold(on) {
 }
 let lastEllipseRx = null; // last live enclosure radii: the park fallback, so a null step reuses the ring instead of snapping to the 260px registered initial
 let lastEllipseRy = null;
+let lastVrWritten = null; // last WRITTEN enclosure strings on #app: per-tick dedupe, so an unchanged
+let lastVrYWritten = null; // radius/center never forces style recalc mid-tick (one cache shared by the
+let lastVxWritten = null; // live write, the park fallback, and the hold blend — same element, same props).
+let lastVyWritten = null; // Guards stay inline at each setProperty site (never a shared writer), so the
+// driver keeps one literal per-site write of the horizontal and vertical radii.
 let entryRx = null; // staged-entry radii: the arrival's live-law write, cached so the hold ring blends entry->seam on scroll instead of snapping to the seam constant (cleared on unwind)
 let entryRy = null;
 /** Write the live enclosure ellipse (center + radii) onto #app from a proximity
@@ -958,8 +960,10 @@ function writeEnclosureEllipse(proxArg, zArg) {
     // frame when nearness resumes. Radii still write (the arrival path needs
     // true sizes off-centre); the stale center is simply left at last-near.
     if (prox.near) {
-      app.style.setProperty('--vx', Math.round(prox.sx) + 'px');
-      app.style.setProperty('--vy', Math.round(prox.sy) + 'px');
+      const vxStr = Math.round(prox.sx) + 'px';
+      const vyStr = Math.round(prox.sy) + 'px';
+      if (lastVxWritten !== vxStr) { app.style.setProperty('--vx', vxStr); lastVxWritten = vxStr; }
+      if (lastVyWritten !== vyStr) { app.style.setProperty('--vy', vyStr); lastVyWritten = vyStr; }
     }
     let corner = null;
     try {
@@ -972,8 +976,10 @@ function writeEnclosureEllipse(proxArg, zArg) {
     } catch { corner = null; }
     const ellipse = enclosureEllipsePxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, corner);
     if (ellipse && Number.isFinite(ellipse.rx) && Number.isFinite(ellipse.ry)) {
-      app.style.setProperty('--vr', ellipse.rx.toFixed(1) + 'px');
-      app.style.setProperty('--vr-y', ellipse.ry.toFixed(1) + 'px');
+      const vrStr = ellipse.rx.toFixed(1) + 'px';
+      const vrYStr = ellipse.ry.toFixed(1) + 'px';
+      if (lastVrWritten !== vrStr) { app.style.setProperty('--vr', vrStr); lastVrWritten = vrStr; }
+      if (lastVrYWritten !== vrYStr) { app.style.setProperty('--vr-y', vrYStr); lastVrYWritten = vrYStr; }
       lastEllipseRx = +ellipse.rx.toFixed(1);
       lastEllipseRy = +ellipse.ry.toFixed(1);
       try {
@@ -986,7 +992,7 @@ function writeEnclosureEllipse(proxArg, zArg) {
   } catch { return null; }
 }
 /** Park the enclosure on the last live radii (else the seam constant) instead
- * of removing to the 260px registered initial: the seam is 242.2px, so the
+ * of removing to the 260px registered initial: the seam is 484.5px, so the
  * old park breathed ~18px on any visible null-ellipse step. */
 function parkEnclosureEllipse() {
   try {
@@ -1001,13 +1007,16 @@ function parkEnclosureEllipse() {
       } catch { /* seam fallback is best-effort */ }
     }
     if (!Number.isFinite(rx) || !Number.isFinite(ry) || !(rx > 0)) return;
-    app.style.setProperty('--vr', rx.toFixed(1) + 'px');
-    app.style.setProperty('--vr-y', ry.toFixed(1) + 'px');
+    const parkVr = rx.toFixed(1) + 'px';
+    const parkVrY = ry.toFixed(1) + 'px';
+    if (lastVrWritten !== parkVr) { app.style.setProperty('--vr', parkVr); lastVrWritten = parkVr; }
+    if (lastVrYWritten !== parkVrY) { app.style.setProperty('--vr-y', parkVrY); lastVrYWritten = parkVrY; }
   } catch { /* cosmetic */ }
 }
 /** THE native-zoom driver: reads ONE zoom snapshot (the map owns zoom —
  * this never sets zoom, never jumpTo's depth). Fade tracks zoom at the
- * CURRENT center; center eases onto the spot only under proximity; deep
+ * CURRENT center; center rides the shared blend onto the spot continuously
+ * (takeover tick-write), never a settle snap; deep
  * zoom past the top-down checkpoint bridges top->iso then hands to the
  * twin through flyToSectorThenTwin; zoom-out at/below the min cap lands
  * the mirrored reverse home. */
@@ -1138,51 +1147,20 @@ function onNativeZoomStep(snap, source) {
     // NOT park pitch — the map is visible through prewarm and the fade, and
     // the tilt has to track the law there (measured: parking on pendingReveal
     // froze pitch at the first slew-capped write for the whole dive).
-    // (3) PROXIMITY CENTERING — past the arm zoom, ease center onto the
-    // spot + top-down ONLY when near, and ONLY on gesture settle
-    // (native-zoomend). NOTHING may touch the camera mid-gesture: even an
-    // instant jumpTo cancels the wheel/pinch glide, stair-stepping zoom
-    // into abrupt states. Settle-landing glides onto the spot and HOLDS it,
-    // so the next push zooms from the locked center. Fade + clip + vignette
-    // above still track every live step; only the recenter waits for settle.
-    // Throttled, epsilon-guarded, and it preserves the native zoom.
-    if (!twinOpen && !busyNow && shouldCenter(z) && prox && prox.near && source === 'native-zoomend') {
-      let now = 0;
-      try {
-        now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-      } catch {
-        now = Date.now();
-      }
-      const far = dist == null || dist > CENTER_EPS_DEG;
-      let tilt = false;
-      let pHold = 0;
-      try {
-        const b = mapRef.getBearing();
-        const p = mapRef.getPitch();
-        pHold = pitchTargetForZoom(z);
-        tilt = Math.abs(b || 0) > ISO_SETTLE_TOL_DEG || Math.abs((p || 0) - pHold) > ISO_SETTLE_TOL_DEG;
-      } catch { /* bearing read is best-effort */ }
-      if ((far || tilt) && now - lastCenterEaseT >= CENTER_EASE_MS) {
-        lastCenterEaseT = now;
-        try {
-          // Instant snap, never a glide: no timer owns camera motion. Fires
-          // only when the frame actually drifted (far/tilt), so exact
-          // journeys no-op here.
-          mapRef.jumpTo({ center: SITE_LNGLAT.slice(), bearing: 0, pitch: pHold });
-        } catch (err) {
-          errors.push('CENTER-EASE: ' + (err && err.message));
-        }
-      }
-      try {
-        window.__mapProbe.centerEase = +blend.toFixed(4);
-        window.__mapProbe.autoCenter = true;
-      } catch { /* probe cosmetic */ }
-    } else {
-      try {
-        window.__mapProbe.centerEase = +blend.toFixed(4);
-        window.__mapProbe.autoCenter = false;
-      } catch { /* probe cosmetic */ }
-    }
+    // (3) PROXIMITY CENTERING — R11-CENTER: centering is CONTINUOUS now. The
+    // band takeover's tick write carries an explicit center derived from
+    // the shared center blend, so the spot glides to center coupled to
+    // scroll speed with no snap. The old settle jumpTo-center
+    // fired inside the visible band (measured 120px snap with the mask up),
+    // and every firing was in-band by construction (shouldCenter gates
+    // z>=Z_CENTER, where blend>0) — so no settle owns the center anymore.
+    // Settles leave the center finger-owned; arrival framing rides the
+    // continuous law. Pitch strands keep their owners below (reconcile,
+    // catch-up, pump).
+    try {
+      window.__mapProbe.centerEase = +blend.toFixed(4);
+      window.__mapProbe.autoCenter = false;
+    } catch { /* probe cosmetic */ }
     // (3b) SETTLE RECONCILE — the strand guarantor. Per-step iso writes can
     // be clobbered mid-glide (the native zoom animation re-applies the
     // gesture-start pitch per frame), so a fast flick-out may land below
@@ -1949,8 +1927,10 @@ function driveStagedHold(st) {
         const eRy = Number.isFinite(entryRy) && entryRy > 0 ? entryRy : seam.ry;
         const rx = (eRx * (1 - rev) + seam.rx * rev) * (1 - ringClose);
         const ry = (eRy * (1 - rev) + seam.ry * rev) * (1 - ringClose);
-        app.style.setProperty('--vr', rx.toFixed(1) + 'px');
-        app.style.setProperty('--vr-y', ry.toFixed(1) + 'px');
+        const holdVr = rx.toFixed(1) + 'px';
+        const holdVrY = ry.toFixed(1) + 'px';
+        if (lastVrWritten !== holdVr) { app.style.setProperty('--vr', holdVr); lastVrWritten = holdVr; }
+        if (lastVrYWritten !== holdVrY) { app.style.setProperty('--vr-y', holdVrY); lastVrYWritten = holdVrY; }
         try {
           window.__mapProbe.vignetteR = +rx.toFixed(1);
           window.__mapProbe.vignetteRy = +ry.toFixed(1);
@@ -1993,6 +1973,21 @@ function driveStagedOverlay() {
     root = null;
   }
   if (!root) return;
+  // R11-FADE: one writer for every S-owned opacity value. The scrubbed leg
+  // below suspends the CSS transition (`.scrubbing`) — but the HOLD legs
+  // above ran under the live 0.45s transition, so each hold write restarted
+  // an ease between committed values and the rendered opacity lagged the
+  // law. Every value here derives from S (holds pin the law's 0 floor, the
+  // dissolve writes the law, the commit pre-writes the law's clamp), so all
+  // of them go through this helper: transition suspended first, then the
+  // synchronous inline write. Rendered IS the law on every tick.
+  const scrubWrite = (v) => {
+    try {
+      if (!root.classList.contains('scrubbing')) root.classList.add('scrubbing');
+      const s = String(v);
+      if (root.style.opacity !== s) root.style.opacity = s;
+    } catch { /* cosmetic */ }
+  };
   let ready = false;
   try {
     ready = !!window.__mapProbe.twinReady || !!window.__mapProbe.twinPainted;
@@ -2038,9 +2033,7 @@ function driveStagedOverlay() {
     // Hold at 0 until Lane B grants the frame AND the twin releases a pose —
     // the prewarm keeps booting, but the S stages stay visible on the map
     // side through driveStagedHold.
-    try {
-      if (root.style.opacity !== '0') root.style.opacity = '0';
-    } catch { /* cosmetic */ }
+    scrubWrite('0'); // law floor at S below the reveal band — via the one writer (no transition)
     return;
   }
   // Commit gate (gaps direction: near-and-non-blank): the fingers dissolved
@@ -2068,9 +2061,7 @@ function driveStagedOverlay() {
       scaleNear = Number.isFinite(zGate) && Math.abs(zGate - Z_HANDOFF) <= STAGED_COMMIT_Z_TOL;
     } catch { scaleNear = false; }
     if (!hasContent) {
-      try {
-        if (root.style.opacity !== '0') root.style.opacity = '0';
-      } catch { /* cosmetic */ }
+      scrubWrite('0'); // blank guard holds the law floor — via the one writer (no transition)
       try {
         window.__mapProbe.staged.blankTwin = true;
         window.__mapProbe.staged.notNear = !proxNear;
@@ -2079,9 +2070,7 @@ function driveStagedOverlay() {
       return; // no commit — hold the map, retry when the twin reports content
     }
     if (!proxNear || !scaleNear) {
-      try {
-        if (root.style.opacity !== '0') root.style.opacity = '0';
-      } catch { /* cosmetic */ }
+      scrubWrite('0'); // near-guard holds the law floor — via the one writer (no transition)
       try {
         window.__mapProbe.staged.blankTwin = false;
         window.__mapProbe.staged.notNear = !proxNear;
@@ -2094,6 +2083,13 @@ function driveStagedOverlay() {
       window.__mapProbe.staged.notNear = false;
       window.__mapProbe.staged.scaleFar = false;
     } catch { /* probe cosmetic */ }
+    // R11-FADE: the commit tick pre-writes the law's clamped end value (the
+    // reveal branch only runs at st.reveal >= 1, so this is the S law's 1,
+    // not a literal) through the one writer WHILE the transition is still
+    // suspended — the rendered opacity is exactly 1 before the handoff.
+    // finalizeStagedReveal then restores the transition and releases the
+    // inline value with nothing left to ease or snap (1 -> stylesheet 1).
+    scrubWrite(String(+st.reveal.toFixed(4)));
     finalizeStagedReveal(root);
     return;
   }
@@ -2109,9 +2105,10 @@ function driveStagedOverlay() {
     // dissolve tracks the fingers exactly and the commit has nothing to snap.
     // The law stays the single source of the opacity; the transition is only
     // the easing for the UNSCRUBBED legs (the prewarm->reveal crossfade and
-    // the timed reverse), which the class is removed for.
-    if (!root.classList.contains('scrubbing')) root.classList.add('scrubbing');
-    root.style.opacity = st.reveal <= 0 ? '0' : String(+st.reveal.toFixed(4));
+    // the timed reverse), which the class is removed for. R11-FADE: routed
+    // through the one writer above so the suspend-then-write order is
+    // identical on every S-owned leg (holds, dissolve, commit pre-write).
+    scrubWrite(st.reveal <= 0 ? '0' : String(+st.reveal.toFixed(4)));
   } catch { /* cosmetic */ }
   // S owns the dissolve: the paint-gated fallback window slides while the hold
   // flows (re-armed at most once/sec — the window only fires after S stalls a
@@ -3385,6 +3382,34 @@ function installBandTakeover() {
           around = mapRef.unproject([e.clientX - r.left, e.clientY - r.top]);
         }
       } catch { around = null; }
+      // R11-CENTER continuous centering: diving in while near, the tick
+      // write carries an explicit center on the SHARED center blend — the
+      // spot glides to center coupled to scroll speed inside the SAME
+      // synchronous write (no extra Camera call, no ease curve, no settle
+      // snap). Applied factor is 1-(1-b)^2: still a pure function of the
+      // shared scalar (no new constants, no magic px), but it closes the
+      // gap inside the band's tick budget — a plain b-fraction leaves a
+      // ~6px residual at the handoff because zoom magnification inflates
+      // each tick's remainder. Every value is the shared scalar + live
+      // camera/site state. Zoom-out and far frames keep the cursor anchor
+      // (finger-owned framing, park-safe). Around stays off a
+      // center-carrying write (around re-anchors and would void it).
+      let correctTo = null;
+      let cBlend = 0;
+      if (target > z && prox && prox.near) {
+        try {
+          const b = centerBlendForZoom(z);
+          const c = mapRef.getCenter();
+          if (Number.isFinite(b) && b > 0 && c && Number.isFinite(+c.lng) && Number.isFinite(+c.lat)) {
+            const f = 1 - (1 - b) * (1 - b);
+            cBlend = f;
+            correctTo = [
+              +c.lng + (SITE_LNGLAT[0] - +c.lng) * f,
+              +c.lat + (SITE_LNGLAT[1] - +c.lat) * f,
+            ];
+          }
+        } catch { correctTo = null; cBlend = 0; }
+      }
       try {
         // Instant drive: duration 0 writes synchronously on this tick — the
         // camera cannot lag the fingers and no timer ever owns the motion.
@@ -3393,7 +3418,8 @@ function installBandTakeover() {
           pitch: pitchTargetForZoom(target),
           duration: 0,
         };
-        if (around) opts.around = around;
+        if (correctTo) opts.center = correctTo;
+        else if (around) opts.around = around;
         mapRef.easeTo(opts);
       } catch { /* drive is best-effort */ }
       // Feed staged S in flip-space sign (dive is negative there): the
@@ -3403,6 +3429,7 @@ function installBandTakeover() {
         feedStagedScroll(-dy);
       } catch { /* S feed is best-effort */ }
       try { window.__mapProbe.takeover = true; } catch { /* probe cosmetic */ }
+      try { window.__mapProbe.centerSteer = +cBlend.toFixed(3); } catch { /* probe cosmetic */ }
     } catch { /* takeover never breaks input */ }
   };
   try {

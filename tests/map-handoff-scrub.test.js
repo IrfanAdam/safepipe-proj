@@ -283,7 +283,7 @@ test('driver: live hold drives visible travel on every staged tick, pre-grant', 
 test('V7 seam hold: the ellipse parks on the handoff radius, identical at/above the gate', () => {
   // rx is the ring ground radius projected at Z_HANDOFF over the site
   // parallel — the same value the forming law converges to (to 0.1px).
-  assert.equal(SEAM_HOLD_RX_PX, 242.2, 'seam rx pins the handoff radius');
+  assert.equal(SEAM_HOLD_RX_PX, 484.5, 'seam rx pins the handoff radius (10km ring at Z_HANDOFF on the 512 grid)');
   assert.equal(
     +vignetteRadiusPxForZoom(Z_HANDOFF, SITE.lat).toFixed(1),
     SEAM_HOLD_RX_PX,
@@ -295,8 +295,8 @@ test('V7 seam hold: the ellipse parks on the handoff radius, identical at/above 
     Math.abs(seam.ry - SEAM_HOLD_RX_PX * Math.cos(ISO_PITCH_DEG * (Math.PI / 180))) < 1e-9,
     `ry is rx times cos45 (got ${seam.ry})`,
   );
-  assert.equal(+seam.rx.toFixed(1), 242.2, 'written --vr reads 242.2px');
-  assert.equal(+seam.ry.toFixed(1), 171.3, 'written --vr-y reads 171.3px');
+  assert.equal(+seam.rx.toFixed(1), 484.5, 'written --vr reads 484.5px');
+  assert.equal(+seam.ry.toFixed(1), 342.6, 'written --vr-y reads 342.6px');
   // Pure fn of S with no zoom input: identical from Z_HANDOFF up, constant
   // across the whole staged band (a hold, not travel), parks on non-finite.
   for (const s of [0, 125, 250, 500, 750, 1000, HANDOFF_STAGED_S_MAX, HANDOFF_STAGED_S_MAX + 9999, NaN]) {

@@ -19,7 +19,13 @@
 //        stays owned by Lane B via the ready/close message contract).
 // Pure helpers are node-checkable: no map imports (the single site.js
 // import below is pure geo constants, no maplibre/three), callbacks injected.
-import { RING_RADIUS_M } from '../ring2/site.js';
+import { RING_RADIUS_M, SANGACHAL } from '../ring2/site.js';
+
+/* Web-mercator ground-scale constants (hoisted with the zoom laws above:
+ * the seam hold derives from the projector at module scope, so the
+ * constants it reads must initialize before first use). */
+export const EARTH_MPP = 78271.51696; // web-mercator m at z0 over a 512px tile grid (MapLibre transform tileSize 512 — verified in the installed 6.13.0 source AND at runtime: map.project spans 10km at z10 as exactly R/mpp512, mpp256 reads 2x off). A 256-grid 156543 here halves every derived radius.
+export const EARTH_CIRC_M = 40075017; // Earth's circumference, meters (ruler maximum)
 
 export const Z_MIN = 6.4; // country home — enforced as map minZoom (the cap)
 export const Z_FADE0 = 6.4; // fade starts: vector->sat keys off zoom only
@@ -200,19 +206,16 @@ export function stagedHoldRingCloseForS(s) {
 
 /* V7 seam hold (map side): while z clamps at Z_HANDOFF and the twin boots,
  * the hold leg parks the enclosure ellipse EXACTLY on the handoff radius —
- * rx SEAM_HOLD_RX_PX with ry squashed by the iso-pole tilt projection
- * (rx * cos(ISO_PITCH_DEG)) — instead of re-deriving it from the frozen
- * live zoom. Pure fn of S: identical at/above Z_HANDOFF (no zoom input, so
+ * seamHoldRxPx() with ry squashed by the iso-pole tilt projection
+ * (rx * cos(ISO_PITCH_DEG)) — the seam is the live projector evaluated at
+ * the handoff (vignetteRadiusPxForZoom at Z_HANDOFF over the site parallel),
+ * never a tuned literal, so it can never drift from the forming law it
+ * meets. Pure fn of S: identical at/above Z_HANDOFF (no zoom input, so
  * no zoom dependence past the gate) and repainted on every staged tick, so
  * the seam stays under finger control while depth is clamped. Constant
  * across S by design (a hold, not travel — scroll-up retraces it
- * trivially); non-finite S still parks the seam, never blanks the chrome. */
-export const SEAM_HOLD_RX_PX = 242.2; // ring ground radius projected at Z_HANDOFF over the site parallel, CSS px
-export function seamHoldEllipseForS(s) {
-  void s; // the value is the seam itself — S owns the repaint cadence, not the radius
-  const rx = SEAM_HOLD_RX_PX;
-  return { rx, ry: rx * Math.cos(ISO_PITCH_DEG * DEG2RAD) };
-}
+ * trivially); non-finite S still parks the seam, never blanks the chrome.
+ * (Definition lives below the projector it derives from.) */
 
 /* Journey-enclosure radius (Task 37, map side): the ground ring the twin
  * clip cuts at — RING_RADIUS_M, imported from src/ring2/site.js (single
@@ -248,7 +251,7 @@ export function enclosureRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING
   if (!Number.isFinite(n)) return null;
   // The projected ring is evaluated at the HANDOFF zoom: the twin's clip is a
   // fixed ground circle at that pose. Holding at the earlier Z_TOP projection
-  // over-zoomed the map (121px vs the twin's 242px clip) — the owner sees the
+  // over-zoomed the map (242.2px vs the twin's 484.5px clip) — the owner sees the
   // circle shrink too far before the twin arrives. Evaluate at the handoff so
   // the circle lands on the twin's clip and holds there.
   const vr = vignetteRadiusPxForZoom(Z_HANDOFF, latDeg, ringM);
@@ -257,6 +260,23 @@ export function enclosureRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING
   const t = enclosureTForZoom(n);
   if (!(t > 0)) return null;
   return c * (1 - t) + vr * t;
+}
+/* Seam hold definition (derives from the projector above — never a tuned
+ * literal): the hold leg parks on the live forming law evaluated at the
+ * handoff zoom over the site parallel, i.e. exactly the radius the forming
+ * law converges to (corner*(1-t) + vr*t is vr at t=1). The exported seam
+ * pins that derivation at written precision (0.1px — the driver writes
+ * --vr/--vr-y to 0.1px, so the written seam and the written live law at the
+ * handoff are the identical string, never a 1-frame snap). Pure fns of S:
+ * rx is zoom-free past the gate by construction. */
+export function seamHoldRxPx(latDeg = SANGACHAL.lat, ringM = MAP_VIGNETTE_RING_M) {
+  return vignetteRadiusPxForZoom(Z_HANDOFF, latDeg, ringM);
+}
+export const SEAM_HOLD_RX_PX = +seamHoldRxPx().toFixed(1);
+export function seamHoldEllipseForS(s) {
+  void s; // the value is the seam itself — S owns the repaint cadence, not the radius
+  const rx = SEAM_HOLD_RX_PX;
+  return { rx, ry: rx * Math.cos(ISO_PITCH_DEG * DEG2RAD) };
 }
 /** At (or below tolerance of) the min-zoom cap — mirrored-reverse home. */
 export function isHomeZoom(z) {
@@ -439,9 +459,9 @@ export function lockAroundPoint(hx, hy, cx, cy, zoomIn) {
 /* Viewport ground-scale telemetry (pure, node-checkable): web-mercator
  * meters-per-pixel at a latitude, scaled by a CSS-px span. Lets the owner
  * report exactly which ground scale a satellite tile swap pops at
- * (integer zoom crossings are where Esri swaps captures). */
-export const EARTH_MPP = 156543.03392;
-export const EARTH_CIRC_M = 40075017; // Earth's circumference, meters (ruler maximum)
+ * (integer zoom crossings are where Esri swaps captures). Constants live at
+ * the top beside the zoom laws (the seam hold derives from this projector
+ * at module scope). */
 export function metersPerPixel(zoom, latDeg) {
   const z = +zoom;
   const lat = +latDeg;

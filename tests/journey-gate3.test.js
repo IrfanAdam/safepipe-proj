@@ -107,8 +107,8 @@ test('FIX 3: the enclosure holds at the handoff instead of over-zooming', () => 
     atHandoff, vignetteRadiusPxForZoom(Z_HANDOFF, SITE.lat),
     'at the handoff the enclosure IS the projected ring the twin clips to',
   );
-  // The old hold evaluated the projection at Z_TOP: 121px, half the twin's
-  // 242px clip — the owner's "enclosure zooming in too much".
+  // The old hold evaluated the projection at Z_TOP: 242.2px, half the twin's
+  // 484.5px clip — the owner's "enclosure zooming in too much".
   const oldHold = vignetteRadiusPxForZoom(Z_TOP, SITE.lat);
   assert.ok(
     atHandoff - oldHold > 100,

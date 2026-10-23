@@ -222,18 +222,39 @@ export function mapDisagrees(map, mp, tol = SYNC_SNAP_TOL) {
 }
 
 /* Drive a live MapLibre map from a twin pose (jumpTo: sync, no animation
- * fight). AUTHORITATIVE every twin frame: jumpTo + redraw run
- * unconditionally, then the camera is read back and snapped back on ANY
- * disagreement beyond tolerance — jumpTo is idempotent, so the agreeing
- * fast path costs one comparison and a map-side nudge can never persist
- * past the next frame. Asserts VEX first so a mis-exaggerated map can never
+ * fight). AUTHORITATIVE every twin frame: the map ends every frame holding
+ * this pose — at rest the redundant re-push + repaint are skipped (the pose
+ * fingerprint matches the last push to the same instance), but the read-back
+ * still runs, so a map-side-only nudge snaps back on the next frame exactly
+ * as before. Asserts VEX first so a mis-exaggerated map can never
  * silently receive a synced camera. Returns the applied
  * { center, zoom, bearing, pitch } with .snapped=true when a snap-back
  * re-push fired. */
+let lastSyncFp = null;
+let lastSyncMap = null;
 export function applyTwinToMap(map, pose, opts = {}) {
   assertTerrainVex(map);
   const mp = mapPoseForTwin(pose, opts);
+  const fp = `${mp.center[0]}|${mp.center[1]}|${mp.zoom}|${mp.bearing}|${mp.pitch}`;
   const push = { center: mp.center, zoom: mp.zoom, bearing: mp.bearing, pitch: mp.pitch };
+  if (map === lastSyncMap && fp === lastSyncFp) {
+    // Rest fingerprint: skip the redundant re-push + repaint, keep the
+    // read-back so a map-side-only change can never linger past this frame.
+    try {
+      if (mapDisagrees(map, mp)) {
+        map.jumpTo(push);
+        try {
+          if (typeof map.redraw === 'function') map.redraw();
+        } catch {
+          /* the map's own async loop still paints — parity degrades one frame, nothing breaks */
+        }
+        mp.snapped = true;
+      }
+    } catch {
+      /* read-back is best-effort — the map already holds this pose from the last push */
+    }
+    return mp;
+  }
   // Unconditional re-push + repaint: the twin pose is the camera authority
   // every frame, resting or moving — a map-side-only change can never linger.
   map.jumpTo(push);
@@ -242,6 +263,8 @@ export function applyTwinToMap(map, pose, opts = {}) {
   } catch {
     /* the map's own async loop still paints — parity degrades one frame, nothing breaks */
   }
+  lastSyncMap = map;
+  lastSyncFp = fp;
   // Snap-back: read the live camera back; any disagreement beyond tolerance
   // is re-pushed immediately (jumpTo is idempotent, so agreement is cheap).
   try {

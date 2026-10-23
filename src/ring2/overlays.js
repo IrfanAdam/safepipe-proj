@@ -326,6 +326,7 @@ export function createOverlayTwin(container, opts = {}) {
     let n = Number(g);
     if (!Number.isFinite(n)) n = 1;
     n = Math.min(1.1, Math.max(0.5, n));
+    if (n === lastTone) return n; // unchanged-value skip: per-tick repeats at rest write nothing
     lastTone = n;
     try {
       ambLight.intensity = AMBIENT_BASE * n;
@@ -621,6 +622,11 @@ export function createOverlayTwin(container, opts = {}) {
       clampH = (2 * range * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * (40 / hPx);
     } catch { /* clamp stays off */ }
     const hidePlaceholder = range < 3500;
+    // Unchanged-value skip: visibility + clamped scales are a pure function
+    // of (collapsed, hide, clampH, label set) — repeats at rest skip the loop.
+    const pillFp = `${collapsed ? 1 : 0}|${hidePlaceholder ? 1 : 0}|${Math.round(clampH * 1000)}|${labels.length}|${countPill ? 1 : 0}|${pillEpoch}`;
+    if (pillFp === lastPillFp) return;
+    lastPillFp = pillFp;
     labels.forEach((p, i) => {
       let vis = !collapsed || i < PILL_MAX_MAP_RANGE;
       if (vis && hidePlaceholder && p.sprite.userData.hideNear) vis = false;
@@ -863,6 +869,13 @@ function edgeFade(x, z) {
   /* Rim-fade material handle: refreshed by every buildRimFade() so the
    * per-frame tilt feed below always hits the live program. */
   let rimFadeMat = null;
+  /* Rim-uniform dedup: the per-frame tilt feed writes uTiltT/uCamDir every
+   * tick; repeats at rest write nothing (1e-4 quantization in a smoothstep
+   * width law is invisible). Reset on every rim rebuild (fresh program). */
+  let lastRimKey = null;
+  /* Pill-loop dedup epoch: rebuild() swaps the label set, forcing one re-walk. */
+  let pillEpoch = 0;
+  let lastPillFp = null;
 
   /* Periphery vignette: a MASK_COL annulus INSIDE the disc, DEM-draped
    * like the ground, with the falloff evaluated PER PIXEL in the fragment
@@ -953,6 +966,7 @@ function edgeFade(x, z) {
     mesh.frustumCulled = false;
     group.add(mesh);
     rimFadeMat = m;
+    lastRimKey = null; // fresh program holds defaults — force the next feed through
   }
 
   /* Takeover ground (Issue 2): opaque DEM-draped twin terrain filling the
@@ -1037,10 +1051,12 @@ function edgeFade(x, z) {
     // Settle stamp: a VALUE change means the slider/orbit is still moving
     // the view — the DEM auto-redrape below waits these out. Identical
     // per-frame repeats (at rest) leave the stamp alone.
-    if (nu !== lastU) lastSlideAt = Date.now();
+    if (nu === lastU) return nu; // unchanged-value skip: visible/opacity already hold this
+    lastSlideAt = Date.now();
     lastU = nu;
     if (groundMesh) groundMesh.visible = lastU > 0.003;
     if (groundMat) groundMat.opacity = lastU;
+    return nu;
   }
 
   let lastInfo = null;
@@ -1062,6 +1078,8 @@ function edgeFade(x, z) {
       } catch { /* noop */ }
     }
     emphasisMats = [];
+    emphasisEpoch++;
+    pillEpoch++;
     for (const m of externalMats) {
       if (m.userData.baseOpacity == null) m.userData.baseOpacity = m.opacity ?? 1;
       emphasisMats.push(m);
@@ -1177,7 +1195,17 @@ function edgeFade(x, z) {
    * (tiltU).
    * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
   let lastTiltK = 1;
+  /* Dedup epoch: rebuild() re-registers fresh materials, so the fingerprint
+   * below must re-walk even when the values match (fresh objects, stale paint). */
+  let emphasisEpoch = 0;
+  let lastWalkFp = null;
   function applyEmphasisFull() {
+    // Unchanged-value skip: per-frame drivers re-apply the same t every tick
+    // at rest — rewriting every opacity each time. Skip the walk when nothing
+    // observable changed (t + ring override + mat set + epoch).
+    const fp = `${lastT}|${ringFlight ? 1 : 0}|${lastRingP}|${emphasisMats.length}|${emphasisEpoch}`;
+    if (fp === lastWalkFp) return;
+    lastWalkFp = fp;
     for (const m of emphasisMats) {
       // Every mat is mix-only now (tiltFadeApplies is false for all kinds):
       // the tilt stamp below is dead weight kept for API compat, and pitch
@@ -1200,6 +1228,7 @@ function edgeFade(x, z) {
    * multiplier at 1 — the steep-tilt response now lives in mix.js as the
    * tilt takeover (twin ground in, photo out), not a line fade. */
   function setTiltFade(_pitchDeg) {
+    if (lastTiltK === 1) return; // neutered law pins 1 — per-tick calls skip the full re-walk
     lastTiltK = 1;
     applyEmphasisFull();
   }
@@ -1246,8 +1275,14 @@ function edgeFade(x, z) {
         const dy = camera.position.y - (controls.target.y || 0);
         const h = Math.hypot(dx, dz);
         const tilt = 1 - Math.min(1, Math.max(0, dy / (Math.hypot(h, dy) || 1)));
-        sh.uniforms.uTiltT.value = tilt;
-        if (h > 1e-6) sh.uniforms.uCamDir.value.set(dx / h, dz / h);
+        const nx = h > 1e-6 ? dx / h : null;
+        const nz = h > 1e-6 ? dz / h : null;
+        const key = `${Math.round(tilt * 1e4)}|${nx === null ? '-' : Math.round(nx * 1e4)}|${nz === null ? '-' : Math.round(nz * 1e4)}`;
+        if (key !== lastRimKey) {
+          lastRimKey = key;
+          sh.uniforms.uTiltT.value = tilt;
+          if (nx !== null) sh.uniforms.uCamDir.value.set(nx, nz);
+        }
       }
     } catch { /* rim drives on without us */ }
     const t = perfClock.getElapsedTime();
