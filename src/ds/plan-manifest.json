@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-23T08:30:15.115Z",
+  "generated": "2026-10-23T08:38:54.951Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,24 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "2fbeb74",
+      "full": "2fbeb7404ddde263bc48ac5c127b71b9d103ca1f",
+      "date": "2026-10-23",
+      "time": "14:00",
+      "subject": "docs(plan): round-11 calibration eval note [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "4c8b965",
+      "full": "4c8b965a4600421d95c8267706b030239fe4aa22",
+      "date": "2026-10-23",
+      "time": "14:00",
+      "subject": "fix(journey): 512-grid ground scale, derived seam, continuous center, single-writer fade [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "7f91394",
       "full": "7f91394c04b764d757d0603a70c168261da56af0",
@@ -6197,12 +6215,6 @@
   ],
   "wip": [
     ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md",
-    "ops3d-map.html",
-    "public/version.json",
-    "src/map/main.js",
-    "src/map/scrolltrigger.js",
-    "src/ring2/mix.js",
-    "src/ring2/overlays.js",
-    "src/ring2/sync.js"
+    "src/map/main.js"
   ]
 }
