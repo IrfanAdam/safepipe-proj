@@ -39,6 +39,7 @@ import {
   isHomeZoom,
   flipWheelDelta,
   lockAroundPoint,
+  maskGainForBlend,
   pitchTargetForZoom,
   metersPerPixel,
   formatGround,
@@ -653,6 +654,12 @@ const PROX_CURSOR_PX = 140; // cursor within this of the hotspot -> near
 const PROX_CENTER_PX = 90; // hotspot within this of canvas center -> near
 let lastDeepWarmZ = -1; // integer sat level already warmed around the spot
 let lastArriveWarmZ = -1; // arriving level already warmed (integer crossings stream it cold otherwise)
+// INTENT-PRECACHE: per-dive arrival-level warm state. intentWarmed latches
+// when the mask arm first fires (lock intent) and re-arms when intent drops
+// (retreat/off-site), so the next dive warms again; the twin boot itself
+// aborts on the existing z-band retreat path (earlyTwinArmed guard).
+let intentWarmed = false;
+let intentWarmedZ = -1; // integer zoom already warmed at lock intent (per dive)
 let scrubProgress = 0;
 let scrubFired = false;
 // Task-35 staged scrub: past the handoff gate scroll-as-zoom is clamped and
@@ -660,6 +667,161 @@ let scrubFired = false;
 let stagedActive = false;
 let stagedS = 0;
 let stagedCommitted = false;
+// HARD-STOP (owner override): long bounded zero-hold favoring holding. The
+// S ramp (overlay opacity) stays at 0 until the twin holds real tiles
+// (twinFrameHasContent); forward scroll itself stalls at frozen S (see
+// stallHolding/feedStagedScroll) instead of running ahead under a 0 ramp.
+// Past HARD_STOP_HOLD_MS forward releases anyway, flagged, so a dead frame
+// can never trap the fingers — reverse is always free. The scrub laws stay
+// pure functions of scroll; only the feeder advance and the written opacity
+// are gated.
+let stagedTilesT0 = 0;
+const HARD_STOP_HOLD_MS = 30000; // long wall-clock escape bound (was a 4s release-to-law)
+const STAGED_TILES_HOLD_MS = HARD_STOP_HOLD_MS; // the overlay ramp shares the same bound
+
+// HARD-STOP state: wall-clock arming of the zero-hold (0 = none armed).
+// stallPhase() names where the fingers are: 'staged' while the staged hold
+// owns S, 'pre' while the enclosing mask is armed on the native-zoom climb.
+// stallArmed() adds the unloaded twin; stallHolding() adds the long cap.
+// Reverse (scroll-up) never consults any of this — every reverse path runs
+// untouched, so fingers always escape by going back.
+let stallT0 = 0;
+let stallCeilingOn = false; // pre-gate depth freeze applied (restored only when set here)
+let stallPollT = 0; // bounded presentation poll: one 500ms chain while holding (cleared on release)
+function stallPhase() {
+  try {
+    if (transitId) return null;
+    // Staged first: the hold owns S while twinOpen is already true (prewarm),
+    // so the twinOpen check below must not mask it — the loader and the S
+    // freeze apply inside the mask exactly as on the climb.
+    if (stagedActive && !stagedCommitted) return 'staged';
+    if (twinOpen) return null;
+    if (maskArmed()) return 'pre';
+  } catch { /* predicate is best-effort */ }
+  return null;
+}
+function twinLoaded() {
+  try { return twinFrameHasContent(); } catch { return false; }
+}
+function stallArmed() {
+  try { return stallPhase() !== null && !twinLoaded(); } catch { return false; }
+}
+function stallWaitMs() {
+  try {
+    const nowS = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    return stallT0 > 0 ? Math.max(0, nowS - stallT0) : 0;
+  } catch { return 0; }
+}
+function stallHolding() {
+  try {
+    if (!stallArmed()) return false;
+    return stallWaitMs() < HARD_STOP_HOLD_MS;
+  } catch { return false; }
+}
+/** HARD-STOP loading pill: created once, visibility derived from stallHolding().
+ * Pointer-transparent, token-styled (see ops3d-map.html #twin-loading). */
+function ensureStallLoading() {
+  try {
+    let el = document.getElementById('twin-loading');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'twin-loading';
+    el.setAttribute('aria-hidden', 'true');
+    el.hidden = true;
+    el.innerHTML = '<b>TWIN LOADING</b><span>forward held &middot; scroll up releases</span>';
+    const app = document.getElementById('app');
+    if (app) app.appendChild(el);
+    return el;
+  } catch { return null; }
+}
+/** Feeder gate: true while forward intent must be swallowed. Refreshes
+ * presentation on the way in — this also catches the just-loaded transition:
+ * a stale holding bit re-releases through refresh instead of swallowing
+ * forever (the content grant lands between ticks, and zone ticks stop while
+ * the ceiling holds). Never throws. */
+function stallSwallowForward() {
+  try {
+    let was = false;
+    try { was = !!(window.__mapProbe.stall && window.__mapProbe.stall.holding); } catch { was = false; }
+    if (!stallArmed() && !was) return false;
+    return !!refreshStallLoading();
+  } catch { return false; }
+}
+/** Pre-gate depth freeze: while the hard stop holds outside staging, pin the
+ * native maxZoom at the live zoom so NO input (wheel, pinch, touch, keys)
+ * advances depth; reverse stays free (minZoom untouched). Staging owns its
+ * own clamp — never touched here. Restores only a ceiling this set. */
+function applyStallCeiling(hold) {
+  try {
+    if (!mapRef || typeof mapRef.setMaxZoom !== 'function') return;
+    if (stagedActive) return; // staged clamp owns the ceiling
+    if (hold) {
+      const z = +mapRef.getZoom();
+      if (Number.isFinite(z)) { mapRef.setMaxZoom(z); stallCeilingOn = true; }
+      return;
+    }
+    if (stallCeilingOn) { restoreMaxZoom(); stallCeilingOn = false; }
+  } catch { /* ceiling is best-effort */ }
+}
+/** Single writer for the stall presentation: arms the hold clock, sets loader
+ * visibility + pre-gate depth ceiling + probe. Idempotent; safe from every
+ * tick/handler. Returns the holding bit so feeder gates stay one-liners. */
+function refreshStallLoading() {
+  let hold = false;
+  let phase = null;
+  let loaded = false;
+  try { phase = stallPhase(); } catch { phase = null; }
+  try { loaded = twinLoaded(); } catch { loaded = false; }
+  try {
+    if (phase !== null && !loaded) {
+      if (stallT0 <= 0) {
+        try {
+          stallT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        } catch { try { stallT0 = Date.now(); } catch { stallT0 = 0; } }
+      }
+      hold = stallWaitMs() < HARD_STOP_HOLD_MS;
+    } else {
+      stallT0 = 0;
+    }
+  } catch { hold = false; }
+  try {
+    const el = ensureStallLoading();
+    if (el) el.hidden = !hold;
+  } catch { /* cosmetic */ }
+  try { applyStallCeiling(hold); } catch { /* ceiling is best-effort */ }
+  try {
+    window.__mapProbe.stall = {
+      holding: hold,
+      phase,
+      loaded,
+      s: +((+stagedS || 0)).toFixed(1),
+      waitMs: Math.round(stallWaitMs()),
+      escape: !hold && phase !== null && !loaded,
+    };
+    window.__mapProbe.twinLoaded = loaded;
+  } catch { /* probe cosmetic */ }
+  // HARD-STOP presentation poll: while the hold is up, re-evaluate at ~2Hz
+  // so a content grant that lands with idle fingers still clears the loader
+  // and restores the ceiling promptly. Presentation-only (never motion); the
+  // chain ends on release or when the arm drops, so it cannot outlive the
+  // hold — the long cap bounds it absolutely.
+  try {
+    if (hold) {
+      if (!stallPollT) {
+        try {
+          stallPollT = setTimeout(() => {
+            stallPollT = 0;
+            try { refreshStallLoading(); } catch { /* poll is best-effort */ }
+          }, 500);
+        } catch { stallPollT = 0; }
+      }
+    } else if (stallPollT) {
+      try { clearTimeout(stallPollT); } catch { /* best-effort */ }
+      stallPollT = 0;
+    }
+  } catch { /* poll is best-effort */ }
+  return hold;
+}
 // Task-37 staged-S producer: last S value posted to the twin frame
 // (postTwinStagedS throttles to value-change; null = nothing posted yet).
 let lastPostedStagedS = null;
@@ -677,6 +839,31 @@ const ISO_SETTLE_TOL_DEG = 0.5; // settle landings treat bearing/pitch inside th
 const STAGED_EXIT_BELOW = 0.05; // zoomend settle this far below Z_TOP unwinds the staged hold (at-gate holds)
 const STAGED_COMMIT_Z_TOL = 0.05; // commit-time scale nearness: live zoom must read at the handoff gate (the clamp holds it there — drift means the ceiling lost and S no longer matches the staged frame)
 let isoPumpOn = false; // per-frame tilt pump flight flag (single rAF loop while the band owns pitch)
+/** Live pitch write (DIM-MATCH): maplibre-gl 6.13.0 exposes no public
+ * `map.transform` at runtime (the d.ts `get transform()` is absent — the
+ * transform lives at `map._camera.transform`, verified live). Every direct
+ * pitch write in this file goes through here: the guarded
+ * `mapRef.transform.setPitch` sites (tilt pump, per-tick scrub, staged-hold
+ * travel, unwind glide) otherwise silently no-op, and the rendered tilt
+ * strands below the law — the drawn enclosure ellipse (law pitch) then
+ * disagrees with the true ground projection AND the twin hold (which adopts
+ * the handed live pitch) for the whole load window. Pitch-only, never
+ * touches zoom/center; same slew/EPS gating as the call sites. Returns true
+ * when the write landed. Never throws. */
+function setLivePitch(p) {
+  try {
+    const v = +p;
+    if (!Number.isFinite(v)) return false;
+    if (!mapRef) return false;
+    const t = mapRef.transform || (mapRef._camera && mapRef._camera.transform) || null;
+    if (!t || typeof t.setPitch !== 'function') return false;
+    t.setPitch(v);
+    try {
+      if (typeof mapRef.triggerRepaint === 'function') mapRef.triggerRepaint();
+    } catch { /* repaint is best-effort */ }
+    return true;
+  } catch { return false; }
+}
 /** Per-frame tilt pump: while the iso band owns pitch, drive it toward the
  * LIVE law target every animation frame — not per zoom tick. Mid-glide the
  * native zoom animation re-applies the gesture-start pitch per frame, so
@@ -730,10 +917,7 @@ function pumpIsoPitch() {
           if (Math.abs(d) > ISO_SCRUB_SLEW_DEG) pT = pCur + Math.sign(d) * ISO_SCRUB_SLEW_DEG;
           if (Math.abs(pCur - pT) > ISO_SCRUB_EPS_DEG) {
             try {
-              if (mapRef.transform && typeof mapRef.transform.setPitch === 'function') {
-                mapRef.transform.setPitch(pT);
-                if (typeof mapRef.triggerRepaint === 'function') mapRef.triggerRepaint();
-              }
+              setLivePitch(pT);
             } catch { /* frame write is best-effort */ }
           }
         }
@@ -1109,6 +1293,41 @@ function onNativeZoomStep(snap, source) {
         window.__mapProbe.maskArmed = false;
       } catch { /* probe cosmetic */ }
     }
+    // INTENT-PRECACHE: earliest reliable lock-intent signal (pre-iso,
+    // center-predictable) — the mask arm itself (near && blend>0, first
+    // true just past Z_CENTER, ~1 level before the takeover band and ~3-4
+    // before the staging gate). Boots the twin iframe + warms the
+    // arrival-level site tiles HERE so both land before the dissolve
+    // instead of mid-dissolve. Sets no twinOpen/clamp/history/timers —
+    // the ONLY opener stays flyToSectorThenTwin at the gate, so an
+    // unintended handoff is structurally impossible (this block names no
+    // opener). Twin-side autoplay laws untouched (same boot URL + the same
+    // grant/release contract the dive-start path uses; arrival still
+    // reloads on the warm cache with re-armed grants).
+    // Runs on every zoom tick (native + takeover-driven), so the
+    // in-band takeover call below stays a backstop, never the first boot.
+    try {
+      if (prox && prox.near && blend > 0) {
+        if (!twinOpen && !transitId && !pendingReveal && !stagedActive && !earlyTwinArmed) {
+          try {
+            earlyBootTwin();
+          } catch { /* intent boot is best-effort */ }
+        }
+        const iz = Math.floor(z);
+        if (!intentWarmed || iz !== intentWarmedZ) {
+          intentWarmed = true;
+          intentWarmedZ = iz;
+          try { prefetchSatTiles(SITE_LNGLAT, 9); } catch { /* warm is best-effort */ }
+          try { prefetchSatTiles(SITE_LNGLAT, 10); } catch { /* warm is best-effort */ }
+          try { prefetchSatTiles(SITE_LNGLAT, 11); } catch { /* warm is best-effort */ }
+        }
+      } else if (intentWarmed) {
+        intentWarmed = false; // intent lost: re-arm for the next dive
+      }
+    } catch { /* intent precache never breaks the journey */ }
+    try {
+      window.__mapProbe.intentPrewarm = intentWarmed || earlyTwinArmed;
+    } catch { /* probe cosmetic */ }
     // Deep warm for the dissolve: while the spot is tracked in sat range,
     // keep the arriving level AND the level after next warm around it — the
     // arriving level used to stream in cold at every integer crossing, so its
@@ -1270,9 +1489,16 @@ function onNativeZoomStep(snap, source) {
             // pump carries the tilt between ticks; the settle
             // reconcile below is the guarantor: isoRestoreDue stays latched
             // until a zoomend glides pitch home.
+            // Prefer the public transform when a future maplibre exposes it;
+            // at 6.13.0 runtime it is absent (lives at map._camera.transform),
+            // so the else leg writes through setLivePitch instead of dropping
+            // the tilt (DIM-MATCH: a dropped write strands pitch below the law
+            // and the drawn circle disagrees with the plane for the load).
             if (mapRef.transform && typeof mapRef.transform.setPitch === 'function') {
               mapRef.transform.setPitch(pTarget);
               if (typeof mapRef.triggerRepaint === 'function') mapRef.triggerRepaint();
+            } else {
+              setLivePitch(pTarget);
             }
           } catch (err) {
             errors.push('ISO-SCRUB: ' + (err && err.message));
@@ -1370,7 +1596,12 @@ function onNativeZoomStep(snap, source) {
     // exit is twin-ready + S-commit (driveStagedOverlay/finalizeStagedReveal).
     // Round-10: a dive-start boot that retreats below the band before
     // arrival aborts here — frame blanked, overlay re-hidden, map untouched.
-    if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && z < Z_ISO_START - 1) {
+    // INTENT-PRECACHE: the boot now arms at the mask arm (z>Z_CENTER, below
+    // the old band floor), so the abort keys off intent-loss — the same
+    // near && blend>0 predicate — instead of the z-band. Retreating below
+    // the mask or drifting off-site aborts; holding intent keeps the boot
+    // through the whole pre-iso climb the old floor would have killed.
+    if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && !(prox && prox.near && blend > 0)) {
       try {
         abortEarlyBootTwin();
       } catch { /* abort is best-effort */ }
@@ -1418,6 +1649,10 @@ function onNativeZoomStep(snap, source) {
     try {
       if (typeof positionDomPins === 'function' && mapRef) positionDomPins(mapRef);
     } catch { /* pins cosmetic */ }
+    // HARD-STOP presentation: loader + ceiling track the mask/content gate on
+    // every zoom tick (re-freezes the ceiling as reverse descends, releases
+    // on grant). Reverse never stalls — this only presents.
+    try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
   } catch (err) {
     errors.push('ZOOM-STEP: ' + (err && err.message));
   }
@@ -1783,23 +2018,35 @@ function flyToSectorThenTwin(id, opts = {}) {
       // on the first drive tick instead of stalling at 0 while the twin
       // boots.
       // The twin intro is scroll-scrubbed to the same S (postTwinStagedS +
-      // the grant-time re-emit), so a high seed replays as matching progress
-      // on both sides, never a teleport — and scroll-up retraces it
-      // symmetrically through accumStagedS.
+      // the grant-time re-emit), so a zeroed hold replays as matching stillness
+      // on both sides — and scroll-up retraces it symmetrically through
+      // accumStagedS once the twin holds content.
       const tSeed = clamp01(
         ((Number.isFinite(liveZ) ? liveZ : Z_TOP) - Z_TOP) / (Z_HANDOFF - Z_TOP),
       );
       stagedS = HANDOFF_STAGED_S_MAX * smooth01(tSeed);
-      // Reveal continuity: the seed STANDS — no park at the reveal gate. S is
-      // the fingers' progress and the overlay is a pure function of S, so a
-      // fast burst that arrives deep already holds the matching dissolve on
-      // the first drive tick instead of stalling at 0 while the twin boots.
-      // The twin intro is scroll-scrubbed to the same S (postTwinStagedS +
-      // the grant-time re-emit), so a high seed replays as matching progress
-      // on both sides, never a teleport — and scroll-up retraces it
-      // symmetrically through accumStagedS.
+      // HARD-STOP: hold at zero — arrival re-hands the frame (reload resets
+      // content), so the continuity seed above is stale by construction and
+      // would paint a mid-dissolve jump on first content. Park S at 0;
+      // forward ticks stall there until the twin holds content
+      // (feedStagedScroll) and the loader shows. The scrub laws are
+      // untouched — only the seeded start value is held.
+      stagedS = 0;
+      try { window.__mapProbe.stallSeedHeld = true; } catch { /* probe cosmetic */ }
+      // HARD-STOP: the staged clamp supersedes any pre-gate ceiling freeze.
+      stallCeilingOn = false;
+      // HARD-STOP: no parked seed — S opens at 0 and the first drive tick
+      // paints the hold (not a partial dissolve) while the twin boots. The
+      // twin intro is scroll-scrubbed to the same S (postTwinStagedS + the
+      // grant-time re-emit), so the hold replays as matching stillness on
+      // both sides — and scroll-up retraces it symmetrically through
+      // accumStagedS once the twin holds content.
       stagedCommitted = false;
       lastPostedStagedS = null; // Task-37: the S producer re-arms (S=0 posts on first drive)
+      // HARD-STOP: arm the long bounded tiles hold (shares HARD_STOP_HOLD_MS).
+      try {
+        stagedTilesT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      } catch { try { stagedTilesT0 = Date.now(); } catch { stagedTilesT0 = 0; } }
       try {
         pumpIsoPitch(); // live-hold carry: keep the per-frame tilt pump running under the clamp (it now converges the S-driven hold tilt, never parks on the prewarm)
       } catch { /* pump is best-effort */ }
@@ -1807,6 +2054,12 @@ function flyToSectorThenTwin(id, opts = {}) {
         window.__mapProbe.staged = { active: true, s: 0, committed: false };
       } catch { /* probe cosmetic */ }
       prewarmThenReveal(id, liveFrame(), { ...opts, staged: true });
+      // HARD-STOP idle poll: one fallback slide so content detection retries
+      // even with no scroll ticks (the staged branch never blind-reveals;
+      // each fire re-drives the frozen hold and refreshes the loader, so the
+      // pill clears when content lands even if the fingers are still).
+      try { armRevealFallback(); } catch { /* poll is best-effort */ }
+      try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
     } else {
       prewarmThenReveal(id, liveFrame(), opts);
     }
@@ -1990,7 +2243,7 @@ function driveStagedHold(st) {
   } catch { ringClose = 0; }
   // (a) tilt travel past the pole — journey-owned tilt only.
   try {
-    if (mapRef && isoScrubOwned && mapRef.transform && typeof mapRef.transform.setPitch === 'function') {
+    if (mapRef && isoScrubOwned) {
       let zNow = null;
       try {
         zNow = +mapRef.getZoom();
@@ -2002,8 +2255,7 @@ function driveStagedHold(st) {
         cur = +mapRef.getPitch();
       } catch { cur = null; }
       if (Number.isFinite(cur) && Math.abs(cur - target) > ISO_SCRUB_EPS_DEG) {
-        mapRef.transform.setPitch(target);
-        if (typeof mapRef.triggerRepaint === 'function') mapRef.triggerRepaint();
+        setLivePitch(target);
       }
     }
   } catch { /* hold tilt is best-effort */ }
@@ -2092,10 +2344,13 @@ function driveStagedHold(st) {
   return { pitchExtra, ringClose };
 }
 
-/** Drive the staged overlay dissolve from accumulated scroll S. Twin-ready
- * (or first paint) GRANTS (>0 only once Lane B posts it); the S law owns
- * the progress, so a fast twin still dissolves on the fingers, never its
- * own rhythm. At full reveal the hold commits (finalizeStagedReveal).
+/** Drive the staged overlay dissolve from accumulated scroll S. Twin TILE
+ * readiness GRANTS the ramp (opacity stays 0 until the twin holds real
+ * tiles, then follows the law); past a bounded hold the ramp releases
+ * anyway, flagged, so dead frames never stall the fingers. The S law owns
+ * the progress — a fast twin still dissolves on the fingers, never its own
+ * rhythm — so the law stays a pure function of S and only the written
+ * opacity is gated. At full reveal the hold commits (finalizeStagedReveal).
  * Pure-law in, DOM out. */
 function driveStagedOverlay() {
   if (!stagedActive || stagedCommitted) return;
@@ -2134,17 +2389,34 @@ function driveStagedOverlay() {
   } catch {
     ready = false;
   }
-  // Reveal continuity: the grant AND the release gate NOTHING in the dissolve.
-  // The overlay opacity is a pure function of staged S on every tick — boot
-  // or not — so fast wheel ticks always paint. The twin intro is
-  // scroll-scrubbed to the same S (Task 36/37 wire), so both sides stay
-  // matched on fingers instead of the map stalling at 0 and jumping later.
-  // The commit below still requires a real frame (content + near + scale),
-  // so bookkeeping never lands on a blind twin — a gated commit only delays
-  // finalize, never the dissolve. Single writer: every opacity value on this
-  // path goes through scrubWrite (transition suspended, synchronous inline
-  // write) — revealTwin's timed leg is barred mid-hold (see its guard), so no
-  // second writer can ease against the law.
+  // HARD-STOP: the ramp gates on twin TILE readiness, not on the
+  // ready/painted listener grants — those only prove the twin is alive, and
+  // a painted-but-tileless boot is the exact ghost (dissolve over a dark,
+  // untextured frame). The S law above stays pure (probe .reveal still
+  // reports it); only the WRITTEN opacity is gated: 0 until the twin holds
+  // real tiles, then the law. Forward S itself stalls at the feeder
+  // (feedStagedScroll) while tilesHold, so the hold is a true zero-hold, not
+  // a 0 ramp under a running S. Past STAGED_TILES_HOLD_MS (the long
+  // HARD_STOP_HOLD_MS bound) the hold releases anyway (tilesFallback,
+  // flagged) so a dead frame can never trap the fingers — the commit below
+  // still requires content, and the silent-twin unwind chain still owns the
+  // dead-frame exit. Reverse never consults any of this.
+  let tilesReady = false;
+  try {
+    tilesReady = twinFrameHasContent();
+  } catch { tilesReady = false; }
+  let tilesWaitMs = 0;
+  try {
+    const nowT = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    tilesWaitMs = stagedTilesT0 > 0 ? Math.max(0, nowT - stagedTilesT0) : 0;
+  } catch { tilesWaitMs = 0; }
+  const tilesFallback = tilesWaitMs > STAGED_TILES_HOLD_MS;
+  const tilesHold = !tilesReady && !tilesFallback;
+  // Effective ramp: the law when granted, 0 while held. Single writer: every
+  // opacity value on this path goes through scrubWrite (transition suspended,
+  // synchronous inline write) — revealTwin's timed leg is barred mid-hold
+  // (see its guard), so no second writer can ease against the law.
+  const effReveal = tilesHold ? 0 : st.reveal;
   let released = false;
   try {
     released = twinReleased();
@@ -2159,11 +2431,19 @@ function driveStagedOverlay() {
       blend: +st.blend.toFixed(4),
       tilt: +st.tilt.toFixed(4),
       reveal: +st.reveal.toFixed(4),
+      eff: +effReveal.toFixed(4),
       ready,
       released,
       committed: false,
+      tilesReady,
+      tilesHold,
+      tilesFallback,
+      tilesWaitMs: Math.round(tilesWaitMs),
     };
   } catch { /* probe cosmetic */ }
+  // HARD-STOP presentation: loader + ceiling + probe track the content gate
+  // on every drive (holds while tileless, clears on grant even if idle).
+  try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
   // Live-hold travel FIRST — every S tick moves the frame even while the
   // twin is dark (pre-grant). The grant below gates only the overlay
   // dissolve, never finger motion.
@@ -2175,9 +2455,10 @@ function driveStagedOverlay() {
     window.__mapProbe.staged.holdPitch = hold ? +hold.pitchExtra.toFixed(3) : 0;
     window.__mapProbe.staged.ringClose = hold ? +hold.ringClose.toFixed(4) : 0;
   } catch { /* probe cosmetic */ }
-  // Reveal continuity: NO hold-at-0 — the S stages stay visible through the
-  // overlay on every tick, grant or not. Falling through to the dissolve
-  // below writes the law value unconditionally.
+  // HARD-STOP: the ramp holds at 0 while the twin is tileless — forward S
+  // stalls at the feeder (feedStagedScroll) so the fingers hold still with
+  // it; only the overlay opacity waits. Reverse still drains and retraces.
+  // Falling through writes the EFFECTIVE ramp (law when granted, 0 held).
   // Commit gate (gaps direction: near-and-non-blank): the fingers dissolved
   // the twin to full, but the commit lands only when the map side is still
   // NEAR the staged frame and the twin holds REAL CONTENT. `ready` only
@@ -2203,7 +2484,7 @@ function driveStagedOverlay() {
       scaleNear = Number.isFinite(zGate) && Math.abs(zGate - Z_HANDOFF) <= STAGED_COMMIT_Z_TOL;
     } catch { scaleNear = false; }
     if (!hasContent) {
-      scrubWrite(String(+st.reveal.toFixed(4))); // blank guard HOLDS the law — via the one writer (no transition). Never 0: a gated commit only delays finalize, and dropping to 0 here would replay the 0->1 snap when the gate passes.
+      scrubWrite(String(+effReveal.toFixed(4))); // blank guard HOLDS the effective ramp — via the one writer (no transition). While the tiles hold is armed this is 0 (nothing dissolved yet, so no snap to replay); past the fallback it holds the law and the silent-twin chain owns the exit.
       try {
         window.__mapProbe.staged.blankTwin = true;
         window.__mapProbe.staged.notNear = !proxNear;
@@ -2212,7 +2493,7 @@ function driveStagedOverlay() {
       return; // no commit — hold the map, retry when the twin reports content
     }
     if (!proxNear || !scaleNear) {
-      scrubWrite(String(+st.reveal.toFixed(4))); // near-guard HOLDS the law — via the one writer (no transition). Never 0: same no-snap reason as the blank guard above.
+      scrubWrite(String(+effReveal.toFixed(4))); // near-guard HOLDS the effective ramp — via the one writer (no transition). Same hold semantics as the blank guard above.
       try {
         window.__mapProbe.staged.blankTwin = false;
         window.__mapProbe.staged.notNear = !proxNear;
@@ -2231,7 +2512,8 @@ function driveStagedOverlay() {
     // suspended — the rendered opacity is exactly 1 before the handoff.
     // finalizeStagedReveal then restores the transition and releases the
     // inline value with nothing left to ease or snap (1 -> stylesheet 1).
-    scrubWrite(String(+st.reveal.toFixed(4)));
+    // (Commit implies content, so the hold has released: eff == law == 1.)
+    scrubWrite(String(+effReveal.toFixed(4)));
     finalizeStagedReveal(root);
     return;
   }
@@ -2250,7 +2532,9 @@ function driveStagedOverlay() {
     // the timed reverse), which the class is removed for. R11-FADE: routed
     // through the one writer above so the suspend-then-write order is
     // identical on every S-owned leg (holds, dissolve, commit pre-write).
-    scrubWrite(st.reveal <= 0 ? '0' : String(+st.reveal.toFixed(4)));
+    // READINESS-HOLD: the written value is the EFFECTIVE ramp — the law once
+    // the twin holds tiles (or past the fallback), 0 while it doesn't.
+    scrubWrite(effReveal <= 0 ? '0' : String(+effReveal.toFixed(4)));
   } catch { /* cosmetic */ }
   // S owns the dissolve: the paint-gated fallback window slides while the hold
   // flows (re-armed at most once/sec — the window only fires after S stalls a
@@ -2347,6 +2631,7 @@ function finalizeStagedReveal(root) {
   if (stagedCommitted) return;
   stagedCommitted = true;
   stagedActive = false;
+  stagedTilesT0 = 0; // HARD-STOP: commit disarms the hold (loader already cleared by content)
   try {
     unfreezeStagedFrame(); // MAP FRAME FREEZE: commit releases the camera lock
   } catch { /* unlock is best-effort */ }
@@ -2376,6 +2661,8 @@ function finalizeStagedReveal(root) {
   try {
     window.__mapProbe.staged = { active: false, s: +stagedS.toFixed(1), committed: true };
   } catch { /* probe cosmetic */ }
+  // HARD-STOP presentation: the commit implies content — the loader clears.
+  try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
 }
 
 /** Unwind the staged hold (reverse exit): zoomend settle below the gate.
@@ -2389,6 +2676,7 @@ function exitStaged() {
   stagedActive = false;
   stagedS = 0;
   stagedCommitted = false;
+  stagedTilesT0 = 0; // HARD-STOP: unwind disarms the hold
   entryRx = null; // unwind clears the entry radii — the next hold re-caches its own arrival
   entryRy = null;
   lastPostedStagedS = null; // symmetric unwind: the S stream ends with the hold
@@ -2402,7 +2690,7 @@ function exitStaged() {
   // same settle tempo; zoom/center untouched — the next zoom step re-derives
   // the enclosure chrome from z the same way).
   try {
-    if (had && mapRef && mapRef.transform && typeof mapRef.transform.setPitch === 'function') {
+    if (had && mapRef) {
       let zNow = null;
       try {
         zNow = +mapRef.getZoom();
@@ -2413,8 +2701,7 @@ function exitStaged() {
         cur = +mapRef.getPitch();
       } catch { cur = null; }
       if (Number.isFinite(cur) && Math.abs(cur - base) > ISO_SCRUB_EPS_DEG) {
-        mapRef.transform.setPitch(base);
-        if (typeof mapRef.triggerRepaint === 'function') mapRef.triggerRepaint();
+        setLivePitch(base);
       }
     }
   } catch { /* hold unwind is best-effort */ }
@@ -2474,6 +2761,9 @@ function exitStaged() {
   try {
     if (hadOpen) flattenJourneyTiltToLaw('exit-staged');
   } catch { /* guarantor never breaks teardown */ }
+  // HARD-STOP presentation: unwind may land back under an armed mask with an
+  // unloaded twin — re-freeze the ceiling and show the loader there.
+  try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
 }
 
 /** Round-10 dive-start prewarm: boot the twin iframe EARLY at first aimed
@@ -2528,6 +2818,9 @@ function abortEarlyBootTwin() {
   try {
     window.__mapProbe.earlyPrewarm = false;
   } catch { /* probe cosmetic */ }
+  // HARD-STOP presentation: aborting the early boot unloads the twin — the
+  // loader tracks whatever the mask gate reads now.
+  try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
   return true;
 }
 
@@ -2786,6 +3079,9 @@ function revealTwin(instant = false) {
     try {
       overlayEls.frame.focus?.();
     } catch { /* focus is best-effort */ }
+    // HARD-STOP presentation: a reveal implies the twin owns the frame —
+    // the loader clears (refresh is a no-op when already clear).
+    try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
     return true;
   } catch (err) {
     errors.push('REVEAL: ' + (err && err.message));
@@ -2879,6 +3175,9 @@ function openTwin(id, opts = {}) {
   try {
     frame.focus?.();
   } catch { /* focus is best-effort */ }
+  // HARD-STOP presentation: a direct open hands the frame to the twin —
+  // the loader clears.
+  try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
   return true;
 }
 
@@ -3549,10 +3848,32 @@ function installBandTakeover() {
           earlyBootTwin();
         } catch { /* prewarm never breaks input */ }
       }
+      // HARD-STOP: forward (raw dy>0 = dive) stalls pre-grant while the mask
+      // is armed and the twin holds no content: swallowed, so neither the
+      // camera write below nor any downstream native lane advances depth.
+      // Reverse flows untouched. Past the long cap forward escapes (flagged).
+      try {
+        if (dy > 0 && stallSwallowForward()) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      } catch { /* stall never breaks input */ }
       e.preventDefault();
       e.stopPropagation();
       const rate = Math.abs(dy) < 4 ? TRACK_RATE : WHEEL_RATE;
-      const target = z + dy * rate;
+      // GAIN-LINK: while the enclosing mask is armed (hotspot near — the
+      // blend itself is the mask's forming parameter, 0 while the mask is
+      // down), the tick runs at the mask-anchored dip gain — a pure
+      // function of live mask state, so no timer owns the motion and
+      // zoom-out retraces it symmetrically. The slowdown starts exactly on
+      // the tick the mask appears and releases at iso (gain 1 there, so
+      // the commit is intact). S feed below stays unscaled so the staged
+      // commit keeps its full scroll budget.
+      let dipGain = 1;
+      try { dipGain = maskGainForBlend(centerBlendForZoom(z), !!(prox && prox.near)); } catch { dipGain = 1; }
+      if (!Number.isFinite(dipGain) || dipGain <= 0) dipGain = 1;
+      const target = z + dy * rate * dipGain;
       let around = null;
       try {
         const ctn = mapRef.getContainer();
@@ -3623,7 +3944,7 @@ function installBandTakeover() {
       try {
         feedStagedScroll(-dy);
       } catch { /* S feed is best-effort */ }
-      try { window.__mapProbe.takeover = true; } catch { /* probe cosmetic */ }
+      try { window.__mapProbe.takeover = true; window.__mapProbe.zoomGain = +dipGain.toFixed(3); } catch { /* probe cosmetic */ }
       try { window.__mapProbe.centerSteer = +cBlend.toFixed(3); } catch { /* probe cosmetic */ }
     } catch { /* takeover never breaks input */ }
   };
@@ -3672,14 +3993,42 @@ function installWheelFlip(rootEl, laneEl, ctx) {
           else locked = false;
         } catch { locked = false; }
       }
-      try { window.__mapProbe.zoomLock = locked; } catch { /* probe cosmetic */ }
+      // GAIN-LINK: while the lock holds (mask armed) the flipped clone
+      // carries the mask-anchored dip gain — a pure function of the live
+      // enclosure blend (0 while the mask is down, so the slowdown starts
+      // exactly when the mask appears) releasing to 1 at iso, so the
+      // fingers dwell longer through mask formation with no timer owning
+      // the motion. Zoom-out retraces symmetrically (gain is
+      // direction-free); far frames never lock so they keep full rate.
+      // Pinch (ctrl+wheel) bypasses here.
+      let dipGain = 1;
+      if (locked) {
+        try { dipGain = maskGainForBlend(centerBlendForZoom(+ctx.map.getZoom()), true); } catch { dipGain = 1; }
+        if (!Number.isFinite(dipGain) || dipGain <= 0) dipGain = 1;
+      }
+      try { window.__mapProbe.zoomLock = locked; window.__mapProbe.zoomGain = +dipGain.toFixed(3); } catch { /* probe cosmetic */ }
+      // HARD-STOP: mask armed + twin unloaded → forward stalls HERE (raw dy>0
+      // = dive under the up-out convention): swallowed, loader on, depth
+      // frozen by the ceiling in refresh. Reverse always passes to the clone.
+      // Staged holds are NOT swallowed here — the clone must still reach the
+      // canvas accumulator so feedStagedScroll drives the frozen hold (repaint
+      // + S=0 pin) instead of starving it. Past the long cap forward escapes
+      // (flagged in probe.stall).
+      try {
+        if (dy > 0 && !stagedActive && stallSwallowForward()) {
+          try { window.__mapProbe.stallSwallowed = true; } catch { /* probe cosmetic */ }
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      } catch { /* stall never breaks input */ }
       let clone = null;
       try {
         clone = new WheelEvent('wheel', {
           bubbles: true,
           cancelable: true,
           deltaX: flipWheelDelta(+e.deltaX || 0),
-          deltaY: flipWheelDelta(dy),
+          deltaY: flipWheelDelta(dy) * dipGain,
           deltaZ: +e.deltaZ || 0,
           deltaMode: e.deltaMode,
           clientX: px == null ? e.clientX : px,
@@ -3720,6 +4069,17 @@ function installAnchorGuard() {
       let armed = false;
       try { armed = maskArmed(); } catch { armed = false; }
       if (!armed) return;
+      // HARD-STOP: forward pinch (native lane: dy<0 = dive) stalls with the
+      // mask armed + twin unloaded; reverse pinch always passes through.
+      // Staged holds fall through to the centered clone (never swallowed) so
+      // the canvas accumulator still feeds the frozen hold's drive.
+      try {
+        if (+e.deltaY < 0 && !stagedActive && stallSwallowForward()) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      } catch { /* stall never breaks input */ }
       if (!mapRef || typeof mapRef.getCanvasContainer !== 'function') return;
       const lane = mapRef.getCanvasContainer();
       if (!lane || typeof lane.contains !== 'function' || !lane.contains(e.target)) return;
@@ -3789,14 +4149,25 @@ function feedStagedScroll(dyFlip) {
     }
     const dy = +dyFlip;
     if (!Number.isFinite(dy) || dy === 0) return;
+    // HARD-STOP: forward (flip-space dy<0) stalls at frozen S until the twin
+    // holds content — no accumulate, so neither the overlay dissolve nor the
+    // twin-plane scrub (both pure fns of the same S) advances. The frozen
+    // drive below repaints the hold and posts S (the first post pins the twin
+    // intro at its start); the loader shows via refresh. Reverse (dy>0)
+    // always drains through the same law. Past the long cap forward escapes
+    // anyway (flagged in probe.stall).
+    if (dy < 0 && stallSwallowForward()) {
+      try { driveStagedOverlay(); } catch { /* frozen repaint is best-effort */ }
+      return;
+    }
     stagedS = accumStagedS(stagedS, dy); // symmetric: scroll-up retraces the same law
-    // Reveal continuity: NO gate clamp — S accumulates on every wheel tick,
-    // boot or not. The overlay is a pure function of S, so every tick paints;
-    // parking S at the reveal gate pre-grant discarded fast-wheel intent and
-    // stalled the dissolve at 0 (the stutter), and the grant-time re-emit in
-    // the Lane B handlers replays the live S to the twin so both sides stay
-    // matched. Scroll-up drains symmetrically (the clamp only ever lowers);
-    // the silent-twin unwind still owns the never-grant case.
+    // HARD-STOP: S advances only past the content grant (or the long-cap
+    // escape) — the overlay stays a pure function of scroll, so every tick
+    // paints. Forward intent while unloaded never reaches this line (stalled
+    // above at frozen S); the grant-time re-emit in the Lane B handlers
+    // replays the live S to the twin so both sides stay matched. Scroll-up
+    // drains symmetrically; the silent-twin unwind still owns the
+    // never-grant case.
     driveStagedOverlay(); // repaints the overlay AND posts S to the twin (throttled)
   } catch { /* accumulator never breaks the map */ }
 }

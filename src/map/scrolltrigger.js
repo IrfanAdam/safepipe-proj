@@ -467,6 +467,40 @@ export function lockAroundPoint(hx, hy, cx, cy, zoomIn) {
   return { x: +hx + (+hx - +cx) * K, y: +hy + (+hy - +cy) * K };
 }
 
+/* Mask-anchored scroll-gain dip (pure, node-checkable): the slowdown rides
+ * the enclosing mask itself, not absolute zoom. Input is the live enclosure
+ * blend b (centerBlendForZoom — 0 while the mask is down) plus the mask-arm
+ * predicate (hotspot near): gain is 1 whenever the mask is down, dips to
+ * MASK_GAIN_MIN mid-formation through a smoothstepped sine window (zero
+ * slope at both ends, so the entry joins the full-rate law without a kink
+ * and the release meets full rate exactly at the iso checkpoint Z_TOP),
+ * and stays 1 at/above iso so the handoff commit runs at full rate.
+ * Strictly scroll-governed: a pure function of live mask state, so no
+ * timer ever owns camera motion; zoom-out retraces it symmetrically (gain
+ * is direction-free). Far frames keep full rate at any zoom because the
+ * arm predicate owns the gate — the zoom value alone can never dip. */
+export const MASK_GAIN_MIN = 0.7; // deepest slowdown: 30% off at mid mask formation
+export const MASK_GAIN_RELEASE_BLEND = enclosureTForZoom(Z_TOP); // blend at the iso checkpoint (~0.874): the dip releases here
+export function maskGainForBlend(blend, armed) {
+  if (!armed) return 1;
+  const b = +blend;
+  if (!Number.isFinite(b) || b <= 0) return 1;
+  const t = clamp01(b / MASK_GAIN_RELEASE_BLEND);
+  if (t <= 0 || t >= 1) return 1;
+  const u = smooth01(t);
+  return 1 - (1 - MASK_GAIN_MIN) * Math.sin(Math.PI * u);
+}
+/* Legacy absolute-zoom entry: kept so older imports keep working. Delegates
+ * to the mask law with the span-implied arm — the live mask predicate in
+ * main.js owns the real gating. */
+export const LOCK_GAIN_MIN = MASK_GAIN_MIN;
+export function zoomGainForZoom(z) {
+  const n = +z;
+  if (!Number.isFinite(n)) return 1;
+  const armed = n > Z_CENTER && n < Z_TOP;
+  return maskGainForBlend(centerBlendForZoom(n), armed);
+}
+
 /* Viewport ground-scale telemetry (pure, node-checkable): web-mercator
  * meters-per-pixel at a latitude, scaled by a CSS-px span. Lets the owner
  * report exactly which ground scale a satellite tile swap pops at

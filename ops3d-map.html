@@ -263,6 +263,21 @@
   #twin-overlay[hidden] { display: none; }
   #twin-overlay.prewarm { opacity: 0; pointer-events: none; }
   #twin-overlay.closing { opacity: 0; transition-duration: 0.45s; }
+  /* HARD-STOP loading state: shown while the enclosing mask is armed and the
+   * twin holds no content (forward stalled, reverse free). Pointer-transparent
+   * pill above the prewarm overlay (z 50) and below HUD chrome; token colors
+   * only, no raw values. */
+  #twin-loading { position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 60; pointer-events: none; display: flex; align-items: center; gap: 8px;
+    background: var(--ops-bg); border: 1px solid var(--ops-line);
+    color: var(--ops-amber); font: 10px/1.6 ui-monospace, Menlo, monospace;
+    letter-spacing: 0.12em; padding: 6px 12px; border-radius: 999px;
+    white-space: nowrap; }
+  #twin-loading[hidden] { display: none; }
+  #twin-loading b { font-weight: 700; animation: twin-loading-pulse 1.2s ease-in-out infinite; }
+  #twin-loading span { color: var(--ops-dim); letter-spacing: 0.06em; }
+  @keyframes twin-loading-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { #twin-loading b { animation: none; } }
   /* GATE-3 REVISION: the staged dissolve is SCRUBBED, so the browser must
    * not also ease it. A CSS transition eases between committed values; when
    * the scroll law rewrites the inline opacity every tick, each write

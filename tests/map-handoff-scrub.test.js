@@ -250,39 +250,54 @@ test('round-8 sync audit: twin release re-derives mid from grant-time zoom', () 
     'the staged wire carries the live zoom when finite, omits it otherwise',
   );
 });
-test('reveal continuity: overlay opacity is a pure function of staged S during boot', () => {
-  // The old round-9 contract held the overlay at 0 until grant AND release,
-  // so pre-grant wheel ticks painted nothing and the dissolve jumped when
-  // the gates lifted. Now the S law owns the opacity on every tick — grant
-  // and release gate nothing in the dissolve (both still published on the
-  // probe), and revealTwin's timed leg is barred mid-hold so the driver is
-  // the single writer. The commit still requires a real frame (content +
-  // near + scale), and gated commits hold the LAW value, never 0 — so a
-  // late-passing gate finalizes 1->1 with no snap.
+test('readiness-hold: overlay ramp waits for twin tiles, law stays pure', () => {
+  // Owner diagnosis: the dissolve revealed the twin before its tiles were
+  // ready (ghosting). The ramp now gates on TILE readiness
+  // (twinFrameHasContent), not on the ready/painted listener grants — those
+  // only prove the twin is alive. The S law itself stays a pure function of
+  // scroll (probe .reveal still reports it); only the WRITTEN opacity is
+  // gated (probe .eff): 0 while tileless, the law once granted. Past
+  // STAGED_TILES_HOLD_MS the hold releases anyway, flagged, so a dead frame
+  // can never stall the fingers; the commit still requires content and the
+  // silent-twin unwind chain still owns the dead-frame exit. The commit
+  // pre-write and the blank/near guards hold the EFFECTIVE ramp, and
+  // revealTwin's timed leg is still barred mid-hold (single writer).
   const main = srcOf('../src/map/main.js');
   assert.ok(
     main.includes('function twinReleased()'),
     'a release signal exists (fwd allocated / phase past hold)',
   );
   assert.ok(
-    !main.includes('if (!ready || !released) {'),
-    'no hold-at-0 — the dissolve never waits for grant/release',
+    main.includes('const effReveal = tilesHold ? 0 : st.reveal;'),
+    'the effective ramp is the law when granted, 0 while the tiles hold',
   );
   assert.ok(
-    !main.includes("scrubWrite('0')"),
-    'opacity 0 is only ever the law floor (reveal <= 0), never a hold',
+    main.includes("scrubWrite(effReveal <= 0 ? '0' : String(+effReveal.toFixed(4)));"),
+    'the dissolve writes the effective ramp, never the raw law',
   );
   assert.ok(
-    main.includes("scrubWrite(st.reveal <= 0 ? '0' : String(+st.reveal.toFixed(4)));"),
-    'the dissolve writes the S law unconditionally',
+    main.includes('const HARD_STOP_HOLD_MS = 30000;'),
+    'the hard stop holds forward scroll up to 30 s while the twin loads (owner override: stall + loading state, not release-to-law)',
+  );
+  assert.ok(
+    main.includes('const STAGED_TILES_HOLD_MS = HARD_STOP_HOLD_MS;'),
+    'the overlay ramp shares the same long bound',
+  );
+  assert.ok(
+    main.includes('stagedTilesT0 = 0; // HARD-STOP: unwind disarms the hold'),
+    'unwind disarms the tiles hold',
+  );
+  assert.ok(
+    main.includes('stagedTilesT0 = 0; // HARD-STOP: commit disarms the hold'),
+    'commit disarms the tiles hold',
   );
   assert.ok(
     main.includes('if (stagedActive && !stagedCommitted && !instant) {'),
     'revealTwin routes mid-hold timed reveals through the driver (single writer)',
   );
   assert.ok(
-    main.includes('released,'),
-    'the staged probe still publishes release state',
+    main.includes('tilesFallback,'),
+    'the staged probe publishes the fallback release flag',
   );
   assert.ok(
     !main.includes("|| ph === 'done'"),
