@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-24T18:15:33.930Z",
+  "generated": "2026-10-24T18:19:03.210Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "515dae4",
+      "full": "515dae42270ff916517fb8a778228f92f071d382",
+      "date": "2026-10-24",
+      "time": "23:48",
+      "subject": "fix(handoff): intent precache + load stall + mask-anchored gain + pitch routing [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "e28d62f",
       "full": "e28d62f575756aeb6d4c9d3767573e1626dd4417",
@@ -6267,10 +6276,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "ops3d-map.html",
-    "public/version.json",
-    "src/map/main.js",
-    "src/map/scrolltrigger.js"
-  ]
+  "wip": []
 }
