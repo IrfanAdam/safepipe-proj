@@ -30,7 +30,6 @@ import {
   handoffScrubForZoom,
   handoffStagesForScroll,
   HANDOFF_STAGED_S_MAX,
-  HANDOFF_REVEAL_LEN_PX,
   accumStagedS,
   stagedHoldPitchForS,
   stagedHoldRingCloseForS,
@@ -1095,7 +1094,13 @@ function onNativeZoomStep(snap, source) {
           parkEnclosureEllipse();
         }
       } catch { /* cosmetic */ }
-      showVignette(prox.near && blend > 0);
+      // MASK-SYNC: the arrival flight owns the wash — flyToSectorThenTwin
+      // washes staged arrivals now, revealTwin co-fires unstaged at the
+      // reveal tick — so the driver must not wash mid-jump, or the mask
+      // parks seconds before a timer-fired twin. Radii/park writes above
+      // still run (the staged entry caches them); maskArmed below is
+      // untouched (telemetry still reads the arm predicate).
+      if (!transitId) showVignette(prox.near && blend > 0);
       try {
         window.__mapProbe.maskArmed = !!(prox.near && blend > 0);
       } catch { /* probe cosmetic */ }
@@ -1694,12 +1699,27 @@ function flyToSectorThenTwin(id, opts = {}) {
     } catch { /* sat stage is best-effort */ }
     const proxNow = proximityInfo();
     const nearNow = !!(proxNow && proxNow.near);
+    // Reduced-motion never stages (no scroll-driven dissolve to follow) —
+    // the unstaged prewarm below reveals instantly inside prewarmThenReveal.
+    // Read here (hoisted above the wash write) so the wash decision knows
+    // the path: staged arrivals wash now, unstaged arrivals defer to the
+    // reveal tick (MASK-SYNC co-fire in revealTwin).
+    let reducedMotion = false;
+    try {
+      reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch { /* cosmetic */ }
     // Wash only when ARMED: re-derive the center from the live projection and
     // require the proximity predicate. An off-screen arrival (zoom-around-
     // cursor can park the spot 100k+ px out) skips the wash — never the
     // handoff below. Showing the wash on a stale/off-screen center blacks
     // the frame in one tick; the per-step driver keeps writing live values,
     // so the wash appears honestly the moment the spot is near.
+    // MASK-SYNC: STAGED arrivals wash now — the S scrub owns the joint
+    // mask+twin motion from the first post-gate tick. UNSTAGED arrivals
+    // defer the wash to the reveal tick: revealTwin co-fires it (live-near
+    // gated), so the 450ms mask fade and the 450ms twin crossfade start on
+    // the same tick as one motion instead of the mask parking seconds
+    // before the twin-ready/fallback timer fires the twin.
     if (nearNow) {
       try {
         // Wash opens at the true radius after jumps — never the stale size or
@@ -1712,18 +1732,12 @@ function flyToSectorThenTwin(id, opts = {}) {
           entryRy = entry && Number.isFinite(entry.ry) ? +entry.ry.toFixed(1) : null;
         } catch { /* entry cache is best-effort */ }
       } catch { /* radii re-derive is best-effort */ }
-      showVignette(true);
+      if (deep && !reducedMotion) showVignette(true);
     }
     // Handoff-5-close: publish the staged zoom for the framing probe.
     try {
       window.__mapProbe.mapZoom = liveFrame()?.z ?? null;
     } catch { /* probe cosmetic */ }
-    // Reduced-motion never stages (no scroll-driven dissolve to follow) —
-    // the unstaged prewarm below reveals instantly inside prewarmThenReveal.
-    let reducedMotion = false;
-    try {
-      reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch { /* cosmetic */ }
     // Arrival owns staging (synchronous — no 180ms settle, no 3500ms moveend
     // fallback). Near the hotspot the hold becomes STAGED: z clamps at the
     // gate and further scroll ticks accumulate as stage advances (the twin-
@@ -1761,13 +1775,21 @@ function flyToSectorThenTwin(id, opts = {}) {
       } catch { /* freeze is best-effort */ }
       // Seed S from the LIVE zoom, not the band start: a fast wheel burst can
       // arrive at 11.5 in one step, and there may be no further zoom step to
-      // drive the band. Seeding from liveZ means the prewarm/ready path
-      // already holds the correct reveal (and can commit immediately).
-      const revealStart = Math.max(0, HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX);
+      // drive the band. MASK-SYNC: the seed spans the FULL S band (0 at the
+      // iso checkpoint, S_MAX at the gate) because the reveal now dissolves
+      // across the whole hold — seeding into a sub-band would replay the old
+      // 0->0.74 jump on the first staged tick. The overlay is a pure function
+      // of S, so a deep arrival already holds its matching partial dissolve
+      // on the first drive tick instead of stalling at 0 while the twin
+      // boots.
+      // The twin intro is scroll-scrubbed to the same S (postTwinStagedS +
+      // the grant-time re-emit), so a high seed replays as matching progress
+      // on both sides, never a teleport — and scroll-up retraces it
+      // symmetrically through accumStagedS.
       const tSeed = clamp01(
         ((Number.isFinite(liveZ) ? liveZ : Z_TOP) - Z_TOP) / (Z_HANDOFF - Z_TOP),
       );
-      stagedS = revealStart + (HANDOFF_STAGED_S_MAX - revealStart) * smooth01(tSeed);
+      stagedS = HANDOFF_STAGED_S_MAX * smooth01(tSeed);
       // Reveal continuity: the seed STANDS — no park at the reveal gate. S is
       // the fingers' progress and the overlay is a pure function of S, so a
       // fast burst that arrives deep already holds the matching dissolve on
@@ -2716,6 +2738,18 @@ function revealTwin(instant = false) {
       if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
     } catch { /* timer teardown is best-effort */ }
     if (!overlayEls || overlayEls.root.hidden) return false;
+    // MASK-SYNC: the enclosing wash fires on the reveal tick, live-near
+    // gated — the 450ms mask fade and the twin crossfade start together as
+    // one motion. Staged holds already washed at arrival (re-asserting true
+    // is a no-op); unstaged arrivals deferred the wash here so the mask
+    // cannot park seconds ahead of the twin-ready/painted/fallback timer.
+    // The live read (not the arrival flag) keeps off-screen grants honest:
+    // a spot that drifted away keeps the frame clear instead of blacking it
+    // on a stale center.
+    try {
+      const pxNow = proximityInfo();
+      if (pxNow && pxNow.near) showVignette(true);
+    } catch { /* wash co-fire is best-effort */ }
     // GATE-3 REVISION: the timed crossfade needs its transition BACK. The
     // staged scrub suspends it (`.scrubbing`) so the law's value is the
     // rendered value; once the scrub is done, the prewarm->reveal crossfade

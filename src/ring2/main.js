@@ -2411,11 +2411,38 @@ async function boot() {
     paintStatus();
   }
   function mapRace() {
+    /* BASE SEED PARITY (boresight ghost): the base instance must be BORN on
+     * the handed hold frame, never on a static z11/top-down seed. The twin
+     * camera is pinned to the handoff pose before its first painted frame
+     * (see beginHandoffFlight: entryFrames is -1), but the per-frame
+     * twin->map sync cannot pose the map until this instance exists — so a
+     * static seed leaves a window in which the satellite under the twin is a
+     * DIFFERENT frame, and the first-painted grant (pose-blind, see the
+     * TWIN_PAINT_MAX_MS wall cap) can land inside it. Measured at the static
+     * seed: 18 px mean / 28 px max misregistration of identical ground at
+     * 2 km off-boresight, 126 px / 197 px at 10 km, zero AT the boresight —
+     * the double image pivots on the camera axis point. Zoom (not range)
+     * seeds the scale, so an unsettled viewport cannot stale-date it. */
+    const seed = (() => {
+      try {
+        const f = handoff?.frame;
+        if (!f || !Number.isFinite(+f.cx) || !Number.isFinite(+f.cy) || !Number.isFinite(+f.z)) return null;
+        const polar = Number.isFinite(Number(handoff.start?.polar))
+          ? Number(handoff.start.polar)
+          : holdPolarForFrame(f);
+        return {
+          center: [+f.cx, +f.cy],
+          zoom: +f.z,
+          bearing: Number.isFinite(+f.bearing) ? +f.bearing : 0,
+          pitch: Number.isFinite(polar) ? polar : 0,
+        };
+      } catch {
+        return null;
+      }
+    })();
     return Promise.race([
       mountMapBase(mapDiv, {
-        zoom: 11,
-        pitch: 0,
-        bearing: 0,
+        ...(seed || { zoom: 11, pitch: 0, bearing: 0 }),
         // Twin owns the camera at every mix: native map handlers stay off
         // so a map gesture can never fight the per-frame twin->map sync.
         // All orbit/zoom input goes to the twin canvas (pointer-interactive
@@ -2676,34 +2703,6 @@ async function boot() {
     } catch { /* ring never breaks the frame */ }
     twin.updateControls();
     twinFrames++;
-    // First-painted signal (twin->parent, once): PREWARM frames are on the
-    // canvas AND the scene is live (map tile-idle + terrain draped;
-    // wall-cap backstop) — no pose/cam match, so off-site arrivals report
-    // too. Never breaks the frame; ready-match below still owns the
-    // matched reveal.
-    try {
-      let mapIdle = false;
-      try {
-        mapIdle = map && typeof map.loaded === 'function' ? !!map.loaded() : true;
-      } catch { mapIdle = false; }
-      let sceneLive = false;
-      try {
-        sceneLive = typeof terrainState === 'function' ? terrainState() === 'vex' : true;
-      } catch { sceneLive = false; }
-      let elapsed = 0;
-      try {
-        elapsed = paintT0 > 0 ? Date.now() - paintT0 : 0;
-      } catch { elapsed = 0; }
-      if (!paintedPosted && firstPaintDue({ frames: twinFrames, mapIdle, sceneLive, elapsedMs: elapsed })) {
-        paintedPosted = true;
-        try {
-          window.parent?.postMessage(buildTwinPaintedMessage(), '*');
-        } catch { /* parent notify is best-effort */ }
-        try {
-          (window.__ring2paintOut ?? (window.__ring2paintOut = [])).push(buildTwinPaintedMessage());
-        } catch { /* probe log is best-effort */ }
-      }
-    } catch { /* painted post never breaks the frame */ }
     const pose = twin.getPose();
     const viewportPx = Math.max(twinDiv.clientHeight || window.innerHeight, 1);
     // Aspect parity (Phase 00): twin + map containers fill the same box,
@@ -2736,6 +2735,44 @@ async function boot() {
         }
       }
     }
+    /* First-painted signal (twin->parent, once): the canvas has PREWARM
+     * frames AND the base is live (map tile-idle + terrain draped; wall-cap
+     * backstop) — no pose/cam match, so off-site arrivals report too. Emitted
+     * AFTER the pose push above (frame order, not just gating): the grant is
+     * what the parent reveals on, so a grant that left before this frame's
+     * jumpTo would advertise a frame the base is not showing yet. Never
+     * breaks the frame; ready-match still owns the matched reveal. */
+    try {
+      let mapIdle = false;
+      try {
+        mapIdle = map && typeof map.loaded === 'function' ? !!map.loaded() : true;
+      } catch { mapIdle = false; }
+      let sceneLive = false;
+      try {
+        sceneLive = typeof terrainState === 'function' ? terrainState() === 'vex' : true;
+      } catch { sceneLive = false; }
+      let elapsed = 0;
+      try {
+        elapsed = paintT0 > 0 ? Date.now() - paintT0 : 0;
+      } catch { elapsed = 0; }
+      /* Base-present gate: the wall-cap backstop must never grant the reveal
+       * against a base that does not exist yet (measured: painted posted at
+       * frame 10 / +8 s with the map still unmounted, so the parent dissolved
+       * onto a black iframe). Held here until the instance exists — it is
+       * born on the handed frame (main.js seed parity), so the first base
+       * frame is already registered. A map that never mounts leaves the
+       * reveal to Lane A's own fallback (orbited, never stalled). */
+      const baseUp = !!map;
+      if (baseUp && !paintedPosted && firstPaintDue({ frames: twinFrames, mapIdle, sceneLive, elapsedMs: elapsed })) {
+        paintedPosted = true;
+        try {
+          window.parent?.postMessage(buildTwinPaintedMessage(), '*');
+        } catch { /* parent notify is best-effort */ }
+        try {
+          (window.__ring2paintOut ?? (window.__ring2paintOut = [])).push(buildTwinPaintedMessage());
+        } catch { /* probe log is best-effort */ }
+      }
+    } catch { /* painted post never breaks the frame */ }
     const pitch = pitchForPose(pose.eye, pose.target, pose.target.y ?? 0);
     const rangeM = Math.hypot(
       pose.eye.x - pose.target.x,

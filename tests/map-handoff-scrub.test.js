@@ -58,9 +58,9 @@ test('handoff scrub law is monotonic non-decreasing', () => {
   }
 });
 
-test('stage gates: ring -> blend -> tilt -> reveal in order, isolated', () => {
+test('stage gates: ring -> blend -> tilt in order, reveal spans the hold', () => {
   assert.equal(HANDOFF_STAGE_PX, 250, 'one stage per 250px of scroll');
-  assert.equal(HANDOFF_REVEAL_LEN_PX, 500, 'reveal dissolves over 500px');
+  assert.equal(HANDOFF_REVEAL_LEN_PX, 500, 'reveal band constant still sizes the staged band');
   assert.equal(HANDOFF_STAGED_S_MAX, 1250, 'full commit at 1250px past the gate');
   const zero = handoffStagesForScroll(0);
   assert.deepEqual(zero, { ring: 0, blend: 0, tilt: 0, reveal: 0 }, 'gate entry starts every stage at 0');
@@ -68,7 +68,10 @@ test('stage gates: ring -> blend -> tilt -> reveal in order, isolated', () => {
   assert.ok(mid1.ring > 0 && mid1.ring < 1, 'ring dissolves first');
   assert.equal(mid1.blend, 0, 'blend waits for its gate');
   assert.equal(mid1.tilt, 0, 'tilt waits for its gate');
-  assert.equal(mid1.reveal, 0, 'reveal waits for its gate');
+  // MASK-SYNC: the reveal has no gate — the overlay moves on the first
+  // post-gate tick together with the hold-ring, so mask and twin stay one
+  // motion. Ring/blend/tilt keep their gates (twin-intro pacing).
+  assert.ok(mid1.reveal > 0 && mid1.reveal < mid1.ring, 'reveal dissolves across the whole hold');
   const atRing = handoffStagesForScroll(HANDOFF_STAGE_PX);
   assert.equal(atRing.ring, 1, 'ring holds complete at its gate');
   assert.equal(atRing.blend, 0, 'blend still gated');
@@ -76,7 +79,7 @@ test('stage gates: ring -> blend -> tilt -> reveal in order, isolated', () => {
   assert.equal(midReveal.ring, 1, 'ring holds');
   assert.equal(midReveal.blend, 1, 'blend holds');
   assert.equal(midReveal.tilt, 1, 'tilt holds');
-  assert.ok(midReveal.reveal > 0 && midReveal.reveal < 1, 'reveal dissolves last');
+  assert.ok(midReveal.reveal > 0 && midReveal.reveal < 1, 'reveal still dissolving near commit');
   const full = handoffStagesForScroll(HANDOFF_STAGED_S_MAX);
   assert.deepEqual(full, { ring: 1, blend: 1, tilt: 1, reveal: 1 }, 'commit holds every stage at 1');
   const over = handoffStagesForScroll(HANDOFF_STAGED_S_MAX + 9999);
@@ -142,8 +145,11 @@ test('accumulator-owned reveal: S seeds from live zoom at entry, wheel owns it a
     assert.equal(stagedHoldPitchForS(s), 0, `S=${s} adds no tilt`);
     assert.equal(stagedHoldRingCloseForS(s), 0, `S=${s} adds no ring close`);
   }
-  // The reveal band starts at the iso checkpoint: seed S is S_MAX - reveal.
-  assert.equal(HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX, 750, 'reveal starts at S=750');
+  // MASK-SYNC: no reveal sub-band — the seed spans the full S band (0 at the
+  // iso checkpoint, S_MAX at the gate) so the first staged tick already
+  // paints the matching partial dissolve instead of jumping 0->0.74.
+  // The staged band still stages ring/blend/tilt pacing + full-span reveal.
+  assert.equal(3 * HANDOFF_STAGE_PX + HANDOFF_REVEAL_LEN_PX, HANDOFF_STAGED_S_MAX, 'S band stages pacing + full-span reveal');
   const main = srcOf('../src/map/main.js');
   // S OWNERSHIP: the wheel accumulator owns S after entry (KEEP +100/tick).
   // No per-step zoom re-derivation may exist: the clamp freezes zoom
@@ -154,8 +160,8 @@ test('accumulator-owned reveal: S seeds from live zoom at entry, wheel owns it a
     'no per-step zoom re-derivation of S — the accumulator is the sole writer',
   );
   assert.ok(
-    main.includes('const revealStart = Math.max(0, HANDOFF_STAGED_S_MAX - HANDOFF_REVEAL_LEN_PX);'),
-    'the staged entry computes the reveal band start',
+    main.includes('stagedS = HANDOFF_STAGED_S_MAX * smooth01(tSeed);'),
+    'the staged entry seeds S across the full band from the live zoom (no reveal sub-band)',
   );
   assert.ok(
     main.includes('((Number.isFinite(liveZ) ? liveZ : Z_TOP) - Z_TOP) / (Z_HANDOFF - Z_TOP)'),
@@ -455,5 +461,30 @@ test('round-10 grant semantics preserved: once-ever paint, per-handoff ready, co
   assert.ok(
     !main.includes('if (!releasedFeed && stagedS > gateS && (releaseKnown || !grantedFeed)) stagedS = gateS;'),
     'reveal continuity: no S cap — the feed accumulates on every tick',
+  );
+});
+
+test('mask-sync: twin reveal bound to enclosing-mask progress', () => {
+  // Owner: the twin faded in stuttery and out of sync with the enclosing
+  // mask. The reveal is now a pure function of the same S that drives the
+  // hold-ring (mask) from the first post-gate tick, and the timed unstaged
+  // path co-fires mask + twin from one tick.
+  const main = srcOf('../src/map/main.js');
+  const trig = srcOf('../src/map/scrolltrigger.js');
+  assert.ok(
+    trig.includes('reveal: clamp01(n / HANDOFF_STAGED_S_MAX),'),
+    'the overlay reveal spans the full S hold, linear in S — no dead reveal gate, constant scroll rate',
+  );
+  assert.ok(
+    main.includes('stagedS = HANDOFF_STAGED_S_MAX * smooth01(tSeed);'),
+    'the staged seed spans the full band (no 0->0.74 first-tick jump)',
+  );
+  assert.ok(
+    main.includes('if (deep && !reducedMotion) showVignette(true);'),
+    'staged arrivals wash at arrival; unstaged arrivals defer the wash',
+  );
+  assert.ok(
+    main.includes('MASK-SYNC: the enclosing wash fires on the reveal tick'),
+    'revealTwin co-fires the enclosing wash on the reveal tick (one motion)',
   );
 });

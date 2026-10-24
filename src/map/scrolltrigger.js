@@ -146,20 +146,27 @@ export function handoffScrubForZoom(z) {
   return smooth01((n - Z_HANDOFF) / (Z_TWIN_COMMIT - Z_HANDOFF));
 }
 
-/* Post-gate staged scroll (Task 35, owner refinement): once z is HELD at
- * Z_HANDOFF (map-side maxZoom clamp — scroll-as-zoom throttled), further
- * scroll ticks accumulate as stage scroll S (px of wheel delta past the
- * gate) instead of depth. Gates (cumulative px):
+/* Post-gate staged scroll (Task 35, owner refinement; MASK-SYNC revision):
+ * once z is HELD at Z_HANDOFF (map-side maxZoom clamp — scroll-as-zoom
+ * throttled), further scroll ticks accumulate as stage scroll S (px of wheel
+ * delta past the gate) instead of depth. Gates (cumulative px):
  *   ring   0..250   — enclosing ring converges canvas-edges -> ring-edges
  *   blend  250..500 — terrain blend holds full satellite
  *   tilt   500..750 — iso tilt holds 45deg
- *   reveal 750..1250 — twin overlay dissolves 0..1 (twin-ready gates >0)
+ *   reveal 0..1250  — twin overlay dissolves 0..1 across the WHOLE hold
  * Ring/blend/tilt already arrive pre-gate in the native journey (Z_TOP..Z_HANDOFF
- * band) — their staged laws HOLD the end-state; the reveal is the live
- * post-gate stage. Every value is a pure function of S, so scroll-up
- * retraces it symmetrically. Pure + node-checkable; the map-side wheel
- * accumulator owns S, Task 36 consumes the reveal band for the
- * range-scrubbed twin intro. */
+ * band) — their staged laws HOLD the end-state. The reveal used to wait for
+ * its own gate (750..1250), so the fingers crossed 750px of dead scroll with
+ * the mask parked and the overlay at 0, then the twin faded in 4-5 quantized
+ * steps strictly after the mask finished — two separate moves (measured:
+ * overlay 0 -> 0.74 -> 1.0 in two wheel ticks). Now the overlay moves on the
+ * first post-gate tick together with the hold-ring breathing entry->seam on
+ * the same S (driveStagedHold): mask and twin ride one continuous motion from
+ * the gate to the commit. Ring/blend/tilt pacing is untouched, so the twin
+ * intro anchors (swoop over 0..750, push completing at commit) still agree.
+ * Every value is a pure function of S, so scroll-up retraces it
+ * symmetrically. Pure + node-checkable; the map-side wheel accumulator owns
+ * S, Task 36 consumes S for the range-scrubbed twin intro. */
 export const HANDOFF_STAGE_PX = 250;
 export const HANDOFF_REVEAL_LEN_PX = 500;
 export const HANDOFF_STAGED_S_MAX = 3 * HANDOFF_STAGE_PX + HANDOFF_REVEAL_LEN_PX; // 1250
@@ -170,7 +177,11 @@ export function handoffStagesForScroll(s) {
     ring: seg(0, HANDOFF_STAGE_PX),
     blend: seg(HANDOFF_STAGE_PX, 2 * HANDOFF_STAGE_PX),
     tilt: seg(2 * HANDOFF_STAGE_PX, 3 * HANDOFF_STAGE_PX),
-    reveal: seg(3 * HANDOFF_STAGE_PX, HANDOFF_STAGED_S_MAX),
+    // Pace: constant scroll rate — linear, not smootherstepped. The old
+    // smootherstep dissolved most of the overlay in one mid-band leap then
+    // crawled into the commit while the twin camera (already linear in S)
+    // held a steady rate. Linear keeps d(reveal)/dS constant on every tick.
+    reveal: clamp01(n / HANDOFF_STAGED_S_MAX),
   };
 }
 

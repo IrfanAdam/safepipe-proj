@@ -5,7 +5,7 @@
 import { latLngToCell } from 'h3-js';
 import { H3_RES, SECTORS, worstHealth, HEALTH_RANK } from '../map/feed.js';
 import { geoToWorld } from './site.js';
-import { rangeForZoom, MAP_TRUE_FOV_DEG, TWIN_MIN_RANGE_M, TWIN_MAX_RANGE_M } from './sync.js';
+import { rangeForZoom, MAP_TRUE_FOV_DEG, MAP_MAX_PITCH_DEG, TWIN_MIN_RANGE_M, TWIN_MAX_RANGE_M } from './sync.js';
 /* Wire strings: twinlink.js is the single source (map-side link module);
  * re-exported here under the twin-side names so the iframe boundary can
  * never name two channels. S-band anchors + iso pole derive from the
@@ -36,6 +36,7 @@ export const CX_PARAM = 'cx';
 export const CY_PARAM = 'cy';
 export const ZOOM_PARAM = 'z';
 export const BEARING_PARAM = 'bearing';
+export const PITCH_PARAM = 'pitch';
 export const TWIN_CLOSE_MSG = MAP_TWIN_CLOSE_MSG;
 /* Handoff-4 Lane B ready (twin->parent): posted ONCE when the hold
  * satellite frame matches the staged map end-frame and the first
@@ -100,6 +101,18 @@ export const HANDOFF_ISO_POLAR_DEG = ISO_PITCH_DEG;
  * (top-down — withhold, never guess). Pure + node-checkable. */
 export function holdPolarForFrame(frame) {
   try {
+    /* HANDED-PITCH PRECEDENCE (boresight ghost): the parent hands its ACTUAL
+     * end-frame pose (&pitch=, twinlink.twinUrl). The z law below is only a
+     * fallback — the parent's live pitch can sit off the law (tilt-pump lag
+     * mid-scroll, a re-hand that restores center/zoom but never pitch), and a
+     * hold at a different tilt than the frame it dissolves from misregisters
+     * the same ground by ~9 px at 2 km and ~44 px mean / 83 px max at 10 km
+     * off-boresight — zero at the boresight, so the double image pivots on
+     * the camera axis point. */
+    const handed = Number(frame?.pitch);
+    if (Number.isFinite(handed) && handed >= 0) {
+      return Math.min(MAP_MAX_PITCH_DEG, handed);
+    }
     const z = Number(frame?.z);
     if (!Number.isFinite(z)) return 0;
     const p = pitchTargetForZoom(z);
@@ -147,7 +160,15 @@ export function parseFrameParams(q) {
     let bearing = rawB === null ? 0 : Number(rawB);
     if (!Number.isFinite(bearing)) bearing = 0;
     bearing = ((bearing % 360) + 360) % 360;
-    return { cx, cy, z, bearing };
+    /* Handed END POSE pitch (twinlink.twinUrl appends &pitch=): carried on
+     * the frame so the hold adopts the parent's actual tilt instead of
+     * re-deriving it from z alone (see holdPolarForFrame). Additive: absent
+     * or non-finite leaves the key off and the z law applies. */
+    const out = { cx, cy, z, bearing };
+    const rawP = p.get(PITCH_PARAM);
+    const pitch = rawP === null ? NaN : Number(rawP);
+    if (Number.isFinite(pitch)) out.pitch = Math.min(90, Math.max(0, pitch));
+    return out;
   } catch {
     return null;
   }
@@ -534,11 +555,13 @@ export function scrubProgressForWalk(legs, i, legT0, now) {
 export const TWIN_STAGED_MSG = MAP_TWIN_STAGED_MSG;
 /* Map-side staged-scroll contract anchors (scrolltrigger.js owns the
  * values — derived below, never restated): S px past the handoff gate over
- * [0,STAGE,2xSTAGE,3xSTAGE,STAGED_MAX] = ring/blend/tilt/reveal, overlay
- * opacity = ready ? reveal(S) : 0. The twin intro consumes S through
- * fwdProgressForStagedS: the swoop completes exactly where the reveal
- * dissolve starts (3xSTAGE), the push completes where the dissolve completes
- * (STAGED_MAX) — the cut dissolves onto a settled iso frame. */
+ * [0,STAGE,2xSTAGE,3xSTAGE,STAGED_MAX] = ring/blend/tilt pacing, overlay
+ * opacity = reveal(S) over the FULL [0,STAGED_MAX] (MASK-SYNC: the overlay
+ * no longer waits for a 3xSTAGE reveal gate — mask hold-ring and twin
+ * dissolve ride the same S from the first post-gate tick). The twin intro
+ * consumes S through fwdProgressForStagedS: the swoop completes at 3xSTAGE
+ * (its pacing anchor, unchanged), the push completes where the dissolve
+ * completes (STAGED_MAX) — the cut dissolves onto a settled iso frame. */
 export const TWIN_FWD_REVEAL_START_PX = 3 * HANDOFF_STAGE_PX;
 export const TWIN_FWD_STAGED_MAX_PX = HANDOFF_STAGED_S_MAX;
 

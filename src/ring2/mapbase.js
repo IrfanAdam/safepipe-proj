@@ -374,6 +374,7 @@ function applyGroundFlag(m) {
  * through a lost context bricks the instance to ratio 0 permanently). */
 export async function mountMapBase(el, opts = {}) {
   const {
+    center = null, // [lng, lat] — BORN on the caller's frame (handoff seed parity)
     zoom = 11,
     pitch = 0,
     bearing = 0,
@@ -395,10 +396,24 @@ export async function mountMapBase(el, opts = {}) {
   const sizedOk = await waitForSized(() => el, { timeoutMs: 8000 });
   if (!sizedOk) throw new Error('mountMapBase: container never sized (0x0) — refusing 0x0-born instance');
 
+  /* Seed parity (boresight ghost): the caller may hand the frame the map
+   * must be BORN on (the twin's handed hold pose). The twin camera is pinned
+   * to that frame before its first painted frame, and the per-frame
+   * twin->map sync cannot run until this instance exists — so a static seed
+   * leaves a window where the satellite under the twin is a DIFFERENT frame
+   * (measured at the z11/top-down seed: 18 px mean / 28 px max
+   * misregistration of identical ground at 2 km off-boresight, 126 px / 197 px
+   * at 10 km — zero at the boresight: a double image pivoting on the axis
+   * point). Falls back to the historic static seed without a handed frame. */
+  const seedCenter =
+    Array.isArray(center) && Number.isFinite(+center[0]) && Number.isFinite(+center[1])
+      ? [+center[0], +center[1]]
+      : [SANGACHAL.lon, SANGACHAL.lat];
+
   const map = new maplibregl.Map({
     container: el,
     style: mapStyle(),
-    center: [SANGACHAL.lon, SANGACHAL.lat],
+    center: seedCenter,
     zoom,
     pitch,
     bearing,
