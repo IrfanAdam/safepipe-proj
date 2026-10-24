@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -691,17 +691,27 @@ async function boot() {
       return 0;
     }
   }
-  /* Analytic top-down eye for a pinned start (matches pinTopDown exactly). */
+  /* Analytic hold eye for a pinned start (matches pinHold exactly).
+   * Polar-aware (LANE twin-pose-match): the hold registers onto the map end
+   * frame, so deep handed frames hold at the iso pole (polar 45), shallow
+   * ones top-down (polar 0) — same bearing convention as poseAt, so
+   * bearingForPose still reports the map's bearing at any polar. */
   function startEye(s) {
     const b = ((s.bearing || 0) * Math.PI) / 180;
-    const e = Math.max(s.range * 1e-4, 0.01);
-    return { x: s.tx - e * Math.sin(b), y: s.ty + s.range, z: s.tz + e * Math.cos(b) };
+    const pol = ((Number(s.polar) || 0) * Math.PI) / 180;
+    const h = Math.max(s.range * Math.sin(pol), s.range * 1e-4, 0.01);
+    return { x: s.tx - h * Math.sin(b), y: s.ty + s.range * Math.cos(pol), z: s.tz + h * Math.cos(b) };
   }
-  /* Top-down pin at the exact handoff footprint: pitch ~0, epsilon offset
-   * along the map bearing so bearingForPose reports the map's bearing. */
-  function pinTopDown(tx, tz, range, bearingDeg) {
+  /* Hold pin at the exact handoff footprint: same center/range/bearing as
+   * the handed map frame, pitched at the handed polar (iso for deep
+   * frames, top-down for shallow) so the first revealed frame registers
+   * onto the map end frame. The epsilon horizontal keeps the exact
+   * top-down case bearing-readable. */
+  function pinHold(tx, tz, range, bearingDeg, polarDeg = 0) {
     const ty = groundYNear(tx, tz);
-    const s = { tx, ty, tz, range, bearing: (((Number(bearingDeg) || 0) % 360) + 360) % 360 };
+    let polar = Number(polarDeg);
+    if (!Number.isFinite(polar)) polar = 0;
+    const s = { tx, ty, tz, range, bearing: (((Number(bearingDeg) || 0) % 360) + 360) % 360, polar };
     try {
       twin.controls.target.set(tx, ty, tz);
       const e = startEye(s);
@@ -717,7 +727,8 @@ async function boot() {
    * 45° HANDOFF_ISO_POLAR_DEG, same Esri imagery) — so the cut is seamless.
    * Posting from top-down used to snap the cut 45° (the way-back mismatch:
    * the twin walked an extra leg the map never follows). Falls back to the
-   * top-down pin when the mid anchor is unknown. */
+   * hold pin when the mid anchor is unknown (for deep frames the hold IS
+   * ring-iso at the handed range, so the cut stays seamless). */
   function pinReverseEnd() {
     try {
       const mid = handoff.mid;
@@ -732,7 +743,7 @@ async function boot() {
     } catch { /* top-down fallback below */ }
     try {
       const s = handoff.start;
-      if (s) pinTopDown(s.tx, s.tz, s.range, s.bearing);
+      if (s) pinHold(s.tx, s.tz, s.range, s.bearing, s.polar ?? 0);
     } catch { /* pin is best-effort */ }
     driveMix(HANDOFF_START_MIX);
     return false;
@@ -758,7 +769,13 @@ async function boot() {
    * frame zoom, then to the frozen anchor (never a canned pose). */
   function releaseFreshMid(fallback) {
     try {
-      let z = Number(handoff.fwdStagedZ);
+      // Scale-lock lane: Number(null) is 0, so a null staged-z used to be read
+      // as zoom 0 — frameRange(0) = 71,738,833 m, clampHandoffRange then
+      // pinned the ring-iso at the 42 km rail and the twin opened its dissolve
+      // 1.7x WIDER than the map frame it fades over (measured dz -0.76 at
+      // vp 800). A missing staged-z must fall through to the handed frame.
+      const posted = handoff.fwdStagedZ;
+      let z = posted === null || posted === undefined ? NaN : Number(posted);
       if (!Number.isFinite(z)) z = Number(handoff.frame && handoff.frame.z);
       const a = handoff.anchor;
       if (!Number.isFinite(z) || !a || !Number.isFinite(a.x) || !Number.isFinite(a.z)) return fallback;
@@ -784,6 +801,44 @@ async function boot() {
       };
     } catch {
       return fallback;
+    }
+  }
+  /* STAGED SCALE LOCK (lane eval-scale): the map side HOLDS its gate pose
+   * (maxZoom = Z_HANDOFF) for the whole staged band, so every frame the
+   * overlay dissolves over is drawn at ONE fixed ground scale. The twin has
+   * to sit on that same scale or the dissolve is a double image — hence the
+   * gate zoom projected through THIS camera's own viewport/fov/lat
+   * (frameRange is the exact inverse of the map's metres-per-pixel), through
+   * the shared orbit rails. Viewport-derived, never a metre literal: the same
+   * law that pinned the hold at the handoff. */
+  function lockStagedRange(latDeg) {
+    try {
+      const r = frameRange(Z_HANDOFF, { viewportPx: viewportPxNow(), lat: latDeg });
+      const cl = clampHandoffRange(r);
+      return Number.isFinite(cl) && cl > 0 ? cl : null;
+    } catch {
+      return null;
+    }
+  }
+  /* Re-place a pose's eye at a fixed range on the bearing/polar it already
+   * holds (target untouched). Two poses built this way share ONE eye offset
+   * vector, so scrubbing between them keeps |eye-target| exactly constant —
+   * the push becomes a pure recentre with zero scale drift. Non-finite range
+   * returns the pose unchanged (never a canned camera). */
+  function poseAtRange(pose, range) {
+    try {
+      const t = pose?.target;
+      const e = pose?.eye;
+      if (!t || !e || !Number.isFinite(range) || !(range > 0)) return pose;
+      const dx = e.x - t.x;
+      const dy = e.y - (t.y ?? 0);
+      const dz = e.z - t.z;
+      const L = Math.hypot(dx, dy, dz);
+      if (!(L > 0)) return pose;
+      const k = range / L;
+      return { eye: { x: t.x + dx * k, y: (t.y ?? 0) + dy * k, z: t.z + dz * k }, target: { ...t } };
+    } catch {
+      return pose;
     }
   }
   function capturePose() {
@@ -863,7 +918,7 @@ async function boot() {
       twin.controls.enabled = false;
     } catch { /* flight still drives the camera */ }
     try {
-      pinTopDown(pinnedStart.tx, pinnedStart.tz, pinnedStart.range, pinnedStart.bearing);
+      pinHold(pinnedStart.tx, pinnedStart.tz, pinnedStart.range, pinnedStart.bearing, pinnedStart.polar ?? 0);
       driveMix(HANDOFF_START_MIX);
     } catch { /* flight steps pin per-frame anyway */ }
     // User takeover: any orbit input cancels the intro flight (never the
@@ -889,9 +944,9 @@ async function boot() {
     twin.controls.target.set(target.x, target.y, target.z);
     twin.camera.position.set(eye.x, eye.y, eye.z);
   }
-  /* FRAME-MATCH read (Lane B): true once the top-down satellite start frame
+  /* FRAME-MATCH read (Lane B): true once the hold satellite frame
    * is actually on screen — map instance up, at least one twin frame
-   * painted, flight still pinned top-down in hold, slider at full satellite.
+   * painted, flight still pinned at the hold pose, slider at full satellite.
    * Satellite purity at mix 0 is mapbase-owned (Esri World Imagery primary +
    * backup at raster-opacity 1, reference 0.85, hillshade at base
    * exaggeration) with the twin takeover gated to 0 at effective mix 0, so
@@ -952,7 +1007,22 @@ async function boot() {
           if (d > 0.5) return false;
         }
         const p = map.getPitch?.();
-        if (Number.isFinite(p) && Math.abs(p) > 0.5) return false;
+        // Pose-match: the map end frame carries the handed polar (iso for
+        // deep frames, top-down for shallow) — the twin hold pins the same
+        // law, so agreement means registered images. Expected polar reads
+        // from the pinned start (falls back to the handed frame law).
+        if (Number.isFinite(p)) {
+          let wantPitch = Number(handoff.start?.polar);
+          if (!Number.isFinite(wantPitch)) {
+            try {
+              wantPitch = holdPolarForFrame(handoff.frame);
+            } catch {
+              wantPitch = 0;
+            }
+          }
+          if (!Number.isFinite(wantPitch)) wantPitch = 0;
+          if (Math.abs(p - wantPitch) > 0.5) return false;
+        }
       } catch {
         return false;
       }
@@ -996,7 +1066,13 @@ async function boot() {
       if (!Number.isFinite(r) || r <= 0) return false;
       const old = handoff.start?.range;
       if (Number.isFinite(old) && Math.abs(old - r) < 1) return false;
-      const s = pinTopDown(handoff.anchor.x, handoff.anchor.z, r, handoff.frame.bearing ?? 0);
+      // Pose-match: the refit rebuilds the pinned hold at the handed polar
+      // (never a top-down snap) — the settle count restarts below so the
+      // post tracks the CURRENT pin.
+      const keepPolar = Number.isFinite(handoff.start?.polar)
+        ? handoff.start.polar
+        : holdPolarForFrame(handoff.frame);
+      const s = pinHold(handoff.anchor.x, handoff.anchor.z, r, handoff.frame.bearing ?? 0, keepPolar);
       handoff.start = s;
       const aty = groundYNear(handoff.anchor.x, handoff.anchor.z);
       const eye = poseAt(handoff.anchor.x, aty, handoff.anchor.z, r, HANDOFF_ISO_POLAR_DEG, handoff.azim);
@@ -1080,7 +1156,7 @@ async function boot() {
    * rests AT the push end pose, so it undoes push (no terminal leg — the
    * pull starts from wherever the camera is, never a canned start). An
    * unknown phase walks everything (terminal-side full walk). Zero legs =
-   * still top-down in hold: the engine pins + posts immediately. */
+   * still at the ring-frame hold pose: the engine pins + posts immediately. */
   function buildReverseWalk(closePhase) {
     const order = inboundStageOrder();
     const phase = String(closePhase ?? '').toLowerCase();
@@ -1152,11 +1228,12 @@ async function boot() {
   let lastRingApplied = 'x';
   /* Per-frame flight step (runs at the top of the render loop, before the
    * damped controls settle — the flight IS the pose source while active).
-   * Forward: hold (ring top-down, mix 0) -> swoop (ring top-down -> ring
-   * iso at the attached angle, mix STAYS 0) -> push (ring iso -> terminal
-   * iso, mix 0->100 with the push-in). Reverse mirrors exactly inside the
-   * single 'reverse' phase by stepping the close-time leg list (see
-   * buildReverseWalk), then the {recede:true} close posts. */
+   * Forward: hold (ring hold pose = handed center/range/polar, mix 0) ->
+   * swoop (ring hold -> ring iso at the attached angle, mix STAYS 0) ->
+   * push (ring iso -> terminal iso, mix 0->100 with the push-in). Reverse
+   * mirrors exactly inside the single 'reverse' phase by stepping the
+   * close-time leg list (see buildReverseWalk), then the {recede:true}
+   * close posts. */
   function stepHandoff() {
     if (!handoff || handoff.phase === 'idle') return;
     /* GATE-3 SCROLL-SCRUB clamp rail (handoff12-B: the cap is an EXIT
@@ -1208,7 +1285,7 @@ async function boot() {
         const s = handoff.start;
         if (s) {
           try {
-            pinTopDown(s.tx, s.tz, s.range, s.bearing);
+            pinHold(s.tx, s.tz, s.range, s.bearing, s.polar ?? 0);
           } catch { /* pin is best-effort */ }
         }
         driveMix(HANDOFF_START_MIX);
@@ -1259,9 +1336,9 @@ async function boot() {
         } catch { /* ready is best-effort */ }
         const heldMs = now - handoff.t0;
         // Task-36: the 25 s cap is SHELVED as an advance trigger — the hold
-        // exits on the ready post only, never blind. Past HOLD+CAP with no
-        // post (fully-stalled loop, map down) the flight parks top-down at
-        // the safe satellite frame and raises capExpired for the probe; a
+        // exits the hold on the ready post only, never blind. Past HOLD+CAP with no
+        // post (fully-stalled loop, map down) the flight parks at the hold pose
+        // (safe satellite frame) and raises capExpired for the probe; a
         // late post still releases normally, and Lane A's own reveal timeout
         // owns the fallback reveal either way.
         if (!handoff.readyPosted && !handoff.capExpired
@@ -1312,6 +1389,24 @@ async function boot() {
           const liveStart = live && live.eye && live.target
             ? { eye: live.eye, target: live.target }
             : null;
+          // Lane eval-scale: a STAGED release dissolves over a map that is
+          // HELD at the gate, so the twin's mid AND terminal both take the
+          // gate's scale (lockStagedRange) instead of the arrival/posted zoom
+          // — which can still be travelling under a parked S — or the fixed
+          // 18 km terminal (a metre literal: viewport-scaled mid vs constant
+          // terminal is what made the delta swing from -0.41x at the dissolve
+          // start to +0.38x at its end on an 800px viewport). The push then
+          // rides poseAtRange, i.e. a pure recentre at constant range.
+          const stagedRelease = fwdStagedOwnsIntro({ stagedS: handoff.fwdStagedS, deepFrame: frameDeep });
+          let midPose = releaseFreshMid(handoff.mid);
+          let toPose = handoff.to;
+          if (stagedRelease) {
+            const rLock = lockStagedRange(handoff.frame?.cy);
+            if (Number.isFinite(rLock) && rLock > 0) {
+              midPose = poseAtRange(midPose, rLock);
+              toPose = poseAtRange(toPose, rLock);
+            }
+          }
           const legs = buildForwardLegs({
             startPose: liveStart
               ?? (st ? { eye: startEye(st), target: { x: st.tx, y: st.ty, z: st.tz } } : null),
@@ -1323,8 +1418,8 @@ async function boot() {
             // listener and carries the live zoom), falling back to the handed
             // frame, then the frozen anchor. Same derivation as boot
             // (frameRange -> clamp rails -> poseAt at the attached angle).
-            mid: releaseFreshMid(handoff.mid),
-            to: handoff.to,
+            mid: midPose,
+            to: toPose,
           });
           if (!legs) {
             endHandoffFlight();
@@ -1343,7 +1438,7 @@ async function boot() {
           // symmetrically. Shallow click frames keep the autoplay intro.
           // Lane T: fwdStagedOwnsIntro is the single source for the
           // staged-vs-autoplay release decision (seed OR deep frame).
-          const staged = fwdStagedOwnsIntro({ stagedS: handoff.fwdStagedS, deepFrame: frameDeep });
+          const staged = stagedRelease; // one decision for legs + driver (see above)
           handoff.fwd = {
             legs,
             progress: fwdProgressForStagedS(handoff.fwdStagedS ?? 0),
@@ -1415,7 +1510,7 @@ async function boot() {
             const sd = handoff.start;
             if (sd) {
               try {
-                pinTopDown(sd.tx, sd.tz, sd.range, sd.bearing);
+                pinHold(sd.tx, sd.tz, sd.range, sd.bearing, sd.polar ?? 0);
               } catch { /* pin is best-effort */ }
             }
             driveMix(HANDOFF_START_MIX);
@@ -1441,7 +1536,7 @@ async function boot() {
         // the named inbound stages actually passed. Each leg flies from the
         // previous waypoint to the next stage pose over that stage's own
         // forward ms with the slider riding down to full satellite; the
-        // final pin guarantees top-down + slider 0 even if an anchor went
+        // final pin restores the hold pose + slider 0 even if an anchor went
         // missing mid-walk — then the {recede:true} close posts.
         const walk = handoff.walk;
         if (!walk || !Array.isArray(walk.legs) || walk.i >= walk.legs.length) {
@@ -1471,7 +1566,7 @@ async function boot() {
             const s = handoff.start;
             if (s) {
               try {
-                pinTopDown(s.tx, s.tz, s.range, s.bearing);
+                pinHold(s.tx, s.tz, s.range, s.bearing, s.polar ?? 0);
               } catch { /* pin is best-effort */ }
             }
             driveMix(HANDOFF_START_MIX);
@@ -1529,11 +1624,11 @@ async function boot() {
       handoff.revMode = reversePlanForPhase(prevPhase);
       const walk = buildReverseWalk(prevPhase);
       if (!walk.legs.length) {
-        // Still top-down at the ring frame (hold): no stage was entered, so
+        // Still at the ring-frame hold pose: no stage was entered, so
         // the mirror is a pin + mix 0 + immediate post.
         try {
           const s = handoff.start;
-          pinTopDown(s.tx, s.tz, s.range, s.bearing);
+          pinHold(s.tx, s.tz, s.range, s.bearing, s.polar ?? 0);
           driveMix(HANDOFF_START_MIX);
         } catch { /* pin is best-effort */ }
         handoff.walk = null;
@@ -1579,7 +1674,7 @@ async function boot() {
    * covers pinch-outs and trackpad dust, since pinch wheels stay native).
    * An unowned reverse takes outward non-pinch wheels over the same way
    * (takeover at the live progress, no pose jump). Scrubbing back to 0
-   * hands free orbit back (symmetric exit); scrubbing to 1 pins top-down +
+   * hands free orbit back (symmetric exit); scrubbing to 1 pins the hold pose +
    * posts {recede:true} on the shared path. Never breaks boot/input. */
   function rangeNow() {
     try {
@@ -1606,7 +1701,7 @@ async function boot() {
       if (!walk.legs.length) {
         try {
           const s = handoff.start;
-          pinTopDown(s.tx, s.tz, s.range, s.bearing);
+          pinHold(s.tx, s.tz, s.range, s.bearing, s.polar ?? 0);
           driveMix(HANDOFF_START_MIX);
         } catch { /* pin is best-effort */ }
         handoff.walk = null;
@@ -2096,9 +2191,9 @@ async function boot() {
   /* Phase 03 Tasks 18+19 (?sector=<h3> preselect + embed close round-trip)
    * + LANE 3 twinlink handoff: ?sector=<h3>&cx=<lng>&cy=<lat>&z=<zoom>,
    * where the frame is the RING bounds (wider than the terminal).
-   * Overlay open with frame params starts the camera at the ring frame
-   * top-down (pitch 0, bearing matching the map, slider at full
-   * satellite), holds a beat, slow-eases to iso at the attached angle
+   * Overlay open with frame params starts the camera at the ring-frame hold
+   * pose (handed pitch law: iso for deep frames, top-down for shallow;
+   * bearing matching the map, slider at full satellite), holds a beat, slow-eases to iso at the attached angle
    * (same ring center/range, slider stays 0), then slow-pushes into the
    * terminal while the slider drives satellite->twin. Sector-only (no
    * frame) flies a wide top-down survey -> iso -> terminal fallback.
@@ -2151,15 +2246,26 @@ async function boot() {
         // at full satellite through the swoop.
         const aty = groundYNear(anchor.x, anchor.z);
         const ringIsoEye = poseAt(anchor.x, aty, anchor.z, startRange, HANDOFF_ISO_POLAR_DEG, azim);
-        // Iso terminal: the sector's worst asset when known, else the
-        // anchor. The push-in (ring iso -> terminal iso) is the tiny leg —
-        // the ring frame is wider than the terminal — and the slider rides
-        // it 0->100.
-        const etx = hit ? hit.sector.dx : anchor.x;
-        const etz = hit ? hit.sector.dz : anchor.z;
+        // Iso terminal (LANE xfade-bore): HOLD the handed frame center. The
+        // push leg used to retarget to the sector pin (processing sits
+        // +400 m E / -200 m N of the site), so the twin boresight sat a
+        // rigid ~11 px off the handed map frame center through the dissolve.
+        // The terminal is now the same center as the ring iso at the
+        // terminal range: the push is a pure range change, boresight never
+        // leaves the handed center, and the settle dissolves between
+        // registered images. Intro feel unchanged (same legs, timing, mix
+        // ride). Sector-only fallback is untouched: there anchor already
+        // IS the sector pin.
+        const etx = anchor.x;
+        const etz = anchor.z;
         const ety = groundYNear(etx, etz);
         const isoEye = poseAt(etx, ety, etz, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, azim);
-        const pinned = pinTopDown(anchor.x, anchor.z, startRange, bearing);
+        // Pose-match: the hold pins the handed pitch law (holdPolarForFrame —
+        // iso for deep scroll-path frames, top-down for shallow click-path
+        // ones) so the first revealed frame registers onto the map end
+        // frame it dissolves from. Same derivation as the refit path.
+        const holdPolar = holdPolarForFrame(sectorQ.frame);
+        const pinned = pinHold(anchor.x, anchor.z, startRange, bearing, holdPolar);
         handoff.frame = sectorQ.frame;
         handoff.anchor = { x: anchor.x, z: anchor.z };
         handoff.azim = azim;

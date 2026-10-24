@@ -82,8 +82,8 @@ export function sectorH3Map(sectors) {
 }
 
 /** Twin overlay URL for a sector H3 index (embed=1 => posts close msg on Esc).
- * Optional handoff frame {cx,cy,z} (map center lng/lat + zoom at bounds) is
- * appended as &cx=&cy=&z= so the twin opens on the staged view. */
+ * Optional handoff frame {cx,cy,z,bearing,pitch} (map center lng/lat + zoom at bounds) is
+ * appended as &cx=&cy=&z=[&bearing=][&pitch=] so the twin opens on the staged view. */
 export function twinUrl(h3, frame = null) {
   let url = `${TWIN_PAGE}?sector=${encodeURIComponent(h3)}&embed=1`;
   if (
@@ -96,6 +96,12 @@ export function twinUrl(h3, frame = null) {
       `&cx=${encodeURIComponent(frame.cx)}` +
       `&cy=${encodeURIComponent(frame.cy)}` +
       `&z=${encodeURIComponent(frame.z)}`;
+    // MAP FRAME FREEZE: hand the full end pose (additive — the twin's
+    // parseFrameParams ignores unknown params, bearing defaults 0).
+    try {
+      if (Number.isFinite(+frame.bearing)) url += `&bearing=${encodeURIComponent(+frame.bearing)}`;
+      if (Number.isFinite(+frame.pitch)) url += `&pitch=${encodeURIComponent(+frame.pitch)}`;
+    } catch { /* pose params are best-effort */ }
   }
   return url;
 }

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-23T08:40:59.694Z",
+  "generated": "2026-10-24T11:56:52.602Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "73fde34",
+      "full": "73fde34b19f0a4ad0f8582870d0cecee2925c778",
+      "date": "2026-10-23",
+      "time": "14:11",
+      "subject": "docs(plan): rank-1 probe verdict, mechanism live but benign [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "aa32b97",
       "full": "aa32b97b893d4f75e09440afda6ab010457e08b5",
@@ -6232,6 +6241,10 @@
     }
   ],
   "wip": [
-    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
+    "public/version.json",
+    "src/map/main.js",
+    "src/map/twinlink.js",
+    "src/ring2/main.js",
+    "src/ring2/sector.js"
   ]
 }

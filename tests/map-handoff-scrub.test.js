@@ -171,26 +171,30 @@ test('accumulator-owned reveal: S seeds from live zoom at entry, wheel owns it a
   );
 });
 
-test('round-6 way-in continuity: S waits at the reveal gate until the twin grants', () => {
-  // The twin intro is scroll-scrubbed: saturating S before the twin is awake
-  // slams its release progress 0->1 and the commit teleports to the
-  // terminal. Both the prewarm seed and the wheel feed park at the reveal
-  // gate (750) while ungranted; the first post-grant tick resumes on
-  // fingers. Scroll-up drains symmetrically (the clamp only ever lowers).
-  // Round-9: the feed wait extends to twin RELEASE (grant alone still shows
-  // the boot pose); unreadable still lifts on grant.
+test('reveal continuity: S flows from entry, never parks at the reveal gate', () => {
+  // Fast wheel bursts must dissolve continuously into the twin: every tick
+  // paints. The old contract parked both the prewarm seed and the wheel feed
+  // at the reveal gate (750) while the twin booted, so ticks painted nothing
+  // (the stutter) and the later resume jumped. Now the seed stands, the feed
+  // accumulates freely, and the overlay is a pure function of S — scroll-up
+  // still retraces symmetrically through accumStagedS, and the Lane B
+  // grant-time re-emit replays the live S to the twin so both sides match.
   const main = srcOf('../src/map/main.js');
   assert.ok(
-    main.includes('if (!grantedSeed && stagedS > revealStart) stagedS = revealStart;'),
-    'the prewarm seed parks at the reveal gate while the twin boots',
+    !main.includes('if (!grantedSeed && stagedS > revealStart) stagedS = revealStart;'),
+    'no prewarm seed park — the live-zoom seed stands',
   );
   assert.ok(
-    main.includes('if (!releasedFeed && stagedS > gateS && (releaseKnown || !grantedFeed)) stagedS = gateS;'),
-    'the wheel feed parks at the reveal gate until release (grant fallback when unreadable)',
+    !main.includes('if (!releasedFeed && stagedS > gateS && (releaseKnown || !grantedFeed)) stagedS = gateS;'),
+    'no wheel-feed gate clamp — S accumulates on every tick during boot',
   );
   assert.ok(
-    main.includes('window.__mapProbe.twinReady || window.__mapProbe.twinPainted'),
-    'the park lifts on either grant',
+    main.includes('stagedS = accumStagedS(stagedS, dy);'),
+    'the feed still accumulates through the symmetric law (scroll-up retraces)',
+  );
+  assert.ok(
+    main.includes('lastPostedStagedS = null;'),
+    'grants still re-emit the live S to the twin (boot-raced seeds replay)',
   );
 });
 
@@ -202,8 +206,21 @@ test('round-8 sync audit: twin release re-derives mid from grant-time zoom', () 
   // handed frame, then the frozen anchor — never a canned pose.
   const twin = srcOf('../src/ring2/main.js');
   assert.ok(
-    twin.includes('mid: releaseFreshMid(handoff.mid),'),
+    twin.includes('let midPose = releaseFreshMid(handoff.mid);') && twin.includes('mid: midPose,'),
     'the release builds legs from a grant-fresh mid',
+  );
+  // Scale lock (eval-scale lane): the staged release must pin BOTH anchors to
+  // the gate scale, otherwise the twin's image drifts against the map it
+  // dissolves over (measured -0.76z -> +0.46z across the reveal band).
+  assert.ok(
+    twin.includes('lockStagedRange(handoff.frame?.cy)')
+      && twin.includes('poseAtRange(midPose, rLock)')
+      && twin.includes('poseAtRange(toPose, rLock)'),
+    'the staged release locks mid + terminal to the held gate scale',
+  );
+  assert.ok(
+    !/let z = Number\(handoff\.fwdStagedZ\);/.test(twin),
+    'a null staged-z is never coerced to zoom 0 (Number(null) === 0 -> 42 km rail)',
   );
   assert.ok(
     twin.includes('handoff.fwdStagedZ = zz;'),
@@ -227,27 +244,39 @@ test('round-8 sync audit: twin release re-derives mid from grant-time zoom', () 
     'the staged wire carries the live zoom when finite, omits it otherwise',
   );
 });
-test('round-9 junction: overlay stays 0 until the twin releases a pose', () => {
-  // The grant only proves the listener — the twin still sits at its top-down
-  // boot pose (dark, wrong scale) until release. Any overlay >0 before then
-  // composites that boot frame over the map: the measured one-frame
-  // basemap+pitch cut and the two-zooms composite.
+test('reveal continuity: overlay opacity is a pure function of staged S during boot', () => {
+  // The old round-9 contract held the overlay at 0 until grant AND release,
+  // so pre-grant wheel ticks painted nothing and the dissolve jumped when
+  // the gates lifted. Now the S law owns the opacity on every tick — grant
+  // and release gate nothing in the dissolve (both still published on the
+  // probe), and revealTwin's timed leg is barred mid-hold so the driver is
+  // the single writer. The commit still requires a real frame (content +
+  // near + scale), and gated commits hold the LAW value, never 0 — so a
+  // late-passing gate finalizes 1->1 with no snap.
   const main = srcOf('../src/map/main.js');
   assert.ok(
     main.includes('function twinReleased()'),
     'a release signal exists (fwd allocated / phase past hold)',
   );
   assert.ok(
-    main.includes('if (!ready || !released) {'),
-    'the dissolve holds at 0 until grant AND release',
+    !main.includes('if (!ready || !released) {'),
+    'no hold-at-0 — the dissolve never waits for grant/release',
+  );
+  assert.ok(
+    !main.includes("scrubWrite('0')"),
+    'opacity 0 is only ever the law floor (reveal <= 0), never a hold',
+  );
+  assert.ok(
+    main.includes("scrubWrite(st.reveal <= 0 ? '0' : String(+st.reveal.toFixed(4)));"),
+    'the dissolve writes the S law unconditionally',
+  );
+  assert.ok(
+    main.includes('if (stagedActive && !stagedCommitted && !instant) {'),
+    'revealTwin routes mid-hold timed reveals through the driver (single writer)',
   );
   assert.ok(
     main.includes('released,'),
-    'the staged probe publishes release state',
-  );
-  assert.ok(
-    main.includes('if (!releasedFeed && stagedS > gateS && (releaseKnown || !grantedFeed)) stagedS = gateS;'),
-    'the S cap holds to release (unreadable still falls back to grant)',
+    'the staged probe still publishes release state',
   );
   assert.ok(
     !main.includes("|| ph === 'done'"),
@@ -394,10 +423,13 @@ test('round-10 dive-start prewarm: early boot fires once per dive with no state 
   );
 });
 
-test('round-10 grant semantics preserved: once-ever paint, per-handoff ready, release gate intact', () => {
+test('round-10 grant semantics preserved: once-ever paint, per-handoff ready, continuity gates revised', () => {
   // Paint posts once per boot (an early boot eats it) while ready re-arms
   // per handoff — so arrival must reload on the warm cache, never reuse the
-  // early frame. Pre-open grants stay dropped, round-9 gates stay identical.
+  // early frame. Pre-open grants stay dropped. The old round-9 dissolve
+  // hold-at-0 and S cap are REPLACED by reveal continuity (pure function of
+  // S, single writer) — asserted in the two tests above; this test pins that
+  // the rework kept every other grant semantic identical.
   const main = srcOf('../src/map/main.js');
   const twin = srcOf('../src/ring2/main.js');
   assert.equal(
@@ -416,9 +448,12 @@ test('round-10 grant semantics preserved: once-ever paint, per-handoff ready, re
   );
   assert.ok(main.includes('setFrameUrl(frameEl, url)'), 'arrival still sets its URL — reload on warm cache, never reuse');
   assert.ok(main.includes('function twinReleased()'), 'release signal intact');
-  assert.ok(main.includes('if (!ready || !released) {'), 'dissolve still holds at 0 until grant AND release');
   assert.ok(
-    main.includes('if (!releasedFeed && stagedS > gateS && (releaseKnown || !grantedFeed)) stagedS = gateS;'),
-    'the S cap still holds to release with grant fallback when unreadable',
+    !main.includes('if (!ready || !released) {'),
+    'reveal continuity: no hold-at-0 — the dissolve is a pure function of S',
+  );
+  assert.ok(
+    !main.includes('if (!releasedFeed && stagedS > gateS && (releaseKnown || !grantedFeed)) stagedS = gateS;'),
+    'reveal continuity: no S cap — the feed accumulates on every tick',
   );
 });

@@ -18,7 +18,7 @@ import {
   TWIN_STAGED_MSG as MAP_TWIN_STAGED_MSG,
   TWIN_FS_MSG as MAP_TWIN_FS_MSG,
 } from '../map/twinlink.js';
-import { HANDOFF_STAGE_PX, HANDOFF_STAGED_S_MAX, ISO_PITCH_DEG } from '../map/scrolltrigger.js';
+import { HANDOFF_STAGE_PX, HANDOFF_STAGED_S_MAX, ISO_PITCH_DEG, pitchTargetForZoom } from '../map/scrolltrigger.js';
 
 export const SECTOR_PARAM = MAP_SECTOR_PARAM;
 export const EMBED_PARAM = 'embed';
@@ -28,16 +28,17 @@ export const EMBED_PARAM = 'embed';
  * its NATIVE zoom and hands the twin its ACTUAL current view at the
  * deep-zoom checkpoint (same contract as the click path) — cx/cy/z may sit
  * anywhere in the legal range, never at a fixed hold pose. The twin accepts
- * the handed frame as the hold footprint and eases from it (hold top-down
- * at the handed range, swoop to iso at the same center/range, push in to
+ * the handed frame as the hold footprint and eases from it (hold at the
+ * handed pitch law — iso for deep frames, top-down for shallow — via
+ * holdPolarForFrame, swoop to iso at the same center/range, push in to
  * the terminal); it never snaps the camera to a canned pose on entry. */
 export const CX_PARAM = 'cx';
 export const CY_PARAM = 'cy';
 export const ZOOM_PARAM = 'z';
 export const BEARING_PARAM = 'bearing';
 export const TWIN_CLOSE_MSG = MAP_TWIN_CLOSE_MSG;
-/* Handoff-4 Lane B ready (twin->parent): posted ONCE when the top-down
- * satellite start frame matches the staged map end-frame and the first
+/* Handoff-4 Lane B ready (twin->parent): posted ONCE when the hold
+ * satellite frame matches the staged map end-frame and the first
  * matched sat frame has painted. Lane A reveals the overlay on this
  * (pre-warm hold + ~600 ms crossfade are map-side owned). */
 export const TWIN_READY_MSG = MAP_TWIN_READY_MSG;
@@ -52,9 +53,9 @@ export const TWIN_FULLSCREEN_MSG = MAP_TWIN_FS_MSG;
 
 /* Handoff flight timing (ms) — GATE-3 NATIVE-ZOOM tempo (handoff12-B): the
  * full transition must read as ONE slow continuous gesture, so holds are
- * long enough to register top-down and legs overlap end-to-end with zero
- * end-acceleration easing (see easeInOutSmoother): hold a beat top-down at
- * the handed ring frame, slow-ease to iso at the attached angle (ring
+ * long enough to register the hold pose and legs overlap end-to-end with zero
+ * end-acceleration easing (see easeInOutSmoother): hold a beat at the handed
+ * ring frame, slow-ease to iso at the attached angle (ring
  * center/range, slider stays 0), then slow-push in to the terminal with the
  * slider driving 0->100. Reverse mirrors exactly: pull back (push reversed)
  * + pitch back (swoop reversed) with the slider ->0, then the {recede:true}
@@ -80,11 +81,33 @@ export const HANDOFF_END_MIX = 100;
  * (MAP_TRUE_FOV_DEG, sync.js single source) — the old 5deg snap is gone.
  * Derived from ISO_PITCH_DEG (scrolltrigger.js single source), so the
  * cut meets with no snap by construction, not by matching literals.
- * The twin hold itself still pins top-down; Task 36 scrubs the intro so the
+ * The twin hold itself pins the handed pitch law (holdPolarForFrame);
+ * Task 36 scrubs the intro so the
  * cut dissolves end-to-end. Decision recorded: carry-45-through + meet at
  * the shared pole (this constant), not flatten-to-0. */
 export const HANDOFF_ISO_RANGE_M = 18000;
 export const HANDOFF_ISO_POLAR_DEG = ISO_PITCH_DEG;
+
+/* Hold-pose pitch (LANE twin-pose-match): the twin's first revealed frame
+ * must register exactly onto the map end frame it dissolves from — same
+ * center, same zoom scale, same pitch. The map end frame carries the
+ * zoom-keyed iso law (pitchTargetForZoom: 0 below the grade, easing to
+ * ISO_PITCH_DEG, held through the handoff gate), so the hold polar derives
+ * from the SAME law evaluated at the handed zoom — never a restated
+ * literal. Deep (scroll-path) frames hold at the iso pole and the dissolve
+ * is between registered images; shallow (click-path) frames keep the
+ * top-down hold exactly as before. Non-finite/absent zoom parks at 0
+ * (top-down — withhold, never guess). Pure + node-checkable. */
+export function holdPolarForFrame(frame) {
+  try {
+    const z = Number(frame?.z);
+    if (!Number.isFinite(z)) return 0;
+    const p = pitchTargetForZoom(z);
+    return Number.isFinite(p) && p >= 0 ? p : 0;
+  } catch {
+    return 0;
+  }
+}
 
 /** Raw ?sector= / ?embed= values from a search string. Frame params
  * (cx/cy/z/bearing) ride along when the map overlay opens the twin. */
@@ -252,11 +275,14 @@ export function isTwinPaintedMessage(data) {
 export const READY_SETTLE_FRAMES = 2;
 
 /** Pure: live twin pose { eye:{x,y,z}, target:{x,y,z} } agrees with the
- * pinned hold start { tx, ty, tz, range, bearing } (top-down at the ring
- * frame). Tolerances scale with range and mirror the map-side gates
- * (0.5° pitch/bearing): target within 0.2% of range, range within 1%,
- * pitch ~0, bearing ~start bearing. False on any non-finite input —
- * withhold, never guess. Node-checkable. */
+ * pinned hold start { tx, ty, tz, range, bearing, polar } (hold pose at the
+ * ring frame: pitch ~start.polar, bearing ~start bearing — the hold
+ * registers onto the map end frame, so deep handed frames hold at the iso
+ * pole, shallow ones top-down). Tolerances scale with range and mirror the
+ * map-side gates (0.5° pitch/bearing): target within 0.2% of range, range
+ * within 1%. polar absent/non-finite reads as 0 (top-down — back-compat
+ * with starts pinned before the pose-match lane). False on any other
+ * non-finite input — withhold, never guess. Node-checkable. */
 export function twinHoldPoseMatch(pose, start, tol = {}) {
   try {
     const eye = pose?.eye;
@@ -277,8 +303,11 @@ export function twinHoldPoseMatch(pose, start, tol = {}) {
     const h = Math.hypot(eye.x - tgt.x, eye.z - tgt.z);
     const v = eye.y - ty;
     if (!(v > 0)) return false;
+    let wantPolar = Number(start?.polar);
+    if (!Number.isFinite(wantPolar)) wantPolar = 0;
+    const livePolar = (Math.atan2(h, v) * 180) / Math.PI;
     const pitchTol = Number.isFinite(tol.pitchDeg) ? tol.pitchDeg : 0.5;
-    if ((Math.atan2(h, v) * 180) / Math.PI > pitchTol) return false;
+    if (Math.abs(livePolar - wantPolar) > pitchTol) return false;
     const want = ((Number(start.bearing) || 0) % 360 + 360) % 360;
     const got = ((Math.atan2(-(eye.x - tgt.x), eye.z - tgt.z) * 180) / Math.PI + 360) % 360;
     const bearingTol = Number.isFinite(tol.bearingDeg) ? tol.bearingDeg : 0.5;
@@ -292,10 +321,10 @@ export function twinHoldPoseMatch(pose, start, tol = {}) {
 
 /** Pure: close-time flight phase -> reverse plan through the stages actually
  * passed (never a jump to a canned start).
- *   hold  -> 'snap'  (still top-down at the ring frame: pin + mix 0, post)
- *   swoop -> 'pitch' (midway to iso: current pose -> ring top-down, mix ->0)
+ *   hold  -> 'snap'  (still at the ring-frame hold pose: pin + mix 0, post)
+ *   swoop -> 'pitch' (midway to iso: current pose -> ring hold, mix ->0)
  *   push/done/idle -> 'full' (terminal-side: pull to ring iso with mix ->0,
- *     then pitch-back to ring top-down). Node-checkable. */
+ *     then pitch-back to the ring hold pose). Node-checkable. */
 export function reversePlanForPhase(phase) {
   const p = String(phase ?? '').toLowerCase();
   if (p === 'hold') return 'snap';
@@ -308,7 +337,7 @@ export function reversePlanForPhase(phase) {
  * shared convention (map-side handoff8-B fires one transition per 120px
  * accumulated wheel; this matches that notch): one 120px outward wheel notch
  * advances the reverse journey by 120/TWIN_SCRUB_WHEEL_PX, i.e. the full
- * terminal-iso -> ring-top-down journey (push + swoop legs) takes
+ * terminal-iso -> ring-hold journey (push + swoop legs) takes
  * TWIN_SCRUB_WHEEL_PX px of accumulated outward wheel (~5 notches).
  * Outward (reverse intent) = wheel-UP (deltaY < 0) — the same sign the
  * map-side scroll trigger treats as close/reverse, so the gesture reads
@@ -411,8 +440,8 @@ export function scrubTotalMs(legs) {
 /** Pure: journey progress 0..1 -> interpolated { eye, target, mix } across
  * the close-time walk legs, each leg weighted by its forward ms (same
  * smootherstep curve as the timed engine, so scrub and timed renders agree
- * pose-for-pose). progress 0 = walk start (live close pose), 1 = ring
- * top-down. Null on empty/invalid legs — caller pins + posts. */
+ * progress 0 = walk start (live close pose), 1 = ring
+ * hold pose. Null on empty/invalid legs — caller pins + posts. */
 export function poseForScrubProgress(legs, progress) {
   try {
     if (!Array.isArray(legs) || !legs.length) return null;
@@ -569,7 +598,7 @@ export function fwdProgressForStagedS(
 }
 
 /** Pure: build the forward intro legs for poseForScrubProgress from the
- * live anchors. startPose = { eye, target } top-down at the ring frame
+ * live anchors. startPose = { eye, target } at the ring-frame hold pose
  * (main.js startEye); mid = ring-frame iso (swoop end / push start); to =
  * terminal iso. Round-6: mix rides 0 through swoop AND push (the visible
  * push is a rigid satellite move the eye can track), 0->100 only through
