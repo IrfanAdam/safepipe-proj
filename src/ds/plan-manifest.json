@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-24T11:56:52.602Z",
+  "generated": "2026-10-24T13:19:42.148Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "e490224",
+      "full": "e4902240601ada42cce97c174e4847439f4cfa8b",
+      "date": "2026-10-24",
+      "time": "18:49",
+      "subject": "fix(handoff): reveal continuity + dissolve registration + mask-armed center zoom [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "73fde34",
       "full": "73fde34b19f0a4ad0f8582870d0cecee2925c778",
@@ -6240,11 +6249,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "public/version.json",
-    "src/map/main.js",
-    "src/map/twinlink.js",
-    "src/ring2/main.js",
-    "src/ring2/sector.js"
-  ]
+  "wip": []
 }
