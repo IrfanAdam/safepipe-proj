@@ -56,6 +56,8 @@ import {
   CACHE_FAST_IDLE_TTL_MS,
   REARM_DOWN_BELOW,
   progressiveRetargetDue,
+  stallCeilingPin,
+  preStallSwallowDue,
 } from './scrolltrigger.js';
 import {
   sectorH3Map,
@@ -809,7 +811,21 @@ function twinLoaded() {
   try { return twinFrameHasContent(); } catch { return false; }
 }
 function stallArmed() {
-  try { return stallPhase() !== null && !twinLoaded(); } catch { return false; }
+  try {
+    const phase = stallPhase();
+    if (phase === null || twinLoaded()) return false;
+    // Gate-approach stop: the mask-armed ('pre') hold swallows forward only
+    // on the gate approach — below it the climb flows and the stop happens
+    // at the shut mask, never frozen mid-gesture below the arming threshold
+    // (a sub-gate freeze the ceiling then had to bound was the trap). The
+    // staged hold's S stall is zoom-independent and untouched.
+    if (phase === 'pre') {
+      let zNow = NaN;
+      try { zNow = mapRef ? +mapRef.getZoom() : NaN; } catch { zNow = NaN; }
+      if (!preStallSwallowDue({ phase, z: zNow })) return false;
+    }
+    return true;
+  } catch { return false; }
 }
 function stallWaitMs() {
   try {
@@ -855,7 +871,10 @@ function stallSwallowForward() {
 /** Depth freeze: while the hard stop holds, pin the native maxZoom at the live
  * zoom so NO input (wheel, pinch, touch, keys — or an in-flight native ease
  * landing after the hold re-arms) advances depth; reverse stays free
- * (minZoom untouched). This runs in EVERY phase including staged: the staged
+ * (minZoom untouched). The pin never sits below the staging-arm threshold
+ * (stallCeilingPin: max(live, Z_TOP)) — a sub-gate pin trapped the journey
+ * (the pin lifts only on a zoom tick, which the pin itself prevents) and let
+ * reverse ticks ratchet it down. This runs in EVERY phase including staged: the staged
  * Z_HANDOFF clamp alone still lets zoom travel (and settle) below the gate
  * under the hold (measured 10.96→11.5 ratchet). Restores the phase owner's
  * ceiling on release — the staged clamp while staged, the native cap
@@ -866,7 +885,7 @@ function applyStallCeiling(hold) {
     if (!mapRef || typeof mapRef.setMaxZoom !== 'function') return;
     if (hold) {
       const z = +mapRef.getZoom();
-      if (Number.isFinite(z)) { mapRef.setMaxZoom(z); stallCeilingOn = true; }
+      if (Number.isFinite(z)) { mapRef.setMaxZoom(stallCeilingPin(z)); stallCeilingOn = true; }
       return;
     }
     if (stallCeilingOn) {
@@ -965,8 +984,15 @@ function refreshStallLoading() {
   let loaded = false;
   try { phase = stallPhase(); } catch { phase = null; }
   try { loaded = twinLoaded(); } catch { loaded = false; }
+  // Single gate: stallArmed() owns the arm (mask/staged phase + unloaded +
+  // the pre-phase approach bound) — the inline phase/loaded read below used
+  // to bypass the approach bound, so a per-tick refresh re-armed the hold
+  // (and its ceiling) below the gate and the swallow's stale-holding latch
+  // kept swallowing where the arm itself refused to.
+  let armed = false;
+  try { armed = stallArmed(); } catch { armed = false; }
   try {
-    if (phase !== null && !loaded) {
+    if (armed) {
       if (stallT0 <= 0) {
         try {
           stallT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -1003,9 +1029,12 @@ function refreshStallLoading() {
   // so a content grant that lands with idle fingers still clears the loader
   // and restores the ceiling promptly. Presentation-only (never motion); the
   // chain ends on release or when the arm drops, so it cannot outlive the
-  // hold — the long cap bounds it absolutely.
+  // hold — the long cap bounds it absolutely. The chain also runs while a
+  // ceiling this set is still flagged (no hold): a pinned ceiling lifts
+  // only inside refresh, and a frozen frame emits no zoom ticks to run it —
+  // without the poll the pin would outlive its condition forever.
   try {
-    if (hold) {
+    if (hold || stallCeilingOn) {
       if (!stallPollT) {
         try {
           stallPollT = setTimeout(() => {
@@ -1919,6 +1948,26 @@ function onNativeZoomStep(snap, source) {
         abortEarlyBootTwin();
       } catch { /* abort is best-effort */ }
     }
+    // INTENT-LOCK: the hotspot lock engages at intent (the mask arm,
+    // near && blend>0, first true just past Z_CENTER) — not at the late
+    // staged arm. Snapshot-only freeze (seat=false): the SITE anchor is
+    // recorded and pan inputs lock, but the center is NOT seated — the
+    // phantom/correctTo writers are already gliding it and seating a fresh
+    // ~175px drift here would snap. The staged arm re-freezes with seat=true
+    // once drift is ~0. Intent loss releases (same predicate as the boot
+    // abort above) so pan restores the moment the journey is abandoned;
+    // Esc/close/commit/unwind release through the existing unfreeze sites.
+    if (!twinOpen && !transitId && !stagedActive && prox && prox.near && blend > 0) {
+      if (!stagedFrozen) {
+        try {
+          freezeStagedFrame(false);
+        } catch { /* intent lock is best-effort */ }
+      }
+    } else if (stagedFrozen && !stagedActive) {
+      try {
+        unfreezeStagedFrame();
+      } catch { /* intent unlock is best-effort */ }
+    }
     if (stagedActive && source === 'native-zoomend' && z < Z_TOP - STAGED_EXIT_BELOW) {
       try {
         exitStaged();
@@ -2416,13 +2465,18 @@ function restoreMaxZoom() {
  * (reassertStagedAnchor) instead of trusting the live camera; the commit and
  * unwind paths release the lock. Zoom stays clamped (existing maxZoom) and
  * pitch stays on the law (frozen zoom = frozen pitch) — only pan needed a
- * lock. Idempotent; never throws. */
+ * lock. Idempotent; never throws.
+ * seat=false (intent-lock): snapshot the SITE anchor + lock pan inputs
+ * WITHOUT seating the center — the phantom/correctTo writers are already
+ * gliding it (seating here would snap ~175px). The arm re-freezes with
+ * seat=true once drift is ~0. Pan-only inputs lock here (drag + box);
+ * pinch/keyboard stay live so depth gestures keep working pre-arm. */
 let stagedAnchor = null;
 let stagedFrozen = false;
 // Arrival-seat record: the live camera center at freeze (kept for the probe;
 // the LOCK-EARLY pin seats the map on SITE directly, so no glide reads it).
 let stagedFreezeCenter = null;
-function freezeStagedFrame() {
+function freezeStagedFrame(seat = true) {
   try {
     if (mapRef) {
       let c = null;
@@ -2448,19 +2502,26 @@ function freezeStagedFrame() {
           z: zz,
           pitch: Number.isFinite(p) ? p : pitchTargetForZoom(zz),
           bearing: Number.isFinite(b) ? b : 0,
+          intent: seat ? undefined : true,
         };
         stagedFreezeCenter = { lng: +c.lng, lat: +c.lat };
       }
       try { if (mapRef.dragPan) mapRef.dragPan.disable(); } catch { /* lock best-effort */ }
-      try { if (mapRef.touchZoomRotate) mapRef.touchZoomRotate.disable(); } catch { /* lock best-effort */ }
       try { if (mapRef.boxZoom) mapRef.boxZoom.disable(); } catch { /* lock best-effort */ }
-      try { if (mapRef.keyboard) mapRef.keyboard.disable(); } catch { /* lock best-effort */ }
+      if (seat) {
+        try { if (mapRef.touchZoomRotate) mapRef.touchZoomRotate.disable(); } catch { /* lock best-effort */ }
+        try { if (mapRef.keyboard) mapRef.keyboard.disable(); } catch { /* lock best-effort */ }
+      }
       // LOCK-EARLY lock tick: recenter onto the SITE anchor AS the hold arms
       // (not at S-max recovery) — the twin boots on this frame, so lock-in
       // happens on the first staged tick. jumpTo is instant (scroll-pure, no
       // timer); an aimed arrival already sits here, so this is a no-op
       // correction, and the S-max re-park below stays the invisible backstop.
-      try { if (mapRef && stagedAnchor) mapRef.jumpTo({ center: SITE_LNGLAT }); } catch { /* lock tick is best-effort */ }
+      // Intent-lock (seat=false) skips the seating: the glide owns the
+      // center and seating a ~175px drift here would snap.
+      if (seat) {
+        try { if (mapRef && stagedAnchor) mapRef.jumpTo({ center: SITE_LNGLAT }); } catch { /* lock tick is best-effort */ }
+      }
     }
   } catch { /* freeze never breaks staging */ }
   stagedFrozen = true;

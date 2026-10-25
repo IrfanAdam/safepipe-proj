@@ -13,7 +13,7 @@ const srcOf = (rel) => readFileSync(join(dirname(fileURLToPath(import.meta.url))
 
 test('lock tick fires at the staged arm, onto the SITE anchor', () => {
   const main = srcOf('../src/map/main.js');
-  const freeze = main.slice(main.indexOf('function freezeStagedFrame()'), main.indexOf('function reassertStagedAnchor('));
+  const freeze = main.slice(main.indexOf('function freezeStagedFrame(seat = true)'), main.indexOf('function reassertStagedAnchor('));
   assert.ok(freeze.length > 500, 'freezeStagedFrame body is intact');
   assert.ok(
     freeze.includes('mapRef.jumpTo({ center: SITE_LNGLAT })'),
@@ -43,7 +43,7 @@ test('staged ticks hard-pin the center: no glide gate, no pan drift', () => {
 
 test('arm disables all panning; unwind restores it', () => {
   const main = srcOf('../src/map/main.js');
-  const freeze = main.slice(main.indexOf('function freezeStagedFrame()'), main.indexOf('function reassertStagedAnchor('));
+  const freeze = main.slice(main.indexOf('function freezeStagedFrame(seat = true)'), main.indexOf('function reassertStagedAnchor('));
   for (const h of ['mapRef.dragPan', 'mapRef.touchZoomRotate', 'mapRef.keyboard']) {
     assert.ok(freeze.includes(`${h}.disable()`), `${h} disabled at arm`);
   }

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-25T10:02:26.271Z",
+  "generated": "2026-10-25T10:39:35.302Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "795ae3f",
+      "full": "795ae3fb85f9602a122643948cf6f667dc41a6b8",
+      "date": "2026-10-25",
+      "time": "15:34",
+      "subject": "fix(reverse): notch-1 reverse initiation — first wheel-up enters the staged reverse at any range [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "ce3f328",
       "full": "ce3f328dbe366f9241ad0e8af70f0276e300fbe5",
@@ -6350,6 +6359,7 @@
   ],
   "wip": [
     "public/version.json",
-    "src/ring2/main.js"
+    "src/map/main.js",
+    "src/map/scrolltrigger.js"
   ]
 }

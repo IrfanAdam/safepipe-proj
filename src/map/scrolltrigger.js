@@ -140,6 +140,31 @@ export function shouldCenter(z) {
   return Number.isFinite(+z) && +z >= Z_CENTER;
 }
 
+/** Stall-ceiling pin law: the pre-gate depth freeze never parks below the
+ * staging-arm threshold — pin at max(live, Z_TOP) so the gate stays
+ * reachable while the hold owns the frame. Pinning at a sub-gate live zoom
+ * trapped the journey (the ceiling can only be lifted by a zoom tick, but
+ * the ceiling itself prevents upward zoom ticks) and let reverse ticks
+ * ratchet the ceiling down with every fight. Pure + node-checkable. */
+export function stallCeilingPin(liveZ) {
+  const z = Number(liveZ);
+  if (!Number.isFinite(z)) return Z_TOP;
+  return Math.max(z, Z_TOP);
+}
+
+/** Pre-phase stall swallow gate: the mask-armed ('pre') hold swallows
+ * forward only on the gate approach (z at/above REARM_DOWN_BELOW) — below
+ * that the climb flows (mask forms, tilt glides, tiles warm) and the stop
+ * happens at the shut mask, never frozen mid-gesture. The staged hold is
+ * untouched (its S stall owns the fingers regardless of zoom). Pure +
+ * node-checkable. */
+export function preStallSwallowDue({ phase = null, z = NaN } = {}) {
+  if (phase !== 'pre') return true;
+  const zz = Number(z);
+  if (!Number.isFinite(zz)) return false;
+  return zz >= REARM_DOWN_BELOW;
+}
+
 /** Iso scrub target: pitch rides the zoom across the ISO_START..Z_TOP band
  * (0 at/below the terrain grade, smooth 0..ISO_PITCH_DEG as the terrain turns
  * iso, held at ISO_PITCH_DEG through the twin handoff). Starting at the
