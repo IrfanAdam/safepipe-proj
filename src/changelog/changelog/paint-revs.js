@@ -151,6 +151,7 @@ const gateText = (note) => {
   t = t.replace(/\s+/g, ' ').trim();
   return t;
 };
+const commitDays = (scope) => (scope && scope.commitDates ? Object.keys(scope.commitDates).length : 0);
 export function paintRevs(revs, scope){
   if (!revs || !revs.length) {
     const gates = scope && scope.gates ? scope.gates : null;
@@ -229,7 +230,7 @@ export function paintRevs(revs, scope){
   const allDates = [...new Set([...gateEvals.map(g=>g.date), ...revRows.map(r=>r.date)])].sort((a,b)=> b.localeCompare(a));
   // For dates with no evals, still create a group with just revs (baseline)
   // For dates with evals, thread: eval parent → its iteration revs (paired by order)
-  const n = gateEvals.length;
+  const n = gateEvals.length || commitDays(scope) || revRows.length;
   const timeline = [];
   for (let di = 0; di < allDates.length; di++) {
     const date = allDates[di];
@@ -237,7 +238,7 @@ export function paintRevs(revs, scope){
     const dayNum = allDates.length - di;
     const gates = gateByDate.get(date) || [];
     const revsForDate = revByDate.get(date) || [];
-    const dayCount = gates.length;
+    const dayCount = gates.length || (scope.commitDates && scope.commitDates[date] ? 1 : revsForDate.length);
     const dayLabel = `<span class="ds-caret">‹›</span><span class="ds-day-num">Day ${dayNum}</span> · ${esc(dLabelDate)} · ${dayCount}`;
     let groupInner = '';
     if (gates.length) {
