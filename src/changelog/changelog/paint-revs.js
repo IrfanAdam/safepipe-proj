@@ -235,9 +235,10 @@ export function paintRevs(revs, scope){
     const date = allDates[di];
     const dLabelDate = fmtTimelineDate(date) || date || 'Undated';
     const dayNum = allDates.length - di;
-    const dayLabel = `<span class="ds-caret">‹›</span><span class="ds-day-num">Day ${dayNum}</span> · ${esc(dLabelDate)}`;
     const gates = gateByDate.get(date) || [];
     const revsForDate = revByDate.get(date) || [];
+    const dayCount = gates.length + revsForDate.length;
+    const dayLabel = `<span class="ds-caret">‹›</span><span class="ds-day-num">Day ${dayNum}</span> · ${esc(dLabelDate)} · ${dayCount}`;
     let groupInner = '';
     if (gates.length) {
       for (let gi = 0; gi < gates.length; gi++) {
