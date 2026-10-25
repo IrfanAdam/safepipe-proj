@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -1065,8 +1065,11 @@ async function boot() {
       // settle count below, so the post tracks the CURRENT pin.
       r = clampHandoffRange(r);
       if (!Number.isFinite(r) || r <= 0) return false;
-      const old = handoff.start?.range;
-      if (Number.isFinite(old) && Math.abs(old - r) < 1) return false;
+      // Refit gate (sector.js handoffRefitDue): fires on a moved ANCHOR as
+      // well as a moved range — a retarget onto a new frame must rebuild the
+      // pin even at an identical (rail-clamped) range, or a reused shell
+      // pins its boot anchor through the whole climb.
+      if (!handoffRefitDue(handoff.start, handoff.anchor, r)) return false;
       // Pose-match: the refit rebuilds the pinned hold at the handed polar
       // (never a top-down snap) — the settle count restarts below so the
       // post tracks the CURRENT pin.
@@ -1078,6 +1081,13 @@ async function boot() {
       const aty = groundYNear(handoff.anchor.x, handoff.anchor.z);
       const eye = poseAt(handoff.anchor.x, aty, handoff.anchor.z, r, HANDOFF_ISO_POLAR_DEG, handoff.azim);
       handoff.mid = { eye, target: { x: handoff.anchor.x, y: aty, z: handoff.anchor.z } };
+      // Terminal rebuild (sector.js terminalPoseForAnchor — the SAME derivation
+      // the boot terminal uses): without it the retargeted shell kept its boot
+      // terminal, so the commit landed on the boot frame's content.
+      try {
+        const term = terminalPoseForAnchor(handoff.anchor.x, aty, handoff.anchor.z, handoff.azim);
+        if (term && term.eye && term.target) handoff.to = term;
+      } catch { /* terminal rebuild is best-effort — keep the boot pose */ }
       driveMix(HANDOFF_START_MIX);
       handoff.refits = (handoff.refits | 0) + 1;
       return true;
@@ -2339,7 +2349,14 @@ async function boot() {
         const etx = anchor.x;
         const etz = anchor.z;
         const ety = groundYNear(etx, etz);
-        const isoEye = poseAt(etx, ety, etz, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, azim);
+        // Single derivation (sector.js terminalPoseForAnchor): the hold refit
+        // rebuilds this exact terminal on every retarget, so a reused shell
+        // commits on the arrival frame, never the boot frame.
+        const terminal = terminalPoseForAnchor(etx, ety, etz, azim) ?? {
+          eye: poseAt(etx, ety, etz, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, azim),
+          target: { x: etx, y: ety, z: etz },
+          mix: HANDOFF_END_MIX,
+        };
         // Pose-match: the hold pins the handed pitch law (holdPolarForFrame —
         // iso for deep scroll-path frames, top-down for shallow click-path
         // ones) so the first revealed frame registers onto the map end
@@ -2353,9 +2370,9 @@ async function boot() {
           eye: ringIsoEye,
           target: { x: anchor.x, y: aty, z: anchor.z },
         }, {
-          eye: isoEye,
-          target: { x: etx, y: ety, z: etz },
-          mix: HANDOFF_END_MIX,
+          eye: terminal.eye,
+          target: terminal.target,
+          mix: terminal.mix ?? HANDOFF_END_MIX,
         });
       }
     } catch { /* flight never breaks boot; probe still reports the sector */ }

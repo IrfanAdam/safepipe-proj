@@ -1014,3 +1014,74 @@ export function fwdAutoplayHeld({ staged = false, stagedS = null } = {}) {
     return false;
   }
 }
+
+/* Refit epsilon (metres, twin-world): the hold rebuild is worth the pin
+ * churn only past this. Matches the historic 1 m range literal below so
+ * the anchor check and the range check speak one tolerance. */
+export const HANDOFF_REFIT_EPS_M = 1;
+
+/** Pure: does the hold refit need to rebuild the pinned poses?
+ * True when there is no pin yet, when the ANCHOR moved past epsilon (a
+ * retarget onto a new frame — rebuild even at identical range: a
+ * rail-clamped reused shell otherwise pins its boot anchor through the
+ * whole climb because every pin reads the same clamped range), or when
+ * the range moved past epsilon (the historic range-only guard).
+ * False on non-finite range/anchor — withhold, never guess. */
+export function handoffRefitDue(start, anchor, range) {
+  try {
+    const r = Number(range);
+    if (!Number.isFinite(r) || !(r > 0)) return false;
+    if (!anchor || !Number.isFinite(+anchor.x) || !Number.isFinite(+anchor.z)) return false;
+    if (!start || !Number.isFinite(+start.tx) || !Number.isFinite(+start.tz)) return true;
+    if (Math.hypot(+start.tx - +anchor.x, +start.tz - +anchor.z) > HANDOFF_REFIT_EPS_M) return true;
+    const old = Number(start.range);
+    if (!Number.isFinite(old)) return true;
+    return Math.abs(old - r) >= HANDOFF_REFIT_EPS_M;
+  } catch {
+    return false;
+  }
+}
+
+/** Pure: pose-at-anchor (twin orbit): eye at range/polar/azimuth over
+ * (ax, ay, az). Same convention as the twin's poseAt (x = +r·sp·sin,
+ * z = +r·sp·cos). Null on any non-finite input. */
+export function poseAtAnchor(ax, ay, az0, range, polarDeg, azimRad) {
+  try {
+    const x = Number(ax);
+    const y = Number(ay);
+    const z = Number(az0);
+    const r = Number(range);
+    let pol = Number(polarDeg);
+    const az = Number(azimRad);
+    if (![x, y, z, r].every(Number.isFinite)) return null;
+    if (!Number.isFinite(pol) || !Number.isFinite(az)) return null;
+    if (!(r > 0)) return null;
+    const p = (pol * Math.PI) / 180;
+    const sp = Math.sin(p);
+    return {
+      eye: {
+        x: x + r * sp * Math.sin(az),
+        y: y + r * Math.cos(p),
+        z: z + r * sp * Math.cos(az),
+      },
+      target: { x, y, z },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Pure: terminal (push/done) pose for a handoff anchor — the same
+ * derivation the boot terminal uses (iso range, iso pole, attached
+ * angle, end mix), so a hold refit onto a retargeted anchor rebuilds the
+ * identical terminal the boot would have pinned on that frame. Null on
+ * any non-finite input — caller keeps the boot pose, never a guess. */
+export function terminalPoseForAnchor(ax, ay, az, azimRad) {
+  try {
+    const pose = poseAtAnchor(ax, ay, az, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, azimRad);
+    if (!pose || !pose.eye || !pose.target) return null;
+    return { eye: { ...pose.eye }, target: { ...pose.target }, mix: HANDOFF_END_MIX };
+  } catch {
+    return null;
+  }
+}
