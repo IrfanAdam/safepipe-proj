@@ -908,7 +908,11 @@ function applyStallCeiling(hold) {
         // live zoom and the hold refreshes on every pass, so re-applying an
         // unchanged ceiling re-ran MapLibre's constrain setup per frame for
         // the whole stall window (the region the owner reports as worst).
-        const pin = stallCeilingPin(z);
+        // Phase floor: staged holds need the gate reachable (Z_HANDOFF), the
+        // pre-gate lanes only need the staging arm (Z_TOP). Pinning staged at
+        // Z_TOP parked a 100%-opaque dive at z10.59 forever.
+        const floorZ = stagedActive && !stagedCommitted ? Z_HANDOFF : Z_TOP;
+        const pin = stallCeilingPin(z, floorZ);
         if (!stallCeilingOn || pin !== lastCeilingPin) {
           mapRef.setMaxZoom(pin);
           lastCeilingPin = pin;
@@ -3759,6 +3763,7 @@ let releaseWatchTimer = 0;
 let releaseWatchHoldT = 0; // when the CURRENT frozen-S wait started
 let releaseWatchS = NaN;
 let releaseWatchFrames = -1; // last seen twin frame count (progress signal)
+let releaseWatchZ = NaN; // last seen depth (progress signal for a granted hold)
 const RELEASE_WATCH_POLL_MS = 200;
 
 function releaseWatchDisarm() {
@@ -3766,6 +3771,7 @@ function releaseWatchDisarm() {
   releaseWatchHoldT = 0;
   releaseWatchS = NaN;
   releaseWatchFrames = -1;
+  releaseWatchZ = NaN;
   try {
     if (releaseWatchTimer) clearTimeout(releaseWatchTimer);
   } catch { /* timer teardown is best-effort */ }
@@ -3830,8 +3836,16 @@ function releaseWatchTick() {
       return null;
     }
     if (stagedTilesGranted) {
-      releaseWatchDisarm();
-      return null;
+      // A grant only ends the watch when the ramp can actually finish. A
+      // granted hold whose depth sits short of the gate is the parked-under-
+      // an-opaque-overlay state (measured 61s, nothing but Esc): keep watching
+      // so the bounded reasons can unwind it.
+      const gz = mapRef && typeof mapRef.getZoom === 'function' ? +mapRef.getZoom() : NaN;
+      const atGate = !Number.isFinite(gz) || Math.abs(gz - Z_HANDOFF) <= 0.05;
+      if (atGate) {
+        releaseWatchDisarm();
+        return null;
+      }
     }
     const now = nowMs();
     if (!releaseWatchOn) {
@@ -3844,18 +3858,25 @@ function releaseWatchTick() {
       releaseWatchS = stagedS;
       releaseWatchHoldT = now;
     }
-    // PROGRESS BEATS THE CLOCK: a twin that keeps painting is slow, not
-    // stuck. Counting its frames means the bound only fires on a genuine
-    // freeze — otherwise a heavy-but-healthy device would have its dive
-    // yanked out from under it after 2.6s.
+    // PROGRESS BEATS THE CLOCK: slow is not stuck. While UNGRANTED, a twin
+    // that keeps painting means the wait is healthy; while GRANTED, the clock
+    // only resets when depth actually advances toward the gate (that state
+    // waits on zoom, not on the twin, so its frames climb forever and would
+    // otherwise mask the freeze).
+    const zNowW = mapRef && typeof mapRef.getZoom === 'function' ? +mapRef.getZoom() : NaN;
+    const zMoved =
+      Number.isFinite(zNowW) && Number.isFinite(releaseWatchZ) && Math.abs(zNowW - releaseWatchZ) > 0.01;
+    if (Number.isFinite(zNowW)) releaseWatchZ = zNowW;
     const watchFrames = twinFrameCount();
+    let framesMoved = false;
     if (Number.isFinite(watchFrames)) {
       if (releaseWatchFrames < 0) releaseWatchFrames = watchFrames;
       else if (watchFrames > releaseWatchFrames) {
+        framesMoved = true;
         releaseWatchFrames = watchFrames;
-        releaseWatchHoldT = now;
       }
     }
+    if (zMoved || (!stagedTilesGranted && framesMoved)) releaseWatchHoldT = now;
     const waitMs = releaseWatchHoldT > 0 ? now - releaseWatchHoldT : 0;
     const iframeAlive = twinFrameLive();
     const readable = twinStateReadable();

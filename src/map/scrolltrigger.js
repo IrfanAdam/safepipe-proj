@@ -145,11 +145,20 @@ export function shouldCenter(z) {
  * reachable while the hold owns the frame. Pinning at a sub-gate live zoom
  * trapped the journey (the ceiling can only be lifted by a zoom tick, but
  * the ceiling itself prevents upward zoom ticks) and let reverse ticks
- * ratchet the ceiling down with every fight. Pure + node-checkable. */
-export function stallCeilingPin(liveZ) {
+ * ratchet the ceiling down with every fight. Pure + node-checkable.
+ *
+ * FLOOR BY PHASE (Task-37 staged): the same trap bites one level later —
+ * a stall landing at the staged arm pinned the ceiling at Z_TOP (10.5) while
+ * the commit gate needs Z_HANDOFF (11.5), so the dive parked at z10.59 under
+ * a 100% opaque overlay for 61s with no commit and no forward input able to
+ * move it. The staged floor is therefore the gate itself; anything below
+ * Z_TOP is still raised to Z_TOP. */
+export function stallCeilingPin(liveZ, floorZ = Z_TOP) {
   const z = Number(liveZ);
-  if (!Number.isFinite(z)) return Z_TOP;
-  return Math.max(z, Z_TOP);
+  const f = Number(floorZ);
+  const floor = Number.isFinite(f) ? Math.max(f, Z_TOP) : Z_TOP;
+  if (!Number.isFinite(z)) return floor;
+  return Math.max(z, floor);
 }
 
 /** Pre-phase stall swallow gate: the mask-armed ('pre') hold swallows

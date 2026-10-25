@@ -14,6 +14,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   Z_TOP,
+  Z_HANDOFF,
   REARM_DOWN_BELOW,
   stallCeilingPin,
   preStallSwallowDue,
@@ -29,6 +30,21 @@ test('stall ceiling never pins below the staging-arm threshold', () => {
   assert.equal(stallCeilingPin(14), 14, 'deep pins track live zoom');
   assert.equal(stallCeilingPin(NaN), Z_TOP, 'non-finite reads fall back to the gate');
   assert.equal(stallCeilingPin(undefined), Z_TOP, 'missing reads fall back to the gate');
+});
+
+test('staged stall pins at the commit gate, not the iso checkpoint', () => {
+  // The same trap one level later: a stall landing at the staged arm pinned
+  // the ceiling at Z_TOP (10.5) while commit needs Z_HANDOFF (11.5) — the
+  // dive parked at z10.59 under a 100% opaque overlay for 61s with every
+  // forward input dead (measured). The staged floor is the gate itself.
+  assert.equal(stallCeilingPin(10.59, Z_HANDOFF), Z_HANDOFF, 'a staged hold can still reach the gate');
+  assert.equal(stallCeilingPin(Z_HANDOFF - 0.01, Z_HANDOFF), Z_HANDOFF, 'short of the gate pins at the gate');
+  assert.equal(stallCeilingPin(7.0, Z_HANDOFF), Z_HANDOFF, 'a deep staged stall still reaches the gate');
+  assert.equal(stallCeilingPin(13, Z_HANDOFF), 13, 'past the gate the pin tracks live zoom');
+  assert.equal(stallCeilingPin(9.0, Z_TOP), Z_TOP, 'the pre-gate lanes keep the iso floor');
+  assert.equal(stallCeilingPin(9.0, 1), Z_TOP, 'a floor below the arm is raised to Z_TOP');
+  assert.equal(stallCeilingPin(9.0, undefined), Z_TOP, 'no floor means the iso floor');
+  assert.equal(stallCeilingPin(NaN, Z_HANDOFF), Z_HANDOFF, 'non-finite reads fall back to the given floor');
 });
 
 test('pre-phase stall swallows only on the gate approach', () => {
@@ -72,7 +88,7 @@ test('pre-phase stall swallows only on the gate approach', () => {
 test('stall ceiling + swallow gates are wired in the driver', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(
-    main.includes('stallCeilingPin(z)') && main.includes('mapRef.setMaxZoom(pin)'),
+    main.includes('stallCeilingPin(z, floorZ)') && main.includes('mapRef.setMaxZoom(pin)'),
     'the depth freeze pins through the gate-floor law, never the raw live zoom',
   );
   assert.ok(
