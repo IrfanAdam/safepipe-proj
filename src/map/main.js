@@ -2251,9 +2251,8 @@ function restoreMaxZoom() {
  * lock. Idempotent; never throws. */
 let stagedAnchor = null;
 let stagedFrozen = false;
-// S-glide source: the live camera center at freeze. The hold glides it onto
-// the hotspot as a pure fn of S (driveStagedHold), so the map slides under
-// the frozen mask/twin pair with no snap at either end. Cleared with the anchor.
+// Arrival-seat record: the live camera center at freeze (kept for the probe;
+// the LOCK-EARLY pin seats the map on SITE directly, so no glide reads it).
 let stagedFreezeCenter = null;
 function freezeStagedFrame() {
   try {
@@ -2288,6 +2287,12 @@ function freezeStagedFrame() {
       try { if (mapRef.touchZoomRotate) mapRef.touchZoomRotate.disable(); } catch { /* lock best-effort */ }
       try { if (mapRef.boxZoom) mapRef.boxZoom.disable(); } catch { /* lock best-effort */ }
       try { if (mapRef.keyboard) mapRef.keyboard.disable(); } catch { /* lock best-effort */ }
+      // LOCK-EARLY lock tick: recenter onto the SITE anchor AS the hold arms
+      // (not at S-max recovery) — the twin boots on this frame, so lock-in
+      // happens on the first staged tick. jumpTo is instant (scroll-pure, no
+      // timer); an aimed arrival already sits here, so this is a no-op
+      // correction, and the S-max re-park below stays the invisible backstop.
+      try { if (mapRef && stagedAnchor) mapRef.jumpTo({ center: SITE_LNGLAT }); } catch { /* lock tick is best-effort */ }
     }
   } catch { /* freeze never breaks staging */ }
   stagedFrozen = true;
@@ -2510,26 +2515,19 @@ function driveStagedHold(st) {
       }
     }
   } catch { /* hold ring is best-effort */ }
-  // (b2) center convergence — the S-glide: the map center rides from its
-  // arrival seat onto the hotspot as a pure fn of S (k = st.reveal: 0 at
-  // entry, 1 at commit), so the map slides UNDER the frozen mask/twin
-  // pair with no snap at either end. jumpTo is instant (no timers —
-  // scroll-pure) and symmetric (scroll-up retraces it through the same
-  // law). At commit k=1 the map center IS the hotspot, so the commit's
-  // center-near gate reads true for every aimed dive including
-  // static-cursor ones. The mask center is written from the anchor
-  // projection by the live writer above — mask and twin share one center
-  // by construction.
+  // (b2) LOCK-EARLY hard center pin: after lock-in the map stays on the SITE
+  // anchor on EVERY staged tick — no pan possible. This replaces the old
+  // S-glide (arrival seat -> hotspot as a fn of reveal): centering now lands
+  // at the arm tick, so mid-hold the frame is pinned, not travelled. Any
+  // drift (a drag that beat the handler lock, a synthetic panBy/jumpTo, a
+  // settle correction) is re-seated here, and scroll-up unwinds through
+  // exitStaged, never through this pin. jumpTo is instant (scroll-pure, no
+  // timers). The S-max recovery re-park stays the invisible backstop.
   try {
-    if (mapRef && stagedActive && stagedAnchor && stagedAnchor.site && stagedFreezeCenter) {
-      const k = clamp01(st && Number.isFinite(st.reveal) ? st.reveal : 0);
-      if (k > 0 && Number.isFinite(stagedFreezeCenter.lng) && Number.isFinite(stagedFreezeCenter.lat)) {
-        const cx = stagedFreezeCenter.lng + (stagedAnchor.cx - stagedFreezeCenter.lng) * k;
-        const cy = stagedFreezeCenter.lat + (stagedAnchor.cy - stagedFreezeCenter.lat) * k;
-        try { mapRef.jumpTo({ center: [cx, cy] }); } catch { /* glide is best-effort */ }
-      }
+    if (mapRef && stagedActive && stagedAnchor && stagedAnchor.site) {
+      try { mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] }); } catch { /* pin is best-effort */ }
     }
-  } catch { /* center glide never breaks the hold */ }
+  } catch { /* center pin never breaks the hold */ }
   // (c) satellite rides the same S progress as the overlay (the staged blend
   // stage holds full sat): glued to the fingers through the hold, never to
   // the clamped z both laws agree on anyway.
@@ -3177,6 +3175,9 @@ function prewarmThenReveal(id, frame, opts = {}) {
     stagedCommitted = true;
     lastPostedStagedS = null;
     try {
+      unfreezeStagedFrame(); // LOCK-EARLY: a resolved hold must not keep the camera lock — pan restores now
+    } catch { /* unlock is best-effort */ }
+    try {
       window.__mapProbe.staged = { active: false, s: +stagedS.toFixed(1), committed: true };
     } catch { /* probe cosmetic */ }
   }
@@ -3431,6 +3432,9 @@ function openTwin(id, opts = {}) {
     stagedCommitted = true;
     lastPostedStagedS = null;
     try {
+      unfreezeStagedFrame(); // LOCK-EARLY: a resolved hold must not keep the camera lock — pan restores now
+    } catch { /* unlock is best-effort */ }
+    try {
       root.classList.remove('scrubbing');
       if (root.style.opacity !== '') root.style.opacity = '';
     } catch { /* cosmetic */ }
@@ -3480,6 +3484,11 @@ function doCloseTwin() {
       }
     }
   } catch { /* fullscreen teardown is best-effort */ }
+  // LOCK-EARLY: Esc/reverse during a staged hold must restore pan — unwind
+  // the hold (no-op when nothing is staged) and release the camera lock even
+  // for holds a fork guard already resolved (those leak frozen handlers).
+  try { if (stagedActive && !stagedCommitted) exitStaged(); } catch { /* unwind is best-effort */ }
+  try { unfreezeStagedFrame(); } catch { /* unlock is best-effort */ }
   try {
     if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
   } catch { /* timer teardown is best-effort */ }

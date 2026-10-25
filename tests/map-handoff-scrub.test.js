@@ -617,7 +617,11 @@ test('commit+superimpose: near-fail recovery, single radius law, center converge
     main.includes('with the spot clamped to the viewport'),
     'the hold entry refresh keeps its clamp contract',
   );
-  // (b) center convergence: anchor + boot + mask + glide on the hotspot.
+  // (b) center convergence: anchor + boot + mask + pin on the hotspot.
+  // LOCK-EARLY revision: the S-glide (arrival seat -> hotspot as a fn of
+  // reveal) is replaced by the arm lock tick + per-tick hard pin — centering
+  // lands when the hold arms, and mid-hold the frame is pinned, never
+  // travelled. Twin center == mask center by construction, unchanged.
   assert.ok(
     main.includes('cx: SITE_LNGLAT[0],'),
     'the staged anchor sits ON the hotspot, never on the drifted camera',
@@ -631,8 +635,12 @@ test('commit+superimpose: near-fail recovery, single radius law, center converge
     'the mask writes the anchor projection off-centre (no stale-center park)',
   );
   assert.ok(
-    main.includes('stagedAnchor.cx - stagedFreezeCenter.lng'),
-    'the S-glide slides the live map onto the hotspot with no snap',
+    main.includes('mapRef.jumpTo({ center: SITE_LNGLAT })'),
+    'the arm lock tick seats the live map onto the hotspot when the hold arms',
+  );
+  assert.ok(
+    main.includes('mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] })'),
+    'every staged tick hard-pins the center (no glide, no drift, no snap)',
   );
   assert.ok(
     main.includes('if (zDrift > 0.02) mapRef.jumpTo({ zoom: stagedAnchor.z });'),
