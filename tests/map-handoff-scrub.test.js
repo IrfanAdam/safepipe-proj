@@ -304,6 +304,55 @@ test('readiness-hold: overlay ramp waits for twin tiles, law stays pure', () => 
     "'done' (cancelled/failed flight, camera still top-down) must not authorize a dissolve",
   );
 });
+test('readiness-hysteresis: the tiles grant latches, tile gaps never re-arm the hold', () => {
+  // Eval: the dissolve strobed 0<->law mid-hold — the twin camera moves on
+  // every S step, so mapIdle flaps false for a few frames per step and the
+  // raw tilesReady re-armed the zero-hold (and re-froze S at the feeder) on
+  // each gap. The grant now latches: first content (or the long-cap escape)
+  // releases the hold for the life of the staged hold. Pre-grant ov stays 0
+  // and the commit still samples LIVE content, so the latch can never commit
+  // a blank twin.
+  const main = srcOf('../src/map/main.js');
+  assert.ok(
+    main.includes('let stagedTilesGranted = false;'),
+    'the grant latch exists, released by default',
+  );
+  assert.ok(
+    main.includes('if (tilesReady || tilesFallback) stagedTilesGranted = true;'),
+    'first content (or the fallback escape) latches the grant',
+  );
+  assert.ok(
+    main.includes('const tilesHold = !stagedTilesGranted;'),
+    'the hold reads the latch — a mid-dissolve tile gap never re-arms it',
+  );
+  assert.ok(
+    main.includes('if (stagedActive && !stagedCommitted && stagedTilesGranted) return true;'),
+    'the feeder/loader predicate honors the latch, so S never re-freezes mid-dissolve (pre-gate climb stays strict)',
+  );
+  assert.equal(
+    (main.match(/stagedTilesGranted = false/g) || []).length,
+    4,
+    'entry, commit, and unwind all consume the grant (declaration + 3 resets) — the next hold restages cold',
+  );
+  assert.ok(
+    main.includes('tilesGranted: stagedTilesGranted,'),
+    'the staged probe publishes the latched grant',
+  );
+  // Commit gates untouched: the blank/near guards still sample live content,
+  // never the latch.
+  assert.ok(
+    main.includes('const hasContent = twinFrameHasContent();'),
+    'the commit still samples live content at full reveal',
+  );
+  assert.ok(
+    !main.includes('hasContent = stagedTilesGranted'),
+    'the latch never feeds the commit gate — a gap at full reveal holds the commit, never lands it blind',
+  );
+  assert.ok(
+    main.includes('const effReveal = tilesHold ? 0 : st.reveal;'),
+    'pre-grant ov stays 0 — the latch only ever releases, never pre-grants',
+  );
+});
 test('round-7 sync audit: parked pre-grant entry tracks the live zoom', () => {
   // Measured: zoom 10.94->11.48 over 3 ticks with the ring frozen at the
   // arrival entry (286px) — static circle, zooming terrain. The ceiling

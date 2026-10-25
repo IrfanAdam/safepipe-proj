@@ -678,6 +678,13 @@ let stagedCommitted = false;
 let stagedTilesT0 = 0;
 const HARD_STOP_HOLD_MS = 30000; // long wall-clock escape bound (was a 4s release-to-law)
 const STAGED_TILES_HOLD_MS = HARD_STOP_HOLD_MS; // the overlay ramp shares the same bound
+// READINESS-HYSTERESIS: the tiles grant latches. twinFrameHasContent flaps
+// mid-dissolve (the twin camera moves => fresh tiles => mapIdle false for a
+// few frames), and without a latch each gap re-armed the zero-hold and the
+// overlay strobed 0<->law with S freezing under it. Once granted the hold
+// stays released for the life of the staged hold (commit/unwind/entry reset
+// it); pre-grant ov stays 0 and the commit gates still sample live content.
+let stagedTilesGranted = false;
 
 // HARD-STOP state: wall-clock arming of the zero-hold (0 = none armed).
 // stallPhase() names where the fingers are: 'staged' while the staged hold
@@ -701,6 +708,13 @@ function stallPhase() {
   return null;
 }
 function twinLoaded() {
+  // READINESS-HYSTERESIS: a latched staged grant survives tile gaps — the
+  // feeder (stallSwallowForward) and the loader share this predicate, so
+  // without the latch each mid-dissolve gap re-froze S and re-lit the pill.
+  // Scoped to the live staged hold: the pre-gate climb stays strict.
+  try {
+    if (stagedActive && !stagedCommitted && stagedTilesGranted) return true;
+  } catch { /* latch read is best-effort */ }
   try { return twinFrameHasContent(); } catch { return false; }
 }
 function stallArmed() {
@@ -2047,6 +2061,7 @@ function flyToSectorThenTwin(id, opts = {}) {
       try {
         stagedTilesT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       } catch { try { stagedTilesT0 = Date.now(); } catch { stagedTilesT0 = 0; } }
+      stagedTilesGranted = false; // HYSTERESIS: re-entry restages cold — the old grant died with the reloaded frame
       try {
         pumpIsoPitch(); // live-hold carry: keep the per-frame tilt pump running under the clamp (it now converges the S-driven hold tilt, never parks on the prewarm)
       } catch { /* pump is best-effort */ }
@@ -2411,7 +2426,14 @@ function driveStagedOverlay() {
     tilesWaitMs = stagedTilesT0 > 0 ? Math.max(0, nowT - stagedTilesT0) : 0;
   } catch { tilesWaitMs = 0; }
   const tilesFallback = tilesWaitMs > STAGED_TILES_HOLD_MS;
-  const tilesHold = !tilesReady && !tilesFallback;
+  // READINESS-HYSTERESIS: the grant latches — first content (or the fallback
+  // escape) releases the hold for the life of this staged hold, so
+  // mid-dissolve tile gaps (camera moves => mapIdle false for a few frames)
+  // never re-arm it and the written opacity never flaps 0<->law. Pre-grant
+  // the hold is a true zero (ov=0); the commit below still samples LIVE
+  // content, so the latch can never commit a blank twin.
+  if (tilesReady || tilesFallback) stagedTilesGranted = true;
+  const tilesHold = !stagedTilesGranted;
   // Effective ramp: the law when granted, 0 while held. Single writer: every
   // opacity value on this path goes through scrubWrite (transition suspended,
   // synchronous inline write) — revealTwin's timed leg is barred mid-hold
@@ -2438,6 +2460,7 @@ function driveStagedOverlay() {
       tilesReady,
       tilesHold,
       tilesFallback,
+      tilesGranted: stagedTilesGranted,
       tilesWaitMs: Math.round(tilesWaitMs),
     };
   } catch { /* probe cosmetic */ }
@@ -2632,6 +2655,7 @@ function finalizeStagedReveal(root) {
   stagedCommitted = true;
   stagedActive = false;
   stagedTilesT0 = 0; // HARD-STOP: commit disarms the hold (loader already cleared by content)
+  stagedTilesGranted = false; // HYSTERESIS: commit consumes the grant — the next hold restages cold
   try {
     unfreezeStagedFrame(); // MAP FRAME FREEZE: commit releases the camera lock
   } catch { /* unlock is best-effort */ }
@@ -2677,6 +2701,7 @@ function exitStaged() {
   stagedS = 0;
   stagedCommitted = false;
   stagedTilesT0 = 0; // HARD-STOP: unwind disarms the hold
+  stagedTilesGranted = false; // HYSTERESIS: unwind consumes the grant — the next hold restages cold
   entryRx = null; // unwind clears the entry radii — the next hold re-caches its own arrival
   entryRy = null;
   lastPostedStagedS = null; // symmetric unwind: the S stream ends with the hold
