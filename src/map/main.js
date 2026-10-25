@@ -51,6 +51,9 @@ import {
   Z_HANDOFF,
   Z_TOP,
   Z_MAX,
+  Z_FAR_INTENT,
+  CACHE_FAST_IDLE_DELAY_MS,
+  CACHE_FAST_IDLE_TTL_MS,
   REARM_DOWN_BELOW,
 } from './scrolltrigger.js';
 import {
@@ -173,6 +176,9 @@ window.__mapProbe = {
   transit: null, handoff: null, vignette: false, mapFs: false, twinFs: false,
   prewarm: false, twinReady: false, twinPainted: false, reveal: null, revealFallback: false, revealLate: false, revealPaint: false,
   twinBootKey: null, twinBoots: 0, // boot-once cache: live shell key + shell boots this page life (one per dive)
+  // CACHE-FAST wall-clock boot budget: idle/intent/boot/arm/grant timestamps
+  // (performance.now ms) + live ready-by-arm verdict for the slow-net regression.
+  bootTiming: { idleArmed: false, idleFiredMs: 0, intentMs: 0, bootMs: 0, firstBootMs: 0, armMs: 0, readyMs: 0, paintedMs: 0, bootToReadyMs: 0, bootToPaintedMs: 0, readyByArm: null },
   recede: null, mapZoom: null, reverseWait: false, reverseFallback: false,
   view: null, // live ground-scale telemetry { z, tile, frac, w, h, label }
   // GATE-9-A scrub probe: journey progress driving zoom/center/fade.
@@ -483,6 +489,81 @@ function deckLayers() {
   ];
 }
 
+/** CACHE-FAST wall-clock stamp (performance.now ms, Date.now fallback). Never throws. */
+function nowMs() {
+  try {
+    if (typeof performance !== 'undefined' && performance.now) return performance.now();
+  } catch { /* fall through to Date */ }
+  try { return Date.now(); } catch { return 0; }
+}
+/** CACHE-FAST arm stamp: the handoff commits to the twin (arrival entry).
+ * Per-arm verdict, reset every arm: true iff the CURRENT shell already
+ * granted at/before the arm (parent-stamped grants gated on the current
+ * shell birth, so a previous dive's grants never leak in) — including a
+ * first-frame that posted while the twin was still unopened (the twin
+ * posts painted once per shell life and the parent drops pre-open grants,
+ * so poll the shell's own paint log read-only). A fresh navigation after
+ * this stamp resets the race (see resetGrantStampsForFreshShell). */
+function stampArm() {
+  try {
+    const bt = window.__mapProbe && window.__mapProbe.bootTiming;
+    if (!bt) return;
+    const t = nowMs();
+    bt.armMs = t;
+    bt.readyByArm = null;
+    const sameShell = bt.bootMs > 0;
+    if (sameShell && bt.paintedMs > 0 && bt.paintedMs >= bt.bootMs && bt.paintedMs <= t) bt.readyByArm = true;
+    else if (sameShell && bt.readyMs > 0 && bt.readyMs >= bt.bootMs && bt.readyMs <= t) bt.readyByArm = true;
+    if (bt.readyByArm !== true) {
+      // Idle-shell case: the first frame may predate the arm (painted while
+      // unopened, dropped parent-side). The shell's paint log is same-origin
+      // readable — a logged paint means warm at arm, honestly stamped.
+      try {
+        const win = overlayEls && overlayEls.frame && overlayEls.frame.contentWindow;
+        const log = win && win.__ring2paintOut;
+        if (Array.isArray(log) && log.length > 0) bt.readyByArm = true;
+      } catch { /* cross-frame read is best-effort */ }
+    }
+  } catch { /* probe cosmetic */ }
+}
+/** CACHE-FAST grant stamp: twin first-paint ('painted') or pose-match
+ * ('ready'). Records boot->grant wall-clock; decides ready-by-arm once an
+ * arm exists (grant at/before the arm = warm when the fingers arrived).
+ * Sticky-true: a pre-arm warm shell stays warm even when the post-arm grant
+ * lands later — each new arm resets the verdict (see stampArm). */
+function stampGrant(kind) {
+  try {
+    const bt = window.__mapProbe && window.__mapProbe.bootTiming;
+    if (!bt) return;
+    const t = nowMs();
+    if (kind === 'ready') {
+      bt.readyMs = t;
+      if (bt.bootMs > 0 && t >= bt.bootMs) bt.bootToReadyMs = t - bt.bootMs;
+    } else {
+      bt.paintedMs = t;
+      if (bt.bootMs > 0 && t >= bt.bootMs) bt.bootToPaintedMs = t - bt.bootMs;
+    }
+    if (bt.armMs > 0 && bt.readyByArm !== true) bt.readyByArm = t <= bt.armMs;
+  } catch { /* probe cosmetic */ }
+}
+/** CACHE-FAST fresh-shell reset: a post-arm navigation births a new shell,
+ * so the discarded shell's grants must not describe the new race. Re-births
+ * bootMs (firstBootMs keeps the page-life headline number); grants pending. */
+function resetGrantStampsForFreshShell() {
+  try {
+    const bt = window.__mapProbe && window.__mapProbe.bootTiming;
+    if (!bt) return;
+    const t = nowMs();
+    if (!bt.firstBootMs && bt.bootMs > 0) bt.firstBootMs = bt.bootMs;
+    bt.bootMs = t;
+    bt.paintedMs = 0;
+    bt.readyMs = 0;
+    bt.bootToPaintedMs = 0;
+    bt.bootToReadyMs = 0;
+    bt.readyByArm = null;
+  } catch { /* probe cosmetic */ }
+}
+
 function ensureOverlay() {
   if (overlayEls) return overlayEls;
   const root = document.createElement('div');
@@ -666,6 +747,8 @@ let lastArriveWarmZ = -1; // arriving level already warmed (integer crossings st
 // aborts on the existing z-band retreat path (earlyTwinArmed guard).
 let intentWarmed = false;
 let intentWarmedZ = -1; // integer zoom already warmed at lock intent (per dive)
+// CACHE-FAST far-intent: per-dive current-level warm state (re-arms with intent loss).
+let lastFarWarmZ = -1; // integer zoom already warmed at far intent (per dive)
 let scrubProgress = 0;
 let scrubFired = false;
 // Task-35 staged scrub: past the handoff gate scroll-as-zoom is clamped and
@@ -1442,6 +1525,25 @@ function onNativeZoomStep(snap, source) {
         window.__mapProbe.maskArmed = false;
       } catch { /* probe cosmetic */ }
     }
+    // CACHE-FAST: far-intent tile warm — one zoom level below the mask arm
+    // (near && z >= Z_FAR_INTENT, ~6): warms the CURRENT-level site patch
+    // hotspot-first, so the frame under the fingers resolves before the
+    // arrival band streams. Tiles only — never boots, never flips twin
+    // state, so the mask-arm abort lifecycle is untouched.
+    try {
+      if (prox && prox.near && z >= Z_FAR_INTENT && !twinOpen) {
+        const fz = Math.floor(z);
+        if (fz !== lastFarWarmZ) {
+          lastFarWarmZ = fz;
+          try { prefetchSatTiles(SITE_LNGLAT, fz); } catch { /* warm is best-effort */ }
+        }
+        try {
+          if (!window.__mapProbe.bootTiming.intentMs) window.__mapProbe.bootTiming.intentMs = nowMs();
+        } catch { /* probe cosmetic */ }
+      } else if (lastFarWarmZ !== -1 && !(prox && prox.near)) {
+        lastFarWarmZ = -1; // intent lost: re-arm for the next dive
+      }
+    } catch { /* far-intent warm never breaks the journey */ }
     // INTENT-PRECACHE: earliest reliable lock-intent signal (pre-iso,
     // center-predictable) — the mask arm itself (near && blend>0, first
     // true just past Z_CENTER, ~1 level before the takeover band and ~3-4
@@ -1469,6 +1571,9 @@ function onNativeZoomStep(snap, source) {
           try { prefetchSatTiles(SITE_LNGLAT, 9); } catch { /* warm is best-effort */ }
           try { prefetchSatTiles(SITE_LNGLAT, 10); } catch { /* warm is best-effort */ }
           try { prefetchSatTiles(SITE_LNGLAT, 11); } catch { /* warm is best-effort */ }
+          try {
+            if (!window.__mapProbe.bootTiming.intentMs) window.__mapProbe.bootTiming.intentMs = nowMs();
+          } catch { /* probe cosmetic */ }
         }
       } else if (intentWarmed) {
         intentWarmed = false; // intent lost: re-arm for the next dive
@@ -1871,18 +1976,20 @@ function prefetchSatTiles(center, zoom) {
     const t = lngLatToTile(c[0], c[1], z);
     const n = Math.pow(2, z);
     const urls = [];
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        const x = t.x + dx;
-        const y = t.y + dy;
-        if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= n || y >= n) continue;
-        urls.push(satTileUrl(z, x, y));
-      }
+    // CACHE-FAST hotspot-first: the center tile (the dive target) heads the
+    // patch so it wins the connection race; the ring follows. Order only —
+    // same 9 URLs, same cap, same dedupe.
+    const order = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    for (const [dx, dy] of order) {
+      const x = t.x + dx;
+      const y = t.y + dy;
+      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= n || y >= n) continue;
+      urls.push({ url: satTileUrl(z, x, y), hot: dx === 0 && dy === 0 });
     }
     try {
       window.__mapProbe.precache.tiles = { z, x: t.x, y: t.y, n: urls.length };
     } catch { /* probe cosmetic */ }
-    for (const url of urls) {
+    for (const { url, hot } of urls) {
       try {
         if (satTileSeen.has(url)) {
           precacheHits += 1;
@@ -1898,6 +2005,8 @@ function prefetchSatTiles(center, zoom) {
         try {
           const img = new Image();
           img.decoding = 'async';
+          // CACHE-FAST: the hotspot tile loads first (high), the ring deprioritized (low) so speculative warms never contend the live frame.
+          try { img.fetchPriority = hot ? 'high' : 'low'; } catch { /* priority hint is best-effort */ }
           img.src = url; // warm the HTTP cache; never inserted in the DOM
         } catch { /* preload is best-effort */ }
         precachePrefetched += 1;
@@ -3020,6 +3129,23 @@ function earlyBootTwin() {
     const h3 = h3map[siteSector];
     if (!h3) return false;
     if (earlyTwinArmed) return twinBootKey === h3; // already booted: warm for this hotspot, cold never reuses
+    // CACHE-FAST: adopt the page-idle preloaded shell (same hotspot, live
+    // frame, bootMs stays the shell's birth) — no second navigation; the
+    // arrival retarget re-pins the frame. Falls through to a fresh boot when
+    // the shell is blank, dead, or for another hotspot.
+    try {
+      if (!earlyTwinArmed && twinBootKey === h3 && overlayEls && overlayEls.frame) {
+        const cur = overlayEls.frame.getAttribute('data-url');
+        if (typeof cur === 'string' && cur !== 'about:blank' && cur.length > 0) {
+          earlyTwinArmed = true;
+          try {
+            window.__mapProbe.earlyPrewarm = true;
+            window.__mapProbe.twinBootKey = h3;
+          } catch { /* probe cosmetic */ }
+          return true;
+        }
+      }
+    } catch { /* adopt is best-effort — fall through to a fresh boot */ }
     const ov = ensureOverlay();
     try {
       ov.root.classList.remove('closing');
@@ -3036,7 +3162,32 @@ function earlyBootTwin() {
       window.__mapProbe.earlyPrewarm = true;
       window.__mapProbe.twinBootKey = h3;
       window.__mapProbe.twinBoots = (window.__mapProbe.twinBoots | 0) + 1;
+      window.__mapProbe.bootTiming.bootMs = nowMs();
+      if (!window.__mapProbe.bootTiming.firstBootMs) window.__mapProbe.bootTiming.firstBootMs = window.__mapProbe.bootTiming.bootMs;
     } catch { /* probe cosmetic */ }
+    return true;
+  } catch { return false; }
+}
+
+/** CACHE-FAST retarget gate: the warm shell takes the arrival frame via
+ * retarget ONLY while it can (twin-side contract: hold, pre-release). A
+ * shell that is still loading (no probe yet), already matched (ready
+ * posted), or autoplaying past hold would drop or ignore the retarget and
+ * strand the arrival on the wrong frame — navigate fresh instead (caches
+ * stay warm, so the reload is cheap and always lands the arrival frame).
+ * Same-origin probe read; unreadable = not provably safe = fresh. */
+function shellRetargetable(h3) {
+  try {
+    if (!twinBootKey || twinBootKey !== h3) return false;
+    if (!overlayEls || !overlayEls.frame) return false;
+    const win = overlayEls.frame.contentWindow;
+    if (!win) return false;
+    const probe = win.__ring2;
+    if (!probe || typeof probe.handoffPhase !== 'function') return false;
+    if (probe.handoffPhase() !== 'hold') return false;
+    try {
+      if (typeof probe.ready === 'function' && probe.ready()) return false;
+    } catch { return false; }
     return true;
   } catch { return false; }
 }
@@ -3045,10 +3196,12 @@ function earlyBootTwin() {
  * iframe navigation entirely and hands the arrival frame to the live shell
  * via retarget — the twin re-pins its hold pose while tiles/details stream
  * in (selective update, no shell reboot). False when there is no warm
- * shell (different hotspot, no boot, dead frame) — the caller navigates. */
+ * shell (different hotspot, no boot, dead frame) or the shell already left
+ * the retarget window (loading/matched/past-hold) — the caller navigates. */
 function reuseWarmTwin(h3, frame) {
   try {
     if (!earlyTwinArmed || !twinBootKey || twinBootKey !== h3) return false;
+    if (!shellRetargetable(h3)) return false;
     if (!overlayEls || !overlayEls.frame) return false;
     const win = overlayEls.frame.contentWindow;
     if (!win) return false;
@@ -3088,6 +3241,68 @@ function abortEarlyBootTwin() {
   return true;
 }
 
+/** CACHE-FAST page-idle shell preload: boot the twin shell on idle after
+ * load (no intent needed), so the shell compile + first-frame cost lands
+ * before the first dive instead of mid-dive. Same-origin iframe — the
+ * navigation itself is the preload (preconnect N/A); Esri + CARTO
+ * preconnects ride in ops3d-map.html <head>.
+ * The shell is UNARMED (earlyTwinArmed stays false): the zoom-step abort
+ * keys on the armed flag, so an idle shell survives until the first
+ * intent/takeover adopts it via earlyBootTwin (no second navigation — the
+ * arrival retarget re-pins the frame). A TTL blanks shells no dive arms
+ * (frees the hidden rAF); the next intent reboots, no worse than today.
+ * Never opens, never flips twin state, never touches the camera. */
+let idleShellTimer = 0;
+function preloadTwinShellIdle() {
+  try {
+    if (twinOpen || transitId || pendingReveal || stagedActive || earlyTwinArmed) return false;
+    if (!mapRef) return false;
+    const frame = liveFrame();
+    if (!frame) return false;
+    const h3 = h3map[siteSector];
+    if (!h3) return false;
+    if (twinBootKey) return true; // a shell already lives — nothing to preload
+    const ov = ensureOverlay();
+    try {
+      ov.root.classList.remove('closing');
+      ov.root.classList.add('prewarm');
+    } catch { /* cosmetic */ }
+    try {
+      void ov.root.offsetWidth;
+    } catch { /* reflow nudge is best-effort */ }
+    setFrameUrl(ov.frame, twinUrl(h3, frame));
+    ov.root.hidden = false;
+    twinBootKey = h3; // live shell, unarmed: adopted (not rebooted) at first intent
+    try {
+      window.__mapProbe.twinBootKey = h3;
+      window.__mapProbe.twinBoots = (window.__mapProbe.twinBoots | 0) + 1;
+      window.__mapProbe.bootTiming.bootMs = nowMs();
+      window.__mapProbe.bootTiming.idleFiredMs = nowMs();
+      if (!window.__mapProbe.bootTiming.firstBootMs) window.__mapProbe.bootTiming.firstBootMs = window.__mapProbe.bootTiming.bootMs;
+    } catch { /* probe cosmetic */ }
+    try {
+      if (idleShellTimer) clearTimeout(idleShellTimer);
+      idleShellTimer = setTimeout(() => {
+        try {
+          if (!earlyTwinArmed && !twinOpen && twinBootKey === h3) {
+            try { if (overlayEls && overlayEls.frame) setFrameUrl(overlayEls.frame, 'about:blank'); } catch { /* teardown is best-effort */ }
+            try {
+              if (overlayEls && overlayEls.root) {
+                overlayEls.root.classList.remove('prewarm');
+                overlayEls.root.hidden = true;
+              }
+            } catch { /* cosmetic */ }
+            twinBootKey = null;
+            try { window.__mapProbe.twinBootKey = null; } catch { /* probe cosmetic */ }
+          }
+        } catch { /* ttl release never breaks the map */ }
+        idleShellTimer = 0;
+      }, CACHE_FAST_IDLE_TTL_MS);
+    } catch { /* ttl is best-effort */ }
+    return true;
+  } catch { return false; }
+}
+
 /** Handoff-4 Lane A seeded reveal: PRE-WARM the twin at the ring frame —
  * create the overlay iframe hidden (opacity 0 via .prewarm, still loading
  * ?sector&cx&cy&z&embed=1) and HOLD the map end-frame until the twin posts
@@ -3103,6 +3318,7 @@ function prewarmThenReveal(id, frame, opts = {}) {
   if (!s) return false;
   selectSector(id);
   const h3 = h3map[id];
+  try { stampArm(); } catch { /* arm stamp never breaks arrival */ }
   const { root, frame: frameEl, label } = ensureOverlay();
   const url = twinUrl(h3, frame);
   // Handoff-5-close: a fresh open cancels any pending close hide/recede.
@@ -3133,6 +3349,18 @@ function prewarmThenReveal(id, frame, opts = {}) {
       staleCloseGuardUntil = nowG + 1500; // the replaced early twin's pagehide echo lands in this window — drop it
     } catch { /* guard is best-effort */ }
   }
+  // CACHE-FAST: replacing a live UNARMED idle shell unloads it too — its
+  // pagehide echo lands after twinOpen flips and would tear down the fresh
+  // arrival (the round-10 stale echo, unarmed variant). Same 1.5s drop
+  // window; reuse posts no unload so the guard stays down there, and a
+  // genuine close past the window still lands. twinBootKey aliveness proves
+  // a shell lived (null = plain first navigation, no echo possible).
+  if (!warmReused && !earlyTwinArmed && twinBootKey) {
+    try {
+      const nowI = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+      staleCloseGuardUntil = nowI + 1500;
+    } catch { /* guard is best-effort */ }
+  }
   earlyTwinArmed = false; // arrival consumes the dive-start boot (warm shell reused via retarget, never reloaded)
   try {
     window.__mapProbe.earlyPrewarm = false;
@@ -3154,6 +3382,7 @@ function prewarmThenReveal(id, frame, opts = {}) {
   // Boot-once: the warm shell already lives — navigating here would reboot
   // it mid-dive (the double-load). Reused shells only get the retarget.
   if (!warmReused) setFrameUrl(frameEl, url);
+  if (!warmReused) resetGrantStampsForFreshShell(); // new shell = new race: old grants describe the discarded shell
   root.hidden = false;
   try {
     document.body.classList.add('twin-open');
@@ -3392,6 +3621,8 @@ function openTwin(id, opts = {}) {
   // navigation arms the stale-close guard (no unload echo on reuse).
   const warmReused = reuseWarmTwin(h3, handoff);
   if (!warmReused) setFrameUrl(frame, url);
+  if (!warmReused) resetGrantStampsForFreshShell(); // new shell = new race (see arrival path)
+  try { stampArm(); } catch { /* arm stamp never breaks a direct open */ }
   root.hidden = false;
   try {
     root.classList.remove('closing');
@@ -3409,6 +3640,15 @@ function openTwin(id, opts = {}) {
     try {
       const nowG = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
       staleCloseGuardUntil = nowG + 1500; // the replaced early twin's pagehide echo lands in this window — drop it
+    } catch { /* guard is best-effort */ }
+  }
+  // CACHE-FAST: same unarmed-idle-shell echo cover as the arrival path —
+  // a direct open over a live idle shell replaces it (no retarget), so its
+  // pagehide echo must not tear down the fresh open.
+  if (!warmReused && !earlyTwinArmed && twinBootKey) {
+    try {
+      const nowI = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+      staleCloseGuardUntil = nowI + 1500;
     } catch { /* guard is best-effort */ }
   }
   earlyTwinArmed = false; // direct open consumes any dive-start boot
@@ -3832,6 +4072,7 @@ window.addEventListener('message', (e) => {
   if (!twinOpen) return;
   try {
     window.__mapProbe.twinReady = true;
+    try { stampGrant('ready'); } catch { /* grant stamp is best-effort */ }
   } catch { /* probe cosmetic */ }
   // Task-35 staged: ready GRANTS the dissolve but the fingers own its
   // progress — route through the staged driver, never revealTwin directly.
@@ -3876,6 +4117,7 @@ window.addEventListener('message', (e) => {
   if (!twinOpen) return;
   try {
     window.__mapProbe.twinPainted = true;
+    try { stampGrant('painted'); } catch { /* grant stamp is best-effort */ }
   } catch { /* probe cosmetic */ }
   // Staged paint grants the dissolve — route through the staged driver,
   // never revealTwin directly (the S law still owns the progress). The
@@ -4688,6 +4930,19 @@ async function boot() {
     };
     mapRef = map;
     setSatRef = setSat;
+    // CACHE-FAST: page-idle shell preload — boot the twin shell on idle
+    // after init (no intent needed): the shell compile + first-frame cost
+    // lands before the first dive instead of mid-dive. Same-origin iframe
+    // (preconnect N/A — the navigation itself is the preload); Esri +
+    // CARTO preconnects ride in ops3d-map.html <head>. Best-effort.
+    try {
+      window.__mapProbe.bootTiming.idleArmed = true;
+      const fireIdle = () => { try { preloadTwinShellIdle(); } catch { /* idle preload never breaks init */ } };
+      if (typeof requestIdleCallback === 'function') {
+        try { requestIdleCallback(fireIdle, { timeout: CACHE_FAST_IDLE_DELAY_MS + 2000 }); }
+        catch { setTimeout(fireIdle, CACHE_FAST_IDLE_DELAY_MS); }
+      } else setTimeout(fireIdle, CACHE_FAST_IDLE_DELAY_MS);
+    } catch { /* idle scheduling never breaks init */ }
     try {
       const zz0 = map.getZoom();
       if (Number.isFinite(+zz0)) updateScaleHud(+zz0);

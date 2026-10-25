@@ -40,6 +40,29 @@ const HOME_EPS = 0.06; // zoomend-at-home tolerance for the reverse edge
 export const REARM_DOWN_BELOW = Z_TOP - 0.5; // drop below to re-arm onDown / staging
 const REARM_UP_ABOVE = Z_MIN + 0.3; // rise above to re-arm onUp
 
+/* CACHE-FAST (wall-clock boot budget): profile-driven boot/prefetch speed.
+ * Measured breakdown behind the owner verdict (5/10, caching too slow):
+ * the twin SHELL boot (iframe doc + JS compile) dominates, then the
+ * first-frame tile stream, then arrival tiles streaming mid-dive. So the
+ * shell boots on page idle (whole-session lead instead of a ~4-level dive
+ * lead), hotspot tiles warm one level below the mask arm, every patch
+ * orders center-first, and boot->grant wall-clock is instrumented on the
+ * probe (bootTiming) for the slow-network ready-by-arm regression. */
+export const Z_FAR_INTENT = Z_CENTER - 1; // far-intent tile warm: one full level below the mask arm (fires ~z6)
+export const CACHE_FAST_IDLE_DELAY_MS = 1500; // page-idle shell preload delay after init
+export const CACHE_FAST_IDLE_TTL_MS = 90000; // idle shell released if no dive arms it within this
+export const CACHE_FAST_SLOW_FIRST_FRAME_MS = 2500; // simulated slow-network shell + first-frame cost
+/** Pure: slow-network readiness schedule — the shell is ready by the arm
+ * iff the boot lead covers the first-frame cost. Node-checkable. */
+export function readyByArm({ bootAtMs, armAtMs, firstFrameCostMs }) {
+  const b = +bootAtMs;
+  const a = +armAtMs;
+  const c = +firstFrameCostMs;
+  if (!Number.isFinite(b) || !Number.isFinite(a) || !Number.isFinite(c)) return false;
+  if (b < 0 || a < 0 || c < 0) return false;
+  return b + c <= a;
+}
+
 export function clamp01(v) {
   const n = +v;
   if (!Number.isFinite(n)) return 0;
