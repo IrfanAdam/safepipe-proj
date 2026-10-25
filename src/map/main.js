@@ -773,20 +773,35 @@ function stallSwallowForward() {
     return !!refreshStallLoading();
   } catch { return false; }
 }
-/** Pre-gate depth freeze: while the hard stop holds outside staging, pin the
- * native maxZoom at the live zoom so NO input (wheel, pinch, touch, keys)
- * advances depth; reverse stays free (minZoom untouched). Staging owns its
- * own clamp — never touched here. Restores only a ceiling this set. */
+/** Depth freeze: while the hard stop holds, pin the native maxZoom at the live
+ * zoom so NO input (wheel, pinch, touch, keys — or an in-flight native ease
+ * landing after the hold re-arms) advances depth; reverse stays free
+ * (minZoom untouched). This runs in EVERY phase including staged: the staged
+ * Z_HANDOFF clamp alone still lets zoom travel (and settle) below the gate
+ * under the hold (measured 10.96→11.5 ratchet). Restores the phase owner's
+ * ceiling on release — the staged clamp while staged, the native cap
+ * otherwise — so a grant-time release never unclamps a staged hold, and only
+ * ever a ceiling this set. */
 function applyStallCeiling(hold) {
   try {
     if (!mapRef || typeof mapRef.setMaxZoom !== 'function') return;
-    if (stagedActive) return; // staged clamp owns the ceiling
     if (hold) {
       const z = +mapRef.getZoom();
       if (Number.isFinite(z)) { mapRef.setMaxZoom(z); stallCeilingOn = true; }
       return;
     }
-    if (stallCeilingOn) { restoreMaxZoom(); stallCeilingOn = false; }
+    if (stallCeilingOn) {
+      // Release to the phase owner's ceiling, never past it: granting while
+      // staged re-hands the staged clamp (the sprint still needs its gate);
+      // anywhere else the native cap returns. Unwind/commit paths restore
+      // the native cap themselves and clear the arm, so this never fights
+      // them — and a ceiling set by nobody is never touched.
+      try {
+        if (stagedActive && !stagedCommitted) mapRef.setMaxZoom(Z_HANDOFF);
+        else restoreMaxZoom();
+      } catch { restoreMaxZoom(); }
+      stallCeilingOn = false;
+    }
   } catch { /* ceiling is best-effort */ }
 }
 /** Preventive directional guards for non-wheel forward input: touch pinch-in,
