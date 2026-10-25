@@ -62,7 +62,7 @@ test('depth ceiling pins live zoom in every phase, releases to the phase owner',
     'no staged exemption in the ceiling: the gate-only cap let zoom travel below it',
   );
   assert.ok(
-    main.includes('if (stagedActive && !stagedCommitted) mapRef.setMaxZoom(Z_HANDOFF);'),
+    main.includes('if (stagedActive && !stagedCommitted) {') && main.includes('mapRef.setMaxZoom(Z_HANDOFF)'),
     'release while staged re-hands the staged clamp, never the native cap',
   );
 });

@@ -59,6 +59,7 @@ import {
   stallCeilingPin,
   preStallSwallowDue,
 } from './scrolltrigger.js';
+import { coalesceStepSource } from './frame-pacing.js';
 import {
   sectorH3Map,
   twinUrl,
@@ -404,11 +405,10 @@ function updateScaleHud(z) {
       const c = mapRef.getCenter();
       if (c && Number.isFinite(+c.lat)) lat = +c.lat;
     } catch { /* center read best-effort */ }
-    try {
-      const el = mapRef.getContainer();
-      w = (el && el.clientWidth) || window.innerWidth || 800;
-      h = (el && el.clientHeight) || window.innerHeight || 600;
-    } catch { /* size read best-effort */ }
+    // ONE box read per pass (frameSize — shared with proximity + enclosure).
+    const box = frameSize();
+    w = box.w;
+    h = box.h;
     const mpp = metersPerPixel(+z, lat);
     if (mpp == null) return;
     const tile = Math.floor(+z);
@@ -781,6 +781,7 @@ let stagedTilesGranted = false;
 // untouched, so fingers always escape by going back.
 let stallT0 = 0;
 let stallCeilingOn = false; // pre-gate depth freeze applied (restored only when set here)
+let lastCeilingPin = null; // last applied ceiling value (unchanged pins write nothing)
 let stallPollT = 0; // bounded presentation poll: one 500ms chain while holding (cleared on release)
 // HARD-STOP pill grace: the loader is a FALLBACK surface, not a dive badge.
 // stallPhase arms at the mask (z~7) while fast-grant dives release almost
@@ -885,7 +886,18 @@ function applyStallCeiling(hold) {
     if (!mapRef || typeof mapRef.setMaxZoom !== 'function') return;
     if (hold) {
       const z = +mapRef.getZoom();
-      if (Number.isFinite(z)) { mapRef.setMaxZoom(stallCeilingPin(z)); stallCeilingOn = true; }
+      if (Number.isFinite(z)) {
+        // No-op dedupe (frame pacing): the pin is a pure function of the
+        // live zoom and the hold refreshes on every pass, so re-applying an
+        // unchanged ceiling re-ran MapLibre's constrain setup per frame for
+        // the whole stall window (the region the owner reports as worst).
+        const pin = stallCeilingPin(z);
+        if (!stallCeilingOn || pin !== lastCeilingPin) {
+          mapRef.setMaxZoom(pin);
+          lastCeilingPin = pin;
+        }
+        stallCeilingOn = true;
+      }
       return;
     }
     if (stallCeilingOn) {
@@ -895,8 +907,12 @@ function applyStallCeiling(hold) {
       // the native cap themselves and clear the arm, so this never fights
       // them — and a ceiling set by nobody is never touched.
       try {
-        if (stagedActive && !stagedCommitted) mapRef.setMaxZoom(Z_HANDOFF);
-        else restoreMaxZoom();
+        if (stagedActive && !stagedCommitted) {
+          if (lastCeilingPin !== Z_HANDOFF) {
+            mapRef.setMaxZoom(Z_HANDOFF);
+            lastCeilingPin = Z_HANDOFF;
+          }
+        } else restoreMaxZoom();
       } catch { restoreMaxZoom(); }
       stallCeilingOn = false;
     }
@@ -1194,20 +1210,17 @@ function maskArmed() {
  * Returns { sx, sy, distCursor, distCenter, cursorNear, centerNear,
  * near } or null pre-ready. Passive read only — never moves the map. */
 function proximityInfo() {
+  if (inDriverPass && frameProxCache) return frameProxCache;
   try {
     if (!mapRef || typeof mapRef.project !== 'function') return null;
     const pt = mapRef.project(SITE_LNGLAT);
     if (!pt || !Number.isFinite(+pt.x) || !Number.isFinite(+pt.y)) return null;
-    let cw = 0;
-    let ch = 0;
-    try {
-      const el = mapRef.getContainer();
-      cw = (el && el.clientWidth) || window.innerWidth || 800;
-      ch = (el && el.clientHeight) || window.innerHeight || 600;
-    } catch {
-      cw = 800;
-      ch = 600;
-    }
+    // ONE box read per pass (frameSize): this used to read clientWidth and
+    // clientHeight here AND in the enclosure writer AND in the scale HUD, so
+    // every pass forced several fresh layouts between its own style writes.
+    const box = frameSize();
+    const cw = box.w;
+    const ch = box.h;
     const dxC = pt.x - cw / 2;
     const dyC = pt.y - ch / 2;
     const distCenter = Math.sqrt(dxC * dxC + dyC * dyC);
@@ -1215,7 +1228,7 @@ function proximityInfo() {
     let cursorNear = false;
     if (lastCursor && Number.isFinite(+lastCursor.x) && Number.isFinite(+lastCursor.y)) {
       try {
-        const r = mapRef.getContainer().getBoundingClientRect();
+        const r = frameRect();
         const lx = lastCursor.x - (r ? r.left : 0);
         const ly = lastCursor.y - (r ? r.top : 0);
         const dx = pt.x - lx;
@@ -1225,12 +1238,17 @@ function proximityInfo() {
       } catch { /* cursor math is best-effort */ }
     }
     const centerNear = distCenter <= PROX_CENTER_PX;
-    return {
+    const out = {
       sx: Math.round(pt.x), sy: Math.round(pt.y),
       distCursor: distCursor == null ? null : +distCursor.toFixed(1),
       distCenter: +distCenter.toFixed(1),
       cursorNear, centerNear, near: cursorNear || centerNear,
     };
+    // Memoised for the rest of THIS pass only: the driver, the ring clip and
+    // the staged hold ask the same question about the same camera. Reads
+    // outside a pass (wheel lane, commit gate) always project live.
+    if (inDriverPass) frameProxCache = out;
+    return out;
   } catch {
     return null;
   }
@@ -1299,6 +1317,7 @@ function holdVectorWarm(reason) {
  * Layout + transition writes are idempotent after the first write in a
  * visible stretch — only the opacity value moves per tick. */
 let satScrubPrimed = false;
+let lastSatOpacity = null; // last WRITTEN raster-opacity: unchanged values write nothing
 function setSatScrubbed(p) {
   const v = clamp01(p);
   try {
@@ -1312,13 +1331,20 @@ function setSatScrubbed(p) {
         } catch { /* transition reset is best-effort */ }
         satScrubPrimed = true;
       }
-      try {
-        mapRef.setPaintProperty(SAT_LAYER_ID, 'raster-opacity', v);
-      } catch (err) {
-        errors.push('SAT-SCRUB: ' + (err && err.message));
+      // No-op dedupe (frame pacing): at the ends of the band this value is
+      // pinned (0 or 1) for seconds, and re-writing an unchanged paint
+      // property makes MapLibre re-evaluate the layer style every pass.
+      if (lastSatOpacity !== v) {
+        try {
+          mapRef.setPaintProperty(SAT_LAYER_ID, 'raster-opacity', v);
+          lastSatOpacity = v;
+        } catch (err) {
+          errors.push('SAT-SCRUB: ' + (err && err.message));
+        }
       }
     } else {
       satScrubPrimed = false;
+      lastSatOpacity = null; // layer swapped/removed: the next write must land
     }
   } catch { /* pre-ready */ }
   try {
@@ -1410,9 +1436,10 @@ function writeEnclosureEllipse(proxArg, zArg) {
     }
     let corner = null;
     try {
-      const el = mapRef.getContainer();
-      const w = (el && el.clientWidth) || window.innerWidth || 800;
-      const h = (el && el.clientHeight) || window.innerHeight || 600;
+      // ONE box read per pass (frameSize — shared with proximity + the HUD).
+      const box = frameSize();
+      const w = box.w;
+      const h = box.h;
       // SINGLE RADIUS LAW: the clamped corner (shared with the staged-hold
       // entry refresh below) — never the true off-screen projection.
       corner = viewportCornerPx(prox.sx, prox.sy, w, h);
@@ -1455,6 +1482,92 @@ function parkEnclosureEllipse() {
     if (lastVrWritten !== parkVr) { app.style.setProperty('--vr', parkVr); lastVrWritten = parkVr; }
     if (lastVrYWritten !== parkVrY) { app.style.setProperty('--vr-y', parkVrY); lastVrYWritten = parkVrY; }
   } catch { /* cosmetic */ }
+}
+/* ONE COHERENT PASS PER FRAME (frame pacing, measured): a native zoom emits
+ * BOTH 'move' and 'zoom' on every animation frame, so the whole driver used
+ * to run ~2x per frame — measured 1.92 passes/frame mid-dive, each pass doing
+ * 6-16 forced-layout reads (clientWidth/clientHeight/getBoundingClientRect)
+ * plus the same CSS-var and paint-property writes again. The driver reads the
+ * LIVE map state and is idempotent, so collapsing queued steps into one pass
+ * on the next animation frame is behaviour-preserving: the last snapshot of
+ * the frame IS the frame. Source priority matters — a settle ('zoomend')
+ * carries laws a running gesture never runs (reconcile, catch-up, staged
+ * exit), so it wins over 'zoom'/'move' when both are queued. */
+let pendingStep = null; // { snap, source } — latest queued step of the frame
+let pendingStepRaf = 0; // in-flight rAF handle (0 = none)
+let frameSeq = 0; // bumped once per pass: scopes the per-frame caches
+let frameSizeCache = null; // { w, h } container box, read ONCE per pass
+let frameRectCache = null; // container client rect, read ONCE per pass
+let frameProxCache = null; // proximity read, shared WITHIN one pass only
+let inDriverPass = false; // true only while the coalesced pass runs
+function scheduleNativeZoomStep(snap, source) {
+  try {
+    const prev = pendingStep;
+    pendingStep = { snap, source: coalesceStepSource([prev && prev.source, source]) };
+    if (pendingStepRaf) return;
+    if (typeof requestAnimationFrame !== 'function') {
+      pendingStep = null;
+      onNativeZoomStep(snap, source);
+      return;
+    }
+    pendingStepRaf = requestAnimationFrame(() => {
+      pendingStepRaf = 0;
+      const p = pendingStep;
+      pendingStep = null;
+      if (!p) return;
+      frameSeq += 1;
+      frameSizeCache = null;
+      frameRectCache = null;
+      frameProxCache = null;
+      inDriverPass = true;
+      try {
+        onNativeZoomStep(p.snap, p.source);
+      } catch (err) {
+        errors.push('ZOOM-STEP: ' + (err && err.message));
+      } finally {
+        inDriverPass = false;
+        // The pass may have MOVED the camera (jumpTo/easeTo); a proximity
+        // read taken inside it must not outlive it, so the wheel/commit
+        // gates always project the live camera.
+        frameProxCache = null;
+      }
+    });
+  } catch {
+    try {
+      onNativeZoomStep(snap, source);
+    } catch (err) {
+      errors.push('ZOOM-STEP: ' + (err && err.message));
+    }
+  }
+}
+/** Container box for THIS pass: one layout read, shared by every consumer
+ * (proximity, enclosure, scale HUD). Reading clientWidth in each of them
+ * forced a fresh layout between the writes they sit behind. */
+function frameSize() {
+  if (frameSizeCache) return frameSizeCache;
+  let w = 800;
+  let h = 600;
+  try {
+    const el = mapRef && typeof mapRef.getContainer === 'function' ? mapRef.getContainer() : null;
+    w = (el && el.clientWidth) || window.innerWidth || 800;
+    h = (el && el.clientHeight) || window.innerHeight || 600;
+  } catch {
+    w = 800;
+    h = 600;
+  }
+  frameSizeCache = { w, h };
+  return frameSizeCache;
+}
+/** Container client rect for THIS pass (cursor math only). */
+function frameRect() {
+  if (frameRectCache) return frameRectCache;
+  try {
+    const el = mapRef && typeof mapRef.getContainer === 'function' ? mapRef.getContainer() : null;
+    frameRectCache = el && typeof el.getBoundingClientRect === 'function' ? el.getBoundingClientRect() : { left: 0, top: 0 };
+  } catch {
+    frameRectCache = { left: 0, top: 0 };
+  }
+  return frameRectCache;
 }
 /** THE native-zoom driver: reads ONE zoom snapshot (the map owns zoom —
  * this never sets zoom, never jumpTo's depth). Fade tracks zoom at the
@@ -2453,6 +2566,7 @@ function flyToSectorThenTwin(id, opts = {}) {
 function restoreMaxZoom() {
   try {
     if (mapRef && typeof mapRef.setMaxZoom === 'function') mapRef.setMaxZoom(Z_MAX);
+    lastCeilingPin = Z_MAX; // the pin cache follows every ceiling write
   } catch { /* unclamp is best-effort */ }
 }
 
@@ -4422,15 +4536,28 @@ function syncFsProbe() {
   } catch { /* recede fallback is best-effort */ }
 }
 
+let lastPinWrite = null; // last written pin px — unchanged frames write nothing
 function positionDomPins(map) {
   const layer = document.getElementById('map-pins');
   if (!layer) return;
   const pins = layer.querySelectorAll('.map-pin');
+  if (!pins.length) return;
+  // One projection for every pin (all pins sit on the same site point) and a
+  // write only when the px actually moved — the old loop projected per pin
+  // and rewrote left/top every pass, forcing style recalc on a static frame.
+  let pt = null;
+  try {
+    pt = map.project([SITE.lon, SITE.lat]);
+  } catch { pt = null; }
+  if (!pt || !Number.isFinite(+pt.x) || !Number.isFinite(+pt.y)) return;
+  const l = Math.round(pt.x) + 'px';
+  const t = Math.round(pt.y) + 'px';
+  if (lastPinWrite && lastPinWrite.l === l && lastPinWrite.t === t) return;
+  lastPinWrite = { l, t };
   pins.forEach((p) => {
     try {
-      const pt = map.project([SITE.lon, SITE.lat]);
-      p.style.left = Math.round(pt.x) + 'px';
-      p.style.top = Math.round(pt.y) + 'px';
+      if (p.style.left !== l) p.style.left = l;
+      if (p.style.top !== t) p.style.top = t;
     } catch { /* pre-ready: centered via CSS */ }
   });
 }
@@ -5122,7 +5249,9 @@ async function boot() {
     // Restored selection (reload/back-forward with ?sector= or stored): mark
     // only — the overlay stays closed until a click (Task 19 keep).
     if (selectedId) selectSector(selectedId);
-    map.on('move', () => positionDomPins(map));
+    // Pins follow the camera through the journey driver (one coalesced pass
+    // per frame, which calls positionDomPins) — a second 'move' listener here
+    // projected and wrote the same pins again on every move frame.
     positionDomPins(map);
     window.__mapProbe.ready = true;
     window.__mapProbe.satLayer = !!map.getLayer(SAT_LAYER_ID);
@@ -5153,7 +5282,7 @@ async function boot() {
         map,
         isOpen: () => twinOpen,
         isBusy: () => !!transitId || !!pendingReveal || !!reverseWait || receding,
-        onProgress: (snap, source) => onNativeZoomStep(snap, source),
+        onProgress: (snap, source) => scheduleNativeZoomStep(snap, source),
         onDown: () => {
           try {
             if (!scrubFired && !twinOpen && !transitId) {

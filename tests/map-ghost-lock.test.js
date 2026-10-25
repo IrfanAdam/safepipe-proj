@@ -72,7 +72,7 @@ test('pre-phase stall swallows only on the gate approach', () => {
 test('stall ceiling + swallow gates are wired in the driver', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(
-    main.includes('mapRef.setMaxZoom(stallCeilingPin(z))'),
+    main.includes('stallCeilingPin(z)') && main.includes('mapRef.setMaxZoom(pin)'),
     'the depth freeze pins through the gate-floor law, never the raw live zoom',
   );
   assert.ok(
