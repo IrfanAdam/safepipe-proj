@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-25T07:39:54.281Z",
+  "generated": "2026-10-25T07:48:25.826Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "5175e0a",
+      "full": "5175e0a6966b8c253f3cd745158e7913acbb20aa",
+      "date": "2026-10-25",
+      "time": "13:11",
+      "subject": "fix(handoff): commit+superimpose — near-fail recovery, single radius law + center convergence, shared reveal/intro pacing [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "20b181b",
       "full": "20b181bdadcf529d25999baaa6862aa6360f2bca",
@@ -6286,9 +6295,9 @@
     }
   ],
   "wip": [
-    "public/version.json",
     "src/map/main.js",
-    "src/map/scrolltrigger.js",
+    "src/map/twinlink.js",
+    "src/ring2/main.js",
     "src/ring2/sector.js"
   ]
 }

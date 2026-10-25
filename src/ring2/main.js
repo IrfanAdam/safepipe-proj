@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -1802,6 +1802,35 @@ async function boot() {
       if (!isTwinStagedMessage(e?.data)) return;
       applyTwinStagedS(e.data.s, e.data.z);
     } catch { /* staged drive never breaks input */ }
+  });
+  /* Boot-once retarget (parent -> twin): the arrival frame lands on the
+   * live shell instead of reloading it. While still in hold (pre-release)
+   * re-pin the hold pose onto the arrival frame — same derivation as boot
+   * (frameTarget + refitHandoffRange, which restarts the settle count so
+   * the ready-match settles on the arrival scale/center). Tiles/details
+   * already streaming just re-aim: selective update, shell never reboots.
+   * Past hold the staged stream owns the pose — ignore. Never breaks boot. */
+  window.addEventListener('message', (e) => {
+    try {
+      if (!isTwinRetargetMessage(e?.data)) return;
+      const f = parseTwinRetargetFrame(e?.data);
+      if (!f) return;
+      if (!handoff || handoff.phase !== 'hold' || handoff.readyPosted) return;
+      handoff.frame = f;
+      try {
+        const a = frameTarget(f);
+        if (a) handoff.anchor = { x: a.x, z: a.z };
+      } catch { /* anchor is best-effort */ }
+      try {
+        handoff.azim = -(((Number(f.bearing) || 0) * Math.PI) / 180);
+      } catch { /* azim is best-effort */ }
+      try {
+        if (window.__ring2 && window.__ring2.sector) window.__ring2.sector.frame = { ...f };
+      } catch { /* probe is best-effort */ }
+      try {
+        refitHandoffRange();
+      } catch { /* refit is best-effort */ }
+    } catch { /* retarget never breaks the frame */ }
   });
   /* Capture-phase wheel over the twin container (runs before OrbitControls'
    * own canvas listener, so stopPropagation keeps a consumed gesture from

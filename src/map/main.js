@@ -63,6 +63,7 @@ import {
   TWIN_CLOSE_MSG,
   TWIN_READY_MSG,
   buildTwinStagedMessage,
+  buildTwinRetargetMessage,
   parseTwinFsMessage,
   parseTwinReadyMessage,
   parseTwinPaintedMessage,
@@ -158,6 +159,10 @@ const REVEAL_TIMEOUT_MS = 4000;
 let lastFallbackArmT = 0; // staged fallback re-arms at most once/sec while the hold flows: every-tick clear+set churns a 4000ms timer that only matters after S stalls
 let earlyTwinArmed = false; // round-10 dive-start prewarm: early iframe boot armed, consumed at arrival or aborted on retreat
 let staleCloseGuardUntil = 0; // round-10 stale-echo guard: arrival replaces a LIVE early twin, whose pagehide posts a close echo that lands after twinOpen flips and would tear down the fresh prewarm — closes inside this window are dropped (set only when consuming an armed early boot, so plain opens keep exact Esc behavior)
+// Boot-once smart cache: the h3 of the live booted twin shell (null = no
+// live boot). The intent prewarm boots it once per dive; takeover + arrival
+// reuse the warm shell via retarget (no second navigation/reload).
+let twinBootKey = null;
 
 window.__mapProbe = {
   ready: false, base: 'positron', satOn: false,
@@ -167,6 +172,7 @@ window.__mapProbe = {
   blips: 1, siteWorst, siteSector, site: { lat: SITE.lat, lon: SITE.lon, name: 'SANGACHAL' },
   transit: null, handoff: null, vignette: false, mapFs: false, twinFs: false,
   prewarm: false, twinReady: false, twinPainted: false, reveal: null, revealFallback: false, revealLate: false, revealPaint: false,
+  twinBootKey: null, twinBoots: 0, // boot-once cache: live shell key + shell boots this page life (one per dive)
   recede: null, mapZoom: null, reverseWait: false, reverseFallback: false,
   view: null, // live ground-scale telemetry { z, tile, frac, w, h, label }
   // GATE-9-A scrub probe: journey progress driving zoom/center/fade.
@@ -1430,8 +1436,8 @@ function onNativeZoomStep(snap, source) {
     // the ONLY opener stays flyToSectorThenTwin at the gate, so an
     // unintended handoff is structurally impossible (this block names no
     // opener). Twin-side autoplay laws untouched (same boot URL + the same
-    // grant/release contract the dive-start path uses; arrival still
-    // reloads on the warm cache with re-armed grants).
+    // grant/release contract the dive-start path uses; arrival reuses the
+    // warm shell via retarget — no reload).
     // Runs on every zoom tick (native + takeover-driven), so the
     // in-band takeover call below stays a backstop, never the first boot.
     try {
@@ -2981,17 +2987,26 @@ function exitStaged() {
  * takeover engagement so grant+release land near arrival. Mounts the
  * overlay at opacity 0 (.prewarm still paints — display:none suspends rAF
  * so a hidden frame never paints or posts) with the live frame, but sets
- * no twinOpen, no pendingReveal, no clamp, no history, no timers. The
- * arrival URL always differs (dive-start zoom vs arrival zoom), so arrival
- * reloads on the warm tile/compile cache with re-armed once-ever grants. */
+ * no twinOpen, no pendingReveal, no clamp, no history, no timers.
+ * Boot-once: the shell boots at most once per hotspot per dive — a second
+ * call for the same h3 while armed is already warm (true, no second boot);
+ * arrival reuses the warm shell via retarget, never a reload. */
 function earlyBootTwin() {
   try {
-    if (earlyTwinArmed || twinOpen || transitId || pendingReveal || stagedActive) return false;
+    if (earlyTwinArmed || twinOpen || transitId || pendingReveal || stagedActive) {
+      // Boot-once warm re-entry: the shell for this hotspot already lives —
+      // report warm so repeat intent/takeover ticks reuse it, never re-boot.
+      try {
+        if (earlyTwinArmed && twinBootKey && twinBootKey === h3map[siteSector]) return true;
+      } catch { /* key read is best-effort */ }
+      return false;
+    }
     if (!mapRef) return false;
     const frame = liveFrame();
     if (!frame) return false;
     const h3 = h3map[siteSector];
     if (!h3) return false;
+    if (earlyTwinArmed) return twinBootKey === h3; // already booted: warm for this hotspot, cold never reuses
     const ov = ensureOverlay();
     try {
       ov.root.classList.remove('closing');
@@ -3003,9 +3018,32 @@ function earlyBootTwin() {
     setFrameUrl(ov.frame, twinUrl(h3, frame));
     ov.root.hidden = false;
     earlyTwinArmed = true;
+    twinBootKey = h3; // the shell now lives: takeover + arrival reuse it
     try {
       window.__mapProbe.earlyPrewarm = true;
+      window.__mapProbe.twinBootKey = h3;
+      window.__mapProbe.twinBoots = (window.__mapProbe.twinBoots | 0) + 1;
     } catch { /* probe cosmetic */ }
+    return true;
+  } catch { return false; }
+}
+
+/** Boot-once reuse: arrival on an armed boot for the SAME hotspot skips the
+ * iframe navigation entirely and hands the arrival frame to the live shell
+ * via retarget — the twin re-pins its hold pose while tiles/details stream
+ * in (selective update, no shell reboot). False when there is no warm
+ * shell (different hotspot, no boot, dead frame) — the caller navigates. */
+function reuseWarmTwin(h3, frame) {
+  try {
+    if (!earlyTwinArmed || !twinBootKey || twinBootKey !== h3) return false;
+    if (!overlayEls || !overlayEls.frame) return false;
+    const win = overlayEls.frame.contentWindow;
+    if (!win) return false;
+    const msg = buildTwinRetargetMessage(frame);
+    if (!msg) return false;
+    try {
+      win.postMessage(msg, '*');
+    } catch { return false; }
     return true;
   } catch { return false; }
 }
@@ -3017,6 +3055,7 @@ function earlyBootTwin() {
 function abortEarlyBootTwin() {
   if (!earlyTwinArmed) return false;
   earlyTwinArmed = false;
+  twinBootKey = null; // the shell is blanked below: no live boot to reuse
   try {
     if (overlayEls && overlayEls.frame) setFrameUrl(overlayEls.frame, 'about:blank');
   } catch { /* frame teardown is best-effort */ }
@@ -3028,6 +3067,7 @@ function abortEarlyBootTwin() {
   } catch { /* cosmetic */ }
   try {
     window.__mapProbe.earlyPrewarm = false;
+    window.__mapProbe.twinBootKey = null;
   } catch { /* probe cosmetic */ }
   // HARD-STOP presentation: aborting the early boot unloads the twin — the
   // loader tracks whatever the mask gate reads now.
@@ -3069,13 +3109,18 @@ function prewarmThenReveal(id, frame, opts = {}) {
   window.__mapProbe.twinReady = false;
   window.__mapProbe.twinPainted = false;
   window.__mapProbe.reveal = 'prewarm';
-  if (earlyTwinArmed) {
+  // Boot-once: an armed boot for this hotspot IS the twin — retarget the
+  // live shell onto the arrival frame instead of navigating (no reload, no
+  // unload echo, so no stale-close guard for the reused shell: a fast
+  // genuine close must land). Only an actual navigation arms the guard.
+  const warmReused = reuseWarmTwin(h3, frame);
+  if (earlyTwinArmed && !warmReused) {
     try {
       const nowG = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
       staleCloseGuardUntil = nowG + 1500; // the replaced early twin's pagehide echo lands in this window — drop it
     } catch { /* guard is best-effort */ }
   }
-  earlyTwinArmed = false; // arrival consumes the dive-start boot (reloads warm with re-armed grants)
+  earlyTwinArmed = false; // arrival consumes the dive-start boot (warm shell reused via retarget, never reloaded)
   try {
     window.__mapProbe.earlyPrewarm = false;
   } catch { /* probe cosmetic */ }
@@ -3093,7 +3138,9 @@ function prewarmThenReveal(id, frame, opts = {}) {
   try {
     void root.offsetWidth;
   } catch { /* reflow nudge is best-effort */ }
-  setFrameUrl(frameEl, url);
+  // Boot-once: the warm shell already lives — navigating here would reboot
+  // it mid-dive (the double-load). Reused shells only get the retarget.
+  if (!warmReused) setFrameUrl(frameEl, url);
   root.hidden = false;
   try {
     document.body.classList.add('twin-open');
@@ -3324,7 +3371,11 @@ function openTwin(id, opts = {}) {
   const { root, frame, label } = ensureOverlay();
   const handoff = opts.frame === undefined ? liveFrame() : opts.frame;
   const url = twinUrl(h3, handoff);
-  setFrameUrl(frame, url);
+  // Boot-once: a direct open over an armed boot for the same hotspot reuses
+  // the warm shell via retarget — no second navigation. Only an actual
+  // navigation arms the stale-close guard (no unload echo on reuse).
+  const warmReused = reuseWarmTwin(h3, handoff);
+  if (!warmReused) setFrameUrl(frame, url);
   root.hidden = false;
   try {
     root.classList.remove('closing');
@@ -3338,7 +3389,7 @@ function openTwin(id, opts = {}) {
   window.__mapProbe.twinReady = false;
   window.__mapProbe.twinPainted = false;
   window.__mapProbe.reveal = 'revealed';
-  if (earlyTwinArmed) {
+  if (earlyTwinArmed && !warmReused) {
     try {
       const nowG = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
       staleCloseGuardUntil = nowG + 1500; // the replaced early twin's pagehide echo lands in this window — drop it
@@ -3437,6 +3488,11 @@ function doCloseTwin() {
       try {
         setFrameUrl(overlayEls.frame, 'about:blank');
       } catch { /* frame teardown is best-effort */ }
+      // Boot-once: the shell is blanked — the next dive boots fresh.
+      twinBootKey = null;
+      try {
+        window.__mapProbe.twinBootKey = null;
+      } catch { /* probe cosmetic */ }
     }
   };
   // Instant cut: hide synchronously — no fade class, no fade timer. The
@@ -4294,14 +4350,13 @@ function installAnchorGuard() {
     try {
       if (!e || !e.ctrlKey) return;
       if (e.__zoomFlipped || e.__anchorCentered) return;
-      let armed = false;
-      try { armed = maskArmed(); } catch { armed = false; }
-      if (!armed) return;
-      // HARD-STOP: forward pinch (native lane: dy<0 = dive) stalls with the
-      // mask armed + twin unloaded; reverse pinch always passes through.
-      // Staged holds swallow here too (no exemption): the centered clone
-      // must NOT reach the canvas lane or native zoom advances under the
-      // hold below the gate — the frozen hold repaints inline instead.
+      // HARD-STOP FIRST: forward pinch stalls whenever the hold owns the
+      // frame — checked BEFORE the mask predicate below, which reads false
+      // during staged holds (twinOpen) and would otherwise let every pinch
+      // tick through to native zoom (measured +0.09/tick ratchet 10.96→11.5
+      // under tilesHold). The gate is self-arming (true only while phase-set
+      // and unloaded), so pre-mask ticks still fall through untouched.
+      // Reverse pinch always passes through.
       try {
         if (+e.deltaY < 0 && stallSwallowForward()) {
           try { window.__mapProbe.stallSwallowed = true; } catch { /* probe cosmetic */ }
@@ -4311,6 +4366,9 @@ function installAnchorGuard() {
           return;
         }
       } catch { /* stall never breaks input */ }
+      let armed = false;
+      try { armed = maskArmed(); } catch { armed = false; }
+      if (!armed) return;
       if (!mapRef || typeof mapRef.getCanvasContainer !== 'function') return;
       const lane = mapRef.getCanvasContainer();
       if (!lane || typeof lane.contains !== 'function' || !lane.contains(e.target)) return;

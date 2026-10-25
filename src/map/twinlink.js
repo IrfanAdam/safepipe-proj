@@ -38,6 +38,57 @@ export function buildTwinStagedMessage(s, z) {
   return msg;
 }
 
+// Boot-once retarget (parent->twin): when the arrival frame lands on an
+// already-booted shell for the SAME hotspot, the parent posts
+// { type:'safepipe-twin-retarget', frame } instead of navigating the
+// iframe — the twin re-pins its hold pose onto the arrival frame while
+// its tiles/details keep streaming (selective update, shell never
+// re-boots). Pure; frame sanitized like twinUrl's params.
+export const TWIN_RETARGET_MSG = 'safepipe-twin-retarget';
+
+/** Build the retarget payload. Null unless cx/cy/z are finite and legal.
+ * Bearing/pitch ride along when finite (same additive pose as twinUrl). */
+export function buildTwinRetargetMessage(frame) {
+  try {
+    if (!frame || typeof frame !== 'object') return null;
+    const cx = Number(frame.cx);
+    const cy = Number(frame.cy);
+    const z = Number(frame.z);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(z)) return null;
+    if (cx < -180 || cx > 180 || cy < -90 || cy > 90) return null;
+    if (z < 0 || z > 24) return null;
+    const out = { cx, cy, z };
+    const b = Number(frame.bearing);
+    if (Number.isFinite(b)) out.bearing = b;
+    const p = Number(frame.pitch);
+    if (Number.isFinite(p)) out.pitch = p;
+    return { type: TWIN_RETARGET_MSG, frame: out };
+  } catch {
+    return null;
+  }
+}
+
+/** True for the parent->twin retarget shape { type, frame }. The frame
+ * itself is validated at the consumer (parse below), not the gate. */
+export function isTwinRetargetMessage(data) {
+  try {
+    return !!data && typeof data === 'object' && data.type === TWIN_RETARGET_MSG;
+  } catch {
+    return false;
+  }
+}
+
+/** Parse a retarget message to its sanitized frame. Null on any bad shape. */
+export function parseTwinRetargetFrame(data) {
+  try {
+    if (!isTwinRetargetMessage(data)) return null;
+    const msg = buildTwinRetargetMessage(data.frame);
+    return msg ? msg.frame : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Parse a twin ready message. { ready:true } when matched, else null. */
 export function parseTwinReadyMessage(d) {
   try {

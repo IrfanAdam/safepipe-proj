@@ -16,6 +16,7 @@ import {
   TWIN_READY_MSG as MAP_TWIN_READY_MSG,
   TWIN_PAINTED_MSG as MAP_TWIN_PAINTED_MSG,
   TWIN_STAGED_MSG as MAP_TWIN_STAGED_MSG,
+  TWIN_RETARGET_MSG as MAP_TWIN_RETARGET_MSG,
   TWIN_FS_MSG as MAP_TWIN_FS_MSG,
 } from '../map/twinlink.js';
 import { HANDOFF_STAGE_PX, HANDOFF_STAGED_S_MAX, ISO_PITCH_DEG, pitchTargetForZoom, stagedIntroProgressForS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_MORPH_MS } from '../map/scrolltrigger.js';
@@ -579,6 +580,17 @@ export function isTwinStagedMessage(data) {
     return false;
   }
 }
+
+/* Boot-once retarget (parent->twin): the wire string is twinlink.js single
+ * source (re-exported here). The parent posts the arrival frame to a live
+ * shell instead of reloading it; the consumer re-pins the hold pose (see
+ * the retarget listener in main.js) so tiles/details stream onto the new
+ * frame with no shell reboot. */
+export const TWIN_RETARGET_MSG = MAP_TWIN_RETARGET_MSG;
+/* Retarget shape + frame parse: twinlink-owned pure helpers, re-exported
+ * so the twin consumer reads one module. The frame is sanitized at the
+ * parse (finite legal cx/cy/z) — the listener only re-pins parsed frames. */
+export { isTwinRetargetMessage, parseTwinRetargetFrame } from '../map/twinlink.js';
 
 /** Pure: staged scroll S (px) -> forward intro progress 0..1. Delegates to
  * the shared map+twin pacing law (stagedIntroProgressForS, scrolltrigger.js
