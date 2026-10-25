@@ -63,6 +63,36 @@ export function readyByArm({ bootAtMs, armAtMs, firstFrameCostMs }) {
   return b + c <= a;
 }
 
+/* CONTENT-READY (D2): the twin shell streams its OWN tiles during the dive.
+ * Map-side prefetches only warm the HTTP cache — the twin's MapLibre
+ * instance still starts its arrival-zoom tiles at the arm, so content lands
+ * seconds post-arm behind a frozen S + loading pill. The armed/idle shell
+ * sits in hold pre-release, so re-pinning it onto the live frame as the
+ * climb proceeds streams the arrival tiles BEFORE the arm. Pure
+ * schedule: fires in the climb band on integer-zoom crossings (or a keep
+ * alive beat — each accepted pin restarts the twin's hold floor twin-side,
+ * so a settled shell can never mature a pre-arm exit while pins flow),
+ * never at/above the handoff — a deep frame would trip the twin's painted
+ * deep-release pre-arm and spend the hold invisibly (the arrival retarget
+ * carries the final frame). Node-checkable. */
+export const TWIN_RETARGET_RETRY_MS = 500;
+export function progressiveRetargetDue({ z = NaN, lastZ = -1, lastT = 0, nowT = 0 } = {}) {
+  try {
+    const zz = Number(z);
+    if (!Number.isFinite(zz)) return false;
+    if (!(zz >= Z_FAR_INTENT && zz < Z_HANDOFF)) return false;
+    const iz = Math.floor(zz);
+    const lz = Number(lastZ);
+    if (!Number.isFinite(lz) || iz !== Math.floor(lz)) return true;
+    const lt = Number(lastT);
+    const nt = Number(nowT);
+    if (!Number.isFinite(lt) || !Number.isFinite(nt)) return false;
+    return nt - lt >= TWIN_RETARGET_RETRY_MS;
+  } catch {
+    return false;
+  }
+}
+
 export function clamp01(v) {
   const n = +v;
   if (!Number.isFinite(n)) return 0;

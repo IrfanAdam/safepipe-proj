@@ -98,7 +98,11 @@ test('retarget gate: hold pre-release reuses, everything else navigates fresh', 
   assert.ok(at !== -1, 'the retarget gate exists');
   const body = main.slice(at, main.indexOf('function reuseWarmTwin', at));
   assert.ok(body.includes("probe.handoffPhase() !== 'hold'"), 'only hold-phase shells retarget');
-  assert.ok(body.includes('probe.ready()'), 'already-matched shells navigate fresh');
+  // CONTENT-READY (2026-10-25, map-content-ready lane): a shell that matched
+  // an earlier pin re-arms on retarget (twin-side resets the post + settle
+  // count), so readiness no longer blocks reuse — a pre-arm ready post used
+  // to seal the warmest shell and force a 7s fresh navigation at arrival.
+  assert.ok(!body.includes('probe.ready()'), 'matched shells reuse too (re-armed twin-side), no fresh-nav seal');
   assert.ok(body.includes('__ring2'), 'the gate reads the live shell probe');
   const reuse = main.slice(main.indexOf('function reuseWarmTwin('), main.indexOf('function abortEarlyBootTwin'));
   assert.ok(reuse.includes('if (!shellRetargetable(h3)) return false'), 'reuse obeys the gate');

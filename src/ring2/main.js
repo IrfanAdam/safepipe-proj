@@ -656,6 +656,7 @@ async function boot() {
     azim: 0, // attached-angle azimuth rad (range refit source)
     readyPosted: false, // {type:'safepipe-twin-ready'} sent once per handoff
     readyHits: 0, // consecutive agreed hold frames (settle gate before post)
+    arrived: true, // CONTENT-READY: fresh boot carries arrival semantics (today's behavior); a progressive (non-arrival) retarget clears it so the hold cannot mature an exit pre-arm, and the arrival retarget sets it back
     closePosted: false, // {recede:true} close sent (later closes re-post, never re-fly)
     entryPose: null, // GATE-3 native-zoom: live camera pose captured BEFORE the entry pin (continuity proof)
     entryFrames: -1, // twinFrames at entry (boot entry runs pre-first-paint, so no visible jump is possible)
@@ -1374,9 +1375,9 @@ async function boot() {
         try {
           if (fwdStagedOwnsIntro({ stagedS: preStagedS, deepFrame: frameDeep })) holdFloor = 0;
         } catch { /* floor removal is best-effort */ }
-        const grantedRelease = heldMs >= holdFloor && handoff.readyPosted;
+        const grantedRelease = heldMs >= holdFloor && handoff.readyPosted && handoff.arrived;
         const paintedStagedRelease = heldMs >= holdFloor && !handoff.readyPosted
-          && paintedPosted && (stagedInReveal || frameDeep);
+          && paintedPosted && (stagedInReveal || frameDeep) && handoff.arrived;
         if (grantedRelease || paintedStagedRelease) {
           // Task-36 intro scrub: freeze the anchors into one forward leg
           // list — pose/mix/ring all read it as a pure function of progress
@@ -1845,13 +1846,33 @@ async function boot() {
    * (frameTarget + refitHandoffRange, which restarts the settle count so
    * the ready-match settles on the arrival scale/center). Tiles/details
    * already streaming just re-aim: selective update, shell never reboots.
-   * Past hold the staged stream owns the pose — ignore. Never breaks boot. */
+   * CONTENT-READY: a retarget re-arms the hold — a ready posted on an
+   * earlier pin (the dive warms the shell onto near-arrival frames, so it
+   * can settle pre-arm) resets here, or the seal would force a wasteful
+   * fresh navigation at arrival on the warmest shell of the dive. The
+   * settle gate below re-posts on the new pin within frames. Past hold
+   * the staged stream owns the pose — ignore. Never breaks boot. */
   window.addEventListener('message', (e) => {
     try {
       if (!isTwinRetargetMessage(e?.data)) return;
       const f = parseTwinRetargetFrame(e?.data);
       if (!f) return;
-      if (!handoff || handoff.phase !== 'hold' || handoff.readyPosted) return;
+      if (!handoff || handoff.phase !== 'hold') return;
+      // Arrival gate (see handoff.arrived): a progressive (non-arrival) pin
+      // clears it — the shell is warming, not arriving — and the arrival pin
+      // sets it back. Same-frame postMessage delivery is FIFO, so a stale
+      // progressive pin can never land after the arrival pin.
+      if (e?.data?.arrival === true) handoff.arrived = true;
+      else handoff.arrived = false;
+      handoff.readyPosted = false;
+      handoff.readyHits = 0;
+      // New pin = new hold: the floor + cap measure from the current pin, so
+      // a warming shell that keeps getting re-pinned never matures an exit
+      // pre-arm (a matched pin would otherwise release 900ms after posting
+      // and autoplay the intro invisibly, stranding arrival on a done shell).
+      try {
+        handoff.t0 = handoffNow();
+      } catch { /* floor restart is best-effort */ }
       handoff.frame = f;
       try {
         const a = frameTarget(f);

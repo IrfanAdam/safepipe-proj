@@ -55,6 +55,7 @@ import {
   CACHE_FAST_IDLE_DELAY_MS,
   CACHE_FAST_IDLE_TTL_MS,
   REARM_DOWN_BELOW,
+  progressiveRetargetDue,
 } from './scrolltrigger.js';
 import {
   sectorH3Map,
@@ -497,13 +498,12 @@ function nowMs() {
   try { return Date.now(); } catch { return 0; }
 }
 /** CACHE-FAST arm stamp: the handoff commits to the twin (arrival entry).
- * Per-arm verdict, reset every arm: true iff the CURRENT shell already
- * granted at/before the arm (parent-stamped grants gated on the current
- * shell birth, so a previous dive's grants never leak in) — including a
- * first-frame that posted while the twin was still unopened (the twin
- * posts painted once per shell life and the parent drops pre-open grants,
- * so poll the shell's own paint log read-only). A fresh navigation after
- * this stamp resets the race (see resetGrantStampsForFreshShell). */
+ * Per-arm verdict, reset every arm: true iff the CURRENT shell holds REAL
+ * CONTENT at the arm (sampled live through the same gate the staged hold
+ * drives on) — boot-earliness alone never counts, because a booted-but-
+ * tileless shell still freezes S behind the pill, so stamping it warm lied.
+ * A fresh navigation after this stamp resets the race
+ * (see resetGrantStampsForFreshShell). */
 function stampArm() {
   try {
     const bt = window.__mapProbe && window.__mapProbe.bootTiming;
@@ -511,19 +511,11 @@ function stampArm() {
     const t = nowMs();
     bt.armMs = t;
     bt.readyByArm = null;
-    const sameShell = bt.bootMs > 0;
-    if (sameShell && bt.paintedMs > 0 && bt.paintedMs >= bt.bootMs && bt.paintedMs <= t) bt.readyByArm = true;
-    else if (sameShell && bt.readyMs > 0 && bt.readyMs >= bt.bootMs && bt.readyMs <= t) bt.readyByArm = true;
-    if (bt.readyByArm !== true) {
-      // Idle-shell case: the first frame may predate the arm (painted while
-      // unopened, dropped parent-side). The shell's paint log is same-origin
-      // readable — a logged paint means warm at arm, honestly stamped.
-      try {
-        const win = overlayEls && overlayEls.frame && overlayEls.frame.contentWindow;
-        const log = win && win.__ring2paintOut;
-        if (Array.isArray(log) && log.length > 0) bt.readyByArm = true;
-      } catch { /* cross-frame read is best-effort */ }
-    }
+    let content = false;
+    try {
+      content = twinFrameHasContent() === true;
+    } catch { content = false; }
+    if (content) bt.readyByArm = true;
   } catch { /* probe cosmetic */ }
 }
 /** CACHE-FAST grant stamp: twin first-paint ('painted') or pose-match
@@ -749,6 +741,10 @@ let intentWarmed = false;
 let intentWarmedZ = -1; // integer zoom already warmed at lock intent (per dive)
 // CACHE-FAST far-intent: per-dive current-level warm state (re-arms with intent loss).
 let lastFarWarmZ = -1; // integer zoom already warmed at far intent (per dive)
+// CONTENT-READY: progressive twin retarget during the climb — last integer
+// zoom re-pinned + last post time. Re-arms with intent loss like the warms.
+let lastRetargetZ = -1;
+let lastRetargetT = 0;
 let scrubProgress = 0;
 let scrubFired = false;
 // Task-35 staged scrub: past the handoff gate scroll-as-zoom is clamped and
@@ -1579,6 +1575,69 @@ function onNativeZoomStep(snap, source) {
         intentWarmed = false; // intent lost: re-arm for the next dive
       }
     } catch { /* intent precache never breaks the journey */ }
+    // CONTENT-READY: stream the twin's arrival tiles DURING the dive. The
+    // armed/idle shell sits in hold pre-release, so re-pinning it onto the
+    // predicted arrival frame as the climb proceeds starts its tile stream
+    // early — by the arm the arrival zoom is cached/decoding instead of
+    // cold. Posts only: never boots, never flips twin state (same contract
+    // as the tile warms above); unreadable shells (still loading) skip and
+    // the next tick retries. The band stops below the handoff: a deep frame
+    // would trip the twin's painted deep-release pre-arm
+    // (see progressiveRetargetDue).
+    try {
+      if (prox && prox.near && !twinOpen && !transitId && !pendingReveal && !stagedActive) {
+        if (progressiveRetargetDue({ z, lastZ: lastRetargetZ, lastT: lastRetargetT, nowT: nowMs() })) {
+          try {
+            const h3 = h3map[siteSector];
+            const shellLive = !!h3 && (earlyTwinArmed || twinBootKey === h3) && overlayEls && overlayEls.frame;
+            let posted = false;
+            if (shellLive) {
+              const win = overlayEls.frame.contentWindow;
+              const probe = win && win.__ring2;
+              const phase = probe && typeof probe.handoffPhase === 'function' ? probe.handoffPhase() : null;
+              // Hold pre-release only. A shell that already matched an
+              // earlier pin re-arms on the retarget (twin-side), so posting
+              // stays safe — the pin keeps tracking the dive instead of
+              // going stale behind a pre-arm grant.
+              if (phase === 'hold') {
+                // CONTENT-READY prefetch: pin the PREDICTED arrival frame,
+                // not the travelling live frame. The arm seats the map on
+                // SITE at the live zoom, so stream that center now (plus a
+                // half-level zoom lookahead, clamped below the handoff so a
+                // deep frame can never trip the twin's painted deep-release
+                // pre-arm) — the arrival retarget then lands on cached tiles
+                // instead of a cold zoom + center snap.
+                const pf = liveFrame();
+                if (pf) {
+                  pf.cx = SITE_LNGLAT[0];
+                  pf.cy = SITE_LNGLAT[1];
+                  if (Number.isFinite(pf.z)) pf.z = Math.min(pf.z + 0.5, Z_HANDOFF - 0.1);
+                }
+                // Same-frame pins are the keepalive, not overhead: every
+                // accepted pin restarts the twin's hold floor (twin-side), so
+                // a settled shell can never mature a pre-arm exit while pins
+                // flow — including through a frozen dive, where the frame
+                // stops changing but the floor keeps measuring.
+                const msg = buildTwinRetargetMessage(pf);
+                if (msg) {
+                  win.postMessage(msg, '*');
+                  posted = true;
+                  try {
+                    window.__mapProbe.retargetPosts = (window.__mapProbe.retargetPosts | 0) + 1;
+                  } catch { /* post count is probe-only */ }
+                }
+              }
+            }
+            if (posted) {
+              lastRetargetZ = Math.floor(z);
+              lastRetargetT = nowMs();
+            }
+          } catch { /* retarget is best-effort */ }
+        }
+      } else if (lastRetargetZ !== -1 && (!prox || !prox.near)) {
+        lastRetargetZ = -1; // intent lost: re-arm for the next dive
+      }
+    } catch { /* progressive retarget never breaks the journey */ }
     try {
       window.__mapProbe.intentPrewarm = intentWarmed || earlyTwinArmed;
     } catch { /* probe cosmetic */ }
@@ -3171,11 +3230,14 @@ function earlyBootTwin() {
 
 /** CACHE-FAST retarget gate: the warm shell takes the arrival frame via
  * retarget ONLY while it can (twin-side contract: hold, pre-release). A
- * shell that is still loading (no probe yet), already matched (ready
- * posted), or autoplaying past hold would drop or ignore the retarget and
- * strand the arrival on the wrong frame — navigate fresh instead (caches
- * stay warm, so the reload is cheap and always lands the arrival frame).
- * Same-origin probe read; unreadable = not provably safe = fresh. */
+ * shell that is still loading (no probe yet) or autoplaying past hold would
+ * drop or ignore the retarget and strand the arrival on the wrong frame —
+ * navigate fresh instead (caches stay warm, so the reload is cheap and
+ * always lands the arrival frame). A shell that already matched an earlier
+ * pin re-arms on retarget (twin-side: the post + settle count reset), so
+ * readiness no longer blocks reuse — the arrival frame re-settles within
+ * frames on warm tiles. Same-origin probe read; unreadable = not provably
+ * safe = fresh. */
 function shellRetargetable(h3) {
   try {
     if (!twinBootKey || twinBootKey !== h3) return false;
@@ -3185,9 +3247,6 @@ function shellRetargetable(h3) {
     const probe = win.__ring2;
     if (!probe || typeof probe.handoffPhase !== 'function') return false;
     if (probe.handoffPhase() !== 'hold') return false;
-    try {
-      if (typeof probe.ready === 'function' && probe.ready()) return false;
-    } catch { return false; }
     return true;
   } catch { return false; }
 }
@@ -3197,7 +3256,9 @@ function shellRetargetable(h3) {
  * via retarget — the twin re-pins its hold pose while tiles/details stream
  * in (selective update, no shell reboot). False when there is no warm
  * shell (different hotspot, no boot, dead frame) or the shell already left
- * the retarget window (loading/matched/past-hold) — the caller navigates. */
+ * the retarget window (loading/past-hold) — the caller navigates. A shell
+ * that matched an earlier pin re-arms on the retarget (twin-side), so reuse
+ * never strands on a stale grant. */
 function reuseWarmTwin(h3, frame) {
   try {
     if (!earlyTwinArmed || !twinBootKey || twinBootKey !== h3) return false;
@@ -3207,6 +3268,10 @@ function reuseWarmTwin(h3, frame) {
     if (!win) return false;
     const msg = buildTwinRetargetMessage(frame);
     if (!msg) return false;
+    // CONTENT-READY: this pin IS the arrival — it flips the twin's arrival
+    // gate (see handoff.arrived) so the hold may release. Progressive
+    // (non-arrival) pins carry no flag and can never release the hold.
+    msg.arrival = true;
     try {
       win.postMessage(msg, '*');
     } catch { return false; }
@@ -3414,6 +3479,21 @@ function prewarmThenReveal(id, frame, opts = {}) {
   window.__mapProbe.twinOpen = true;
   window.__mapProbe.sectorH3 = h3;
   window.__mapProbe.handoff = frame ?? null;
+  // CONTENT-READY: a reused warm shell posted its once-per-life paint
+  // pre-open (dropped parent-side while twinOpen was false) and never
+  // re-posts — adopt the shell's paint log so the paint grant fires and
+  // paintedMs stays honest. The staged dissolve still rides the LIVE
+  // content gate, so an adopted paint can never dissolve a blank twin.
+  try {
+    if (warmReused && !window.__mapProbe.twinPainted) {
+      const win = overlayEls && overlayEls.frame && overlayEls.frame.contentWindow;
+      const log = win && win.__ring2paintOut;
+      if (Array.isArray(log) && log.length > 0) {
+        window.__mapProbe.twinPainted = true;
+        try { stampGrant('painted'); } catch { /* grant stamp is best-effort */ }
+      }
+    }
+  } catch { /* paint adoption is best-effort */ }
   if (!opts.replace) {
     try {
       history.pushState({ twin: id }, '', mapUrlWithSector(h3));
