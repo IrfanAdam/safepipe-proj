@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -1241,8 +1241,8 @@ async function boot() {
      * trigger, never a parking spot): a range strictly PAST the cap clamps
      * back onto it and exits on the SAME frame (no parking past the rail,
      * not even for a frame). Resting AT the clamp never auto-enters — entry
-     * is gesture-owned (decisive/accumulated outward wheel/pinch delta in
-     * onTwinScrubWheel) or explicit (Esc / parent-X / close message).
+     * is gesture-owned (first-notch outward wheel, or accumulated outward
+     * pinch delta at the clamp, in onTwinScrubWheel) or explicit (Esc /
      * Gated on a flown handoff (start set) so standalone free orbit never
      * trips it; re-arms when range drops back. */
     if (handoff.phase === 'done') {
@@ -1941,34 +1941,28 @@ async function boot() {
       // flipping a pinch clone would convert it into a plain dolly.
       if (pinch && handoff.phase !== 'done') return;
       if (handoff.phase === 'done') {
-        // Free orbit: outward intent AT the zoom clamp crosses into the
-        // staged reverse. Inward wheels pass through to OrbitControls, which
-        // dollies back in natively — entering on an inward gesture would
-        // park controls-disabled at progress 0 for no reason. A decisive
-        // outward wheel enters on the single shot; sub-threshold outward
-        // wheels AND pinch-outs (pinch stays native — its delta only feeds
-        // entry) accumulate toward the same entry via scrubEntryForDelta, so
-        // pinch/keyboard arrivals cross in on gesture, never on a timer.
+        // Reverse-initiation (notch-1 alive): an outward wheel enters the
+        // staged reverse on the FIRST notch at ANY range — never a dolly
+        // budget through free orbit first. Inward wheels pass through to
+        // OrbitControls, which dollies back in natively — entering on an
+        // inward gesture would park controls-disabled at progress 0 for no
+        // reason. Pinch stays native (its zoom belongs to OrbitControls);
+        // only at the clamp does accumulated outward pinch delta cross in,
+        // pose-native, so pinch-out arrivals still cross on gesture.
         if (dY >= 0) { handoff.entryAccum = 0; if (!pinch) twinFlipToOrbit(e); return; }
-        const r = rangeNow();
-        if (!Number.isFinite(r) || !isAtMaxZoom(r)) { handoff.entryAccum = 0; if (!pinch) twinFlipToOrbit(e); return; }
-        const decisive = !pinch && Math.abs(dY) >= TWIN_SCRUB_ENTER_DELTA;
-        if (!decisive) {
+        if (pinch) {
+          const r = rangeNow();
+          if (!Number.isFinite(r) || !isAtMaxZoom(r)) { handoff.entryAccum = 0; return; }
           const upd = scrubEntryForDelta(handoff.entryAccum ?? 0, dY, { enterPx: TWIN_SCRUB_PINCH_ENTER_PX });
           handoff.entryAccum = upd.accum;
-          if (!upd.enter) {
-            // Below the entry budget the gesture still belongs to orbit
-            // (a no-op against the clamp) — never swallowed.
-            if (!pinch) twinFlipToOrbit(e);
-            return;
-          }
+          if (!upd.enter) return;
           handoff.entryAccum = 0;
-        } else {
-          handoff.entryAccum = 0;
+          if (!enterScrubReverse()) return;
+          return; // entered on pinch: pose stays native, wheel owns it from here
         }
+        handoff.entryAccum = 0;
         if (!enterScrubReverse()) { twinFlipToOrbit(e); return; }
         if (handoff.phase !== 'reverse' || !handoff.scrub?.active) { twinFlipToOrbit(e); return; }
-        if (pinch) return; // entered on pinch: pose stays native, wheel owns it from here
       } else if (handoff.phase === 'reverse' && !handoff.scrub?.active) {
         // Unowned reverse (defensive — closes always hand a scrub now):
         // outward non-pinch wheels take over at the live progress.

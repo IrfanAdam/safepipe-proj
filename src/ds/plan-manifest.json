@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-25T09:19:41.858Z",
+  "generated": "2026-10-25T10:02:26.271Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "ce3f328",
+      "full": "ce3f328dbe366f9241ad0e8af70f0276e300fbe5",
+      "date": "2026-10-25",
+      "time": "15:06",
+      "subject": "fix(handoff): twin content-ready by the staged arm — progressive retarget, honest signals, arrival gate [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "bc93cf2",
       "full": "bc93cf272f7e96f4af9813244467b5b6c1978da1",
@@ -6341,8 +6350,6 @@
   ],
   "wip": [
     "public/version.json",
-    "src/map/main.js",
-    "src/map/scrolltrigger.js",
     "src/ring2/main.js"
   ]
 }
