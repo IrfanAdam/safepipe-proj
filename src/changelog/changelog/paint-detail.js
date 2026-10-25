@@ -199,7 +199,9 @@ export function paintDetail(root, ctx){
       // repeat the gate badge and the eval rows under a second rail row while
       // anchorOwners suppressed only the commits.
       const dupSec = dupAnchor.has(si);
-      const revsHTML = (dupSec ? '' : paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN }))
+      const commitDates = {};
+      for (const c of hs) { const d = c.date || ''; commitDates[d] = (commitDates[d] || 0) + 1; }
+      const revsHTML = (dupSec ? '' : paintRevs(revs, { head: sprint.head, heads: plan.sprints.map((s) => s.head), gates, phaseN, commitDates }))
         + (hs.length ? badges(hs) : '');
       const raw = sectionRaw(plan.raw || '', sprint.head) || String(sprint.body || '');
       const rendered = renderSection(raw, { gateSuffix: dupSec ? '' : gateSuffix(gates, phaseN) });

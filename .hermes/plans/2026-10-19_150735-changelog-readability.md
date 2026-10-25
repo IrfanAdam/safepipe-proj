@@ -335,3 +335,5 @@
 - Modify: `src/changelog/changelog/paint-chips.js`, `src/changelog/changelog.css`, `src/changelog/changelog-events.js`, `src/changelog/pages-changelog.js`, `src/changelog/changelog-drawer.css`, `src/changelog/changelog/paint-detail.js`
 
 **Verify:** build green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-12]`; close with `✓ done` + sha.
+
+**Eval · 2026-10-25 (owner):** each Evals Day group now carries a section-scoped commit-count suffix (`Day N · <date> · M commits`) so a day's review volume reads at a glance. Token-only, no layout change; `0 commits` shows when the date has evals but no linked commits.
