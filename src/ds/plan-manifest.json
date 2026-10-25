@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-25T12:32:28.400Z",
+  "generated": "2026-10-25T13:16:14.644Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,24 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "579f193",
+      "full": "579f1938682592f0fc5f532179b6114fa578df13",
+      "date": "2026-10-25",
+      "time": "18:45",
+      "subject": "fix(twin): anchor law — an off-site frame may not own the twin anchor or range; mix-aware content verdict [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "43d0487",
+      "full": "43d04870d7b0bc9fe9d52d29ec52cb92359161ea",
+      "date": "2026-10-25",
+      "time": "18:02",
+      "subject": "fix(handoff): pixel verdict is bounded — 1.2s patience, then proceed flagged; never a deadlock [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "33e7043",
       "full": "33e704393ef56d8d201e6b39f16fd2be51a2916e",
@@ -6395,6 +6413,7 @@
   ],
   "wip": [
     "public/version.json",
-    "src/map/main.js"
+    "src/map/main.js",
+    "src/map/scrolltrigger.js"
   ]
 }

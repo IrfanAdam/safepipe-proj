@@ -165,6 +165,51 @@ export function preStallSwallowDue({ phase = null, z = NaN } = {}) {
   return zz >= REARM_DOWN_BELOW;
 }
 
+/* RELEASE-IMPOSSIBLE LAW (resilience half of the handoff contract): a staged
+ * hold freezes forward S until the twin reports content, and the twin's intro
+ * is scrubbed BY that same S — so when the twin's release cannot arrive, the
+ * two sides wait on each other and the map parks with the fingers dead. The
+ * long HARD_STOP_HOLD_MS (30s) bound was the only escape, which reads as a
+ * frozen page. This law names the impossible wait far earlier: the map-side
+ * watch (main.js releaseWatchTick) samples it while a staged hold is
+ * un-granted and unwinds the dive with the returned reason.
+ *
+ * The bound is deliberately an order of magnitude under HARD_STOP_HOLD_MS but
+ * above a healthy grant (measured boot->grant on the gallery path is ~1s):
+ * ~2.6s of a FROZEN S with no content is no longer a load, it is a deadlock.
+ *
+ * Reasons (the named unwind the probe reports):
+ *   iframe-gone   — no live twin frame at all (blanked / removed): no arrival
+ *   twin-unreadable — live frame, but no __ring2 state past the bound (its JS
+ *                     never came up, so no release can ever be allocated)
+ *   intro-held    — readable and still parked in 'hold': its intro never
+ *                   started, and it only starts on an S the map is holding
+ *   release-starved — released (intro allocated) but content never settles:
+ *                   its tiles can only go idle once the camera stops moving,
+ *                   and the camera only moves on the S the map is holding
+ *   release-timeout — readable, un-released, not parked: no known state, same
+ *                   circular shape, same escape
+ * Pure + node-checkable. Returns null while the wait is still legitimate. */
+export const RELEASE_WAIT_BOUND_MS = 2600;
+export function releaseImpossibleReason({
+  iframeAlive = true,
+  readable = false,
+  released = null,
+  phase = null,
+  waitMs = 0,
+  boundMs = RELEASE_WAIT_BOUND_MS,
+} = {}) {
+  if (iframeAlive === false) return 'iframe-gone';
+  const b = Number(boundMs);
+  const bound = Number.isFinite(b) && b > 0 ? b : RELEASE_WAIT_BOUND_MS;
+  const w = Number(waitMs);
+  if (!Number.isFinite(w) || w < bound) return null;
+  if (!readable) return 'twin-unreadable';
+  if (released === true) return 'release-starved';
+  if (phase === 'hold') return 'intro-held';
+  return 'release-timeout';
+}
+
 /** Iso scrub target: pitch rides the zoom across the ISO_START..Z_TOP band
  * (0 at/below the terrain grade, smooth 0..ISO_PITCH_DEG as the terrain turns
  * iso, held at ISO_PITCH_DEG through the twin handoff). Starting at the

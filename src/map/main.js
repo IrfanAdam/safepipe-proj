@@ -58,6 +58,8 @@ import {
   progressiveRetargetDue,
   stallCeilingPin,
   preStallSwallowDue,
+  releaseImpossibleReason,
+  RELEASE_WAIT_BOUND_MS,
 } from './scrolltrigger.js';
 import { coalesceStepSource } from './frame-pacing.js';
 import {
@@ -165,7 +167,8 @@ let pendingReveal = null;
 const REVEAL_TIMEOUT_MS = 4000;
 let lastFallbackArmT = 0; // staged fallback re-arms at most once/sec while the hold flows: every-tick clear+set churns a 4000ms timer that only matters after S stalls
 let earlyTwinArmed = false; // round-10 dive-start prewarm: early iframe boot armed, consumed at arrival or aborted on retreat
-let staleCloseGuardUntil = 0; // round-10 stale-echo guard: arrival replaces a LIVE early twin, whose pagehide posts a close echo that lands after twinOpen flips and would tear down the fresh prewarm — closes inside this window are dropped (set only when consuming an armed early boot, so plain opens keep exact Esc behavior)
+let staleCloseGuardUntil = 0; // round-10 stale-echo guard: arrival replaces a LIVE early twin, whose pagehide posts a close echo that lands after twinOpen flips and would tear down the fresh prewarm — closes inside this window are dropped (set only when consuming an armed early boot, so plain opens keep exact Esc behavior). UNWIND LAW: the window is short (a replaced frame's echo lands within a frame) and is bypassed the moment the fresh shell grants or releases, so a genuine close is never lost.
+const STALE_CLOSE_GUARD_MS = 1500; // round-10's window is kept (a slow boot can echo late); the grant/release bypass below is what makes a genuine close land
 // Boot-once smart cache: the h3 of the live booted twin shell (null = no
 // live boot). The intent prewarm boots it once per dive; takeover + arrival
 // reuse the warm shell via retarget (no second navigation/reload).
@@ -184,6 +187,11 @@ window.__mapProbe = {
   // (performance.now ms) + live ready-by-arm verdict for the slow-net regression.
   bootTiming: { idleArmed: false, idleFiredMs: 0, intentMs: 0, bootMs: 0, firstBootMs: 0, armMs: 0, readyMs: 0, paintedMs: 0, bootToReadyMs: 0, bootToPaintedMs: 0, readyByArm: null },
   recede: null, mapZoom: null, reverseWait: false, reverseFallback: false,
+  // UNWIND LAW (resilience half): the frame this dive left, the last unwind
+  // (named reason + what it left/restored), Esc routing, close-echo drops, and
+  // the release-impossible watch. A harness proves escape by reading these.
+  diveCam: null, unwind: null, unwindCount: 0, escSource: null, escRequests: 0,
+  closeDropped: 0, releaseWatch: null,
   view: null, // live ground-scale telemetry { z, tile, frac, w, h, label }
   // GATE-9-A scrub probe: journey progress driving zoom/center/fade.
   scrub: { progress: 0, zoom: null, opacity: 0, centerDist: null },
@@ -198,6 +206,10 @@ window.__mapProbe = {
   precache: { predicted: 0, velocity: 0, prefetched: 0, hits: 0, tiles: null },
   errors, openTwin, closeTwin, selectSector, flyToSectorThenTwin,
   toggleMapFs, setTwinFs, prewarmThenReveal, revealTwin,
+  // UNWIND LAW: live camera read for the escape harness (center/zoom/pitch/
+  // bearing) — the same read the dive-frame capture and the restore use, so a
+  // measurement compares like with like.
+  readCam: liveCamFrame,
 };
 
 function fallbackStyle() {
@@ -1069,6 +1081,11 @@ function refreshStallLoading() {
       stallPollT = 0;
     }
   } catch { /* poll is best-effort */ }
+  // RELEASE-IMPOSSIBLE WATCH: the presentation refresh is the one surface that
+  // runs on the 500ms poll, on every staged tick and on every stall refresh,
+  // so sampling here bounds a parked hold even with no scroll ticks at all.
+  // Self-disarming when nothing is staged.
+  try { releaseWatchTick(); } catch { /* watch never breaks presentation */ }
   return hold;
 }
 // Task-37 staged-S producer: last S value posted to the twin frame
@@ -2357,6 +2374,10 @@ function wideZoomForBounds(bounds) {
 function flyToSectorThenTwin(id, opts = {}) {
   const s = sectors.find((x) => x.id === id);
   if (!s) return false;
+  // UNWIND LAW: the click/pin entry is the other way a dive starts — record
+  // the frame it leaves BEFORE the jump/flight moves the camera, so Esc from
+  // any state it reaches returns here.
+  try { noteDiveFrame('click'); } catch { /* dive frame is best-effort */ }
   // GATE-9-A(1): hold the vector style warm BEFORE leaving the flat view,
   // so the way back never refetches it.
   holdVectorWarm('outbound');
@@ -2901,6 +2922,12 @@ function driveStagedHold(st) {
  * Pure-law in, DOM out. */
 function driveStagedOverlay() {
   if (!stagedActive || stagedCommitted) return;
+  // RELEASE-IMPOSSIBLE WATCH: sampled on every drive (it also self-chains at
+  // 200ms while armed, so a hold with idle fingers is still bounded). Firing
+  // here means the dive was just unwound — stop driving.
+  try {
+    if (releaseWatchTick()) return;
+  } catch { /* watch never breaks the drive */ }
   // Task-37: feed S to the twin on every drive (value-change throttled
   // inside) — including the unready hold, where it seeds the release
   // progress without moving the pin.
@@ -3370,6 +3397,482 @@ function exitStaged() {
   try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
 }
 
+/* ===== UNWIND LAW (Phase-03 resilience half) ==============================
+ * The dive is cumulative: intent lock -> staged arm -> dissolve ramp ->
+ * commit, and each state owns a slice of the camera plus a slice of the
+ * pending-work set (hold clock, ceiling pin, prewarm timer, reverse-wait
+ * timer, live iframe). Measured failures proved that ONE slice left behind
+ * traps the page: Esc was ignored for the whole session once a stale
+ * reverse-wait stayed armed, Esc was ignored whenever the pointer/focus sat
+ * outside the map iframe (gallery embeds this page), and a staged hold could
+ * park 30s waiting for a twin release that could never arrive.
+ *
+ * So the escape is ONE function with one contract:
+ *   unwindDive(reason) drives ANY state back to the frame the dive left.
+ * Idempotent, it always clears the pending-work set, always restores the
+ * recorded camera, and always publishes why on the probe. New waits must
+ * route their exit through it (the release watch does).
+ */
+let diveCam = null; // the frame this dive left (center/zoom/pitch/bearing)
+let diveCamAt = 0;
+const FRAME_BOOT_GRACE_MS = 600; // a just-armed prewarm may still be navigating
+let unwindLast = null; // mirrored on the probe (__mapProbe.unwind)
+let unwindActive = false; // inside unwindDive: the close chain must not restore twice
+let closeSource = null; // 'esc' when the ordinary close chain was started by an Escape (probe reason)
+
+/** Live camera frame, or null when the map is not readable yet. Never throws. */
+function liveCamFrame() {
+  try {
+    if (!mapRef) return null;
+    const c = mapRef.getCenter();
+    if (!c || !Number.isFinite(+c.lng) || !Number.isFinite(+c.lat)) return null;
+    const z = +mapRef.getZoom();
+    const p = +mapRef.getPitch();
+    const b = +mapRef.getBearing();
+    return {
+      center: { lng: +c.lng, lat: +c.lat },
+      zoom: Number.isFinite(z) ? z : null,
+      pitch: Number.isFinite(p) ? p : null,
+      bearing: Number.isFinite(b) ? b : null,
+    };
+  } catch { return null; }
+}
+
+/** Is any part of the dive live right now? Used by the escape routing and by
+ * the dive-frame capture (a dive in progress must never overwrite the frame
+ * it left). Never throws. */
+function diveInProgress() {
+  try {
+    if (twinOpen || stagedActive || stagedCommitted || pendingReveal) return true;
+    if (transitId || reverseWait || receding) return true;
+    if (stagedS > 0 || stagedFrozen || stallCeilingOn || isoRestoreDue) return true;
+    return !!stallArmed();
+  } catch { return false; }
+}
+
+/** Record the frame a dive leaves. Captured on forward intent BEFORE any
+ * camera write, and only while the camera still SITS on the recorded frame:
+ * once it has moved, the dive owns that frame and no later tick may overwrite
+ * it (a mid-dive pause is not a new dive). */
+function noteDiveFrame(reason = 'forward') {
+  try {
+    if (diveInProgress()) return false;
+    const cam = liveCamFrame();
+    if (!cam) return false;
+    if (diveCam) {
+      const dz = cam.zoom == null || diveCam.zoom == null ? 0 : Math.abs(cam.zoom - diveCam.zoom);
+      const dc = cam.center && diveCam.center
+        ? Math.max(Math.abs(cam.center.lng - diveCam.center.lng), Math.abs(cam.center.lat - diveCam.center.lat))
+        : 0;
+      if (dz > 0.01 || dc > 1e-4) return false; // camera left the frame: dive is under way
+    }
+    diveCam = { ...cam, reason, at: nowMs() };
+    diveCamAt = diveCam.at;
+    try {
+      window.__mapProbe.diveCam = {
+        zoom: cam.zoom == null ? null : +cam.zoom.toFixed(3),
+        pitch: cam.pitch == null ? null : +cam.pitch.toFixed(2),
+        bearing: cam.bearing == null ? null : +cam.bearing.toFixed(2),
+        center: cam.center,
+        reason,
+      };
+    } catch { /* probe cosmetic */ }
+    return true;
+  } catch { return false; }
+}
+
+/** Snapshot of every state the unwind has to clear (published on the probe so
+ * a harness can prove which pathological state it escaped from). */
+function escapeStateSnapshot() {
+  let overlayVisible = false;
+  try { overlayVisible = !!(overlayEls && overlayEls.root && !overlayEls.root.hidden); } catch { overlayVisible = false; }
+  let stall = null;
+  try {
+    const s = window.__mapProbe.stall;
+    if (s) stall = { holding: !!s.holding, phase: s.phase, waitMs: s.waitMs };
+  } catch { stall = null; }
+  return {
+    twinOpen: !!twinOpen,
+    staged: !!stagedActive,
+    stagedS: +((+stagedS || 0)).toFixed(1),
+    committed: !!stagedCommitted,
+    prewarm: !!pendingReveal,
+    reverseWait: !!reverseWait,
+    transit: !!transitId,
+    intentLock: !!stagedFrozen,
+    ceilingPinned: !!stallCeilingOn,
+    overlayVisible,
+    stall,
+  };
+}
+
+/** Restore the frame the dive left: center/zoom/pitch/bearing in one instant
+ * jump (no timer owns camera motion on this path — scroll-pure rule), then
+ * re-derive the zoom-keyed chrome (imagery, enclosure, journey flags) so the
+ * restored frame renders exactly as it did before the dive. Never throws. */
+function restoreDiveCam(reason = 'unwind') {
+  const cam = diveCam;
+  if (!cam || !mapRef) return false;
+  // The restore IS the landing — drop any gesture-owned recede armed by
+  // recedeToHome (otherwise it keeps waiting on fingers that never come).
+  receding = false;
+  recedeDone = false;
+  recedeLandHome = null;
+  try { showVectorHold(false); } catch { /* veil teardown is best-effort */ }
+  const target = {};
+  if (cam.center && Number.isFinite(+cam.center.lng) && Number.isFinite(+cam.center.lat)) {
+    target.center = [+cam.center.lng, +cam.center.lat];
+  }
+  if (Number.isFinite(cam.zoom)) target.zoom = cam.zoom;
+  if (Number.isFinite(cam.pitch)) target.pitch = cam.pitch;
+  if (Number.isFinite(cam.bearing)) target.bearing = cam.bearing;
+  let jumpErr = null;
+  try {
+    mapRef.jumpTo(target);
+  } catch (err) {
+    jumpErr = err && err.message;
+    errors.push('UNWIND-CAM: ' + jumpErr);
+  }
+  // Ceilings the hold may have pinned (stall pin / staged clamp).
+  stallCeilingOn = false;
+  lastCeilingPin = null;
+  stallT0 = 0;
+  try { restoreMaxZoom(); } catch { /* unclamp is best-effort */ }
+  const landed = liveCamFrame();
+  const zLand = landed && Number.isFinite(landed.zoom) ? landed.zoom : cam.zoom;
+  // Imagery + chrome follow the restored zoom (the journey pose is gone).
+  try { if (Number.isFinite(zLand)) setSatScrubbed(satOpacityForZoom(zLand)); } catch { /* sat is best-effort */ }
+  try { showVignette(false); } catch { /* cosmetic */ }
+  try { isoScrubOwned = false; isoRestoreDue = false; } catch { /* flags are best-effort */ }
+  try { resetScrubJourney(); } catch { /* reset never breaks the unwind */ }
+  try {
+    window.__mapProbe.recede = 'home';
+    window.__mapProbe.mapZoom = Number.isFinite(zLand) ? +zLand.toFixed(2) : null;
+    window.__mapProbe.vectorReturnMs = 0;
+    window.__mapProbe.diveCam = null;
+  } catch { /* probe cosmetic */ }
+  const out = {
+    reason,
+    target: {
+      zoom: cam.zoom == null ? null : +cam.zoom.toFixed(3),
+      pitch: cam.pitch == null ? null : +cam.pitch.toFixed(2),
+      bearing: cam.bearing == null ? null : +cam.bearing.toFixed(2),
+      center: cam.center,
+    },
+    landed: landed
+      ? {
+        zoom: landed.zoom == null ? null : +landed.zoom.toFixed(3),
+        pitch: landed.pitch == null ? null : +landed.pitch.toFixed(2),
+        bearing: landed.bearing == null ? null : +landed.bearing.toFixed(2),
+        center: landed.center,
+      }
+      : null,
+    exact: !!(landed && landed.zoom != null && cam.zoom != null && Math.abs(landed.zoom - cam.zoom) <= 0.001),
+    jumpErr,
+  };
+  diveCam = null;
+  diveCamAt = 0;
+  return out;
+}
+
+/** Hide + blank the twin layers without the close theatre (used when the
+ * overlay is mounted but no twin is open, e.g. a fork-resolved hold). */
+function quiesceTwinLayers() {
+  try {
+    if (overlayEls && overlayEls.root) {
+      overlayEls.root.hidden = true;
+      overlayEls.root.classList.remove('closing');
+      overlayEls.root.classList.remove('prewarm');
+      overlayEls.root.classList.remove('scrubbing');
+      try { overlayEls.root.style.opacity = ''; } catch { /* inline release is best-effort */ }
+      try { setFrameUrl(overlayEls.frame, 'about:blank'); } catch { /* frame teardown is best-effort */ }
+    } else {
+      const root = document.getElementById('twin-overlay');
+      if (root) root.hidden = true;
+    }
+  } catch { /* overlay teardown is best-effort */ }
+  try { document.body.classList.remove('twin-open'); } catch { /* chrome class is cosmetic */ }
+  twinOpen = false;
+  twinBootKey = null;
+  try {
+    window.__mapProbe.twinOpen = false;
+    window.__mapProbe.prewarm = false;
+    window.__mapProbe.twinReady = false;
+    window.__mapProbe.twinPainted = false;
+    window.__mapProbe.reveal = null;
+    window.__mapProbe.revealFallback = false;
+    window.__mapProbe.revealLate = false;
+    window.__mapProbe.revealPaint = false;
+    window.__mapProbe.handoff = null;
+    window.__mapProbe.twinBootKey = null;
+    window.__mapProbe.staged = { active: false, s: 0, committed: false };
+  } catch { /* probe cosmetic */ }
+  try { history.replaceState(null, '', mapUrlWithSector(null)); } catch { /* history is best-effort */ }
+}
+
+/** THE ESCAPE. Drives every dive state (intent lock, staged hold, dissolve
+ * ramp, stalled arm, parked ceiling, mid-commit, committed twin) back to the
+ * pre-dive camera with the twin closed and every staged flag cleared.
+ * Idempotent — a second Esc on an already-unwound map is a quiet no-op.
+ * Returns the unwind record (also published on __mapProbe.unwind). */
+function unwindDive(reason = 'esc', opts = {}) {
+  const t0 = nowMs();
+  const from = escapeStateSnapshot();
+  const restore = opts.restore !== false;
+  unwindActive = true;
+  try { window.__mapProbe.escRequests = (+window.__mapProbe.escRequests || 0) + 1; } catch { /* probe cosmetic */ }
+  // (1) PENDING-WORK SET — every timer/wait the dive can own. The reverse
+  // wait is first: a timer that bailed on its seq guard used to leave
+  // reverseWait armed forever, and closeTwin() returns early while it holds —
+  // that alone made Esc a permanent no-op (measured).
+  try { clearReverseWait(); } catch { /* timer teardown is best-effort */ }
+  try { releaseWatchDisarm(); } catch { /* watch teardown is best-effort */ }
+  try {
+    if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
+  } catch { /* timer teardown is best-effort */ }
+  pendingReveal = null;
+  try { if (stallPollT) clearTimeout(stallPollT); } catch { /* timer teardown is best-effort */ }
+  stallPollT = 0;
+  stallT0 = 0;
+  contentVerdictFalseMs = 0;
+  contentVerdictIgnored = false;
+  // (2) STAGED FLAGS + the clamp/hold they own (exitStaged is idempotent and
+  // does the unlock, unclamp, overlay release, quiet prewarm teardown, and
+  // clears the S/grant/entry-radii/committed flags — single writer, no
+  // duplicate resets here).
+  try { exitStaged(); } catch { /* staged unwind is best-effort */ }
+  stallCeilingOn = false;
+  lastCeilingPin = null;
+  try { unfreezeStagedFrame(); } catch { /* unlock is best-effort */ }
+  // (3) TWIN LAYERS — the close theatre only when a twin is actually open;
+  // anything else is a quiet teardown (a fork-resolved hold leaks otherwise).
+  if (twinOpen) {
+    try { finishTwinClose(); } catch (err) { errors.push('UNWIND-CLOSE: ' + (err && err.message)); }
+  }
+  let overlayVisible = false;
+  try { overlayVisible = !!(overlayEls && overlayEls.root && !overlayEls.root.hidden); } catch { overlayVisible = false; }
+  if (twinOpen || overlayVisible) {
+    try { quiesceTwinLayers(); } catch { /* teardown is best-effort */ }
+  }
+  // (4) CAMERA — back to the frame this dive left (zoom/pitch/bearing/pan).
+  let restored = null;
+  if (restore) {
+    try { restored = restoreDiveCam(reason); } catch (err) { errors.push('UNWIND-RESTORE: ' + (err && err.message)); }
+  }
+  // (5) PROBE — name the reason, what was left, what came back.
+  const rec = publishUnwind(reason, opts.source || null, restored, from, t0);
+  unwindActive = false;
+  try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
+  return rec;
+}
+
+/** Publish one unwind record (single writer for the probe + the module copy).
+ * Used by the escape path AND by the ordinary close chain, so every way out of
+ * a dive reports the same shape: reason, what it left, what came back. */
+function publishUnwind(reason, source, restored, from, t0) {
+  const rec = {
+    reason,
+    source: source || null,
+    at: Math.round(t0 == null ? nowMs() : t0),
+    ms: Math.round(nowMs() - (t0 == null ? nowMs() : t0)),
+    from: from || null,
+    restored: restored || null,
+    ok: !!(restored && restored.exact),
+  };
+  unwindLast = rec;
+  try {
+    window.__mapProbe.unwind = rec;
+    window.__mapProbe.unwindCount = (+window.__mapProbe.unwindCount || 0) + 1;
+  } catch { /* probe cosmetic */ }
+  return rec;
+}
+
+/** Esc routing (map + same-origin parent document). True when Esc was
+ * consumed by the dive. A HEALTHY committed twin keeps its reverse walk
+ * (product: the twin retraces its stages, bounded by TWIN_REVERSE_WAIT_MS);
+ * every other state — held, stalled, unreadable, mid-dissolve, mid-commit —
+ * unwinds immediately, because there is no walk to wait for. */
+function escapeKeyDown(e, source) {
+  try {
+    if (!e || e.key !== 'Escape') return false;
+    if (e.defaultPrevented) return false;
+    const t = e.target;
+    try {
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return false;
+    } catch { /* target read is best-effort */ }
+    let healthy = false;
+    try { healthy = !!(twinOpen && !stagedActive && !stallArmed() && twinFrameHasContent()); } catch { healthy = false; }
+    if (!healthy && !diveInProgress()) return false;
+    if (e.preventDefault) e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+    try { window.__mapProbe.escSource = source; } catch { /* probe cosmetic */ }
+    if (healthy) {
+      closeSource = 'esc'; // the probe names the close an Escape even when the twin walks back first
+      if (reverseWait) {
+        // A reverse walk is already in flight: a second Esc takes the cut
+        // immediately instead of waiting out the walk (an Esc that answers
+        // nothing is the exact failure this law exists to remove).
+        try { clearReverseWait(); } catch { /* timer teardown is best-effort */ }
+        try { finishTwinClose(); } catch { /* close is best-effort */ }
+        return true;
+      }
+      closeTwin(); // reverse-first: the twin walks back, teardown + restore follow
+      return true;
+    }
+    unwindDive('esc-' + source, { source: 'esc' });
+    return true;
+  } catch { return false; }
+}
+
+/** Esc must work when focus sits OUTSIDE this iframe: the gallery embeds the
+ * map, so a key pressed over the page chrome never reaches this window. The
+ * parent is same-origin (our own mount page), so hook its document too —
+ * defensively, and only while a dive is live (escapeKeyDown no-ops otherwise).
+ * A cross-origin embed simply keeps the map-window behaviour. */
+function installParentEscapeHook() {
+  try {
+    if (!window.parent || window.parent === window) return false;
+    const pdoc = window.parent.document; // throws when cross-origin
+    if (!pdoc) return false;
+    if (pdoc.__safepipeEscHook) return true;
+    pdoc.__safepipeEscHook = true;
+    pdoc.addEventListener('keydown', (e) => { escapeKeyDown(e, 'parent'); }, true);
+    try { window.__mapProbe.escParentHook = true; } catch { /* probe cosmetic */ }
+    return true;
+  } catch {
+    try { window.__mapProbe.escParentHook = false; } catch { /* probe cosmetic */ }
+    return false;
+  }
+}
+
+/* ===== RELEASE-IMPOSSIBLE WATCH ==========================================
+ * The staged hold freezes forward S until the twin reports content, and the
+ * twin's intro is scrubbed BY that same S. When the twin's release cannot
+ * arrive (no frame, JS never came up, parked in hold, or released-but-never-
+ * idle because the camera only moves on the S we are holding) the two sides
+ * wait on each other and the map parks until HARD_STOP_HOLD_MS (30s). This
+ * watch samples the pure law every 200ms while the hold is un-granted and
+ * unwinds the dive with the named reason ~2.6s in — an order of magnitude
+ * before the hard stop, and far past a healthy grant. */
+let releaseWatchOn = false;
+let releaseWatchTimer = 0;
+let releaseWatchHoldT = 0; // when the CURRENT frozen-S wait started
+let releaseWatchS = NaN;
+const RELEASE_WATCH_POLL_MS = 200;
+
+function releaseWatchDisarm() {
+  releaseWatchOn = false;
+  releaseWatchHoldT = 0;
+  releaseWatchS = NaN;
+  try {
+    if (releaseWatchTimer) clearTimeout(releaseWatchTimer);
+  } catch { /* timer teardown is best-effort */ }
+  releaseWatchTimer = 0;
+  try {
+    if (window.__mapProbe.releaseWatch) window.__mapProbe.releaseWatch = { ...window.__mapProbe.releaseWatch, armed: false };
+  } catch { /* probe cosmetic */ }
+}
+
+/** Is a twin frame mounted at all (navigating counts — grace below)? */
+function twinFrameLive() {
+  try {
+    const fr = overlayEls && overlayEls.frame;
+    if (!fr) return false;
+    if (fr.getAttribute('data-url') === 'about:blank') return false;
+    return !!fr.contentWindow;
+  } catch { return false; }
+}
+/** Has the twin's own state come up (__ring2)? */
+function twinStateReadable() {
+  try {
+    const fr = overlayEls && overlayEls.frame;
+    const win = fr && fr.contentWindow;
+    return !!(win && win.__ring2);
+  } catch { return false; }
+}
+/** The twin's own handoff phase ('hold' | 'swoop' | 'push' | 'settle' | ...). */
+function twinHandoffPhase() {
+  try {
+    const fr = overlayEls && overlayEls.frame;
+    const win = fr && fr.contentWindow;
+    const r2 = win && win.__ring2;
+    if (!r2) return null;
+    if (typeof r2.handoffPhase === 'function') {
+      const p = r2.handoffPhase();
+      return typeof p === 'string' ? p : null;
+    }
+    const h = r2.handoff;
+    return h && typeof h.phase === 'string' ? h.phase : null;
+  } catch { return null; }
+}
+
+/** One sample of the release watch. Returns the unwind reason it fired with
+ * (null while the wait is still legitimate). Self-chaining while armed, so a
+ * parked hold is detected with NO further scroll ticks. Never throws. */
+function releaseWatchTick() {
+  try {
+    if (!stagedActive || stagedCommitted) {
+      releaseWatchDisarm();
+      return null;
+    }
+    if (stagedTilesGranted) {
+      releaseWatchDisarm();
+      return null;
+    }
+    const now = nowMs();
+    if (!releaseWatchOn) {
+      releaseWatchOn = true;
+      releaseWatchS = stagedS;
+      releaseWatchHoldT = now;
+    }
+    if (stagedS !== releaseWatchS) {
+      // S moved: the wait is legitimately retrying, restart the clock.
+      releaseWatchS = stagedS;
+      releaseWatchHoldT = now;
+    }
+    const waitMs = releaseWatchHoldT > 0 ? now - releaseWatchHoldT : 0;
+    const iframeAlive = twinFrameLive();
+    const readable = twinStateReadable();
+    const released = readable ? twinReleased() : null;
+    const phase = readable ? twinHandoffPhase() : null;
+    const reason = releaseImpossibleReason({
+      // A prewarm armed this instant may still be navigating (data-url not
+      // applied yet) — that is a boot, not an impossibility.
+      iframeAlive: iframeAlive || waitMs < FRAME_BOOT_GRACE_MS,
+      readable,
+      released,
+      phase,
+      waitMs,
+    });
+    try {
+      window.__mapProbe.releaseWatch = {
+        armed: true,
+        waitMs: Math.round(waitMs),
+        s: +((+stagedS || 0)).toFixed(1),
+        iframeAlive: !!iframeAlive,
+        readable: !!readable,
+        released,
+        phase,
+        boundMs: RELEASE_WAIT_BOUND_MS,
+        reason: reason || null,
+      };
+    } catch { /* probe cosmetic */ }
+    if (reason) {
+      unwindDive(reason, { source: 'release-watch' });
+      return reason;
+    }
+    if (!releaseWatchTimer) {
+      try {
+        releaseWatchTimer = setTimeout(() => {
+          releaseWatchTimer = 0;
+          try { releaseWatchTick(); } catch { /* watch never breaks the page */ }
+        }, RELEASE_WATCH_POLL_MS);
+      } catch { releaseWatchTimer = 0; }
+    }
+    return null;
+  } catch { return null; }
+}
+
 /** Round-10 dive-start prewarm: boot the twin iframe EARLY at first aimed
  * takeover engagement so grant+release land near arrival. Mounts the
  * overlay at opacity 0 (.prewarm still paints — display:none suspends rAF
@@ -3617,7 +4120,7 @@ function prewarmThenReveal(id, frame, opts = {}) {
   if (earlyTwinArmed && !warmReused) {
     try {
       const nowG = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
-      staleCloseGuardUntil = nowG + 1500; // the replaced early twin's pagehide echo lands in this window — drop it
+      staleCloseGuardUntil = nowG + STALE_CLOSE_GUARD_MS; // the replaced early twin's pagehide echo lands in this window — drop it
     } catch { /* guard is best-effort */ }
   }
   // CACHE-FAST: replacing a live UNARMED idle shell unloads it too — its
@@ -3629,7 +4132,7 @@ function prewarmThenReveal(id, frame, opts = {}) {
   if (!warmReused && !earlyTwinArmed && twinBootKey) {
     try {
       const nowI = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
-      staleCloseGuardUntil = nowI + 1500;
+      staleCloseGuardUntil = nowI + STALE_CLOSE_GUARD_MS;
     } catch { /* guard is best-effort */ }
   }
   earlyTwinArmed = false; // arrival consumes the dive-start boot (warm shell reused via retarget, never reloaded)
@@ -3925,7 +4428,7 @@ function openTwin(id, opts = {}) {
   if (earlyTwinArmed && !warmReused) {
     try {
       const nowG = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
-      staleCloseGuardUntil = nowG + 1500; // the replaced early twin's pagehide echo lands in this window — drop it
+      staleCloseGuardUntil = nowG + STALE_CLOSE_GUARD_MS; // the replaced early twin's pagehide echo lands in this window — drop it
     } catch { /* guard is best-effort */ }
   }
   // CACHE-FAST: same unarmed-idle-shell echo cover as the arrival path —
@@ -3934,7 +4437,7 @@ function openTwin(id, opts = {}) {
   if (!warmReused && !earlyTwinArmed && twinBootKey) {
     try {
       const nowI = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
-      staleCloseGuardUntil = nowI + 1500;
+      staleCloseGuardUntil = nowI + STALE_CLOSE_GUARD_MS;
     } catch { /* guard is best-effort */ }
   }
   earlyTwinArmed = false; // direct open consumes any dive-start boot
@@ -4079,6 +4582,21 @@ function doCloseTwin() {
   try { restoreMaxZoom(); } catch { /* unclamp is best-effort */ }
   // Shared guarantor: flatten a journey-owned tilt onto the law (see def).
   flattenJourneyTiltToLaw('close');
+  // UNWIND LAW: an aborted dive returns the frame it left (zoom/pitch/
+  // bearing/pan), not merely the journey home — "home" is wrong whenever the
+  // dive started anywhere else. Runs LAST so it overrides the close pose and
+  // the gesture-owned recede armed above. No-op when no dive was recorded
+  // (a plain reload/back open), which keeps the old close behaviour exactly.
+  // Skipped inside unwindDive, which owns its own single restore.
+  if (!unwindActive) {
+    try {
+      const t0 = nowMs();
+      const from = escapeStateSnapshot();
+      const restored = restoreDiveCam('close');
+      publishUnwind(closeSource || 'close', closeSource || 'close', restored, from, t0);
+    } catch { /* restore never breaks teardown */ }
+    closeSource = null;
+  }
 }
 
 /** Close-time flatten guarantor (shared): the last zoomend fired while the
@@ -4175,7 +4693,14 @@ function closeTwin() {
       } catch { /* probe cosmetic */ }
       reverseWait = {
         timer: setTimeout(() => {
-          if (seq !== closeSeq) return; // fresh open landed first
+          // UNWIND LAW: a superseded wait must still DISARM itself. The old
+          // early return left reverseWait armed with no timer, and closeTwin()
+          // bails while it is armed — one stale wait made Esc a permanent
+          // no-op for the rest of the session (measured run-4).
+          if (seq !== closeSeq) {
+            if (reverseWait && reverseWait.timer === timerHandle) clearReverseWait();
+            return;
+          }
           if (!twinOpen) {
             clearReverseWait();
             return;
@@ -4186,6 +4711,7 @@ function closeTwin() {
           finishTwinClose();
         }, TWIN_REVERSE_WAIT_MS),
       };
+      const timerHandle = reverseWait.timer;
       return;
     }
   } catch { /* request is best-effort; fall through to teardown */ }
@@ -4198,12 +4724,17 @@ window.addEventListener('popstate', (e) => {
   else if (!id && twinOpen) closeTwin();
 });
 
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && twinOpen) {
-    if (e.stopPropagation) e.stopPropagation();
-    closeTwin();
-  }
-});
+// UNWIND LAW (Phase-03 resilience): Esc is the guaranteed escape from EVERY
+// dive state — not just "twinOpen". The old handler was gated on twinOpen, so
+// a staged hold / stalled arm / intent lock / parked ceiling answered Esc with
+// nothing at all (measured: staged.active + twinOpen still true after Esc, the
+// page only recoverable by reload). Routing lives in escapeKeyDown (see the
+// unwind block): healthy committed twin -> reverse-first close, everything
+// else -> immediate unwindDive with the pre-dive camera restored.
+// Capture phase so no inner handler can swallow the escape, and the same-origin
+// parent document is hooked too (the gallery mounts this page in an iframe, so
+// focus over the page chrome never reaches this window).
+window.addEventListener('keydown', (e) => { escapeKeyDown(e, 'map'); }, true);
 
 // Twin-iframe Esc (focus lives in the iframe while orbiting): the embedded
 // twin posts TWIN_CLOSE_MSG instead of touching history. LANE 3 also posts
@@ -4423,10 +4954,21 @@ window.addEventListener('message', (e) => {
   if (!twinOpen || !isTwinCloseData(e && e.data)) return;
   // Round-10 stale-echo guard: the replaced early twin's pagehide echo is
   // already in flight when arrival flips twinOpen — it must not tear down
-  // the fresh prewarm. Genuine closes land outside this window.
+  // the fresh prewarm. Narrowed by the UNWIND LAW: the window is short and
+  // only applies while the fresh shell has proven NOTHING (no grant, no
+  // release) — once its own ready/painted/release lands, a close from that
+  // frame is genuine and always honored. Dropped echoes are counted on the
+  // probe instead of vanishing.
   try {
     const nowE = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
-    if (nowE < staleCloseGuardUntil) return;
+    let proven = false;
+    try {
+      proven = !!window.__mapProbe.twinReady || !!window.__mapProbe.twinPainted || twinReleased();
+    } catch { proven = false; }
+    if (nowE < staleCloseGuardUntil && !proven) {
+      try { window.__mapProbe.closeDropped = (+window.__mapProbe.closeDropped || 0) + 1; } catch { /* probe cosmetic */ }
+      return;
+    }
   } catch { /* guard never blocks the close */ }
   const recede = !!(e.data && typeof e.data === 'object' && e.data.recede);
   if (recede) {
@@ -4659,6 +5201,11 @@ function installBandTakeover() {
       try {
         if (e.deltaMode === 1) dy = dy * 40;
       } catch { /* deltaMode read is best-effort */ }
+      // UNWIND LAW: backstop capture for a dive whose wheel lane skipped the
+      // flip (in-band takeover still owns its own ticks).
+      if (dy > 0) {
+        try { noteDiveFrame('takeover'); } catch { /* dive frame is best-effort */ }
+      }
       if (twinOpen || transitId || pendingReveal || reverseWait) return;
       // HARD-STOP staged hold: staging never drives here (the clamp owns
       // depth), but forward intent must still stall — returning before the
@@ -4822,6 +5369,12 @@ function installWheelFlip(rootEl, laneEl, ctx) {
       if (e.ctrlKey) return;
       const dy = +e.deltaY;
       if (!Number.isFinite(dy) || dy === 0) return;
+      // UNWIND LAW: this lane is the first wheel entry at every zoom, so the
+      // frame the dive is about to leave is recorded HERE (once per dive,
+      // before any camera write) — Esc later restores exactly this frame.
+      if (dy > 0) {
+        try { noteDiveFrame('wheel'); } catch { /* dive frame is best-effort */ }
+      }
       // Journey lock: zoom AROUND a phantom point placed beyond the spot
       // (zoom-in) or at canvas center (zoom-out) — but ONLY while the mask
       // is armed. The native handler keeps its around-point fixed, so the
@@ -4915,6 +5468,11 @@ function installAnchorGuard() {
     try {
       if (!e || !e.ctrlKey) return;
       if (e.__zoomFlipped || e.__anchorCentered) return;
+      // UNWIND LAW: pinch-in (ctrl+wheel deltaY<0) also opens a dive — record
+      // the frame it leaves before any camera write.
+      if (+e.deltaY < 0) {
+        try { noteDiveFrame('pinch'); } catch { /* dive frame is best-effort */ }
+      }
       // HARD-STOP FIRST: forward pinch stalls whenever the hold owns the
       // frame — checked BEFORE the mask predicate below, which reads false
       // during staged holds (twinOpen) and would otherwise let every pinch
@@ -5026,7 +5584,24 @@ function feedStagedScroll(dyFlip) {
       try { driveStagedOverlay(); } catch { /* frozen repaint is best-effort */ }
       return;
     }
+    const sPrev = stagedS;
+    // UNWIND LAW (reverse): a reverse tick (dy>0 — the same convention the
+    // forward swallow above reads) while the hold is STALLED is the user
+    // asking to back out of a frozen hold: unwind now and restore the frame
+    // the dive left. The S-drain test cannot express this — the hard stop
+    // seeds S at 0, so a stalled hold has nothing to drain.
+    if (dy > 0 && stallArmed()) {
+      try { unwindDive('reverse-stalled', { source: 'reverse' }); } catch { /* unwind is best-effort */ }
+      return;
+    }
     stagedS = accumStagedS(stagedS, dy); // symmetric: scroll-up retraces the same law
+    // UNWIND LAW (reverse): S drained back to 0 (direction-agnostic — the two
+    // wheel conventions disagree on sign, the S value does not) while the hold
+    // is stalled. Nothing is left to retrace, so unwind through the same path.
+    if (stagedS < sPrev && stagedS <= 0 && stallArmed()) {
+      try { unwindDive('reverse-drained', { source: 'reverse' }); } catch { /* unwind is best-effort */ }
+      return;
+    }
     // HARD-STOP: S advances only past the content grant (or the long-cap
     // escape) — the overlay stays a pure function of scroll, so every tick
     // paints. Forward intent while unloaded never reaches this line (stalled
@@ -5149,6 +5724,22 @@ async function boot() {
   // Stall guards: touch pinch-in / keyboard + / double-click carry forward
   // intent with no wheel tick — swallowed while holding, reverse always free.
   try { installStallForwardGuards(); } catch { /* guards best-effort */ }
+  // UNWIND LAW: the dive frame is captured at window level, before ANY lane
+  // claims the tick — the flip lane only sees ticks whose target sits inside
+  // #map, and the first forward tick of a dive can land on the body/chrome
+  // (measured: the record was taken 5 zoom levels late at z=6.7 instead of
+  // home). Passive + capture only; it writes no camera state.
+  try {
+    window.addEventListener('wheel', (e) => {
+      try {
+        if (e && +e.deltaY > 0) noteDiveFrame('wheel-any');
+      } catch { /* dive frame is best-effort */ }
+    }, { capture: true, passive: true });
+  } catch { /* listener is best-effort */ }
+  // UNWIND LAW: Esc must work with focus anywhere on the embedding page, not
+  // just inside this iframe — hook the same-origin parent document (no-op for
+  // a cross-origin embed, and it only acts while a dive is live).
+  try { installParentEscapeHook(); } catch { /* parent hook best-effort */ }
   // Task-35 staged scrub: passive stage-scroll accumulator on the same lane
   // (read-only — never hijacks gestures; the maxZoom clamp holds depth).
   try { installStagedAccum(map.getCanvasContainer()); } catch { /* accum best-effort */ }
