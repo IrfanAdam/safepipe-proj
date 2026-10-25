@@ -172,5 +172,20 @@ test('the pacing laws are the single source of the cadences', () => {
 // the journey's main-thread script time (7863ms -> 2421ms with the loop
 // stopped). Fix: gate ring2's frameOnce paint through renderDue()/
 // twinPaintsNow() and pass sampleDue() as `{ sample }` into renderTwin().
-// Re-rate this todo once that lane lands the gate (then assert the guard).
-test.todo('twin frameOnce paints through renderDue() and samples on sampleDue()');
+// FIXED (twin-side gate applied): ring2's frameOnce paints through
+// renderDue()/twinPaintsNow() and passes sampleDue() as `{ sample }` into
+// renderTwin(); overlays.renderTwin honours opts.sample === false. Pinned
+// below on source so a refactor cannot silently restore the per-frame
+// readback.
+test('twin frameOnce paints through renderDue() and samples on sampleDue()', () => {
+  const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+  const main = read('src/ring2/main.js');
+  const ov = read('src/ring2/overlays.js');
+  assert.match(main, /import \{ overlayPaintsNow, renderDue, sampleDue \} from '\.\.\/map\/frame-pacing\.js'/);
+  assert.match(main, /const twinPaintsNow = \(\) =>/);
+  assert.match(main, /if \(renderDue\(\{ paints, nowMs: tNow, lastRenderMs: lastTwinRenderMs \}\)\)/);
+  assert.match(main, /const sample = sampleDue\(\{ nowMs: tNow, lastSampleMs: lastContentSampleMs \}\)/);
+  assert.match(main, /twin\.renderTwin\(\{ sample \}\)/);
+  assert.match(ov, /function renderTwin\(opts = \{\}\)/);
+  assert.match(ov, /if \(opts\.sample === false\) return;/);
+});

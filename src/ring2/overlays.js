@@ -1293,8 +1293,14 @@ function edgeFade(x, z) {
     }
   }
 
-  function renderTwin() {
+  function renderTwin(opts = {}) {
     renderer.render(scene, camera);
+    // FRAME BUDGET (src/map/frame-pacing.js): two synchronous gl.readPixels
+    // are the journey's biggest single cost (~2ms of GPU sync per frame,
+    // 240 readbacks/s while the overlay sat hidden behind the map). The
+    // caller owns the cadence and asks for a fresh reading only when one is
+    // due; the last reading stands in between (withhold, never guess).
+    if (opts.sample === false) return;
     sampleFreshContent();
   }
 

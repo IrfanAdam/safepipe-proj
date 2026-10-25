@@ -3176,16 +3176,25 @@ function twinFrameHasContent() {
       c = typeof r2.content === 'function' ? r2.content() : null;
     } catch { c = null; }
     if (!c || typeof c !== 'object') return false;
-    const ok =
+    // PIXEL VERDICT: idle + live is not enough — a twin that has settled its
+    // tiles while pointed at the wrong world paints black (coverage 0). The
+    // twin folds its own readback through its single content law and reports
+    // contentOk; a false or withheld verdict (null) keeps the hold instead of
+    // committing blind. The staged long-cap fallback still bounds the hold.
+    let ok =
       !!c.mapIdle &&
       !!c.sceneLive &&
       Number.isFinite(c.frames) &&
       c.frames >= TWIN_MIN_CONTENT_FRAMES;
+    if (ok && c.contentOk === false) ok = false;
     try {
       window.__mapProbe.twinContent = {
         loaded: !!c.mapIdle,
         sceneLive: !!c.sceneLive,
         frames: c.frames,
+        coverage: c.coverage ?? null,
+        spread: c.spread ?? null,
+        contentOk: c.contentOk ?? null,
         ok,
       };
     } catch { /* probe cosmetic */ }

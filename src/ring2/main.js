@@ -28,8 +28,9 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor, twinContentPass } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
+import { overlayPaintsNow, renderDue, sampleDue } from '../map/frame-pacing.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
  * Lane A constant move applies with no further edits. Named imports above
@@ -2132,7 +2133,22 @@ async function boot() {
         coverage = Number.isFinite(cov) ? cov : null;
         spread = Number.isFinite(spr) ? spr : null;
       } catch { coverage = null; spread = null; }
-      return { frames: twinFrames, mapIdle, sceneLive, coverage, spread };
+      // CONTENT-OK: the pixel fold verdict (coverage/spread vs the twin's own
+      // thresholds), computed HERE with the twin's single law so the map can
+      // refuse a blank-but-idle canvas without duplicating it. null until the
+      // first sample lands — the map withholds, never guesses.
+      let contentOk = null;
+      try {
+        contentOk = twinContentPass({
+          frames: twinFrames,
+          mapIdle,
+          sceneLive,
+          coverage,
+          spread,
+          minFrames: HANDOFF_PREWARM_MIN_FRAMES,
+        });
+      } catch { contentOk = null; }
+      return { frames: twinFrames, mapIdle, sceneLive, coverage, spread, contentOk };
     },
     handoff,
     requestTwinClose,
@@ -2760,6 +2776,46 @@ async function boot() {
    * order (twin.update() painted, THEN jumpTo) left the map exactly one
    * frame behind every twin move: the satellite visibly chased the twin
    * through every zoom. */
+  /* FRAME BUDGET (src/map/frame-pacing.js): the twin sits behind the map at
+   * opacity 0 through prewarm/hold. Painting its full scene there at display
+   * rate, plus two synchronous gl.readPixels per frame, measured as 69% of
+   * the journey's main-thread script time and 240 readbacks/s. So: render at
+   * display rate ONLY when the overlay can actually paint; keep it warm at
+   * the hidden cadence otherwise; sample pixels on their own slower cadence
+   * (the map's grant/commit gate answers "do I hold real pixels?" from the
+   * last reading, never from a per-frame readback). */
+  let lastTwinRenderMs = -Infinity;
+  let lastContentSampleMs = -Infinity;
+  const nowMs = () => {
+    try {
+      if (typeof performance !== 'undefined' && typeof performance.now === 'function') return performance.now();
+    } catch { /* fall through to the wall clock */ }
+    return Date.now();
+  };
+  /** Can this overlay paint this frame? Reads the parent's own overlay root
+   * (the iframe's parent element) by attribute/class/inline opacity — no
+   * getComputedStyle, no forced layout. Anything unreadable counts as
+   * PAINTING so a visible twin can never be frozen. */
+  const twinPaintsNow = () => {
+    try {
+      const fe = window.frameElement;
+      const root = fe && fe.parentElement;
+      if (!root) return true;
+      let opacity = null;
+      try {
+        const raw = root.style ? root.style.opacity : '';
+        opacity = raw === '' || raw === undefined || raw === null ? null : raw;
+      } catch { opacity = null; }
+      return overlayPaintsNow({
+        hidden: typeof root.hasAttribute === 'function' ? root.hasAttribute('hidden') : false,
+        prewarm: !!(root.classList && root.classList.contains('prewarm')),
+        closing: !!(root.classList && root.classList.contains('closing')),
+        opacity,
+      });
+    } catch {
+      return true;
+    }
+  };
   const loop = () => {
     try {
       frameOnce();
@@ -2887,7 +2943,17 @@ async function boot() {
     } catch { /* cosmetic — never breaks the frame */ }
     // Paint LAST: the map already holds this frame's pose (jumpTo above),
     // so both GL paints land in the same frame — no catch-up lag.
-    twin.renderTwin();
+    // Frame-budget gated: full rate while the overlay can paint, keep-warm
+    // cadence while it sits hidden behind the map, and the pixel readback on
+    // its own (slower) cadence.
+    const tNow = nowMs();
+    const paints = twinPaintsNow();
+    if (renderDue({ paints, nowMs: tNow, lastRenderMs: lastTwinRenderMs })) {
+      const sample = sampleDue({ nowMs: tNow, lastSampleMs: lastContentSampleMs });
+      twin.renderTwin({ sample });
+      lastTwinRenderMs = tNow;
+      if (sample) lastContentSampleMs = tNow;
+    }
   };
   requestAnimationFrame(loop);
   // Manual pump (diag hook, same pattern as __ring2kick/__ring2remountMap):

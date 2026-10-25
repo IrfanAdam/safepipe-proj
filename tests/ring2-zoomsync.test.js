@@ -145,7 +145,7 @@ test('main.js frame loop is sync-first: controls -> jumpTo -> paint', () => {
   const loop = src.slice(src.indexOf('const loop ='));
   const iCtl = loop.indexOf('twin.updateControls()');
   const iSync = loop.indexOf('applyTwinToMap(');
-  const iPaint = loop.indexOf('twin.renderTwin()');
+  const iPaint = loop.indexOf('twin.renderTwin(');
   assert.ok(iCtl !== -1 && iSync !== -1 && iPaint !== -1, 'loop must call all three phases');
   assert.ok(iCtl < iSync && iSync < iPaint,
     'same-frame order: damped controls settle, map jumpTo, twin paint LAST');

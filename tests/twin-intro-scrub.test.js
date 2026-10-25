@@ -370,7 +370,7 @@ test('twin wiring: pixel sample after render + autoplay hold (Lane T)', () => {
   const main = srcOf('../src/ring2/main.js');
   assert.ok(main.includes('fwdStagedOwnsIntro({ stagedS:'), 'release reads the single ownership law');
   assert.ok(main.includes('fwdAutoplayHeld({ staged:'), 'advance holds the clock while staged owns it');
-  assert.ok(main.includes('coverage, spread }'), 'content() exposes the pixel fold');
+  assert.ok(main.includes('coverage, spread, contentOk }'), 'content() exposes the pixel fold + verdict');
   assert.ok(main.includes('twin.sampleContent()'), 'content() reads the twin sampler');
   assert.ok(main.includes('isTwinStagedMessage(e?.data)'), 'staged listener still receives the map-side channel');
   assert.ok(main.includes('setStagedS: (s) => applyTwinStagedS(s)'), 'staged probe setter intact');
