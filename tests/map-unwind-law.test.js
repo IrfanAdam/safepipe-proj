@@ -180,3 +180,19 @@ test('reverse drains out of a stalled hold through the same unwind', () => {
   assert.ok(main().includes("unwindDive('reverse-drained', { source: 'reverse' })"),
     'scroll-up from a stalled hold unwinds with a named reason');
 });
+
+test('progress beats the clock: a painting twin is never yanked out of its dive', () => {
+  // The 2.6s bound must fire on a FREEZE, not on slowness — a heavy device
+  // still painting would otherwise have a healthy dive unwound under it.
+  const m = main();
+  assert.ok(m.includes('function twinFrameCount()'), 'the watch reads the twin frame counter');
+  const watch = m.slice(m.indexOf('function releaseWatchTick()'), m.indexOf('function releaseWatchDisarm()') === -1 ? m.length : m.length);
+  assert.ok(m.includes('const watchFrames = twinFrameCount()'), 'frames sampled inside the watch');
+  assert.ok(
+    m.includes('else if (watchFrames > releaseWatchFrames) {') &&
+      m.includes('releaseWatchFrames = watchFrames;') &&
+      m.includes('releaseWatchHoldT = now;'),
+    'a climbing frame count restarts the clock — the reason never fires on progress',
+  );
+  assert.ok(m.includes('releaseWatchFrames = -1;'), 'state resets when the watch disarms');
+});

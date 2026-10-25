@@ -3758,12 +3758,14 @@ let releaseWatchOn = false;
 let releaseWatchTimer = 0;
 let releaseWatchHoldT = 0; // when the CURRENT frozen-S wait started
 let releaseWatchS = NaN;
+let releaseWatchFrames = -1; // last seen twin frame count (progress signal)
 const RELEASE_WATCH_POLL_MS = 200;
 
 function releaseWatchDisarm() {
   releaseWatchOn = false;
   releaseWatchHoldT = 0;
   releaseWatchS = NaN;
+  releaseWatchFrames = -1;
   try {
     if (releaseWatchTimer) clearTimeout(releaseWatchTimer);
   } catch { /* timer teardown is best-effort */ }
@@ -3781,6 +3783,18 @@ function twinFrameLive() {
     if (fr.getAttribute('data-url') === 'about:blank') return false;
     return !!fr.contentWindow;
   } catch { return false; }
+}
+/** Twin frame counter (progress signal, not a verdict): a climbing count
+ * means the twin is painting, so a long wait is slowness — never a freeze. */
+function twinFrameCount() {
+  try {
+    const fr = overlayEls && overlayEls.frame;
+    const win = fr && fr.contentWindow;
+    const r2 = win && win.__ring2;
+    const c = r2 && typeof r2.content === 'function' ? r2.content() : null;
+    const n = c && Number(c.frames);
+    return Number.isFinite(n) ? n : NaN;
+  } catch { return NaN; }
 }
 /** Has the twin's own state come up (__ring2)? */
 function twinStateReadable() {
@@ -3829,6 +3843,18 @@ function releaseWatchTick() {
       // S moved: the wait is legitimately retrying, restart the clock.
       releaseWatchS = stagedS;
       releaseWatchHoldT = now;
+    }
+    // PROGRESS BEATS THE CLOCK: a twin that keeps painting is slow, not
+    // stuck. Counting its frames means the bound only fires on a genuine
+    // freeze — otherwise a heavy-but-healthy device would have its dive
+    // yanked out from under it after 2.6s.
+    const watchFrames = twinFrameCount();
+    if (Number.isFinite(watchFrames)) {
+      if (releaseWatchFrames < 0) releaseWatchFrames = watchFrames;
+      else if (watchFrames > releaseWatchFrames) {
+        releaseWatchFrames = watchFrames;
+        releaseWatchHoldT = now;
+      }
     }
     const waitMs = releaseWatchHoldT > 0 ? now - releaseWatchHoldT : 0;
     const iframeAlive = twinFrameLive();
