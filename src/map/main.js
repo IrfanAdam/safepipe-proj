@@ -765,6 +765,11 @@ let stagedCommitted = false;
 let stagedTilesT0 = 0;
 const HARD_STOP_HOLD_MS = 30000; // long wall-clock escape bound (was a 4s release-to-law)
 const STAGED_TILES_HOLD_MS = HARD_STOP_HOLD_MS; // the overlay ramp shares the same bound
+// The twin's pixel verdict (contentOk) may delay a commit, never deadlock it:
+// a blank sample buys this much patience, then the journey proceeds flagged.
+const CONTENT_VERDICT_HOLD_MS = 1200;
+let contentVerdictFalseMs = 0;
+let contentVerdictIgnored = false;
 // READINESS-HYSTERESIS: the tiles grant latches. twinFrameHasContent flaps
 // mid-dissolve (the twin camera moves => fresh tiles => mapIdle false for a
 // few frames), and without a latch each gap re-armed the zero-hold and the
@@ -2527,6 +2532,7 @@ function flyToSectorThenTwin(id, opts = {}) {
         stagedTilesT0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       } catch { try { stagedTilesT0 = Date.now(); } catch { stagedTilesT0 = 0; } }
       stagedTilesGranted = false; // HYSTERESIS: re-entry restages cold — the old grant died with the reloaded frame
+      contentVerdictFalseMs = 0; contentVerdictIgnored = false;
       try {
         pumpIsoPitch(); // live-hold carry: keep the per-frame tilt pump running under the clamp (it now converges the S-driven hold tilt, never parks on the prewarm)
       } catch { /* pump is best-effort */ }
@@ -3186,7 +3192,20 @@ function twinFrameHasContent() {
       !!c.sceneLive &&
       Number.isFinite(c.frames) &&
       c.frames >= TWIN_MIN_CONTENT_FRAMES;
-    if (ok && c.contentOk === false) ok = false;
+    // BOUNDED: the pixel verdict may only delay a commit briefly. It caught a
+    // real bug (boot-pose commit painted black), but as an unbounded gate it
+    // turns a blank sample into a 30s deadlock with no escape — measured on
+    // the gallery path. So it buys CONTENT_VERDICT_HOLD_MS of patience, then
+    // the journey proceeds and the failure is recorded rather than hidden.
+    if (ok && c.contentOk === false) {
+      if (contentVerdictFalseMs === 0) contentVerdictFalseMs = nowMs();
+      const waited = nowMs() - contentVerdictFalseMs;
+      if (waited < CONTENT_VERDICT_HOLD_MS) ok = false;
+      else contentVerdictIgnored = true;
+    } else if (c.contentOk === true) {
+      contentVerdictFalseMs = 0;
+      contentVerdictIgnored = false;
+    }
     try {
       window.__mapProbe.twinContent = {
         loaded: !!c.mapIdle,
@@ -3195,6 +3214,7 @@ function twinFrameHasContent() {
         coverage: c.coverage ?? null,
         spread: c.spread ?? null,
         contentOk: c.contentOk ?? null,
+        ignored: contentVerdictIgnored,
         ok,
       };
     } catch { /* probe cosmetic */ }
@@ -3213,6 +3233,7 @@ function finalizeStagedReveal(root) {
   stagedActive = false;
   stagedTilesT0 = 0; // HARD-STOP: commit disarms the hold (loader already cleared by content)
   stagedTilesGranted = false; // HYSTERESIS: commit consumes the grant — the next hold restages cold
+  contentVerdictFalseMs = 0;
   try {
     unfreezeStagedFrame(); // MAP FRAME FREEZE: commit releases the camera lock
   } catch { /* unlock is best-effort */ }
@@ -3259,6 +3280,7 @@ function exitStaged() {
   stagedCommitted = false;
   stagedTilesT0 = 0; // HARD-STOP: unwind disarms the hold
   stagedTilesGranted = false; // HYSTERESIS: unwind consumes the grant — the next hold restages cold
+  contentVerdictFalseMs = 0;
   entryRx = null; // unwind clears the entry radii — the next hold re-caches its own arrival
   entryRy = null;
   lastPostedStagedS = null; // symmetric unwind: the S stream ends with the hold
