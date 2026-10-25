@@ -244,6 +244,31 @@ export function frameRange(z, { viewportPx = 600, fovDeg = MAP_TRUE_FOV_DEG, lat
   }
 }
 
+/* ANCHOR LAW (Phase-03 black twin): how far a handed map frame's center may
+ * sit from the sector pin and still OWN the twin's anchor. The journey's
+ * country boot view is ~3000 km away; the site is 10 km across. 25 km is
+ * "still over Sangachal, still showing the terminal" with room for a
+ * ring-frame handoff, and an order of magnitude below any wide/country
+ * frame. Kept in metres, world frame — same units as frameTarget(). */
+export const FRAME_ANCHOR_REACH_M = 25000;
+
+/** Pure: does a handed frame center own the twin anchor? `anchor` and `pin`
+ * are world metres ({x,z}). A missing anchor/pin answers false (the caller
+ * then keeps the sector pin), and a non-finite reach falls back to the
+ * constant. Never throws. */
+export function frameAnchorOnSite(anchor, pin, reachM = FRAME_ANCHOR_REACH_M) {
+  try {
+    if (!anchor || !pin) return false;
+    const ax = Number(anchor.x), az = Number(anchor.z);
+    const px = Number(pin.x), pz = Number(pin.z);
+    if (![ax, az, px, pz].every(Number.isFinite)) return false;
+    const reach = Number.isFinite(reachM) && reachM > 0 ? reachM : FRAME_ANCHOR_REACH_M;
+    return Math.hypot(ax - px, az - pz) <= reach;
+  } catch {
+    return false;
+  }
+}
+
 /** Pure: clamp a handoff range into the shared orbit rails
  * ([TWIN_MIN_RANGE_M, TWIN_MAX_RANGE_M], sync.js single source of truth).
  * Non-finite/non-positive input returns null (caller falls back, never a
@@ -983,6 +1008,46 @@ export function twinContentPass({
     return cov >= TWIN_CONTENT_MIN_COVERAGE && spr >= TWIN_CONTENT_MIN_SPREAD;
   } catch {
     return false;
+  }
+}
+
+/* MIX-VISIBILITY LAW (Phase-03 black twin): below this overlay mix the twin
+ * canvas is transparent BY DESIGN — the satellite owns the frame and the
+ * twin's own clear alpha is 0, so its pixel readback is legitimately empty. */
+export const TWIN_CONTENT_MIN_MIX = 1;
+
+/** Pure: the twin's answer to "do I hold real pixels?", mix-aware.
+ * `visible` says whether the twin actually painted its overlay on this
+ * sample (mix above TWIN_CONTENT_MIN_MIX). Returns:
+ *   true  — painting and the pixel fold passes
+ *   false — painting and the fold FAILS (a real blank frame: refuse it)
+ *   null  — not painting on purpose, or signals not in yet (withhold)
+ * The null case is what keeps the parent's commit gate from deadlocking on
+ * a twin it deliberately made transparent: a `false` there reads as "blank
+ * canvas" and freezes the scrub before the mix ever rises. */
+export function twinContentVerdict({
+  frames = 0,
+  mapIdle = false,
+  sceneLive = false,
+  coverage = null,
+  spread = null,
+  minFrames = HANDOFF_PREWARM_MIN_FRAMES,
+  visible = true,
+} = {}) {
+  try {
+    if (visible !== true) return null;
+    const f = Number(frames);
+    const floor = Number(minFrames);
+    if (!Number.isFinite(f) || !Number.isFinite(floor) || f < floor) return null;
+    if (mapIdle !== true || sceneLive !== true) return null;
+    // Number(null) is 0 — a missing sample must withhold, never read as
+    // "coverage 0 / spread 0" (the blankest possible frame).
+    const cov = coverage === null || coverage === undefined ? NaN : Number(coverage);
+    const spr = spread === null || spread === undefined ? NaN : Number(spread);
+    if (!Number.isFinite(cov) || !Number.isFinite(spr)) return null;
+    return cov >= TWIN_CONTENT_MIN_COVERAGE && spr >= TWIN_CONTENT_MIN_SPREAD;
+  } catch {
+    return null;
   }
 }
 

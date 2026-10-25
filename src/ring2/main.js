@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor, twinContentPass } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor, twinContentPass, frameAnchorOnSite, twinContentVerdict, TWIN_CONTENT_MIN_MIX } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import { overlayPaintsNow, renderDue, sampleDue } from '../map/frame-pacing.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
@@ -393,6 +393,10 @@ function paintStatus() {
 }
 
 async function boot() {
+  /* Sector pin (world metres) — resolved with the sector/anchor block below
+   * and shared by the anchor law (boot + retarget) and the refit range law.
+   * Declared here so every reader precedes its assignment safely. */
+  let sectorPin = null;
   // Chrome first, map second: the status chip + mix bar are plain DOM and
   // must paint even if the map/tiles hang — a black box with no message is
   // the failure mode we're eliminating. Every stage is visible in a
@@ -1058,6 +1062,12 @@ async function boot() {
     try {
       if (!handoff.frame || !handoff.anchor || handoff.phase !== 'hold') return false;
       const vp = viewportPxNow();
+      /* RANGE LAW (Phase-03 black twin): the handed frame's zoom may own the
+       * hold range ONLY while that frame's center is still over the sector
+       * (the same law the boot anchor follows). A country/wide frame (z1,
+       * ~3.3 Mm out) would refit the pin to TWIN_MAX_RANGE_M and paint an
+       * empty 42 km plate over a sector it cannot see. */
+      if (sectorPin && !frameAnchorOnSite(frameTarget(handoff.frame), sectorPin)) return false;
       let r = frameRange(handoff.frame.z, { viewportPx: vp, lat: handoff.frame.cy });
       if (!Number.isFinite(r) || r <= 0) return false;
       // Handoff-5-close: clamp to the shared orbit rails (sync.js, via the
@@ -1869,6 +1879,17 @@ async function boot() {
       const f = parseTwinRetargetFrame(e?.data);
       if (!f) return;
       if (!handoff || handoff.phase !== 'hold') return;
+      /* ANCHOR LAW (see the boot anchor): a retarget may only MOVE the
+       * anchor while the new frame's center is still over the sector. A
+       * warm shell re-pinned to a wide/country frame keeps the sector pin
+       * (and skips the refit, whose range law reads that frame's zoom) —
+       * otherwise the flight boresights empty ground ~3 Mm away and the
+       * twin paints nothing at all. */
+      const ta = frameTarget(f);
+      if (sectorPin && (!ta || !frameAnchorOnSite(ta, sectorPin))) {
+        handoff.frame = { ...f };
+        return;
+      }
       // Arrival gate (see handoff.arrived): a progressive (non-arrival) pin
       // clears it — the shell is warming, not arriving — and the arrival pin
       // sets it back. Same-frame postMessage delivery is FIFO, so a stale
@@ -2137,15 +2158,28 @@ async function boot() {
       // thresholds), computed HERE with the twin's single law so the map can
       // refuse a blank-but-idle canvas without duplicating it. null until the
       // first sample lands — the map withholds, never guesses.
+      /* MIX-VISIBILITY (Phase-03 black twin): below TWIN_CONTENT_MIN_MIX the
+       * twin canvas is transparent BY DESIGN (satellite owns the frame, the
+       * twin's clear alpha is 0), so its readback is legitimately empty. A
+       * hard `false` there tells the parent "blank canvas" and freezes the
+       * scrub before the mix ever rises — a deadlock, not a diagnosis. The
+       * verdict is null (withhold) while the twin is not painting.
+       * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03] */
+      let visible = true;
+      try {
+        const eff = Number(mixCtl?.getEffMix?.() ?? mixCtl?.getMix?.() ?? 100);
+        visible = !Number.isFinite(eff) || eff >= TWIN_CONTENT_MIN_MIX;
+      } catch { visible = true; }
       let contentOk = null;
       try {
-        contentOk = twinContentPass({
+        contentOk = twinContentVerdict({
           frames: twinFrames,
           mapIdle,
           sceneLive,
           coverage,
           spread,
           minFrames: HANDOFF_PREWARM_MIN_FRAMES,
+          visible,
         });
       } catch { contentOk = null; }
       return { frames: twinFrames, mapIdle, sceneLive, coverage, spread, contentOk };
@@ -2310,9 +2344,30 @@ async function boot() {
     const hit = resolveSector(sectorQ.sector);
     let sectorSel = null;
     // Anchor: the map's handed-off frame center, else the sector pin.
+    /* ANCHOR LAW (Phase-03 black twin): a handed frame may OWN the twin
+     * anchor only while its center still sits over the sector the twin
+     * reconstructs (sector.js frameAnchorOnSite). The gallery path prewarms
+     * the twin off the map's COUNTRY boot view (z1, cx 10.9), and
+     * frameTarget() turns that into a world point ~3.3 Mm west of
+     * Sangachal; the range law then clamps to TWIN_MAX_RANGE_M and the twin
+     * paints 42 km of empty ground (measured: coverage 0, spread 0, mean
+     * 0.0000, 30 draw calls of off-screen geometry) while the map reads idle
+     * and the scene reads live. An off-site frame is a zoom hint only: the
+     * sector pin owns the anchor and the iso range floor owns the range —
+     * never the boot zoom.
+     * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03] */
+    const pin = hit ? { x: hit.sector.dx, z: hit.sector.dz } : null;
     let anchor = null;
-    if (sectorQ.frame) anchor = frameTarget(sectorQ.frame);
-    if (!anchor && hit) anchor = { x: hit.sector.dx, z: hit.sector.dz };
+    let frameOwnsAnchor = false;
+    if (sectorQ.frame) {
+      const fa = frameTarget(sectorQ.frame);
+      if (fa && (!pin || frameAnchorOnSite(fa, pin))) {
+        anchor = fa;
+        frameOwnsAnchor = true;
+      }
+    }
+    if (!anchor && pin) anchor = { x: pin.x, z: pin.z };
+    sectorPin = pin;
     if (hit) {
       sectorSel = {
         h3: hit.h3, sectorId: hit.sector.id,
@@ -2337,7 +2392,11 @@ async function boot() {
       if (anchor) {
         const vp = viewportPxNow();
         let startRange = null;
-        if (sectorQ.frame) {
+        // Range law: the handed zoom owns the range ONLY while the handed
+        // frame owns the anchor (see the boot anchor law). An off-site frame
+        // (country prewarm) would otherwise ask for TWIN_MAX_RANGE_M and
+        // paint an empty 42 km plate.
+        if (sectorQ.frame && frameOwnsAnchor) {
           startRange = frameRange(sectorQ.frame.z, { viewportPx: vp, lat: sectorQ.frame.cy });
         }
         if (!Number.isFinite(startRange) || startRange <= 0) startRange = 12000;
