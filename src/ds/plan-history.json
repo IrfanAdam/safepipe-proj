@@ -7183,6 +7183,34 @@
      "state": "8/8"
     }
    ]
+  },
+  {
+   "sha": null,
+   "date": "2026-10-25",
+   "time": "20:16",
+   "hash": "1721ca05",
+   "sections": [
+    {
+     "head": "Phase 1 — Renderer: block structure, honest done, owned gates {#phase-1}",
+     "hash": "f5ef5410",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 2 — Grammar rollout: normalize gates + labels across plans {#phase-2}",
+     "hash": "c821d1cb",
+     "state": "2/2"
+    },
+    {
+     "head": "Phase 3 — Task headers, accordions, compact metadata {#phase-3}",
+     "hash": "fb5c2d8a",
+     "state": "3/3"
+    },
+    {
+     "head": "Phase 4 — Polish: ship-gate, stamps, titles, heads, ticks, lone-task, reconcilia",
+     "hash": "d16ef22c",
+     "state": "8/8"
+    }
+   ]
   }
  ]
 }

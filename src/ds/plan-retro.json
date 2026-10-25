@@ -381,6 +381,12 @@
   "sha": "00656ad",
   "plan": "2026-10-15_120000-safepipe-changelog-timeline.md",
   "anchor": "task-2",
-  "note": "empty deploy trigger \u2014 rebuilt production after manifest purge, no code"
+  "note": "empty deploy trigger — rebuilt production after manifest purge, no code"
+ },
+ {
+  "sha": "8063944",
+  "plan": "2026-10-07_130000-safepipe-changelog.md",
+  "anchor": "task-3",
+  "note": "calendar weekday column (Mon/Wed/Fri, Sun-first) — landed without a trailer; graph.js calendar view was created under Task 3"
  }
 ]

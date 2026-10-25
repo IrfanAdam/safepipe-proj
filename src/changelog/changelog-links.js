@@ -1,6 +1,6 @@
 // safepipe changelog — link layer: manifest → section badges + unlinked list · [plan:2026-10-07_130000-safepipe-changelog.md#task-2]
 import manifest from '../ds/plan-manifest.json';
-import { fmtDate, fmtTime, anchorHit, anchorHitCI } from './changelog-parse.js';
+import { fmtDate, fmtTime, anchorHit, anchorHitCI, split } from './changelog-parse.js';
 const fmtTimelineDate = (iso) => { if(!iso) return ''; const d=fmtDate(iso); return d ? d.replace(' ', ' ').replace(/^([0-9]{2}) ([A-Za-z]{3}) ([0-9]{4})$/, (_,dd,mmm,yyyy)=> `${Number(dd)} ${mmm}, ${yyyy}`) : iso; };
 const GH = 'https://github.com/IrfanAdam/safepipe-proj/commit/';
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/\"/g, '&quot;').replace(/</g, '&lt;');
@@ -32,7 +32,17 @@ export const badges = (list, title = 'Commits') => {
   return `<hr class="ds-hr"><details class="ds-commits-panel ds-panel" data-commits="${n}" open><summary class="ds-revs-title ds-panel-title"><span class="ds-caret">‹›</span>${esc(title)} · <span class="ds-panel-num">${n}</span></summary><div class="ds-timeline">${inner}</div></details>`;
 };
 export const unlinked = (texts) => {
-  const xs = commits.filter((c) => !c.plan || !texts[c.plan] || (c.anchor && !anchorHitCI(texts[c.plan], c.anchor)));
+  // Triage must match the way hits() matches: section bodies carry
+  // synthesized `{#task-N}` tokens that raw plan text lacks, so a commit
+  // whose anchor hits any section is linked even when the whole-text
+  // check below misses it.
+  const secCache = {};
+  const secHit = (file, anchor) => {
+    if (!anchor) return false;
+    if (!secCache[file]) secCache[file] = split(texts[file] || '').map((s) => s.body);
+    return secCache[file].some((b) => anchorHit(b, anchor));
+  };
+  const xs = commits.filter((c) => !c.plan || !texts[c.plan] || (c.anchor && !anchorHitCI(texts[c.plan], c.anchor) && !secHit(c.plan, c.anchor)));
   if (!xs.length) return '<h2>Unlinked changes</h2><p>All tracked — every commit cites its plan.</p>';
   return ['<h2>Unlinked changes</h2><p>These cite no plan — link next time via ',
     '<code>[plan:&lt;file&gt;#&lt;anchor&gt;]</code>.</p>'].join('')

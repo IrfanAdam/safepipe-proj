@@ -235,9 +235,7 @@ export function paintRevs(revs, scope){
     const date = allDates[di];
     const dLabelDate = fmtTimelineDate(date) || date || 'Undated';
     const dayNum = allDates.length - di;
-    const dayCommits = scope && scope.commitDates ? (scope.commitDates[date] || 0) : null;
-    const daySuffix = dayCommits === null ? '' : ` · ${dayCommits} commit${dayCommits === 1 ? '' : 's'}`;
-    const dayLabel = `<span class="ds-caret">‹›</span><span class="ds-day-num">Day ${dayNum}</span> · ${esc(dLabelDate)}${daySuffix}`;
+    const dayLabel = `<span class="ds-caret">‹›</span><span class="ds-day-num">Day ${dayNum}</span> · ${esc(dLabelDate)}`;
     const gates = gateByDate.get(date) || [];
     const revsForDate = revByDate.get(date) || [];
     let groupInner = '';

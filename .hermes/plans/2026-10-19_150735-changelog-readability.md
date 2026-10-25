@@ -336,4 +336,4 @@
 
 **Verify:** build green; commit with `[plan:2026-10-19_150735-changelog-readability.md#phase-12]`; close with `✓ done` + sha.
 
-**Eval · 2026-10-25 (owner):** each Evals Day group now carries a section-scoped commit-count suffix (`Day N · <date> · M commits`) so a day's review volume reads at a glance. Token-only, no layout change; `0 commits` shows when the date has evals but no linked commits.
+**Eval · 2026-10-25 (owner, revised):** per-Day commit suffix reverted — the Evals section accordion count (`Evals · N`) is the review count, no per-day commit strings. Same eval also fixes triage: `unlinked()` now matches the way `hits()` matches (synthesized per-section `{#task-N}` tokens), clearing 87 false orphans; the one genuinely trailer-less commit (`8063944`, calendar weekday column) is retro-mapped via `src/ds/plan-retro.json` to the changelog plan Task 3 that owns the calendar graph.
