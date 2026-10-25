@@ -127,6 +127,47 @@ export function holdPolarForFrame(frame) {
   }
 }
 
+/* ISO-POSE TRACK (twin side, staged band): the map side HOLDS its scrubbed
+ * end-frame at the iso pole for the whole staged band (z clamps at
+ * Z_HANDOFF so pitchTargetForZoom reads ISO_PITCH_DEG; the S-owned tilt
+ * extra is 0 — STAGED_HOLD_PITCH_DEG), so the twin's staged pose must hold
+ * the SAME pole at every S tick — never replay the 0->45 terrain ramp
+ * under the overlay. poseAtIsoPolar re-places a pose's eye at the given
+ * pole on its own target/range/bearing (polar-only, same anchor — no
+ * center/range travel, which stay owned by the lock/scale lanes). Defaults
+ * to the shared iso pole (HANDOFF_ISO_POLAR_DEG, itself ISO_PITCH_DEG —
+ * never a restated literal). Null on any non-finite input — caller falls
+ * back, never a canned pose. Pure + node-checkable. */
+export function poseAtIsoPolar(pose, polarDeg = HANDOFF_ISO_POLAR_DEG) {
+  try {
+    const t = pose?.target;
+    const e = pose?.eye;
+    if (!t || !e) return null;
+    if (![t.x, t.y, t.z, e.x, e.y, e.z].every(Number.isFinite)) return null;
+    let pol = Number(polarDeg);
+    if (!Number.isFinite(pol)) pol = HANDOFF_ISO_POLAR_DEG;
+    const dx = e.x - t.x;
+    const dy = e.y - t.y;
+    const dz = e.z - t.z;
+    const range = Math.hypot(dx, dy, dz);
+    if (!(range > 0)) return null;
+    const azim = Math.atan2(dx, dz); // poseAt convention: x=+r·sp·sin, z=+r·sp·cos
+    const p = (pol * Math.PI) / 180;
+    const sp = Math.sin(p);
+    const cp = Math.cos(p);
+    return {
+      eye: {
+        x: t.x + range * sp * Math.sin(azim),
+        y: t.y + range * cp,
+        z: t.z + range * sp * Math.cos(azim),
+      },
+      target: { x: t.x, y: t.y, z: t.z },
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Raw ?sector= / ?embed= values from a search string. Frame params
  * (cx/cy/z/bearing) ride along when the map overlay opens the twin. */
 export function parseSectorQuery(search = '') {

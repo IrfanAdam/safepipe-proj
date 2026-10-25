@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_ENTER_DELTA, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
  * generic reverse walker resolves stage ORDER + values through here so a
@@ -1386,7 +1386,7 @@ async function boot() {
           // release), falling back to the pinned start when uncaptured.
           const st = handoff.start;
           const live = capturePose();
-          const liveStart = live && live.eye && live.target
+          let liveStart = live && live.eye && live.target
             ? { eye: live.eye, target: live.target }
             : null;
           // Lane eval-scale: a STAGED release dissolves over a map that is
@@ -1398,6 +1398,18 @@ async function boot() {
           // start to +0.38x at its end on an 800px viewport). The push then
           // rides poseAtRange, i.e. a pure recentre at constant range.
           const stagedRelease = fwdStagedOwnsIntro({ stagedS: handoff.fwdStagedS, deepFrame: frameDeep });
+          /* ISO-POSE TRACK (staged release backstop): freeze the legs from
+           * the live pose lifted onto the iso pole (same target/range/
+           * bearing via poseAtIsoPolar) so the scrub law holds 45 at every
+           * S tick even if the hold had not fully converged (stale pin,
+           * damping residue). No-op once the hold convergence in
+           * applyTwinStagedS has run. Shallow (autoplay) releases keep the
+           * live pose untouched. */
+          if (stagedRelease && liveStart) {
+            try {
+              liveStart = poseAtIsoPolar(liveStart, HANDOFF_ISO_POLAR_DEG) ?? liveStart;
+            } catch { /* fall back to the live pose */ }
+          }
           let midPose = releaseFreshMid(handoff.mid);
           let toPose = handoff.to;
           if (stagedRelease) {
@@ -1789,6 +1801,30 @@ async function boot() {
       try {
         handoff.fwdStagedAt = handoffNow();
       } catch { /* freshness stamp is best-effort */ }
+      /* ISO-POSE TRACK (staged band): while still in hold with the staged
+       * driver owning the intro, converge the pinned hold onto the iso
+       * pole — polar-only (same anchor/range/bearing; center/scale stay
+       * with the lock/scale lanes). An early-booted shell pins its boot
+       * polar (top-down for pre-grade boots) and the refit/retarget path
+       * preserves it (keepPolar), so without this the staged release would
+       * freeze legs from a top-down pose and replay the 0->45 terrain ramp
+       * under a map held at 45. Pre-release the overlay reads 0
+       * (release-gated), so the convergence is invisible; at release the
+       * live pose is already iso and the frozen swoop holds the pole at
+       * every S tick. One-shot (skips once on-pole — no per-tick pin
+       * churn against damping). */
+      try {
+        if (handoff.phase === 'hold') {
+          const fz = Number(handoff.frame?.z);
+          const deep = Number.isFinite(fz) && fz >= Z_HANDOFF;
+          if (fwdStagedOwnsIntro({ stagedS: handoff.fwdStagedS, deepFrame: deep })) {
+            const s0 = handoff.start;
+            if (s0 && Math.abs(Number(s0.polar) - HANDOFF_ISO_POLAR_DEG) > 1e-9) {
+              handoff.start = pinHold(s0.tx, s0.tz, s0.range, s0.bearing, HANDOFF_ISO_POLAR_DEG);
+            }
+          }
+        }
+      } catch { /* iso convergence never breaks the staged drive */ }
       if (handoff.fwd && (handoff.phase === 'swoop' || handoff.phase === 'push')) {
         handoff.fwd.staged = true;
       }
