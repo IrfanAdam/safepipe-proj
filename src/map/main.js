@@ -695,6 +695,12 @@ let stagedTilesGranted = false;
 let stallT0 = 0;
 let stallCeilingOn = false; // pre-gate depth freeze applied (restored only when set here)
 let stallPollT = 0; // bounded presentation poll: one 500ms chain while holding (cleared on release)
+// HARD-STOP pill grace: the loader is a FALLBACK surface, not a dive badge.
+// stallPhase arms at the mask (z~7) while fast-grant dives release almost
+// immediately — showing the pill from tick 0 flashes it on every healthy
+// dive. Visibility waits STALL_PILL_GRACE_MS of held time; the feeder gate
+// (zoom freeze) is unaffected and engages from tick 0.
+const STALL_PILL_GRACE_MS = 2000;
 function stallPhase() {
   try {
     if (transitId) return null;
@@ -777,6 +783,79 @@ function applyStallCeiling(hold) {
     if (stallCeilingOn) { restoreMaxZoom(); stallCeilingOn = false; }
   } catch { /* ceiling is best-effort */ }
 }
+/** Preventive directional guards for non-wheel forward input: touch pinch-in,
+ * keyboard +, and double-click carry forward intent without emitting a wheel
+ * tick, so the wheel-lane swallows above never see them — without a guard
+ * they ratchet depth forward under the hold. Each guard swallows FORWARD
+ * only (pinch-out, keyboard -, and every reverse lane pass through untouched,
+ * so the fingers always escape by going back). Installed once at boot next
+ * to the other lane guards. Never throws. */
+let stallPinchD = -1; // last two-finger distance for the touch pinch guard
+function installStallForwardGuards() {
+  try {
+    if (window.__stallGuardsInstalled) return;
+    window.__stallGuardsInstalled = true;
+  } catch { /* flag best-effort */ }
+  // Keyboard: +/= (and numpad +) zoom in, -/_ zoom out. Swallow forward.
+  window.addEventListener('keydown', (e) => {
+    try {
+      if (!e || e.defaultPrevented) return;
+      const t = e.target;
+      try {
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      } catch { /* target read is best-effort */ }
+      const k = e.key;
+      const fwd = k === '+' || k === '=' || k === 'Add';
+      if (!fwd) return;
+      if (stallSwallowForward()) {
+        try { window.__mapProbe.stallGuardSwallows = (+window.__mapProbe.stallGuardSwallows || 0) + 1; } catch { /* probe cosmetic */ }
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    } catch { /* guard never breaks input */ }
+  }, { capture: true });
+  // Double-click zooms in (forward) — swallow while holding.
+  window.addEventListener('dblclick', (e) => {
+    try {
+      if (stallSwallowForward()) {
+        try { window.__mapProbe.stallGuardSwallows = (+window.__mapProbe.stallGuardSwallows || 0) + 1; } catch { /* probe cosmetic */ }
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    } catch { /* guard never breaks input */ }
+  }, { capture: true, passive: false });
+  // Touch pinch: two fingers spreading zooms out (reverse, free), closing
+  // zooms in (forward, swallowed). Single-finger pan always passes — pan is
+  // not forward intent. Non-passive so preventDefault actually blocks.
+  window.addEventListener('touchstart', (e) => {
+    try {
+      if (e && e.touches && e.touches.length === 2) {
+        const a = e.touches[0];
+        const b = e.touches[1];
+        stallPinchD = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      } else stallPinchD = -1;
+    } catch { stallPinchD = -1; }
+  }, { capture: true, passive: true });
+  window.addEventListener('touchmove', (e) => {
+    try {
+      if (!e || !e.touches || e.touches.length !== 2 || stallPinchD <= 0) return;
+      const a = e.touches[0];
+      const b = e.touches[1];
+      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const closing = d < stallPinchD;
+      stallPinchD = d;
+      if (!closing) return; // spreading = reverse, always free
+      if (stallSwallowForward()) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    } catch { /* guard never breaks input */ }
+  }, { capture: true, passive: false });
+  window.addEventListener('touchend', () => {
+    try { stallPinchD = -1; } catch { /* reset is best-effort */ }
+  }, { capture: true, passive: true });
+  try { window.__mapProbe.stallGuards = 'keys+dblclick+touch'; } catch { /* probe cosmetic */ }
+}
 /** Single writer for the stall presentation: arms the hold clock, sets loader
  * visibility + pre-gate depth ceiling + probe. Idempotent; safe from every
  * tick/handler. Returns the holding bit so feeder gates stay one-liners. */
@@ -800,9 +879,15 @@ function refreshStallLoading() {
   } catch { hold = false; }
   try {
     const el = ensureStallLoading();
-    if (el) el.hidden = !hold;
+    // Pill grace: the freeze engages from tick 0, but the pill only shows
+    // after STALL_PILL_GRACE_MS of held time — fast-grant dives release
+    // before the grace and never flash it (fallback-only surface).
+    if (el) el.hidden = !(hold && stallWaitMs() >= STALL_PILL_GRACE_MS);
   } catch { /* cosmetic */ }
   try { applyStallCeiling(hold); } catch { /* ceiling is best-effort */ }
+  // NOTE: non-wheel forward input (touch pinch-in, keyboard +, double-click)
+  // is swallowed by installStallForwardGuards (boot-wired below) — no
+  // enable/disable lock here, so reverse retreat is never trapped.
   try {
     window.__mapProbe.stall = {
       holding: hold,
@@ -1140,6 +1225,22 @@ let lastVyWritten = null; // Guards stay inline at each setProperty site (never 
 // driver keeps one literal per-site write of the horizontal and vertical radii.
 let entryRx = null; // staged-entry radii: the arrival's live-law write, cached so the hold ring blends entry->seam on scroll instead of snapping to the seam constant (cleared on unwind)
 let entryRy = null;
+/** SINGLE RADIUS LAW: viewport-clamped farthest-corner distance. An
+ * off-screen hotspot inflates the true corner 100x (measured 21000px
+ * blowups that parked the mask off-frame), while the staged-hold entry
+ * refresh already clamps the spot to the viewport — two corner laws whose
+ * mid-band radii disagreed by ~2x (park vs entry). Both writers now share
+ * this clamp: bounded, smooth, converging exact as the enclosure span
+ * closes (t->1 yields the ring radius whatever the corner). Pure. */
+function viewportCornerPx(sx, sy, cw, ch) {
+  const w = Number.isFinite(+cw) && +cw > 0 ? +cw : 800;
+  const h = Number.isFinite(+ch) && +ch > 0 ? +ch : 600;
+  const csx = Math.min(Math.max(+sx, 0), w);
+  const csy = Math.min(Math.max(+sy, 0), h);
+  const fx = Math.max(csx, w - csx);
+  const fy = Math.max(csy, h - csy);
+  return Math.sqrt(fx * fx + fy * fy);
+}
 /** Write the live enclosure ellipse (center + radii) onto #app from a proximity
  * read and a zoom. Returns the ellipse, or null when it parks (no corner /
  * below band / unreadable frame). Every radii write caches, so the park path
@@ -1158,21 +1259,34 @@ function writeEnclosureEllipse(proxArg, zArg) {
     // Center follows proximity only: an off-screen projection parks the spot
     // 100k+ px out, and writing it would snap the mask + brackets across the
     // frame when nearness resumes. Radii still write (the arrival path needs
-    // true sizes off-centre); the stale center is simply left at last-near.
+    // true sizes off-centre); the stale center is simply left at last-near —
+    // UNLESS a site-anchored hold owns the frame: then the mask rides the
+    // ANCHOR projection (the twin's handed center, SITE by construction),
+    // so mask and twin agree even off-centre, zero lateral offset.
     if (prox.near) {
       const vxStr = Math.round(prox.sx) + 'px';
       const vyStr = Math.round(prox.sy) + 'px';
       if (lastVxWritten !== vxStr) { app.style.setProperty('--vx', vxStr); lastVxWritten = vxStr; }
       if (lastVyWritten !== vyStr) { app.style.setProperty('--vy', vyStr); lastVyWritten = vyStr; }
+    } else if (stagedActive && stagedAnchor && stagedAnchor.site && mapRef) {
+      try {
+        const pa = mapRef.project([stagedAnchor.cx, stagedAnchor.cy]);
+        if (pa && Number.isFinite(+pa.x) && Number.isFinite(+pa.y)) {
+          const vxStr = Math.round(pa.x) + 'px';
+          const vyStr = Math.round(pa.y) + 'px';
+          if (lastVxWritten !== vxStr) { app.style.setProperty('--vx', vxStr); lastVxWritten = vxStr; }
+          if (lastVyWritten !== vyStr) { app.style.setProperty('--vy', vyStr); lastVyWritten = vyStr; }
+        }
+      } catch { /* anchor-center write is best-effort */ }
     }
     let corner = null;
     try {
       const el = mapRef.getContainer();
       const w = (el && el.clientWidth) || window.innerWidth || 800;
       const h = (el && el.clientHeight) || window.innerHeight || 600;
-      const fx = Math.max(prox.sx, w - prox.sx);
-      const fy = Math.max(prox.sy, h - prox.sy);
-      corner = Math.sqrt(fx * fx + fy * fy);
+      // SINGLE RADIUS LAW: the clamped corner (shared with the staged-hold
+      // entry refresh below) — never the true off-screen projection.
+      corner = viewportCornerPx(prox.sx, prox.sy, w, h);
     } catch { corner = null; }
     const ellipse = enclosureEllipsePxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, corner);
     if (ellipse && Number.isFinite(ellipse.rx) && Number.isFinite(ellipse.ry)) {
@@ -2068,7 +2182,18 @@ function flyToSectorThenTwin(id, opts = {}) {
       try {
         window.__mapProbe.staged = { active: true, s: 0, committed: false };
       } catch { /* probe cosmetic */ }
-      prewarmThenReveal(id, liveFrame(), { ...opts, staged: true });
+      // CENTER CONVERGENCE: the twin boots on the hotspot by construction
+      // (handed cx/cy = SITE, the mask center) — never the drifted live
+      // camera — so the dissolve superimposes with zero lateral offset.
+      // The S-glide (driveStagedHold b2) slides the live map onto the same
+      // point over the hold; the release re-derivation (round-8) already
+      // re-seats range from the grant-time zoom.
+      const stagedFrame = liveFrame();
+      if (stagedFrame) {
+        stagedFrame.cx = SITE_LNGLAT[0];
+        stagedFrame.cy = SITE_LNGLAT[1];
+      }
+      prewarmThenReveal(id, stagedFrame || liveFrame(), { ...opts, staged: true });
       // HARD-STOP idle poll: one fallback slide so content detection retries
       // even with no scroll ticks (the staged branch never blind-reveals;
       // each fire re-drives the frozen hold and refreshes the loader, so the
@@ -2105,6 +2230,10 @@ function restoreMaxZoom() {
  * lock. Idempotent; never throws. */
 let stagedAnchor = null;
 let stagedFrozen = false;
+// S-glide source: the live camera center at freeze. The hold glides it onto
+// the hotspot as a pure fn of S (driveStagedHold), so the map slides under
+// the frozen mask/twin pair with no snap at either end. Cleared with the anchor.
+let stagedFreezeCenter = null;
 function freezeStagedFrame() {
   try {
     if (mapRef) {
@@ -2119,12 +2248,20 @@ function freezeStagedFrame() {
       if (c && Number.isFinite(+c.lng) && Number.isFinite(+c.lat)) {
         const zz = Number.isFinite(z) ? z : Z_HANDOFF;
         stagedAnchor = {
-          cx: +c.lng,
-          cy: +c.lat,
+          // CENTER CONVERGENCE: the anchor sits ON the hotspot by
+          // construction — the mask writes the anchor projection and the
+          // twin boots on the handed anchor frame, so mask center and twin
+          // center agree even for off-centre arrivals (never the drifted
+          // live camera). Zoom/pitch/bearing stay live (depth + tilt laws
+          // own those); only pan needed the lock.
+          site: true,
+          cx: SITE_LNGLAT[0],
+          cy: SITE_LNGLAT[1],
           z: zz,
           pitch: Number.isFinite(p) ? p : pitchTargetForZoom(zz),
           bearing: Number.isFinite(b) ? b : 0,
         };
+        stagedFreezeCenter = { lng: +c.lng, lat: +c.lat };
       }
       try { if (mapRef.dragPan) mapRef.dragPan.disable(); } catch { /* lock best-effort */ }
       try { if (mapRef.touchZoomRotate) mapRef.touchZoomRotate.disable(); } catch { /* lock best-effort */ }
@@ -2163,7 +2300,15 @@ function reassertStagedAnchor(reason) {
       ? Math.abs(z - stagedAnchor.z) : 0;
     if ((driftPx >= 0 && driftPx > 2) || zDrift > 0.02) {
       try {
-        mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy], zoom: stagedAnchor.z });
+        if (stagedActive && stagedAnchor && stagedAnchor.site) {
+          // CENTER CONVERGENCE: the S-glide owns centering mid-hold (it
+          // converges the arrival center onto the hotspot as a pure fn of
+          // S) — a center snap here would replay the lateral offset the
+          // glide removes. Correct depth only; leave pan to the glide.
+          if (zDrift > 0.02) mapRef.jumpTo({ zoom: stagedAnchor.z });
+        } else {
+          mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy], zoom: stagedAnchor.z });
+        }
       } catch { /* re-assert is best-effort */ }
       reasserted = true;
     }
@@ -2186,6 +2331,7 @@ function reassertStagedAnchor(reason) {
 function unfreezeStagedFrame() {
   stagedFrozen = false;
   stagedAnchor = null;
+  stagedFreezeCenter = null; // S-glide source dies with the anchor
   try {
     if (mapRef) {
       try { if (mapRef.dragPan) mapRef.dragPan.enable(); } catch { /* unlock best-effort */ }
@@ -2306,21 +2452,19 @@ function driveStagedHold(st) {
               const e = writeEnclosureEllipse(proxLive, zLive);
               if (e && Number.isFinite(e.rx) && e.rx > 0) { entryRx = +e.rx.toFixed(1); entryRy = +e.ry.toFixed(1); }
             } else {
-              // Off-centre: the true spot inflates the corner law 100x, so
-              // evaluate it with the spot clamped to the viewport — bounded,
-              // smooth, and tracking zoom (converges exact as t->1). Center
-              // stays parked at last-near (untouched here, as before).
+              // Off-centre: the spot clamps to the viewport via the SINGLE
+              // RADIUS LAW corner (viewportCornerPx, shared with the live
+              // enclosure writer above) — bounded, smooth, and tracking zoom
+              // with the spot clamped to the viewport (converges exact as
+              // t->1). Center stays parked at last-near (untouched here, as
+              // before) — the live writer above owns the anchor center.
               let cw = 0, chh = 0;
               try {
                 const el = mapRef.getContainer();
                 cw = (el && el.clientWidth) || window.innerWidth || 800;
                 chh = (el && el.clientHeight) || window.innerHeight || 600;
               } catch { cw = 800; chh = 600; }
-              const csx = Math.min(Math.max(proxLive.sx, 0), cw);
-              const csy = Math.min(Math.max(proxLive.sy, 0), chh);
-              const fx = Math.max(csx, cw - csx);
-              const fy = Math.max(csy, chh - csy);
-              const corner = Math.sqrt(fx * fx + fy * fy);
+              const corner = viewportCornerPx(proxLive.sx, proxLive.sy, cw, chh);
               const ec = enclosureEllipsePxForZoom(zLive, SITE.lat, MAP_VIGNETTE_RING_M, corner);
               if (ec && Number.isFinite(ec.rx) && ec.rx > 0) { entryRx = +ec.rx.toFixed(1); entryRy = +ec.ry.toFixed(1); }
             }
@@ -2345,6 +2489,26 @@ function driveStagedHold(st) {
       }
     }
   } catch { /* hold ring is best-effort */ }
+  // (b2) center convergence — the S-glide: the map center rides from its
+  // arrival seat onto the hotspot as a pure fn of S (k = st.reveal: 0 at
+  // entry, 1 at commit), so the map slides UNDER the frozen mask/twin
+  // pair with no snap at either end. jumpTo is instant (no timers —
+  // scroll-pure) and symmetric (scroll-up retraces it through the same
+  // law). At commit k=1 the map center IS the hotspot, so the commit's
+  // center-near gate reads true for every aimed dive including
+  // static-cursor ones. The mask center is written from the anchor
+  // projection by the live writer above — mask and twin share one center
+  // by construction.
+  try {
+    if (mapRef && stagedActive && stagedAnchor && stagedAnchor.site && stagedFreezeCenter) {
+      const k = clamp01(st && Number.isFinite(st.reveal) ? st.reveal : 0);
+      if (k > 0 && Number.isFinite(stagedFreezeCenter.lng) && Number.isFinite(stagedFreezeCenter.lat)) {
+        const cx = stagedFreezeCenter.lng + (stagedAnchor.cx - stagedFreezeCenter.lng) * k;
+        const cy = stagedFreezeCenter.lat + (stagedAnchor.cy - stagedFreezeCenter.lat) * k;
+        try { mapRef.jumpTo({ center: [cx, cy] }); } catch { /* glide is best-effort */ }
+      }
+    }
+  } catch { /* center glide never breaks the hold */ }
   // (c) satellite rides the same S progress as the overlay (the staged blend
   // stage holds full sat): glued to the fingers through the hold, never to
   // the clamped z both laws agree on anyway.
@@ -2516,11 +2680,33 @@ function driveStagedOverlay() {
       return; // no commit — hold the map, retry when the twin reports content
     }
     if (!proxNear || !scaleNear) {
+      // NEAR-FAIL RECOVERY: S is maxed and the overlay is opaque (the map is
+      // hidden), so a recenter is invisible. Re-park the map onto the staged
+      // anchor (SITE by construction) instead of stranding uncommitted with
+      // no recovery: the next tick reads near and the commit lands.
+      // Single-shot by construction (the post-jump drift reads ~0, so the
+      // jump arm goes quiet). Never commits blind — the gates below still
+      // decide on the retried tick.
+      let recovered = false;
+      try {
+        const ax = stagedAnchor && Number.isFinite(stagedAnchor.cx) ? stagedAnchor.cx : SITE_LNGLAT[0];
+        const ay = stagedAnchor && Number.isFinite(stagedAnchor.cy) ? stagedAnchor.cy : SITE_LNGLAT[1];
+        if (mapRef && typeof mapRef.jumpTo === 'function' && (!proxNear || !scaleNear)) {
+          const jump = {};
+          if (!proxNear) jump.center = [ax, ay];
+          if (!scaleNear && stagedAnchor && Number.isFinite(stagedAnchor.z)) jump.zoom = stagedAnchor.z;
+          if (jump.center || jump.zoom) {
+            mapRef.jumpTo(jump);
+            recovered = true;
+          }
+        }
+      } catch { /* recovery never breaks the hold */ }
       scrubWrite(String(+effReveal.toFixed(4))); // near-guard HOLDS the effective ramp — via the one writer (no transition). Same hold semantics as the blank guard above.
       try {
         window.__mapProbe.staged.blankTwin = false;
         window.__mapProbe.staged.notNear = !proxNear;
         window.__mapProbe.staged.scaleFar = !scaleNear;
+        window.__mapProbe.staged.recovering = recovered;
       } catch { /* probe cosmetic */ }
       return; // no commit — hold the map, retry when the frame is near again
     }
@@ -3852,7 +4038,22 @@ function installBandTakeover() {
       try {
         if (e.deltaMode === 1) dy = dy * 40;
       } catch { /* deltaMode read is best-effort */ }
-      if (twinOpen || transitId || pendingReveal || reverseWait || stagedActive) return;
+      if (twinOpen || transitId || pendingReveal || reverseWait) return;
+      // HARD-STOP staged hold: staging never drives here (the clamp owns
+      // depth), but forward intent must still stall — returning before the
+      // gate below lets zoom leak under the hold below the gate
+      // (10.5->11.5) through this lane. Swallowed ticks repaint the frozen
+      // hold so the S=0 pin + loader stay live without the S feed.
+      if (stagedActive) {
+        try {
+          if (dy > 0 && stallSwallowForward()) {
+            e.preventDefault();
+            e.stopPropagation();
+            try { if (!stagedCommitted) driveStagedOverlay(); } catch { /* frozen repaint is best-effort */ }
+          }
+        } catch { /* stall never breaks input */ }
+        return;
+      }
       let z = null;
       try { z = +mapRef.getZoom(); } catch { z = null; }
       if (!Number.isFinite(z)) return;
@@ -4035,13 +4236,15 @@ function installWheelFlip(rootEl, laneEl, ctx) {
       // HARD-STOP: mask armed + twin unloaded → forward stalls HERE (raw dy>0
       // = dive under the up-out convention): swallowed, loader on, depth
       // frozen by the ceiling in refresh. Reverse always passes to the clone.
-      // Staged holds are NOT swallowed here — the clone must still reach the
-      // canvas accumulator so feedStagedScroll drives the frozen hold (repaint
-      // + S=0 pin) instead of starving it. Past the long cap forward escapes
-      // (flagged in probe.stall).
+      // Staged holds swallow here too (no exemption): the clone must NOT
+      // reach the canvas lane or native zoom advances under the hold below
+      // the gate — the frozen hold repaints inline instead (same drive the
+      // accumulator's stall branch runs), so nothing starves. Past the long
+      // cap forward escapes (flagged in probe.stall).
       try {
-        if (dy > 0 && !stagedActive && stallSwallowForward()) {
+        if (dy > 0 && stallSwallowForward()) {
           try { window.__mapProbe.stallSwallowed = true; } catch { /* probe cosmetic */ }
+          try { if (stagedActive && !stagedCommitted) driveStagedOverlay(); } catch { /* frozen repaint is best-effort */ }
           e.preventDefault();
           e.stopPropagation();
           return;
@@ -4096,10 +4299,13 @@ function installAnchorGuard() {
       if (!armed) return;
       // HARD-STOP: forward pinch (native lane: dy<0 = dive) stalls with the
       // mask armed + twin unloaded; reverse pinch always passes through.
-      // Staged holds fall through to the centered clone (never swallowed) so
-      // the canvas accumulator still feeds the frozen hold's drive.
+      // Staged holds swallow here too (no exemption): the centered clone
+      // must NOT reach the canvas lane or native zoom advances under the
+      // hold below the gate — the frozen hold repaints inline instead.
       try {
-        if (+e.deltaY < 0 && !stagedActive && stallSwallowForward()) {
+        if (+e.deltaY < 0 && stallSwallowForward()) {
+          try { window.__mapProbe.stallSwallowed = true; } catch { /* probe cosmetic */ }
+          try { if (stagedActive && !stagedCommitted) driveStagedOverlay(); } catch { /* frozen repaint is best-effort */ }
           e.preventDefault();
           e.stopPropagation();
           return;
@@ -4111,13 +4317,25 @@ function installAnchorGuard() {
       const r = lane.getBoundingClientRect();
       const cx = r.left + (r.width || 800) / 2;
       const cy = r.top + (r.height || 600) / 2;
+      // GAIN-LINK (pinch parity with the wheel/flip lanes): the centered
+      // clone carries the same mask-anchored dip gain the flip lane applies
+      // at 4031 — without it every pinch tick runs at full rate through
+      // mask formation while wheel dwells. Same law, same arm (mask armed
+      // checked above), direction-free so zoom-out retraces symmetrically.
+      let pinchDip = 1;
+      try {
+        const pz = +mapRef.getZoom();
+        if (Number.isFinite(pz)) pinchDip = maskGainForBlend(centerBlendForZoom(pz), true);
+      } catch { pinchDip = 1; }
+      if (!Number.isFinite(pinchDip) || pinchDip <= 0) pinchDip = 1;
+      try { window.__mapProbe.zoomGain = +pinchDip.toFixed(3); } catch { /* probe cosmetic */ }
       let clone = null;
       try {
         clone = new WheelEvent('wheel', {
           bubbles: true,
           cancelable: true,
           deltaX: +e.deltaX || 0,
-          deltaY: +e.deltaY || 0,
+          deltaY: (+e.deltaY || 0) * pinchDip,
           deltaZ: +e.deltaZ || 0,
           deltaMode: e.deltaMode,
           clientX: cx, clientY: cy,
@@ -4305,6 +4523,9 @@ async function boot() {
   try { installBandTakeover(); } catch { /* takeover best-effort */ }
   // Pinch guard: center-anchored native pinch past the mask arm.
   try { installAnchorGuard(); } catch { /* guard best-effort */ }
+  // Stall guards: touch pinch-in / keyboard + / double-click carry forward
+  // intent with no wheel tick — swallowed while holding, reverse always free.
+  try { installStallForwardGuards(); } catch { /* guards best-effort */ }
   // Task-35 staged scrub: passive stage-scroll accumulator on the same lane
   // (read-only — never hijacks gestures; the maxZoom clamp holds depth).
   try { installStagedAccum(map.getCanvasContainer()); } catch { /* accum best-effort */ }

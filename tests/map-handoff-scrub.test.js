@@ -21,6 +21,11 @@ import {
   HANDOFF_REVEAL_LEN_PX,
   HANDOFF_STAGED_S_MAX,
   handoffStagesForScroll,
+  stagedIntroProgressForS,
+  STAGED_SWOOP_END_PX,
+  HANDOFF_SWOOP_MS,
+  HANDOFF_PUSH_MS,
+  HANDOFF_MORPH_MS,
   satOpacityForZoom,
   pitchTargetForZoom,
   ISO_PITCH_DEG,
@@ -125,7 +130,7 @@ test('driver: timed flight gone, staged scrub owns the outbound path', () => {
   assert.ok(main.includes('setSatScrubbed(satOpacityForZoom'), 'forward sat rides the scrub law');
   assert.ok(main.includes('setMaxZoom(Z_HANDOFF)'), 'scroll-as-zoom clamps at the gate');
   assert.ok(main.includes('installStagedAccum'), 'stage-scroll accumulator is wired');
-  assert.ok(main.includes('prewarmThenReveal(id, liveFrame(), { ...opts, staged: true })'), 'near-gate arrival stages');
+  assert.ok(main.includes('prewarmThenReveal(id, stagedFrame || liveFrame(), { ...opts, staged: true })'), 'near-gate arrival stages');
   assert.ok(main.includes('grant slides the same paint-gated fallback'), 'staged grants slide the fallback window — S owns the dissolve');
   assert.ok(main.includes('driveStagedOverlay'), 'twin-ready routes through the staged driver');
   assert.ok(main.includes('exitStaged()'), 'zoomend settle unwinds the hold');
@@ -536,9 +541,26 @@ test('mask-sync: twin reveal bound to enclosing-mask progress', () => {
   const main = srcOf('../src/map/main.js');
   const trig = srcOf('../src/map/scrolltrigger.js');
   assert.ok(
-    trig.includes('reveal: clamp01(n / HANDOFF_STAGED_S_MAX),'),
-    'the overlay reveal spans the full S hold, linear in S — no dead reveal gate, constant scroll rate',
+    trig.includes('reveal: stagedIntroProgressForS(n),'),
+    'the overlay reveal rides the shared intro/reveal law — dissolve and camera share every mid-band knee, never a linear ramp ahead of the legged intro',
   );
+  // Mid-band knees: swoop done at 750, push done at the ms-proportional
+  // knee, settle to the commit. The old linear law read 0.60 at the swoop
+  // knee while the camera had only converged 0.42.
+  const w1 = HANDOFF_SWOOP_MS / (HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS + HANDOFF_MORPH_MS);
+  const w2 = (HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS) / (HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS + HANDOFF_MORPH_MS);
+  const ps = STAGED_SWOOP_END_PX
+    + ((HANDOFF_STAGED_S_MAX - STAGED_SWOOP_END_PX) * HANDOFF_PUSH_MS) / (HANDOFF_PUSH_MS + HANDOFF_MORPH_MS);
+  assert.equal(STAGED_SWOOP_END_PX, 750, 'the swoop pacing anchor is unchanged');
+  assert.ok(Math.abs(handoffStagesForScroll(750).reveal - w1) < 1e-9, `swoop knee reads intro progress (got ${handoffStagesForScroll(750).reveal})`);
+  assert.ok(Math.abs(handoffStagesForScroll(Math.round(ps)).reveal - w2) < 0.01, 'push knee reads intro progress');
+  assert.ok(handoffStagesForScroll(750).reveal < 0.5, 'no linear lead at the swoop knee (was 0.60)');
+  for (const s of [0, 125, 375, 750, 1000, Math.round(ps), HANDOFF_STAGED_S_MAX]) {
+    assert.ok(
+      Math.abs(handoffStagesForScroll(s).reveal - stagedIntroProgressForS(s)) < 1e-12,
+      `S=${s} reveal IS the shared law`,
+    );
+  }
   assert.ok(
     main.includes('stagedS = HANDOFF_STAGED_S_MAX * smooth01(tSeed);'),
     'the staged seed spans the full band (no 0->0.74 first-tick jump)',
@@ -550,5 +572,70 @@ test('mask-sync: twin reveal bound to enclosing-mask progress', () => {
   assert.ok(
     main.includes('MASK-SYNC: the enclosing wash fires on the reveal tick'),
     'revealTwin co-fires the enclosing wash on the reveal tick (one motion)',
+  );
+});
+
+test('commit+superimpose: near-fail recovery, single radius law, center convergence', () => {
+  // Eval: static-cursor divers dead-ended at S=1250/ov=1 uncommitted (the
+  // near-guard held with no recovery); off-centre mask-vs-twin lateral
+  // offset (mask on hotspot projection, twin on handed map center) with
+  // dual radius laws (park vs entry ~2x apart). Fixes, all asserted here:
+  // (a) the gate re-parks the map onto the anchor while the overlay is
+  // opaque (invisible recenter) and retries — never a blind commit, never
+  // a strand; (b) one clamped corner law feeds both the live writer and
+  // the hold entry; the anchor sits ON the hotspot with the twin booting
+  // on it, the mask writing it, and the S-glide sliding the live map onto
+  // it — twin center == mask center by construction.
+  const main = srcOf('../src/map/main.js');
+  // (a) near-fail recovery at the gate.
+  assert.ok(
+    main.includes('if (!proxNear || !scaleNear) {'),
+    'the gate still holds on off-frame/off-scale (no blind commit)',
+  );
+  assert.ok(
+    main.includes('NEAR-FAIL RECOVERY'),
+    'the near-guard re-parks the map onto the anchor instead of stranding',
+  );
+  assert.ok(
+    main.includes('if (jump.center || jump.zoom)'),
+    'recovery jumps only when a re-park is actually missing',
+  );
+  assert.ok(
+    main.includes('staged.recovering'),
+    'the staged probe publishes the recovery jump',
+  );
+  // (b) single radius law: one clamped corner, both writers.
+  assert.ok(
+    main.includes('function viewportCornerPx('),
+    'the clamped corner is one named law',
+  );
+  assert.ok(
+    (main.match(/viewportCornerPx\(/g) || []).length >= 3,
+    'definition + live writer + hold entry share it (no dual law)',
+  );
+  assert.ok(
+    main.includes('with the spot clamped to the viewport'),
+    'the hold entry refresh keeps its clamp contract',
+  );
+  // (b) center convergence: anchor + boot + mask + glide on the hotspot.
+  assert.ok(
+    main.includes('cx: SITE_LNGLAT[0],'),
+    'the staged anchor sits ON the hotspot, never on the drifted camera',
+  );
+  assert.ok(
+    main.includes('stagedFrame.cx = SITE_LNGLAT[0];'),
+    'the twin boots on the mask center (zero lateral offset by construction)',
+  );
+  assert.ok(
+    main.includes('} else if (stagedActive && stagedAnchor && stagedAnchor.site && mapRef) {'),
+    'the mask writes the anchor projection off-centre (no stale-center park)',
+  );
+  assert.ok(
+    main.includes('stagedAnchor.cx - stagedFreezeCenter.lng'),
+    'the S-glide slides the live map onto the hotspot with no snap',
+  );
+  assert.ok(
+    main.includes('if (zDrift > 0.02) mapRef.jumpTo({ zoom: stagedAnchor.z });'),
+    'the grant re-assert corrects depth only mid-glide (no center snap)',
   );
 });

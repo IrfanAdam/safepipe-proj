@@ -425,7 +425,7 @@ test('forward path untouched: staged laws, intro legs, iso ownership, FOV', () =
   assert.ok(map.includes('isoRestoreDue = true'), 'engage latches the restore due flag');
   assert.ok(map.includes("source === 'native-zoomend' && isoRestoreDue && !shouldCenter(z)"), 'below-band settle glides journey tilt home');
   assert.ok(map.includes('mapRef.jumpTo({ pitch: 0 })'), 'reconcile snaps pitch home instantly (no settle glide)');
-  assert.ok(map.includes('prewarmThenReveal(id, liveFrame(), { ...opts, staged: true })'), 'near-gate arrival still stages');
+  assert.ok(map.includes('prewarmThenReveal(id, stagedFrame || liveFrame(), { ...opts, staged: true })'), 'near-gate arrival still stages');
   const twin = srcOf('../src/ring2/main.js');
   assert.ok(twin.includes('poseForScrubProgress(fwd.legs, fwd.progress)'), 'forward pose still reads the scrub law');
   assert.ok(twin.includes('buildForwardLegs({'), 'forward legs still frozen at hold exit');

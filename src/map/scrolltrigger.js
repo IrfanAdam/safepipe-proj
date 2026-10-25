@@ -162,14 +162,71 @@ export function handoffScrubForZoom(z) {
  * overlay 0 -> 0.74 -> 1.0 in two wheel ticks). Now the overlay moves on the
  * first post-gate tick together with the hold-ring breathing entry->seam on
  * the same S (driveStagedHold): mask and twin ride one continuous motion from
- * the gate to the commit. Ring/blend/tilt pacing is untouched, so the twin
- * intro anchors (swoop over 0..750, push completing at commit) still agree.
+ * the gate to the commit. Ring/blend/tilt pacing is untouched; the map reveal
+ * and the twin intro ride the SAME law (stagedIntroProgressForS below), so
+ * dissolve and camera agree knee-for-knee by construction.
  * Every value is a pure function of S, so scroll-up retraces it
  * symmetrically. Pure + node-checkable; the map-side wheel accumulator owns
  * S, Task 36 consumes S for the range-scrubbed twin intro. */
 export const HANDOFF_STAGE_PX = 250;
 export const HANDOFF_REVEAL_LEN_PX = 500;
 export const HANDOFF_STAGED_S_MAX = 3 * HANDOFF_STAGE_PX + HANDOFF_REVEAL_LEN_PX; // 1250
+
+/* Shared intro/reveal pacing (map + twin, ONE law): the forward intro is
+ * three legs — swoop (invisible convergence), push (rigid satellite move),
+ * settle (imagery melt on a static pose) — with ms-proportional weights, so
+ * the scrub and autoplay clocks agree on pacing and the knees land exactly
+ * on leg boundaries. Both sides consume S through stagedIntroProgressForS:
+ * the twin maps it onto swoop->push->settle (sector.js delegates here), the
+ * map drives the overlay reveal through it — dissolve and camera ride the
+ * same mid-band knees (swoop done at 750, push done at the ms-proportional
+ * knee), never a linear ramp running ahead of a legged intro. Pure +
+ * node-checkable; scroll-up retraces it symmetrically. The leg durations
+ * live HERE (single source); sector.js re-exports them so the pose legs and
+ * the S law can never disagree. */
+export const HANDOFF_SWOOP_MS = 2600;
+export const HANDOFF_PUSH_MS = 2400;
+export const HANDOFF_MORPH_MS = 1200;
+/** S px where the swoop completes (the pacing anchor, unchanged). */
+export const STAGED_SWOOP_END_PX = 3 * HANDOFF_STAGE_PX; // 750
+/** Pure: staged scroll S (px) -> shared intro/reveal progress 0..1.
+ * Piecewise linear across [0,swoopEnd,pushEnd,max]: the leg easing itself
+ * supplies the curve, so the S law stays linear and double-easing never
+ * drags. Parks at 0/1 outside. Non-finite S parks at 0. Never throws. */
+export function stagedIntroProgressForS(
+  s,
+  { revealStartPx = STAGED_SWOOP_END_PX, pushEndPx = null, stagedMaxPx = HANDOFF_STAGED_S_MAX, swoopW = null } = {},
+) {
+  try {
+    const v = Number(s);
+    if (!Number.isFinite(v) || v <= 0) return 0;
+    let rs = Number(revealStartPx);
+    let mx = Number(stagedMaxPx);
+    if (!Number.isFinite(rs) || rs <= 0) rs = STAGED_SWOOP_END_PX;
+    if (!Number.isFinite(mx) || mx <= rs) mx = HANDOFF_STAGED_S_MAX;
+    const swMs = HANDOFF_SWOOP_MS;
+    const puMs = HANDOFF_PUSH_MS;
+    const moMs = HANDOFF_MORPH_MS;
+    const total = swMs + puMs + moMs;
+    const w1 = total > 0 ? swMs / total : 0.5;
+    const w2 = total > 0 ? (swMs + puMs) / total : 0.8;
+    let ps = pushEndPx === null || pushEndPx === undefined ? NaN : Number(pushEndPx);
+    if (!Number.isFinite(ps) || ps <= rs || ps >= mx) {
+      const span = puMs + moMs;
+      ps = span > 0 ? rs + ((mx - rs) * puMs) / span : (rs + mx) / 2;
+    }
+    if (v >= mx) return 1;
+    if (v >= ps) return w2 + ((v - ps) / (mx - ps)) * (1 - w2);
+    if (v >= rs) {
+      let w = swoopW === null || swoopW === undefined ? NaN : Number(swoopW);
+      if (!Number.isFinite(w) || w <= 0 || w >= 1) w = w1;
+      return w + ((v - rs) / (ps - rs)) * (w2 - w);
+    }
+    return (v / rs) * w1;
+  } catch {
+    return 0;
+  }
+}
 export function handoffStagesForScroll(s) {
   const n = Number.isFinite(+s) ? Math.max(0, +s) : 0;
   const seg = (a, b) => smooth01((n - a) / (b - a));
@@ -177,11 +234,12 @@ export function handoffStagesForScroll(s) {
     ring: seg(0, HANDOFF_STAGE_PX),
     blend: seg(HANDOFF_STAGE_PX, 2 * HANDOFF_STAGE_PX),
     tilt: seg(2 * HANDOFF_STAGE_PX, 3 * HANDOFF_STAGE_PX),
-    // Pace: constant scroll rate — linear, not smootherstepped. The old
-    // smootherstep dissolved most of the overlay in one mid-band leap then
-    // crawled into the commit while the twin camera (already linear in S)
-    // held a steady rate. Linear keeps d(reveal)/dS constant on every tick.
-    reveal: clamp01(n / HANDOFF_STAGED_S_MAX),
+    // Pace: the shared intro/reveal law, not a linear ramp. The old linear
+    // dissolve ran ahead of the legged twin intro mid-band (0.60 at the
+    // swoop knee where the camera had only converged 0.42), so the overlay
+    // led the camera through the middle of the hold. Reveal now IS the
+    // intro progress — dissolve and camera share every knee.
+    reveal: stagedIntroProgressForS(n),
   };
 }
 

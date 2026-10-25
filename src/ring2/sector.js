@@ -18,7 +18,12 @@ import {
   TWIN_STAGED_MSG as MAP_TWIN_STAGED_MSG,
   TWIN_FS_MSG as MAP_TWIN_FS_MSG,
 } from '../map/twinlink.js';
-import { HANDOFF_STAGE_PX, HANDOFF_STAGED_S_MAX, ISO_PITCH_DEG, pitchTargetForZoom } from '../map/scrolltrigger.js';
+import { HANDOFF_STAGE_PX, HANDOFF_STAGED_S_MAX, ISO_PITCH_DEG, pitchTargetForZoom, stagedIntroProgressForS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_MORPH_MS } from '../map/scrolltrigger.js';
+/* Intro leg durations: single-sourced in scrolltrigger.js (the shared S
+ * pacing law lives with the S band). Re-exported here so the pose legs,
+ * the scrub weights, and the map-side reveal law share one set of numbers
+ * that can never disagree. */
+export { HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_MORPH_MS };
 
 export const SECTOR_PARAM = MAP_SECTOR_PARAM;
 export const EMBED_PARAM = 'embed';
@@ -62,9 +67,8 @@ export const TWIN_FULLSCREEN_MSG = MAP_TWIN_FS_MSG;
  * + pitch back (swoop reversed) with the slider ->0, then the {recede:true}
  * close posts. Forward total 5900ms; reverse 5000ms. */
 export const HANDOFF_HOLD_MS = 900;
-export const HANDOFF_SWOOP_MS = 2600;
-export const HANDOFF_PUSH_MS = 2400;
-export const HANDOFF_MORPH_MS = 1200;
+/* HANDOFF_SWOOP_MS / PUSH_MS / MORPH_MS: imported + re-exported above
+ * (scrolltrigger.js single source — see the note there). */
 /* Reverse is the exact two-segment mirror: pull (PUSH_MS) then pitch-back
  * (SWOOP_MS). Single source of truth for the total so the flight and any
  * probe margin agree. */
@@ -576,48 +580,16 @@ export function isTwinStagedMessage(data) {
   }
 }
 
-/** Pure: staged scroll S (px) -> forward intro progress 0..1. Piecewise
- * linear: [0,revealStart] eases the swoop leg 0->swoopW, [revealStart,max]
- * the push leg swoopW->1 (the leg easing itself supplies the curve, so the
- * map stays linear and double-easing never drags). Parks at 0/1 outside.
- * Non-finite S parks at 0. Never throws. */
+/** Pure: staged scroll S (px) -> forward intro progress 0..1. Delegates to
+ * the shared map+twin pacing law (stagedIntroProgressForS, scrolltrigger.js
+ * single source) with the twin-side anchor names, so the twin camera and
+ * the map overlay dissolve share every mid-band knee by construction — the
+ * map reveal IS this progress. Same signature, same defaults, same parks. */
 export function fwdProgressForStagedS(
   s,
   { revealStartPx = TWIN_FWD_REVEAL_START_PX, pushEndPx = null, stagedMaxPx = TWIN_FWD_STAGED_MAX_PX, swoopW = null } = {},
 ) {
-  try {
-    const v = Number(s);
-    if (!Number.isFinite(v) || v <= 0) return 0;
-    let rs = Number(revealStartPx);
-    let mx = Number(stagedMaxPx);
-    if (!Number.isFinite(rs) || rs <= 0) rs = TWIN_FWD_REVEAL_START_PX;
-    if (!Number.isFinite(mx) || mx <= rs) mx = TWIN_FWD_STAGED_MAX_PX;
-    // Round-6: three S bands — swoop (invisible convergence), rigid push
-    // (visible, satellite), settle morph at terminal (imagery change on a
-    // static pose). Band edges are ms-proportional so the scrub and autoplay
-    // clocks agree on pacing; the knees land exactly on leg boundaries.
-    const swMs = HANDOFF_SWOOP_MS;
-    const puMs = HANDOFF_PUSH_MS;
-    const moMs = HANDOFF_MORPH_MS;
-    const total = swMs + puMs + moMs;
-    const w1 = total > 0 ? swMs / total : 0.5;
-    const w2 = total > 0 ? (swMs + puMs) / total : 0.8;
-    let ps = pushEndPx === null || pushEndPx === undefined ? NaN : Number(pushEndPx);
-    if (!Number.isFinite(ps) || ps <= rs || ps >= mx) {
-      const span = puMs + moMs;
-      ps = span > 0 ? rs + ((mx - rs) * puMs) / span : (rs + mx) / 2;
-    }
-    if (v >= mx) return 1;
-    if (v >= ps) return w2 + ((v - ps) / (mx - ps)) * (1 - w2);
-    if (v >= rs) {
-      let w = swoopW === null || swoopW === undefined ? NaN : Number(swoopW);
-      if (!Number.isFinite(w) || w <= 0 || w >= 1) w = w1;
-      return w + ((v - rs) / (ps - rs)) * (w2 - w);
-    }
-    return (v / rs) * w1;
-  } catch {
-    return 0;
-  }
+  return stagedIntroProgressForS(s, { revealStartPx, pushEndPx, stagedMaxPx, swoopW });
 }
 
 /** Pure: build the forward intro legs for poseForScrubProgress from the

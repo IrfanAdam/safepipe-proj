@@ -42,7 +42,7 @@ import {
 } from '../src/ring2/sector.js';
 import { SANGACHAL, RING_RADIUS_M } from '../src/ring2/site.js';
 import { RIM_FADE_IN, rimFadeAlpha } from '../src/ring2/drape.js';
-import { HANDOFF_STAGE_PX, HANDOFF_STAGED_S_MAX } from '../src/map/scrolltrigger.js';
+import { HANDOFF_STAGE_PX, HANDOFF_STAGED_S_MAX, stagedIntroProgressForS } from '../src/map/scrolltrigger.js';
 
 register('./css-stub-loader.mjs', import.meta.url);
 const { shouldDeferRedrape, REDRAPE_MAX_DEFERS } = await import('../src/ring2/overlays.js');
@@ -193,6 +193,21 @@ test('staged-S consumer: swoop completes at reveal start, push rigid, settle mor
 test('staged anchors mirror the map-side contract (break loudly, never drift)', () => {
   assert.equal(TWIN_FWD_REVEAL_START_PX, 3 * HANDOFF_STAGE_PX, 'swoop boundary = reveal start (750)');
   assert.equal(TWIN_FWD_STAGED_MAX_PX, HANDOFF_STAGED_S_MAX, 'push end = staged commit (1250)');
+});
+
+test('map/twin single pacing law: reveal(S) == intro progress(S) at every tick', () => {
+  // The map overlay dissolve and the twin intro scrub share one law
+  // (stagedIntroProgressForS, scrolltrigger.js single source — the twin
+  // delegates). Mid-band knees agree exactly: no linear lead, no lag.
+  for (let s = 0; s <= TWIN_FWD_STAGED_MAX_PX + 250; s += 25) {
+    const a = stagedIntroProgressForS(s);
+    const b = fwdProgressForStagedS(s);
+    assert.ok(Math.abs(a - b) < 1e-12, `S=${s} map ${a} == twin ${b}`);
+  }
+  assert.equal(stagedIntroProgressForS(750), fwdProgressForStagedS(750), 'swoop knee agrees');
+  assert.ok(Math.abs(stagedIntroProgressForS(750) - SWOOP_W) < 1e-12, 'swoop knee is the intro weight');
+  assert.equal(stagedIntroProgressForS(1250), 1, 'commit agrees at 1');
+  assert.equal(stagedIntroProgressForS(NaN), fwdProgressForStagedS(NaN), 'parks agree');
 });
 
 test('staged wire format names the channel, matches nothing else', () => {
