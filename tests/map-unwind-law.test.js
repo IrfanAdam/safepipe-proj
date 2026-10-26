@@ -157,9 +157,18 @@ test('the restore writes center + zoom + pitch + bearing in one instant jump', (
 });
 
 test('an aborted close restores the frame it left, not merely home', () => {
-  const close = main().slice(main().indexOf('function doCloseTwin()'), main().indexOf('function flattenJourneyTiltToLaw('));
+  const close = main().slice(main().indexOf('function doCloseTwin('), main().indexOf('function flattenJourneyTiltToLaw('));
   assert.ok(close.includes("if (!unwindActive) {"), 'the close does not double-restore inside unwindDive');
   assert.ok(close.includes("restoreDiveCam('close')"), 'Esc/X close returns to the pre-dive frame');
+  // GESTURE REVERSE: a twin-initiated recede (the user scrolling out) keeps
+  // the handoff pose instead of teleporting to the frame the dive left, so
+  // the way out retraces through the laws and hands over to the native dolly.
+  assert.ok(close.includes('if (opts && opts.gestureReverse) {'), 'the close forks on a gesture reverse');
+  assert.ok(close.includes('holdHandoffPoseForReverse()'), 'a gesture reverse keeps the handoff pose (no jump home)');
+  const holdStart = main().indexOf('function holdHandoffPoseForReverse(');
+  const hold = main().slice(holdStart, main().indexOf('\n}\n', holdStart));
+  assert.ok(hold.includes('diveCam = null;'), 'the retrace consumes the dive record');
+  assert.ok(!hold.includes('jumpTo') && !hold.includes('easeTo'), 'the retrace hand-off moves no camera');
 });
 
 /* ---------- the watch is actually sampled ---------- */

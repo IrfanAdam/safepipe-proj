@@ -65,7 +65,7 @@ test('pan restores on every teardown: unwind, commit-forks, Esc close', () => {
   );
   const forkLocks = main.match(/unfreezeStagedFrame\(\); \/\/ LOCK-EARLY: a resolved hold must not keep the camera lock/g) || [];
   assert.equal(forkLocks.length, 2, `both fork-guard resolves release the lock (found ${forkLocks.length})`);
-  const close = main.slice(main.indexOf('function doCloseTwin()'), main.indexOf('function flattenJourneyTiltToLaw('));
+  const close = main.slice(main.indexOf('function doCloseTwin('), main.indexOf('function flattenJourneyTiltToLaw('));
   assert.ok(close.includes('if (stagedActive && !stagedCommitted) exitStaged();'), 'Esc/close unwinds a live staged hold');
   assert.ok(close.includes('unfreezeStagedFrame();'), 'Esc/close releases the camera lock even for fork-resolved holds');
 });

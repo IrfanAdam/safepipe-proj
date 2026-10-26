@@ -35,6 +35,11 @@ export const Z_ISO_START = Z_FADE1; // terrain->iso begins when the satellite is
 export const Z_TOP = 10.5; // iso checkpoint: terrain->iso completes here; the twin dissolve begins here
 export const Z_HANDOFF = 11.5; // iso->twin completes here (the twin owns the pose at/above this)
 export const Z_MAX = 14.0; // map maxZoom cap
+/* Band-takeover floor: the in-band takeover owns EVERY tick from the mask
+ * edge up (it writes zoom + centre + tilt in ONE camera update). Below the
+ * mask edge the cursor anchor stays native — there is no journey law to
+ * carry, and the user's own framing should win. */
+export const Z_TAKEOVER_FLOOR = Z_CENTER;
 const HOME_EPS = 0.06; // zoomend-at-home tolerance for the reverse edge
 // Single source for the re-arm gate below the staged entry (derived, never restated).
 export const REARM_DOWN_BELOW = Z_TOP - 0.5; // drop below to re-arm onDown / staging
@@ -133,6 +138,73 @@ export function enclosureTForZoom(z) {
 /** Live zoom -> proximity-center blend 0..1 (the shared enclosure span). */
 export function centerBlendForZoom(z) {
   return enclosureTForZoom(z);
+}
+
+/* CENTRE-SETTLE LAW (owner rev: "make sure the hotspot becomes locked to the
+ * center by animating it to the center even sooner"). The mask arms wherever
+ * the user aimed — measured 154.5px off canvas centre on the gallery dive —
+ * and the old centre glide closed that gap across ~2.6 zoom levels (154px at
+ * z7.04, 16px at z8.84, 0 at z9.65), so the ring read off-centre for most of
+ * the visible approach. This law names the settle as a span of ZOOM (never of
+ * ticks or time): from the arm frame the site's screen offset shrinks to zero
+ * over CENTER_SETTLE_SPAN_Z levels and is exactly zero after that, through the
+ * commit. Being a pure function of (z, armZ) it is frame-rate independent, it
+ * cannot overshoot (the smoothstep has zero slope at both ends, so the pan
+ * starts and ends at rest — no snap, no pop), and reading it backwards
+ * retraces the same pan exactly: at z = armZ the camera is back on the arm
+ * frame, which is where the native cursor dolly takes over on the way out.
+ *
+ * Span choice: 0.45 levels is the shortest settle that does not read as a
+ * yank at wheel-notch cadence (a 154px pan over ~3 notches of zoom) while
+ * still landing inside 10px of centre 0.42 levels after onset — inside the
+ * owner's "even sooner" ask and well before the iso/twin band. */
+export const CENTER_SETTLE_SPAN_Z = 0.45;
+export function centerSettleForZoom(z, armZ, spanZ = CENTER_SETTLE_SPAN_Z) {
+  const zz = +z;
+  const az = +armZ;
+  const sp = +spanZ;
+  if (!Number.isFinite(zz) || !Number.isFinite(az) || !Number.isFinite(sp) || !(sp > 0)) return 0;
+  if (zz <= az) return 0;
+  return smooth01((zz - az) / sp);
+}
+/** The site's screen-offset magnitude (px from canvas centre) at the settle
+ * point for an arm frame: armOffsetPx at the arm, 0 from armZ+span on. Pure;
+ * the same number the ring centre and the camera centre both ride. */
+export function centerSettleOffsetPx(armOffsetPx, z, armZ, spanZ = CENTER_SETTLE_SPAN_Z) {
+  const a = +armOffsetPx;
+  if (!Number.isFinite(a) || !(a > 0)) return 0;
+  return a * (1 - centerSettleForZoom(z, armZ, spanZ));
+}
+/* MapLibre's world is TILE_SIZE_PX * 2^z CSS px wide for 360 degrees of
+ * longitude AND for 360 degrees of mercator y (the same tile grid EARTH_MPP
+ * above is derived from — verified at runtime against map.project). */
+export const TILE_SIZE_PX = 512;
+/** Pure: mercator degrees per CSS px at a zoom. */
+export function degreesPerPixel(zoom) {
+  const z = +zoom;
+  if (!Number.isFinite(z)) return null;
+  return 360 / (TILE_SIZE_PX * Math.pow(2, z));
+}
+/** Pure: the camera centre that leaves the site `offPx` away from the canvas
+ * centre along the screen-space unit direction (ux, uy) — +x right, +y down —
+ * at a zoom. Exact to the same mercator grid metersPerPixel() projects on
+ * (the node suite pins the round-trip against it), so the camera writer and
+ * the ring writer can never disagree about where "off by N px" is.
+ * Signs: the site sits (ux,uy)*off from the CANVAS CENTRE, so the centre sits
+ * the same offset the other way from the SITE — east of it for ux<0, north of
+ * it for uy>0 (+y on screen is south, and mercator y converts to latitude by
+ * cos(lat)). */
+export function centerForSiteOffset({ siteLng, siteLat, ux, uy, offPx, zoom } = {}) {
+  const lng = +siteLng;
+  const lat = +siteLat;
+  const x = +ux;
+  const y = +uy;
+  const off = +offPx;
+  const z = +zoom;
+  if (![lng, lat, x, y, off, z].every((n) => Number.isFinite(n))) return null;
+  const k = degreesPerPixel(z);
+  if (!Number.isFinite(k)) return null;
+  return [lng - x * off * k, lat + y * off * k * Math.cos(lat * DEG2RAD)];
 }
 
 /** Centering arms past Z_CENTER (proximity-gated by main.js). */
@@ -278,14 +350,15 @@ export function handoffScrubForZoom(z) {
   return smooth01((n - Z_HANDOFF) / (Z_TWIN_COMMIT - Z_HANDOFF));
 }
 
-/* Post-gate staged scroll (Task 35, owner refinement; MASK-SYNC revision):
- * once z is HELD at Z_HANDOFF (map-side maxZoom clamp — scroll-as-zoom
- * throttled), further scroll ticks accumulate as stage scroll S (px of wheel
- * delta past the gate) instead of depth. Gates (cumulative px):
- *   ring   0..250   — enclosing ring converges canvas-edges -> ring-edges
- *   blend  250..500 — terrain blend holds full satellite
- *   tilt   500..750 — iso tilt holds 45deg
- *   reveal 0..1250  — twin overlay dissolves 0..1 across the WHOLE hold
+/* Post-gate staged scroll (Task 35, owner refinement; MASK-SYNC revision;
+ * TIGHTEN revision 2026-10-26): once z is HELD at Z_HANDOFF (map-side maxZoom
+ * clamp — scroll-as-zoom throttled), further scroll ticks accumulate as stage
+ * scroll S (px of wheel delta past the gate) instead of depth. Gates
+ * (cumulative px, band = 700):
+ *   ring    0..80   — enclosing ring converges canvas-edges -> ring-edges
+ *   blend  80..160  — terrain blend holds full satellite
+ *   tilt  160..240  — iso tilt holds 45deg
+ *   reveal 0..700   — twin overlay dissolves 0..1 across the WHOLE hold
  * Ring/blend/tilt already arrive pre-gate in the native journey (Z_TOP..Z_HANDOFF
  * band) — their staged laws HOLD the end-state. The reveal used to wait for
  * its own gate (750..1250), so the fingers crossed 750px of dead scroll with
@@ -294,15 +367,25 @@ export function handoffScrubForZoom(z) {
  * overlay 0 -> 0.74 -> 1.0 in two wheel ticks). Now the overlay moves on the
  * first post-gate tick together with the hold-ring breathing entry->seam on
  * the same S (driveStagedHold): mask and twin ride one continuous motion from
- * the gate to the commit. Ring/blend/tilt pacing is untouched; the map reveal
- * and the twin intro ride the SAME law (stagedIntroProgressForS below), so
- * dissolve and camera agree knee-for-knee by construction.
- * Every value is a pure function of S, so scroll-up retraces it
- * symmetrically. Pure + node-checkable; the map-side wheel accumulator owns
- * S, Task 36 consumes S for the range-scrubbed twin intro. */
-export const HANDOFF_STAGE_PX = 250;
-export const HANDOFF_REVEAL_LEN_PX = 500;
-export const HANDOFF_STAGED_S_MAX = 3 * HANDOFF_STAGE_PX + HANDOFF_REVEAL_LEN_PX; // 1250
+ * the gate to the commit. The map reveal and the twin intro ride the SAME law
+ * (stagedIntroProgressForS below), so dissolve and camera agree knee-for-knee
+ * by construction.
+ *
+ * BAND LENGTH (owner: "the sliding from terrain to twin is slow and
+ * noticeable"). The band was 1250px — 12.5 wheel notches at ~100px, i.e. as
+ * much scroll as the last three zoom levels of the dive, spent on one
+ * dissolve. It is now 700px (44% less scroll), and the swoop leg — the
+ * invisible convergence that used to eat the first 60% of the band under a
+ * half-transparent overlay — is a third of it (240px), so the visible
+ * push/melt owns the majority of the motion instead of the tail. The commit
+ * still lands on exactly S = HANDOFF_STAGED_S_MAX at z = Z_HANDOFF, S still
+ * freezes at the gate, and every value is still a pure function of S, so
+ * scroll-up retraces the shorter band symmetrically. Pure + node-checkable;
+ * the map-side wheel accumulator owns S, Task 36 consumes S for the
+ * range-scrubbed twin intro. */
+export const HANDOFF_STAGE_PX = 80;
+export const HANDOFF_REVEAL_LEN_PX = 460;
+export const HANDOFF_STAGED_S_MAX = 3 * HANDOFF_STAGE_PX + HANDOFF_REVEAL_LEN_PX; // 700
 
 /* Shared intro/reveal pacing (map + twin, ONE law): the forward intro is
  * three legs — swoop (invisible convergence), push (rigid satellite move),
@@ -311,7 +394,7 @@ export const HANDOFF_STAGED_S_MAX = 3 * HANDOFF_STAGE_PX + HANDOFF_REVEAL_LEN_PX
  * on leg boundaries. Both sides consume S through stagedIntroProgressForS:
  * the twin maps it onto swoop->push->settle (sector.js delegates here), the
  * map drives the overlay reveal through it — dissolve and camera ride the
- * same mid-band knees (swoop done at 750, push done at the ms-proportional
+ * same mid-band knees (swoop done at 240, push done at the ms-proportional
  * knee), never a linear ramp running ahead of a legged intro. Pure +
  * node-checkable; scroll-up retraces it symmetrically. The leg durations
  * live HERE (single source); sector.js re-exports them so the pose legs and
@@ -319,8 +402,8 @@ export const HANDOFF_STAGED_S_MAX = 3 * HANDOFF_STAGE_PX + HANDOFF_REVEAL_LEN_PX
 export const HANDOFF_SWOOP_MS = 2600;
 export const HANDOFF_PUSH_MS = 2400;
 export const HANDOFF_MORPH_MS = 1200;
-/** S px where the swoop completes (the pacing anchor, unchanged). */
-export const STAGED_SWOOP_END_PX = 3 * HANDOFF_STAGE_PX; // 750
+/** S px where the swoop completes (the pacing anchor, band-derived). */
+export const STAGED_SWOOP_END_PX = 3 * HANDOFF_STAGE_PX; // 240
 /** Pure: staged scroll S (px) -> shared intro/reveal progress 0..1.
  * Piecewise linear across [0,swoopEnd,pushEnd,max]: the leg easing itself
  * supplies the curve, so the S law stays linear and double-easing never

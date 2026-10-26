@@ -24,6 +24,10 @@ import {
   zoomToProgress,
   satOpacityForZoom,
   centerBlendForZoom,
+  centerSettleForZoom,
+  centerSettleOffsetPx,
+  centerForSiteOffset,
+  CENTER_SETTLE_SPAN_Z,
   shouldCenter,
   isTopDown,
   needsHandoff,
@@ -51,6 +55,7 @@ import {
   Z_HANDOFF,
   Z_TOP,
   Z_MAX,
+  Z_TAKEOVER_FLOOR,
   Z_FAR_INTENT,
   CACHE_FAST_IDLE_DELAY_MS,
   CACHE_FAST_IDLE_TTL_MS,
@@ -1280,6 +1285,114 @@ function proximityInfo() {
   }
 }
 
+/* CENTRE-SETTLE (owner rev 2026-10-26: "make sure the hotspot becomes locked
+ * to the center by animating it to the center even sooner").
+ *
+ * The arm frame is captured the moment the mask appears: the live zoom plus
+ * the site's screen offset (magnitude + unit direction). From there the camera
+ * centre is a PURE FUNCTION OF ZOOM — the offset follows centerSettleOffsetPx
+ * (arm offset -> 0 across CENTER_SETTLE_SPAN_Z levels) — so:
+ *   - the ring, the mask ellipse, the pin and the camera all ride one scalar,
+ *     which is what makes the pan read as one motion instead of a glide the
+ *     eye can catch up with;
+ *   - it is frame-rate independent (no per-tick factor, no timer);
+ *   - it cannot overshoot (smoothstep: at rest at the arm, at rest on centre);
+ *   - dead centre from arm+span through the commit (the staged pin and this
+ *     law both resolve to SITE there, so the two writers agree exactly);
+ *   - reading it backwards returns the camera to the EXACT arm frame at
+ *     z = armZ, so when the mask disarms on the way out the native cursor
+ *     dolly takes over with no jump.
+ * Measured before: 154.5px off centre at the arm (z7.04), 16.4 at z8.84, 0
+ * only at z9.65 — the ring was off-centre for 2.6 zoom levels. */
+let centerArm = null; // { z, offPx, ux, uy } — the frame the mask armed on
+let centerArmWrites = 0; // probe: law-driven centre corrections this dive
+function noteCenterArm(prox, z) {
+  try {
+    if (centerArm) return centerArm;
+    const zz = +z;
+    if (!Number.isFinite(zz) || !prox) return centerArm;
+    const sx = +prox.sx;
+    const sy = +prox.sy;
+    if (!Number.isFinite(sx) || !Number.isFinite(sy)) return centerArm;
+    const box = frameSize();
+    const dx = sx - box.w / 2;
+    const dy = sy - box.h / 2;
+    const off = Math.hypot(dx, dy);
+    centerArm = {
+      z: zz,
+      offPx: off,
+      ux: off > 0.5 ? dx / off : 0,
+      uy: off > 0.5 ? dy / off : 0,
+    };
+    centerArmWrites = 0;
+    try {
+      window.__mapProbe.centerArm = { z: +zz.toFixed(3), offPx: +off.toFixed(1) };
+      window.__mapProbe.centerArmRelease = null;
+    } catch { /* probe cosmetic */ }
+  } catch { /* arm capture is best-effort */ }
+  return centerArm;
+}
+function clearCenterArm(why) {
+  if (!centerArm) return;
+  centerArm = null;
+  try {
+    window.__mapProbe.centerArm = false;
+    window.__mapProbe.centerArmRelease = why || null;
+    window.__mapProbe.centerArmWrites = centerArmWrites;
+  } catch { /* probe cosmetic */ }
+}
+/** Camera centre the settle law asks for at a zoom: the site plus the arm's
+ * unit direction scaled to the law's remaining offset. Null when there is no
+ * arm or the frame is unreadable; exactly SITE once the span is spent. */
+function centerSettleTargetFor(z) {
+  try {
+    if (!centerArm) return null;
+    const zz = +z;
+    if (!Number.isFinite(zz)) return null;
+    const off = centerSettleOffsetPx(centerArm.offPx, zz, centerArm.z, CENTER_SETTLE_SPAN_Z);
+    return centerForSiteOffset({
+      siteLng: SITE_LNGLAT[0],
+      siteLat: SITE_LNGLAT[1],
+      ux: centerArm.ux,
+      uy: centerArm.uy,
+      offPx: off,
+      zoom: zz,
+    });
+  } catch {
+    return null;
+  }
+}
+/** Apply the settle law to the live camera. Returns true when it moved the
+ * camera (the caller must re-read proximity for this pass). Sub-pixel drift
+ * writes nothing — the law and the camera already agree. Flights and the
+ * staged hold keep ownership: the hold pins SITE, which IS the law's value
+ * there, so skipping it only avoids a duplicate write. */
+function applyCenterSettle(z) {
+  try {
+    if (!mapRef || twinOpen || transitId || stagedActive) return false;
+    const t = centerSettleTargetFor(z);
+    if (!t || typeof mapRef.jumpTo !== 'function' || typeof mapRef.project !== 'function') return false;
+    const p = mapRef.project(t);
+    if (!p || !Number.isFinite(+p.x) || !Number.isFinite(+p.y)) return false;
+    const box = frameSize();
+    const drift = Math.hypot(+p.x - box.w / 2, +p.y - box.h / 2);
+    if (!(drift > 0.5)) return false;
+    mapRef.jumpTo({ center: t });
+    centerArmWrites += 1;
+    try {
+      window.__mapProbe.centerSettle = {
+        z: +(+z).toFixed(3),
+        driftPx: +drift.toFixed(1),
+        writes: centerArmWrites,
+        offPx: centerArm ? +centerArm.offPx.toFixed(1) : null,
+        armZ: centerArm ? +centerArm.z.toFixed(3) : null,
+      };
+    } catch { /* probe cosmetic */ }
+    return true;
+  } catch {
+    return false;
+  }
+}
 /** Ring clip: --clip gates bracket APPEARANCE (fades in above ~0.02).
  * Positioning rides the shared enclosure vars (--vx/--vy/--vr on #app,
  * written by the journey driver) — glyph centres sit on the ring
@@ -1660,16 +1773,35 @@ function onNativeZoomStep(snap, source) {
     // Written on #app (not the vignette node): #map-vignette and #ring-clip
     // are both inset:0 over #app, so both inherit identical values.
     if (!twinOpen && prox) {
+      // CENTRE-SETTLE FIRST (see the law above): it may move the camera, so
+      // the enclosure write below must read the camera it produced — a
+      // one-frame stale --vx/--vy would put the ring off-centre by exactly
+      // the drift this law exists to remove. The arm is captured on the mask
+      // edge and released when the mask goes down (zoom-out) or the twin
+      // takes the frame.
+      let proxUse = prox;
+      try {
+        if (prox.near && blend > 0) {
+          noteCenterArm(prox, z);
+          if (applyCenterSettle(z)) {
+            frameProxCache = null; // the pass memo predates the camera jump
+            const fresh = proximityInfo();
+            if (fresh) proxUse = fresh;
+          }
+        } else {
+          clearCenterArm('mask-down');
+        }
+      } catch { /* settle never breaks the driver */ }
       try {
         // One law writes center + radii; the park reuses the last live size
         // instead of snapping to the 260px initial (ghost breathe). Off-centre
-        // steps PARK instead of writing: an off-screen projection inflates the
-        // corner law 100x (measured 21000px radii) — invisible while the wash
-        // is off, but a stale giant the moment anything re-arms it. The
+        // steps PARK instead of writing: an off-screen projection inflates
+        // the corner law 100x (measured 21000px radii) — invisible while the
+        // wash is off, but a stale giant the moment anything re-arms it. The
         // arrival path still writes true off-centre sizes directly (its clamp
         // must not depend on nearness); the driver only tracks nearness.
-        if (prox.near) {
-          if (!writeEnclosureEllipse(prox, z)) parkEnclosureEllipse();
+        if (proxUse.near) {
+          if (!writeEnclosureEllipse(proxUse, z)) parkEnclosureEllipse();
         } else {
           parkEnclosureEllipse();
         }
@@ -1680,11 +1812,15 @@ function onNativeZoomStep(snap, source) {
       // parks seconds before a timer-fired twin. Radii/park writes above
       // still run (the staged entry caches them); maskArmed below is
       // untouched (telemetry still reads the arm predicate).
-      if (!transitId) showVignette(prox.near && blend > 0);
+      if (!transitId) showVignette(proxUse.near && blend > 0);
       try {
-        window.__mapProbe.maskArmed = !!(prox.near && blend > 0);
+        window.__mapProbe.maskArmed = !!(proxUse.near && blend > 0);
       } catch { /* probe cosmetic */ }
     } else {
+      // The twin owns the frame: the settle arm dies with it, so a close at
+      // the gate starts the way-out from the SITE (dead centre) rather than
+      // re-using the offset of the dive that opened it.
+      try { clearCenterArm('twin'); } catch { /* settle release is best-effort */ }
       try {
         window.__mapProbe.maskArmed = false;
       } catch { /* probe cosmetic */ }
@@ -4547,7 +4683,7 @@ function openTwin(id, opts = {}) {
  * (no blanked twin, no yanked map). No timers anywhere on this path: the
  * 450ms fade + recede-delay choreography is removed — the map underneath
  * is already at the law pose, so there is nothing to blend toward. */
-function doCloseTwin() {
+function doCloseTwin(opts = {}) {
   // Handoff-3: if the overlay is the fullscreen element, drop fullscreen
   // silently first (flag cleared so fullscreenchange can't recede twice).
   try {
@@ -4635,15 +4771,50 @@ function doCloseTwin() {
   // the gesture-owned recede armed above. No-op when no dive was recorded
   // (a plain reload/back open), which keeps the old close behaviour exactly.
   // Skipped inside unwindDive, which owns its own single restore.
+  //
+  // GESTURE REVERSE (owner rev 2026-10-26: "on the way back ... it goes
+  // through the phases and not just zooms out to the full map"): a recede the
+  // TWIN sent on its own — no close request from this side — is the user
+  // scrolling back out. Restoring the dive frame there is the jump that ends
+  // the retrace: the map is already at the handoff pose the twin just walked
+  // back to, so the fingers must carry it home through the SAME laws
+  // (pitch -> sat -> mask, all keyed off the live zoom) instead of teleporting
+  // to wherever the dive began. Esc/X/back (closeSource set, or a close we
+  // asked for) keep the restore exactly as before.
   if (!unwindActive) {
-    try {
-      const t0 = nowMs();
-      const from = escapeStateSnapshot();
-      const restored = restoreDiveCam('close');
-      publishUnwind(closeSource || 'close', closeSource || 'close', restored, from, t0);
-    } catch { /* restore never breaks teardown */ }
+    if (opts && opts.gestureReverse) {
+      try { holdHandoffPoseForReverse(); } catch { /* retrace hand-off never breaks teardown */ }
+    } else {
+      try {
+        const t0 = nowMs();
+        const from = escapeStateSnapshot();
+        const restored = restoreDiveCam('close');
+        publishUnwind(closeSource || 'close', closeSource || 'close', restored, from, t0);
+      } catch { /* restore never breaks teardown */ }
+    }
     closeSource = null;
   }
+}
+
+/** GESTURE-REVERSE hand-off (see doCloseTwin): consume the dive record and
+ * release every hold the dive pinned, WITHOUT moving the camera. The frame
+ * stays on the handoff pose the twin just retraced to, so the next outward
+ * wheel tick runs the journey's own laws backwards from where the eye already
+ * is — one continuous zoom-out (pitch flattens, satellite fades, mask opens)
+ * that hands over to the native cursor dolly once the mask is down. The
+ * gesture-owned recede armed by recedeToHome is left armed: it lands home on
+ * the zoom step that arrives there.
+ * Pitch/zoom/center are untouched by construction (no jumpTo, no easeTo). */
+function holdHandoffPoseForReverse() {
+  diveCam = null;
+  stallCeilingOn = false;
+  lastCeilingPin = null;
+  stallT0 = 0;
+  try { restoreMaxZoom(); } catch { /* unclamp is best-effort */ }
+  try {
+    window.__mapProbe.diveCam = null;
+    window.__mapProbe.recede = 'retrace';
+  } catch { /* probe cosmetic */ }
 }
 
 /** Close-time flatten guarantor (shared): the last zoomend fired while the
@@ -4678,10 +4849,10 @@ function flattenJourneyTiltToLaw(reason) {
  * Handoff-6-retrace: EVERY map-side close entry (X/Esc/back) goes through
  * closeTwin() (reverse-first) — never straight to finishTwinClose(), which
  * would skip the twin's staged inbound. */
-function finishTwinClose() {
+function finishTwinClose(opts = {}) {
   if (!twinOpen) return;
   clearReverseWait();
-  doCloseTwin();
+  doCloseTwin(opts);
   try {
     if (history.state && history.state.twin) {
       history.replaceState(null, '', mapUrlWithSector(null));
@@ -5024,8 +5195,13 @@ window.addEventListener('message', (e) => {
     // single close chain (fade ~450ms, then sat->flat + zoom out to the
     // blip). Never cut, never fade over flat. Handoff-6-retrace: the reply
     // also settles the reverse-first wait armed by closeTwin().
+    // GESTURE REVERSE (see doCloseTwin): a recede nobody here asked for is
+    // the twin answering the user's own wheel — the camera keeps the handoff
+    // pose so the fingers retrace the journey continuously instead of the
+    // close teleporting back to the frame the dive left.
+    const gestureReverse = !reverseWait && !closeSource;
     setSatForced(true);
-    finishTwinClose();
+    finishTwinClose({ gestureReverse });
     return;
   }
   finishTwinClose();
@@ -5272,7 +5448,7 @@ function installBandTakeover() {
       let z = null;
       try { z = +mapRef.getZoom(); } catch { z = null; }
       if (!Number.isFinite(z)) return;
-      if (z < Z_ISO_START - 1 || z > Z_HANDOFF + 0.5) return;
+      if (z < Z_TAKEOVER_FLOOR || z > Z_HANDOFF + 0.5) return;
       let prox = null;
       try { prox = proximityInfo(); } catch { prox = null; }
       // Aimed (hotspot near cursor/center) OR already journeying (the scrub
@@ -5323,33 +5499,37 @@ function installBandTakeover() {
           around = mapRef.unproject([e.clientX - r.left, e.clientY - r.top]);
         }
       } catch { around = null; }
-      // R11-CENTER continuous centering: diving in while near, the tick
-      // write carries an explicit center on the SHARED center blend — the
-      // spot glides to center coupled to scroll speed inside the SAME
-      // synchronous write (no extra Camera call, no ease curve, no settle
-      // snap). Applied factor is 1-(1-b)^2: still a pure function of the
-      // shared scalar (no new constants, no magic px), but it closes the
-      // gap inside the band's tick budget — a plain b-fraction leaves a
-      // ~6px residual at the handoff because zoom magnification inflates
-      // each tick's remainder. Every value is the shared scalar + live
-      // camera/site state. Zoom-out and far frames keep the cursor anchor
-      // (finger-owned framing, park-safe) — EXCEPT under the mask (see
-      // maskNow below): once the enclosing mask is up the write never
-      // carries the cursor anchor in either direction. Around stays off a
-      // center-carrying write (around re-anchors and would void it).
+      // R11-CENTER continuous centering (CENTRE-SETTLE rev): diving in while
+      // near, the tick write carries an explicit centre — the CAMERA law
+      // (centerSettleTargetFor), evaluated at the zoom this tick is heading
+      // to, so the same synchronous write both zooms and places the frame and
+      // the driver's next pass finds zero drift. The law replaces the old
+      // 1-(1-b)^2 blend factor: that closed ~2.6 zoom levels' worth of
+      // off-centre glide (measured 154px at the arm, still 16px at z8.84);
+      // the settle law lands dead centre within CENTER_SETTLE_SPAN_Z levels
+      // with the pan at rest at both ends. Still a pure function of the shared
+      // scalars (arm frame + live zoom) — no new magic px, no ease curve, no
+      // settle snap, no timer.
+      // Zoom-out and far frames keep the cursor anchor (finger-owned framing,
+      // park-safe) — EXCEPT under the mask (see maskNow below): once the
+      // enclosing mask is up the write never carries the cursor anchor in
+      // either direction. Around stays off a center-carrying write (around
+      // re-anchors and would void it).
       let correctTo = null;
       let cBlend = 0;
-      if (target > z && prox && prox.near) {
+      if (prox && prox.near) {
         try {
           const b = centerBlendForZoom(z);
-          const c = mapRef.getCenter();
-          if (Number.isFinite(b) && b > 0 && c && Number.isFinite(+c.lng) && Number.isFinite(+c.lat)) {
-            const f = 1 - (1 - b) * (1 - b);
-            cBlend = f;
-            correctTo = [
-              +c.lng + (SITE_LNGLAT[0] - +c.lng) * f,
-              +c.lat + (SITE_LNGLAT[1] - +c.lat) * f,
-            ];
+          if (Number.isFinite(b) && b > 0) {
+            noteCenterArm(prox, z);
+            // Direction-free: the settle law is a pure function of zoom, so
+            // the SAME write serves the dive and the retrace — one camera
+            // update per tick, never a zoom-then-pan pair the eye can catch.
+            const t = centerSettleTargetFor(target);
+            if (t) {
+              correctTo = t;
+              cBlend = centerSettleForZoom(target, centerArm ? centerArm.z : z, CENTER_SETTLE_SPAN_Z);
+            }
           }
         } catch { correctTo = null; cBlend = 0; }
       }
@@ -5422,12 +5602,13 @@ function installWheelFlip(rootEl, laneEl, ctx) {
       if (dy > 0) {
         try { noteDiveFrame('wheel'); } catch { /* dive frame is best-effort */ }
       }
-      // Journey lock: zoom AROUND a phantom point placed beyond the spot
-      // (zoom-in) or at canvas center (zoom-out) — but ONLY while the mask
-      // is armed. The native handler keeps its around-point fixed, so the
-      // spot glides toward center coupled to the user's own scroll speed —
-      // one motion, never a yank, easing in as it centers. Fully native
-      // downstream (zoom math, events, zoomend) — only the anchor moves.
+      // Journey lock: zoom AROUND the canvas centre while the mask is armed —
+      // in BOTH directions. The pan onto the hotspot is the CENTRE-SETTLE
+      // law's job now (a pure function of zoom, so it lands exactly and
+      // retraces exactly); a beyond-spot anchor for zoom-in would move the
+      // spot the law just placed, one tick at a time (measured: a 5px
+      // wobble per tick after the settle completed). Fully native downstream
+      // (zoom math, events, zoomend) — only the anchor moves.
       let px = null, py = null;
       let locked = false;
       try { locked = !!(ctx && ctx.map && ctx.maskArmed && ctx.maskArmed()); } catch { locked = false; }
@@ -5435,7 +5616,7 @@ function installWheelFlip(rootEl, laneEl, ctx) {
         try {
           const H = ctx.map.project(SITE_LNGLAT);
           const r = laneEl.getBoundingClientRect();
-          const P = lockAroundPoint(+H.x, +H.y, (r.width || 800) / 2, (r.height || 600) / 2, dy > 0);
+          const P = lockAroundPoint(+H.x, +H.y, (r.width || 800) / 2, (r.height || 600) / 2, false);
           if (P) { px = r.left + P.x; py = r.top + P.y; }
           else locked = false;
         } catch { locked = false; }

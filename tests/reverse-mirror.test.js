@@ -59,9 +59,9 @@ test('staged-S wire: one channel name both sides, shaped payload', () => {
 test('accumStagedS: forward grows, scroll-up drains symmetrically, clamped', () => {
   assert.equal(accumStagedS(0, -250), 250, 'scroll-down past the gate accumulates');
   assert.equal(accumStagedS(250, 250), 0, 'scroll-up drains the same law');
-  assert.equal(accumStagedS(750, -250), 1000, 'mid-hold accumulates');
-  assert.equal(accumStagedS(1000, 250), 750, 'mid-hold retraces');
-  assert.equal(accumStagedS(1200, -200), HANDOFF_STAGED_S_MAX, 'parks at commit');
+  assert.equal(accumStagedS(300, -250), 550, 'mid-hold accumulates');
+  assert.equal(accumStagedS(550, 250), 300, 'mid-hold retraces');
+  assert.equal(accumStagedS(650, -200), HANDOFF_STAGED_S_MAX, 'parks at commit');
   assert.equal(accumStagedS(50, 5000), 0, 'never below zero');
   assert.equal(accumStagedS(100, 0), 100, 'zero delta holds');
   assert.equal(accumStagedS(100, NaN), 100, 'non-finite delta holds');
@@ -373,7 +373,7 @@ test('map vignette: ellipse from projected R, brackets ride the same law', () =>
   assert.ok(main.includes("app.style.setProperty('--vr'"), 'journey writes the vignette radius');
   assert.ok(main.includes("app.style.setProperty('--vr-y'"), 'journey writes the squashed vertical radius');
   assert.ok(main.includes('enclosureEllipsePxForZoom(z, SITE.lat'), 'display ellipse rides the forming law');
-  assert.ok(main.includes('showVignette(prox.near && blend > 0)'), 'enclosure gated past z=8: sub-pixel ring never blacks the frame');
+  assert.ok(main.includes('showVignette(proxUse.near && blend > 0)'), 'enclosure gated past z=8: sub-pixel ring never blacks the frame (reads the post-settle proximity)');
   assert.ok(!main.includes('showVignette(prox.near);'), 'ungated proximity enclosure is gone');
   const html = srcOf('../ops3d-map.html');
   assert.ok(html.includes('@property --vr'), 'radius is registered animatable so the close-in glides');

@@ -169,7 +169,7 @@ test('staged-S consumer: swoop completes at reveal start, push rigid, settle mor
   assert.equal(fwdProgressForStagedS(TWIN_FWD_REVEAL_START_PX), SWOOP_W);
   assert.ok(Math.abs(fwdProgressForStagedS(PUSH_END_S) - PUSH_W) < 1e-9, 'push band ends exactly on the settle boundary');
   assert.equal(fwdProgressForStagedS(TWIN_FWD_STAGED_MAX_PX), 1);
-  assert.ok(Math.abs(fwdProgressForStagedS(375) - SWOOP_W / 2) < 1e-9, 'swoop leg tracks S linearly');
+  assert.ok(Math.abs(fwdProgressForStagedS(TWIN_FWD_REVEAL_START_PX / 2) - SWOOP_W / 2) < 1e-9, 'swoop leg tracks S linearly');
   // Round-6: the visible push carries no imagery change (rigid satellite),
   // the morph rides a static terminal pose.
   const l = legs();
@@ -191,8 +191,8 @@ test('staged-S consumer: swoop completes at reveal start, push rigid, settle mor
 });
 
 test('staged anchors mirror the map-side contract (break loudly, never drift)', () => {
-  assert.equal(TWIN_FWD_REVEAL_START_PX, 3 * HANDOFF_STAGE_PX, 'swoop boundary = reveal start (750)');
-  assert.equal(TWIN_FWD_STAGED_MAX_PX, HANDOFF_STAGED_S_MAX, 'push end = staged commit (1250)');
+  assert.equal(TWIN_FWD_REVEAL_START_PX, 3 * HANDOFF_STAGE_PX, 'swoop boundary = reveal start (240)');
+  assert.equal(TWIN_FWD_STAGED_MAX_PX, HANDOFF_STAGED_S_MAX, 'push end = staged commit (700)');
 });
 
 test('map/twin single pacing law: reveal(S) == intro progress(S) at every tick', () => {
@@ -204,9 +204,9 @@ test('map/twin single pacing law: reveal(S) == intro progress(S) at every tick',
     const b = fwdProgressForStagedS(s);
     assert.ok(Math.abs(a - b) < 1e-12, `S=${s} map ${a} == twin ${b}`);
   }
-  assert.equal(stagedIntroProgressForS(750), fwdProgressForStagedS(750), 'swoop knee agrees');
-  assert.ok(Math.abs(stagedIntroProgressForS(750) - SWOOP_W) < 1e-12, 'swoop knee is the intro weight');
-  assert.equal(stagedIntroProgressForS(1250), 1, 'commit agrees at 1');
+  assert.equal(stagedIntroProgressForS(TWIN_FWD_REVEAL_START_PX), fwdProgressForStagedS(TWIN_FWD_REVEAL_START_PX), 'swoop knee agrees');
+  assert.ok(Math.abs(stagedIntroProgressForS(TWIN_FWD_REVEAL_START_PX) - SWOOP_W) < 1e-12, 'swoop knee is the intro weight');
+  assert.equal(stagedIntroProgressForS(TWIN_FWD_STAGED_MAX_PX), 1, 'commit agrees at 1');
   assert.equal(stagedIntroProgressForS(NaN), fwdProgressForStagedS(NaN), 'parks agree');
 });
 
@@ -353,7 +353,7 @@ test('twin content gate: frames/idle/live/pixels all required, non-finite withho
 // keeps the autoplay clock.
 test('autoplay hold: staged owns the scalar, absent driver releases the clock', () => {
   assert.equal(fwdStagedOwnsIntro({ stagedS: 0, deepFrame: false }), true, 'S=0 seed owns');
-  assert.equal(fwdStagedOwnsIntro({ stagedS: 750, deepFrame: false }), true);
+  assert.equal(fwdStagedOwnsIntro({ stagedS: TWIN_FWD_REVEAL_START_PX, deepFrame: false }), true);
   assert.equal(fwdStagedOwnsIntro({ stagedS: null, deepFrame: true }), true, 'deep frame parks without a seed');
   assert.equal(fwdStagedOwnsIntro({ stagedS: null, deepFrame: false }), false, 'shallow click autoplays');
   assert.equal(fwdStagedOwnsIntro({ stagedS: NaN, deepFrame: false }), false, 'non-finite seed is no driver');

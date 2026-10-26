@@ -64,12 +64,17 @@ test('handoff scrub law is monotonic non-decreasing', () => {
 });
 
 test('stage gates: ring -> blend -> tilt in order, reveal spans the hold', () => {
-  assert.equal(HANDOFF_STAGE_PX, 250, 'one stage per 250px of scroll');
-  assert.equal(HANDOFF_REVEAL_LEN_PX, 500, 'reveal band constant still sizes the staged band');
-  assert.equal(HANDOFF_STAGED_S_MAX, 1250, 'full commit at 1250px past the gate');
+  // TIGHTEN rev 2026-10-26 (owner: "the sliding from terrain to twin is slow
+  // and noticeable"): the band is 700px, not 1250 — 44% less scroll for the
+  // same dissolve — and the invisible swoop leg is a third of it, so the
+  // visible push/melt owns the motion instead of the tail.
+  assert.equal(HANDOFF_STAGE_PX, 80, 'one stage per 80px of scroll');
+  assert.equal(HANDOFF_REVEAL_LEN_PX, 460, 'reveal band constant still sizes the staged band');
+  assert.equal(HANDOFF_STAGED_S_MAX, 700, 'full commit at 700px past the gate (was 1250)');
+  assert.equal(3 * HANDOFF_STAGE_PX, STAGED_SWOOP_END_PX, 'the swoop anchor is three stages in');
   const zero = handoffStagesForScroll(0);
   assert.deepEqual(zero, { ring: 0, blend: 0, tilt: 0, reveal: 0 }, 'gate entry starts every stage at 0');
-  const mid1 = handoffStagesForScroll(125);
+  const mid1 = handoffStagesForScroll(40);
   assert.ok(mid1.ring > 0 && mid1.ring < 1, 'ring dissolves first');
   assert.equal(mid1.blend, 0, 'blend waits for its gate');
   assert.equal(mid1.tilt, 0, 'tilt waits for its gate');
@@ -80,7 +85,7 @@ test('stage gates: ring -> blend -> tilt in order, reveal spans the hold', () =>
   const atRing = handoffStagesForScroll(HANDOFF_STAGE_PX);
   assert.equal(atRing.ring, 1, 'ring holds complete at its gate');
   assert.equal(atRing.blend, 0, 'blend still gated');
-  const midReveal = handoffStagesForScroll(1000);
+  const midReveal = handoffStagesForScroll(560);
   assert.equal(midReveal.ring, 1, 'ring holds');
   assert.equal(midReveal.blend, 1, 'blend holds');
   assert.equal(midReveal.tilt, 1, 'tilt holds');
@@ -485,8 +490,8 @@ test('round-10 dive-start prewarm: early boot fires once per dive with no state 
   assert.ok(main.includes('function abortEarlyBootTwin()'), 'retreat abort exists');
   assert.ok(main.includes('abortEarlyBootTwin();'), 'the zoom step aborts a retreated dive-start boot');
   assert.ok(
-    main.includes('z < Z_ISO_START - 1'),
-    'the abort fires on band exit, before the staged unwind band',
+    main.includes('if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && !(prox && prox.near && blend > 0)) {'),
+    'the abort fires on intent loss (mask down / off-site) — the INTENT-PRECACHE revision moved it off the old z-band',
   );
   const abortStart = main.indexOf('function abortEarlyBootTwin()');
   const abortEnd = main.indexOf('Handoff-4 Lane A seeded reveal', abortStart);
@@ -544,18 +549,18 @@ test('mask-sync: twin reveal bound to enclosing-mask progress', () => {
     trig.includes('reveal: stagedIntroProgressForS(n),'),
     'the overlay reveal rides the shared intro/reveal law — dissolve and camera share every mid-band knee, never a linear ramp ahead of the legged intro',
   );
-  // Mid-band knees: swoop done at 750, push done at the ms-proportional
-  // knee, settle to the commit. The old linear law read 0.60 at the swoop
-  // knee while the camera had only converged 0.42.
+  // Mid-band knees: swoop done at the band's swoop anchor (240 of 700), push
+  // done at the ms-proportional knee, settle to the commit. The old linear
+  // law read 0.60 at the swoop knee while the camera had only converged 0.42.
   const w1 = HANDOFF_SWOOP_MS / (HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS + HANDOFF_MORPH_MS);
   const w2 = (HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS) / (HANDOFF_SWOOP_MS + HANDOFF_PUSH_MS + HANDOFF_MORPH_MS);
   const ps = STAGED_SWOOP_END_PX
     + ((HANDOFF_STAGED_S_MAX - STAGED_SWOOP_END_PX) * HANDOFF_PUSH_MS) / (HANDOFF_PUSH_MS + HANDOFF_MORPH_MS);
-  assert.equal(STAGED_SWOOP_END_PX, 750, 'the swoop pacing anchor is unchanged');
-  assert.ok(Math.abs(handoffStagesForScroll(750).reveal - w1) < 1e-9, `swoop knee reads intro progress (got ${handoffStagesForScroll(750).reveal})`);
+  assert.equal(STAGED_SWOOP_END_PX, 240, 'the swoop anchor is three stages into the tightened band');
+  assert.ok(Math.abs(handoffStagesForScroll(240).reveal - w1) < 1e-9, `swoop knee reads intro progress (got ${handoffStagesForScroll(240).reveal})`);
   assert.ok(Math.abs(handoffStagesForScroll(Math.round(ps)).reveal - w2) < 0.01, 'push knee reads intro progress');
-  assert.ok(handoffStagesForScroll(750).reveal < 0.5, 'no linear lead at the swoop knee (was 0.60)');
-  for (const s of [0, 125, 375, 750, 1000, Math.round(ps), HANDOFF_STAGED_S_MAX]) {
+  assert.ok(handoffStagesForScroll(240).reveal < 0.5, 'no linear lead at the swoop knee (was 0.60)');
+  for (const s of [0, 60, 120, 240, 400, Math.round(ps), HANDOFF_STAGED_S_MAX]) {
     assert.ok(
       Math.abs(handoffStagesForScroll(s).reveal - stagedIntroProgressForS(s)) < 1e-12,
       `S=${s} reveal IS the shared law`,
