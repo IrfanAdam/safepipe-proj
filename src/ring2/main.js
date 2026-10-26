@@ -18,7 +18,7 @@ import * as maplibregl from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { VEX } from './site.js';
 import { ensureField, getStatus } from './field.js';
-import { mountMapBase, assertTerrainOn, releaseMap } from './mapbase.js';
+import { mountMapBase, assertTerrainOn, releaseMap, sampleBasemapTone } from './mapbase.js';
 import { applyTwinToMap, assertTerrainVex, pitchForPose, bearingForPose, groundResForZoom, niceScale, MAP_TRUE_FOV_DEG, TWIN_MAX_RANGE_M, aspectMismatch } from './sync.js';
 import { createOverlayTwin } from './overlays.js';
 import * as THREE from 'three';
@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor, twinContentPass, frameAnchorOnSite, twinContentVerdict, TWIN_CONTENT_MIN_MIX } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor, twinContentPass, frameAnchorOnSite, twinContentVerdict, TWIN_CONTENT_MIN_MIX, stagedReleaseAnchors, poseAtRangePure } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import { overlayPaintsNow, renderDue, sampleDue } from '../map/frame-pacing.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
@@ -683,6 +683,15 @@ async function boot() {
       return Date.now();
     }
   };
+  /* Last basemap tone readback (ms, handoffNow clock) + per-handoff budget.
+   * Throttles the seam tone sample in the hold branch — see SEAM TONE there.
+   * A readback is a full-frame GPU copy, so a stalled hold must not sample
+   * forever: 6 samples per handoff is plenty (boot, each arrival re-pin, the
+   * grant) and a re-handoff re-arms the budget. */
+  let lastToneSampleAt = -Infinity;
+  let toneSamples = 0;
+  const TONE_SAMPLE_MIN_MS = 900;
+  const TONE_SAMPLE_BUDGET = 6;
   function viewportPxNow() {
     try {
       return Math.max(twinDiv.clientHeight || window.innerHeight, 1);
@@ -826,27 +835,10 @@ async function boot() {
       return null;
     }
   }
-  /* Re-place a pose's eye at a fixed range on the bearing/polar it already
-   * holds (target untouched). Two poses built this way share ONE eye offset
-   * vector, so scrubbing between them keeps |eye-target| exactly constant —
-   * the push becomes a pure recentre with zero scale drift. Non-finite range
-   * returns the pose unchanged (never a canned camera). */
-  function poseAtRange(pose, range) {
-    try {
-      const t = pose?.target;
-      const e = pose?.eye;
-      if (!t || !e || !Number.isFinite(range) || !(range > 0)) return pose;
-      const dx = e.x - t.x;
-      const dy = e.y - (t.y ?? 0);
-      const dz = e.z - t.z;
-      const L = Math.hypot(dx, dy, dz);
-      if (!(L > 0)) return pose;
-      const k = range / L;
-      return { eye: { x: t.x + dx * k, y: (t.y ?? 0) + dy * k, z: t.z + dz * k }, target: { ...t } };
-    } catch {
-      return pose;
-    }
-  }
+  /* The fixed-range pose law lives in sector.js (poseAtRangePure) and is
+   * aliased here so every caller in this file — and the staged-release anchor
+   * law, stagedReleaseAnchors — shares exactly ONE implementation. */
+  const poseAtRange = poseAtRangePure;
   function capturePose() {
     let eye = null, tgt = null;
     try {
@@ -890,6 +882,10 @@ async function boot() {
     handoff.readyHits = 0;
     handoff.closePosted = false;
     handoff.refits = 0;
+    // SEAM TONE: a new handoff gets a fresh readback budget (see the hold
+    // branch — the ground is graded to THIS arrival's photo).
+    toneSamples = 0;
+    lastToneSampleAt = -Infinity;
     // GATE-3 native-zoom entry continuity: record the staged entry pose
     // (probe: __ring2.entry()). Boot entry runs before the first frame
     // paints (twinFrames is still -1 — see entryFrames), so staging the
@@ -1356,6 +1352,21 @@ async function boot() {
             handoff.readyHits = 0;
           }
         } catch { /* ready is best-effort */ }
+        /* SEAM TONE sample (Phase-03 rev): the twin ground is graded to the
+         * basemap ACTUALLY on screen, so take the readback while the hold is
+         * parked on the very frame the dissolve will open over (and again
+         * after a retarget re-pins to the arrival frame). Throttled — one
+         * sample per settle window, never per frame: a full-frame readPixels
+         * is milliseconds, not free. Failure is silent (the ground keeps the
+         * palette it was built with — never a guessed dark). */
+        try {
+          const tNow = handoffNow();
+          if (mapLoaded() && toneSamples < TONE_SAMPLE_BUDGET && tNow - lastToneSampleAt > TONE_SAMPLE_MIN_MS) {
+            lastToneSampleAt = tNow;
+            toneSamples += 1;
+            sampleBasemapTone();
+          }
+        } catch { /* tone sample never breaks the hold */ }
         const heldMs = now - handoff.t0;
         // Task-36: the 25 s cap is SHELVED as an advance trigger — the hold
         // exits the hold on the ready post only, never blind. Past HOLD+CAP with no
@@ -1418,27 +1429,34 @@ async function boot() {
           // 18 km terminal (a metre literal: viewport-scaled mid vs constant
           // terminal is what made the delta swing from -0.41x at the dissolve
           // start to +0.38x at its end on an 800px viewport). The push then
-          // rides poseAtRange, i.e. a pure recentre at constant range.
+          // rides stagedReleaseAnchors, i.e. a pure recentre at constant range.
           const stagedRelease = fwdStagedOwnsIntro({ stagedS: handoff.fwdStagedS, deepFrame: frameDeep });
-          /* ISO-POSE TRACK (staged release backstop): freeze the legs from
-           * the live pose lifted onto the iso pole (same target/range/
-           * bearing via poseAtIsoPolar) so the scrub law holds 45 at every
-           * S tick even if the hold had not fully converged (stale pin,
-           * damping residue). No-op once the hold convergence in
-           * applyTwinStagedS has run. Shallow (autoplay) releases keep the
-           * live pose untouched. */
-          if (stagedRelease && liveStart) {
-            try {
-              liveStart = poseAtIsoPolar(liveStart, HANDOFF_ISO_POLAR_DEG) ?? liveStart;
-            } catch { /* fall back to the live pose */ }
-          }
           let midPose = releaseFreshMid(handoff.mid);
           let toPose = handoff.to;
           if (stagedRelease) {
             const rLock = lockStagedRange(handoff.frame?.cy);
+            /* NO VISIBLE SWOOP (Phase-03 rev, seam motion): the release pose,
+             * the ring-iso mid and the push terminal all land on the SAME
+             * locked range the map is held at, with the release pose also
+             * lifted onto the iso pole — one law, in sector.js
+             * (stagedReleaseAnchors), so node can pin it. Before this, a
+             * boot/retarget pin that lagged the live frame left a real
+             * 34.8 km -> 24.8 km (1.4x) convergence INSIDE the reveal: the
+             * overlay was already 13-40% opaque while the twin's own camera
+             * slid, which is exactly the "slow, noticeable slide from
+             * terrain to twin" the owner reported. The twin must be on the
+             * map's footprint from its FIRST visible frame; the only motion
+             * the eye sees after that is the map's own, which has already
+             * come to rest at the zoom ceiling. */
             if (Number.isFinite(rLock) && rLock > 0) {
+              // Both anchors ride the held gate scale (poseAtRange === the
+              // sector.js law, one implementation).
               midPose = poseAtRange(midPose, rLock);
               toPose = poseAtRange(toPose, rLock);
+              // ... and the RELEASE pose joins them there (plus the iso pole),
+              // so the swoop leg carries no scale travel at all.
+              const rel = stagedReleaseAnchors({ startPose: liveStart, mid: midPose, to: toPose, range: rLock });
+              if (rel?.start) liveStart = rel.start;
             }
           }
           const legs = buildForwardLegs({
@@ -1522,9 +1540,18 @@ async function boot() {
         } catch { /* weight is best-effort; the pose above already applied */ }
         handoff.phase = fwd.progress < swoopW ? 'swoop' : 'push';
         if (fwd.progress >= 1) {
-          const to = handoff.to;
+          /* Land on the pose the scrub law ENDS on (the last leg's), not on
+           * handoff.to. A staged release re-derives both anchors onto the
+           * map's locked gate range (lockStagedRange) while handoff.to is
+           * still the boot terminal — snapping to it at progress 1 moved the
+           * camera 24.8 km -> 18.0 km in ONE frame at the seam (a measured
+           * 1.38x ground-scale pop, the last thing the eye sees before the
+           * overlay goes fully opaque). fs IS the terminal at p=1 by
+           * construction (poseForScrubProgress clamps to the last leg), so
+           * the commit is now continuous with the dissolve it ends. */
+          const to = (fs && fs.eye && fs.target) ? fs : handoff.to;
           try {
-            if (to) applyFlightPose(to.eye, to.target);
+            if (to?.eye && to?.target) applyFlightPose(to.eye, to.target);
           } catch { /* snap is best-effort */ }
           driveMix(HANDOFF_END_MIX);
           endHandoffFlight();
@@ -2187,6 +2214,16 @@ async function boot() {
     handoff,
     requestTwinClose,
     handoffPhase: () => handoff.phase,
+    // Force a fresh basemap tone readback (probe/verification hook: the seam
+    // is measured at the pose the dissolve opens over, so the harness needs
+    // to re-sample after it parks the camera there).
+    sampleTone: () => {
+      try {
+        return sampleBasemapTone({ force: true });
+      } catch {
+        return false;
+      }
+    },
     ready: () => handoff.readyPosted,
     readyDetail: () => ({
       posted: handoff.readyPosted,
@@ -2290,7 +2327,14 @@ async function boot() {
           if (o?.isAmbientLight) amb = o.intensity;
         });
       } catch { /* lights read is best-effort */ }
-      return { mix: m, grade: toneGradeForMix(m ?? 0), sun, amb };
+      // SEAM TONE (Phase-03 rev): the ground's last palette derivation — the
+      // photo sample it was solved against + the predicted lit tone. The seam
+      // verification reads this next to the composite luma it measures.
+      let ground = null;
+      try {
+        ground = twin?.getTone?.() ?? null;
+      } catch { ground = null; }
+      return { mix: m, grade: toneGradeForMix(m ?? 0), sun, amb, ground };
     },
     ring: () => {
       let scale = null, opacity = null;
@@ -2666,6 +2710,24 @@ async function boot() {
       // loadedClean false just means the 8 s soft resolve fired first.
       window.__ring2mapErrors = [...(window.__ring2mapErrors ?? []), `terrain pending${loadedClean ? '' : ' (hasty mount)'}: ${err?.message ?? err}`].slice(-5);
     }
+    /* SEAM TONE at adopt (Phase-03 rev): grade the twin ground to the photo
+     * this instance will paint, even on a standalone load with no handoff
+     * (the mix slider is a first-class path). One readback after the first
+     * tiles land; the hold branch re-samples on every arrival re-pin. */
+    try {
+      const tok = adoptSeq;
+      const armTone = () => {
+        try {
+          if (tok !== adoptSeq) return; // a newer instance owns the tone
+          if (typeof map?.loaded === 'function' && !map.loaded()) {
+            map.once('idle', armTone);
+            return;
+          }
+          sampleBasemapTone();
+        } catch { /* tone sample is cosmetic */ }
+      };
+      setTimeout(armTone, 600);
+    } catch { /* tone sample is cosmetic */ }
     // Post-remount verify (one shot per adopt): if the fresh instance is
     // STILL a zero canvas in a sized container 1.5 s later, force the
     // escalation tick so the ladder advances without waiting another 5 s.

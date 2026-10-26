@@ -168,6 +168,65 @@ export function poseAtIsoPolar(pose, polarDeg = HANDOFF_ISO_POLAR_DEG) {
   }
 }
 
+/** Re-place a pose's eye at a fixed range on the bearing/polar it already
+ * holds (target untouched). Two poses built this way share ONE eye offset
+ * vector, so scrubbing between them keeps |eye-target| exactly constant —
+ * the push becomes a pure recentre with zero scale drift. Non-finite range
+ * returns the pose unchanged (never a canned camera). */
+export function poseAtRangePure(pose, range) {
+  try {
+    const t = pose?.target;
+    const e = pose?.eye;
+    if (!t || !e) return pose;
+    if (!Number.isFinite(range) || !(range > 0)) return pose;
+    const dx = e.x - t.x;
+    const dy = e.y - (t.y ?? 0);
+    const dz = e.z - t.z;
+    const L = Math.hypot(dx, dy, dz);
+    if (!(L > 0)) return pose;
+    const k = range / L;
+    return { eye: { x: t.x + dx * k, y: (t.y ?? 0) + dy * k, z: t.z + dz * k }, target: { ...t } };
+  } catch {
+    return pose;
+  }
+}
+
+/* NO VISIBLE SWOOP (Phase-03 rev, seam motion) — the staged release's anchor
+ * law, in one pure place so node can pin it.
+ *
+ * A staged release dissolves over a map that is HELD at the gate (maxZoom =
+ * Z_HANDOFF, pitch 45, static). The twin therefore must be on that exact
+ * footprint from its FIRST visible frame: no convergence of its own inside
+ * the reveal band, no double motion (the map sliding one way while the twin
+ * floats another), and no scale change at the commit.
+ *
+ * So all three anchors — the release pose, the ring-iso mid, and the push
+ * terminal — are lifted onto the SAME locked range (the map's gate range)
+ * and the release pose is also lifted onto the iso pole. With start == mid
+ * in scale and the terminal on the same range, the swoop leg and the push
+ * leg carry zero ground-scale travel: what remains is the pure crossfade the
+ * owner asked for, and the camera is already where the map is.
+ *
+ * Returns null when there is nothing to derive (caller keeps its own
+ * anchors). */
+export function stagedReleaseAnchors({ startPose, mid, to, range, polar = HANDOFF_ISO_POLAR_DEG } = {}) {
+  try {
+    if (!mid?.eye || !mid?.target) return null;
+    const lock = Number(range);
+    if (!Number.isFinite(lock) || !(lock > 0)) return null;
+    let start = startPose?.eye && startPose?.target ? startPose : null;
+    if (start) start = poseAtIsoPolar(start, polar) ?? start;
+    return {
+      start: start ? poseAtRangePure(start, lock) : null,
+      mid: poseAtRangePure(mid, lock),
+      to: to?.eye && to?.target ? poseAtRangePure(to, lock) : poseAtRangePure(mid, lock),
+      range: lock,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Raw ?sector= / ?embed= values from a search string. Frame params
  * (cx/cy/z/bearing) ride along when the map overlay opens the twin. */
 export function parseSectorQuery(search = '') {
@@ -781,16 +840,22 @@ export function isTwinCloseMessage(data) {
 /* GATE-3 GESTURE REVISION, TWIN SIDE (defects 4-6) — pure, node-checkable. */
 
 /* (4) TONE CONTINUITY: twin-ground light multiplier keyed to the mix band.
- * The satellite photo (mapbase setGroundFade) dissolves out exactly as the
- * Lambert twin ground dissolves in (takeoverU/satBaseV share one smoothstep),
- * but the two bases have different native tones: full-lit Lambert over the
- * last of the photo reads as a step. Grading the twin lights from
- * TWIN_TONE_SAT_MATCH at mix 0 to 1.0 at mix 100 (same smoothstep shape as
- * the base swap, so grade + dissolve move together) bridges photo tone into
- * full-twin tone with no step at either end. Endpoints honest: mix 0 ground
- * is invisible (grade unobservable), mix 100 is exactly the canonical
- * full-twin look. Non-finite mix returns 1 (neutral — never guess dark). */
-export const TWIN_TONE_SAT_MATCH = 0.82;
+ *
+ * SUPERSEDED BY MEASUREMENT (Phase-03 rev, seam tone). This used to grade
+ * the twin lights 0.82 -> 1.0 across the band to bridge "photo tone into
+ * full-twin tone". That was a guess compensating for an authored palette
+ * that is ~2.5x darker than the Esri photo (measured: basemap 95.1 vs
+ * ground 53.4 over the same disc) — and it left a 44% step at full
+ * opacity anyway, plus an 18% double-dip mid-band on top of the double
+ * fade. The ground's albedo is now SOLVED against the sampled photo
+ * (tone.js deriveGroundPalette, applied in overlays.buildTwinGround), so
+ * the ground already carries the photo's tone at every mix: any further
+ * mix-keyed dimming would re-introduce the step it was invented to hide.
+ * The law is kept as the identity (neutral) for API compatibility and so
+ * the endpoint contract stays explicit: mix 0 and mix 100 read the same
+ * grade, and the ground is graded by measurement, not by the slider.
+ * Non-finite mix returns 1 (neutral — never guess dark). */
+export const TWIN_TONE_SAT_MATCH = 1;
 export function toneGradeForMix(mix) {
   try {
     const m = Number(mix);

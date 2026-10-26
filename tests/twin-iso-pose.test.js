@@ -156,18 +156,28 @@ test('pre-fix shape diverges: a top-down start replays the ramp (why the lift ex
   assert.ok(Math.abs(polarDegOf(p0.eye, p0.target) - 0) < 1, 'stale start sits top-down vs the iso map');
 });
 
-test('wiring: hold converges + release lifts through poseAtIsoPolar', () => {
+test('wiring: hold converges + release lifts through the shared anchor law', () => {
   const main = srcOf('../src/ring2/main.js');
+  const sector = srcOf('../src/ring2/sector.js');
   assert.ok(
     main.includes('handoff.start = pinHold(s0.tx, s0.tz, s0.range, s0.bearing, HANDOFF_ISO_POLAR_DEG)'),
     'hold convergence re-pins at the iso pole (polar-only, same anchor/range/bearing)',
   );
+  /* SEAM MOTION (Phase-03 rev): the iso lift + the range lock now live in
+   * ONE law (sector.js stagedReleaseAnchors), which main.js calls — so the
+   * release pose, the ring-iso mid and the push terminal can never be lifted
+   * on different ranges (that mismatch was the visible swoop inside the
+   * reveal). */
   assert.ok(
-    main.includes('poseAtIsoPolar(liveStart, HANDOFF_ISO_POLAR_DEG)'),
-    'staged release freezes legs from the iso-lifted live pose',
+    main.includes('stagedReleaseAnchors({'),
+    'staged release derives its anchors from the shared law',
   );
   assert.ok(
-    main.includes('forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage'),
+    sector.includes('poseAtIsoPolar(start, polar)') && sector.includes('poseAtRangePure('),
+    'the shared law lifts the release pose onto the iso pole AND the locked range',
+  );
+  assert.ok(
+    main.includes('poseAtIsoPolar, isTwinStagedMessage'),
     'iso lane appends poseAtIsoPolar to the sector import only',
   );
 });

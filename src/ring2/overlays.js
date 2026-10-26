@@ -34,6 +34,7 @@ import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
 import { DRAPE_LIFTS, RIM_FADE_IN, RIM_TILT_GAIN } from './drape.js';
 import { ringRevealForProgress, TWIN_CONTENT_SAMPLE_N, TWIN_CONTENT_MID_DIV, TWIN_RGBA_STRIDE, TWIN_PIXEL_FIRST, TWIN_PIXEL_STEP, twinContentFromRgba } from './sector.js';
 import { TIER } from './facilities/dims.js';
+import { srgb255ToLinear, meanIrradiance, deriveGroundPalette, getPhotoTone, onPhotoTone } from './tone.js';
 
 /* REF GATE 2: every overlay renderable carries userData.tier. All overlay
  * geometry is computed from the real field/site constants (mapped radius,
@@ -971,14 +972,26 @@ function edgeFade(x, z) {
 
   /* Takeover ground (Issue 2): opaque DEM-draped twin terrain filling the
    * disc to exactly R. Polar grid with a true center vertex (no hole, no
-   * shader discard — Safari-safe). Neutral hypsometric vertex colors under
-   * the scene lights. renderOrder -5: after the outside mask (-10), before
+   * shader discard — Safari-safe). Hypsometric vertex colors under the
+   * scene lights. renderOrder -5: after the outside mask (-10), before
    * every overlay (0) — paint order alone composites, nothing writes depth.
    * Never registered for emphasis and skipped by the ring-clip pass (it IS
-   * ground); visibility/opacity ride on setTakeover(u) only. */
+   * ground); visibility/opacity ride on setTakeover(u) only.
+   *
+   * SEAM TONE (Phase-03 rev): the authored palette below is the SHAPE of
+   * the ground (sea / low / high), not its exposure. Its albedo is solved
+   * per build against the satellite basemap actually on screen — the photo
+   * tone sampled in mapbase (photoStats) plus this mesh's own mean Lambert
+   * irradiance — so the lit ground lands on the photo's luminance and hue
+   * and the base swap has no exposure step (tone.js deriveGroundPalette).
+   * With no sample yet the authored palette stands (never a guessed dark). */
   let groundMesh = null;
   let groundMat = null;
   let lastU = 0;
+  let groundTone = null; // last palette derivation (probe + diagnostics)
+  /* Authored albedo bands (sRGB): the semantic ground, pre-grade. */
+  const GROUND_BASE_SRGB = { sea: [0x23, 0x2f, 0x38], low: [0x2a, 0x30, 0x36], high: [0x6f, 0x70, 0x69] };
+  const GROUND_HIGH_H = 450; // metres: the hypsometric ramp's top key
   /* Wall-clock ms of the last VALUE-changing setTakeover/setEmphasis (slider
    * drag or orbit still moving the view). The DEM auto-redrape waits these
    * out so a rebuild never lands mid-gesture. */
@@ -986,21 +999,34 @@ function edgeFade(x, z) {
   function buildTwinGround() {
     const NS = TAKEOVER_SEG;
     const NR = TAKEOVER_RINGS;
-    const cSea = new THREE.Color(0x232f38);
-    const cLow = new THREE.Color(0x2a3036);
-    const cHigh = new THREE.Color(0x6f7069);
     const tmp = new THREE.Color();
-    const colAt = (h) => {
-      if (!(h >= CASPIAN_SHORE_H)) return tmp.copy(cSea);
-      const u = Math.min(1, Math.max(0, h / 450));
-      return tmp.copy(cLow).lerp(cHigh, u);
+    /* Band cover, measured on the mesh itself: each vertex falls in exactly
+     * one hypsometric band, weighted by the SCREEN AREA it stands for (the
+     * polar grid's cell area grows with radius, and at oblique pitch the
+     * near cells cover far more pixels than the far ones — area ∝ r/dist²).
+     * Without that weighting the solve targets the vertex census instead of
+     * what the eye sees: at the handoff pose the near plain is mostly sea +
+     * low ground while the far hills are bright, so a census-weighted mean
+     * runs ~8% hot (measured). */
+    const bandCount = { sea: 0, low: 0, high: 0 };
+    const bandOf = (h) => {
+      if (!(h >= CASPIAN_SHORE_H)) return 'sea';
+      const u = Math.min(1, Math.max(0, h / GROUND_HIGH_H));
+      return u < 0.5 ? 'low' : 'high';
+    };
+    const camPos = camera.position;
+    const areaWeight = (x, y, z) => {
+      const r = Math.hypot(x, z) + RING_RADIUS_M / NR; // centre vertex = one cell
+      const dx = x - camPos.x, dy = y - camPos.y, dz = z - camPos.z;
+      const d2 = Math.max(1, dx * dx + dy * dy + dz * dz);
+      return r / d2;
     };
     const positions = [];
-    const colors = [];
+    const heights = [];
     const h0 = sampleH(0, 0);
     positions.push(0, h0 * VEX + LIFT_GROUND_M, 0);
-    let c = colAt(h0);
-    colors.push(c.r, c.g, c.b);
+    heights.push(h0);
+    bandCount[bandOf(h0)] += areaWeight(0, h0 * VEX + LIFT_GROUND_M, 0);
     for (let r = 1; r <= NR; r++) {
       const rr = (r / NR) * RING_RADIUS_M;
       for (let s = 0; s < NS; s++) {
@@ -1008,9 +1034,10 @@ function edgeFade(x, z) {
         const x = Math.cos(a) * rr;
         const z = Math.sin(a) * rr;
         const h = sampleH(x, z);
-        positions.push(x, h * VEX + LIFT_GROUND_M, z);
-        c = colAt(h);
-        colors.push(c.r, c.g, c.b);
+        const y = h * VEX + LIFT_GROUND_M;
+        positions.push(x, y, z);
+        heights.push(h);
+        bandCount[bandOf(h)] += areaWeight(x, y, z);
       }
     }
     const ringStart = (r) => 1 + (r - 1) * NS;
@@ -1029,9 +1056,57 @@ function edgeFade(x, z) {
     }
     const g = track(new THREE.BufferGeometry());
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
-    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
     g.setIndex(idx);
     g.computeVertexNormals();
+
+    /* SEAM TONE: solve the albedo against the photo + this mesh's real
+     * irradiance. The rig is read from the LIVE lights at their ungraded
+     * bases (AMBIENT_BASE/SUN_BASE — setToneGrade is a cosmetic multiplier
+     * on top, never part of the derivation), so the numbers here are the
+     * same ones the renderer will multiply by. */
+    let palette = {
+      sea: srgb255ToLinear(GROUND_BASE_SRGB.sea),
+      low: srgb255ToLinear(GROUND_BASE_SRGB.low),
+      high: srgb255ToLinear(GROUND_BASE_SRGB.high),
+    };
+    let derived = null;
+    try {
+      const irr = meanIrradiance({
+        normals: g.getAttribute('normal')?.array,
+        sunDir: [takeSun.position.x, takeSun.position.y, takeSun.position.z],
+        ambientColor: [ambLight.color.r, ambLight.color.g, ambLight.color.b],
+        ambientIntensity: AMBIENT_BASE,
+        sunColor: [takeSun.color.r, takeSun.color.g, takeSun.color.b],
+        sunIntensity: SUN_BASE,
+      });
+      derived = deriveGroundPalette({
+        base: palette,
+        weights: bandCount,
+        irr,
+        photo: getPhotoTone(),
+      });
+      if (derived?.palette) palette = derived.palette;
+      groundTone = derived
+        ? { ...derived, derived: true, photo: getPhotoTone(), irr: { meanDotNL: irr.meanDotNL } }
+        : { derived: false, photo: getPhotoTone(), palette: null };
+    } catch {
+      groundTone = { derived: false, photo: null, palette: null };
+    }
+
+    const cSea = new THREE.Color(palette.sea[0], palette.sea[1], palette.sea[2]);
+    const cLow = new THREE.Color(palette.low[0], palette.low[1], palette.low[2]);
+    const cHigh = new THREE.Color(palette.high[0], palette.high[1], palette.high[2]);
+    const colAt = (h) => {
+      if (!(h >= CASPIAN_SHORE_H)) return tmp.copy(cSea);
+      const u = Math.min(1, Math.max(0, h / GROUND_HIGH_H));
+      return tmp.copy(cLow).lerp(cHigh, u);
+    };
+    const colors = [];
+    for (let i = 0; i < heights.length; i++) {
+      const c = colAt(heights[i]);
+      colors.push(c.r, c.g, c.b);
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
     groundMat = track(new THREE.MeshLambertMaterial({
       vertexColors: true, transparent: true, opacity: 0,
       depthWrite: false, side: THREE.DoubleSide,
@@ -1044,6 +1119,33 @@ function edgeFade(x, z) {
     groundMat.opacity = lastU;
     group.add(groundMesh);
   }
+
+  /* A fresh photo sample re-solves the ground's tone in place: dispose just
+   * the ground mesh (not the whole drape) and rebuild it against the new
+   * sample. Cheap (one polar grid + a Lambert program already cached), and
+   * it only ever runs pre-reveal / on arrival — never per frame. */
+  function rederiveGroundTone() {
+    try {
+      if (!groundMesh) return false;
+      const g = groundMesh;
+      group.remove(g);
+      try {
+        g.geometry?.dispose?.();
+        g.material?.dispose?.();
+      } catch { /* dispose is best-effort */ }
+      groundMesh = null;
+      groundMat = null;
+      buildTwinGround();
+      if (groundMat) groundMat.opacity = lastU;
+      if (groundMesh) groundMesh.visible = lastU > 0.003;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  try {
+    onPhotoTone(() => { rederiveGroundTone(); });
+  } catch { /* tone feed is cosmetic */ }
   /* Takeover control: u 0 = twin ground gone (satellite base), 1 = opaque
    * twin terrain. Called by the mix slider; re-applied after every rebuild. */
   function setTakeover(u) {
@@ -1375,6 +1477,19 @@ function edgeFade(x, z) {
     sampleContent,
     setToneGrade, setRingReveal,
     getPose, dispose, onResize,
+    // SEAM TONE (Phase-03 rev): the ground's last palette derivation — the
+    // photo sample it was solved against, the exposure gain, the tint, and
+    // the predicted lit tone vs that target. Probe + regression surface.
+    getTone: () => (groundTone ? {
+      derived: !!groundTone.derived,
+      gain: groundTone.gain ?? null,
+      tint: groundTone.tint ?? null,
+      litLuma: groundTone.litLuma ?? null,
+      targetLuma: groundTone.targetLuma ?? null,
+      delta: groundTone.delta ?? null,
+      meanDotNL: groundTone.irr?.meanDotNL ?? null,
+      photo: groundTone.photo ?? null,
+    } : null),
     getInfo: () => ({ ...(lastInfo ?? {}), takeoverU: lastU, status: getStatus(), pills: getPillState() }),
   };
 }

@@ -102,14 +102,21 @@ test('clamping: garbage in, bounded out', () => {
   assert.ok(takeoverU('nope') > 0 && takeoverU('nope') < 1, 'garbage must land bounded in-band');
 });
 
-test('wiring: mix.js drives BOTH sides of the dissolve from one merged law', () => {
+test('wiring: mix.js drives the dissolve from ONE law (single-source alpha)', () => {
   const mix = readFileSync(new URL('../src/ring2/mix.js', import.meta.url), 'utf8');
   assert.ok(
     /Math\.max\(takeoverU\(effMixNow\(\)\), tiltU\(lastPitch, lastRange\)\)/.test(mix),
     'mix.js must merge slider ramp + tilt takeover via effUNow (max, single source of truth)',
   );
   assert.ok(/setTakeover\(u\)/.test(mix), 'mix.js must ramp the twin ground from the merged u');
-  assert.ok(/setGroundFade\(1 - u\)/.test(mix), 'mix.js must fade the satellite base to (1 - u) so base+twin sum to 1');
+  /* SEAM TONE (Phase-03 rev): the twin ground's ALPHA is the crossfade, and
+   * the satellite base stays fully painted underneath it — alpha compositing
+   * already sums to 1. Fading the photo too (setGroundFade(1 - u)) made the
+   * two sides MULTIPLY: a measured 60% luma dip mid-dissolve (basemap 95.1 ->
+   * 37.9 -> ground 53.4 at the handoff pose). The photo must hold full paint
+   * through the band; only the endpoint hide remains. */
+  assert.ok(/setGroundFade\(1\)/.test(mix), 'mix.js must hold the satellite base at full paint through the band');
+  assert.ok(!/setGroundFade\(1 - u\)/.test(mix), 'the double fade (both sides fading) must stay gone');
   assert.ok(
     /setGroundOwns\(!groundHidden\(/.test(mix),
     'mix.js must keep the visibility endpoint on groundHidden',

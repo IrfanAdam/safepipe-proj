@@ -6,16 +6,19 @@
  *
  *   - Drives the twin canvas opacity + overlay emphasis (setEmphasis) +
  *     takeover-ground opacity (setTakeover, see takeover.js thresholds) +
- *     satellite-base fade (setGroundFade, same smoothstep band).
- *   - Endpoint rule: the satellite hides ONLY at mix 100, the exact step
- *     the twin ground reaches opaque (same condition both sides — the old
- *     anytime-takeover black hole can't recur); across the mix band the
- *     photo base dissolves out as paint opacity while the twin ground
- *     dissolves in, so the base swap never jumps.
+ *     satellite-base paint (setGroundFade, held at full through the band).
+ *   - Single-source crossfade (Phase-03 rev): the twin ground's alpha IS
+ *     the dissolve — the satellite base stays fully painted underneath it,
+ *     so the composite is photo*(1-a) + ground*a and cannot dip. The
+ *     satellite hides only at mix 100, the exact step the twin ground
+ *     reaches opaque (same condition both sides — the old anytime-takeover
+ *     black hole can't recur, and the old double fade's mid-band dip is
+ *     gone by construction).
  *   - Tilt takeover (owner verdict 2026-10-12): at steep tilt + close range
  *     the twin takes the base regardless of slider — u is the max-merge of
- *     the mix ramp and tiltU(pitch, range), the satellite fades as (1 - u)
- *     so base + twin always sum to 1, and emphasis follows max(t, u) so the
+ *     the mix ramp and tiltU(pitch, range), the twin ground's alpha rides u
+ *     (base + twin sum to 1 by alpha compositing, the photo staying painted
+ *     underneath), and emphasis follows max(t, u) so the
  *     (never tilt-faded) lines stay lit when tilt takes over.
  *   - Canvas-identity watch: a MutationObserver on the twin container
  *     re-applies the full mix (opacity + pointer-events + emphasis) whenever
@@ -149,24 +152,34 @@ export function mountMixBar(el, opts = {}) {
     return (!getMap?.() && mix < 50) ? 50 : mix;
   }
 
-  /* Smooth base crossfade (was: binary satellite hide at mix 100). Every
-   * reapply drives BOTH sides of the dissolve over the SAME steps: the twin
-   * ground ramps 0->1 via setTakeover(u) in reapply, and here the satellite
-   * base fades to (1 - u) via setGroundFade as raster-opacity /
-   * hillshade-exaggeration paint — u is the max-merge (see effUNow), so the
-   * mix band and the close-range tilt takeover share one law and base +
-   * twin always sum to 1. setGroundOwns keeps the slider ENDPOINT only:
-   * layers stay layout-visible through the band and hide exactly at mix
-   * 100, the step the mix-driven twin ground reaches opaque.
-   * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-01] */
+  /* SINGLE-SOURCE BASE CROSSFADE (Phase-03 rev, seam tone).
+   *
+   * The twin ground's ALPHA is the crossfade — nothing else. The satellite
+   * base stays fully painted underneath it, so the composite is ordinary
+   * alpha compositing: photo*(1-a) + ground*a. That is the only law that
+   * cannot dip, because alpha compositing already sums to 1.
+   *
+   * What it replaces faded BOTH sides: the ground ramped 0->1 while
+   * mapbase.setGroundFade dropped the photo's raster-opacity 1->0 over the
+   * same band. Two fades multiply — at mix 50 the frame was 0.5*ground over
+   * (0.5*photo over the page background) = 0.5*ground + 0.25*photo +
+   * 0.25*bg, a measured 60% luma dip mid-dissolve (basemap 95.1 -> 37.9 ->
+   * ground 53.4 at the handoff pose) that read as a dark wash exactly where
+   * the owner saw the pop. The photo now holds full paint through the band
+   * and the ground's alpha alone dissolves it; setGroundOwns still hides
+   * the layers at the mix-100 endpoint, the same step the ground reaches
+   * opaque, so base + twin still sum to 1 with no black hole.
+   * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03] */
   function applyGroundRule(pitchDeg, rangeM) {
     if (pitchDeg !== undefined) lastPitch = pitchDeg;
     if (Number.isFinite(Number(rangeM))) lastRange = Number(rangeM);
     const eff = effMixNow();
-    const u = effUNow();
     try {
-      setGroundFade(1 - u);
-    } catch { /* base fade is cosmetic */ }
+      // Always 1: the ground's alpha owns the dissolve (see above). Kept as
+      // an explicit write so a remount mid-band still lands on full photo
+      // paint instead of a stale faded value.
+      setGroundFade(1);
+    } catch { /* base paint is cosmetic */ }
     setGroundOwns(!groundHidden(eff));
     paintLabel();
   }

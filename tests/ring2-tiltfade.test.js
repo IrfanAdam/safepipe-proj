@@ -122,7 +122,12 @@ test('wiring audit: mix.js max-merges tiltU into one u, main.js feeds range', ()
   const mix = srcOf('../src/ring2/mix.js');
   assert.ok(/tiltU/.test(mix), 'mix.js must consume tiltU');
   assert.ok(/Math\.max\(takeoverU\(/.test(mix), 'mix.js must max-merge takeoverU with tiltU');
-  assert.ok(/setGroundFade\(1 - u\)/.test(mix), 'satellite must fade as (1 - u)');
+  /* SEAM TONE (Phase-03 rev): the satellite base no longer fades — the twin
+   * ground's alpha is the crossfade, so the photo holds full paint under it
+   * and the composite cannot dip (the old (1 - u) fade multiplied with the
+   * ground ramp: a measured 60% luma dip mid-dissolve). */
+  assert.ok(/setGroundFade\(1\)/.test(mix), 'satellite base must hold full paint through the band');
+  assert.ok(!/setGroundFade\(1 - u\)/.test(mix), 'the double fade must stay gone');
   assert.ok(/applyEmphasis\(Math\.max\(t, u\)\)/.test(mix), 'emphasis must follow max(t, u)');
   assert.ok(/function updateForCamera\(pitchDeg, rangeM\)/.test(mix), 'updateForCamera must take (pitch, range)');
   assert.ok(/setGroundOwns\(!groundHidden\(eff\)\)/.test(mix), 'endpoint rule stays slider-only');

@@ -18,6 +18,7 @@ import { MAP_MAX_PITCH_DEG, MAP_INPUT_HANDLERS, assertMapNonInteractive, SAT_IMA
 export { MAP_INPUT_HANDLERS, assertMapNonInteractive };
 import { waitForSized } from './sizeGate.js';
 import { ctxLive, ctxLost, ctxRestored, noteTileErr, noteTileOk } from './ctxmon.js';
+import { photoStats, setPhotoTone, getPhotoTone } from './tone.js';
 
 /* Keyless tile endpoints. Imagery has TWO hosts for the same Esri
  * service: some Safari setups (content blockers) kill tile subresources on
@@ -321,9 +322,77 @@ export function setGroundFade(satV) {
   return s;
 }
 
-/** Current satellite-base fade factor (1 = full photo, 0 = dissolved). */
+/* Current satellite-base fade factor (1 = full photo, 0 = dissolved). */
 export function getGroundFade() {
   return _groundFade;
+}
+
+/* ── SEAM TONE SAMPLE (Phase-03 rev) ─────────────────────────────────────
+ * The twin ground is graded to the photo it replaces, so something has to
+ * MEASURE that photo. The map is already painting it: read the live
+ * MapLibre canvas and hand the pixels to tone.js (photoStats -> the ground
+ * palette derivation in overlays.js). Measured, never assumed — a brighter
+ * acquisition or a different time of day re-derives the same way.
+ *
+ * Readback constraint: preserveDrawingBuffer is off, so the drawing buffer
+ * is only readable inside the frame that drew it. The sample therefore runs
+ * from a one-shot 'render' listener (triggerRepaint forces that frame), and
+ * the result is delivered to subscribers asynchronously. Never throws: no
+ * map / no GL / a blank read all leave the previous tone in place (callers
+ * keep the authored palette rather than guessing a dark one). */
+let _tonePending = false;
+/* Re-exported so the probe/verification can read the sample through the map
+ * module (the registry itself lives in tone.js — see the note there). */
+export { getPhotoTone };
+
+function _readBasemapTone(m) {
+  try {
+    const c = m.getCanvas();
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    if (!gl) return null;
+    const w = gl.drawingBufferWidth | 0;
+    const h = gl.drawingBufferHeight | 0;
+    if (!(w > 0 && h > 0)) return null;
+    const buf = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    // Coarse grid: the tone of a 20 km disc does not need every pixel, and
+    // the walk stays a few thousand samples (one-off, not per frame).
+    return photoStats(buf, w, h, { stride: Math.max(2, Math.round(w / 300)) });
+  } catch {
+    return null;
+  }
+}
+
+/** Sample the basemap's on-screen tone (async, via subscribers). Safe to
+ * call repeatedly: a pending sample is not queued twice unless forced. */
+export function sampleBasemapTone({ force = false } = {}) {
+  const m = _map;
+  if (!m) return false;
+  if (_tonePending && !force) return false;
+  _tonePending = true;
+  let done = false;
+  const finish = (stats) => {
+    if (done) return;
+    done = true;
+    _tonePending = false;
+    if (!stats) return;
+    setPhotoTone(stats); // registry + subscribers (tone.js)
+  };
+  try {
+    m.once('render', () => finish(_readBasemapTone(m)));
+    m.triggerRepaint();
+    // Hidden tab / stalled map: release the latch so a later call can try.
+    setTimeout(() => {
+      if (!done) {
+        done = true;
+        _tonePending = false;
+      }
+    }, 4000);
+  } catch {
+    _tonePending = false;
+    return false;
+  }
+  return true;
 }
 
 function applyGroundFlag(m) {
