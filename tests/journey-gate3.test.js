@@ -169,15 +169,20 @@ test('the enclosure is black-only — no amber rim or wash', () => {
 });
 
 test('the staged dissolve is scrubbed, not chased by a CSS transition', () => {
-  // The layer-swap cut: the overlay's opacity is written inline from the S
-  // law on every scroll tick, and the CSS carried `transition: opacity
-  // 0.45s ease` on #twin-overlay. A transition eases between COMMITTED
-  // values, so every per-tick write restarted it and the rendered opacity
-  // LAGGED the law (measured: target 1.0, rendered 0.89) — then the commit
-  // snapped it up. That is the one-frame hard cut in the owner's recording.
-  // The fix: while the scrub owns the opacity the transition is suspended
-  // (`.scrubbing`), so the law's value IS the rendered value and the commit
-  // hands back to the transition with nothing to snap.
+  // The layer-swap cut: the overlay's opacity is driven from the S law on
+  // every scroll tick, and the CSS carried `transition: opacity 0.45s ease`
+  // on #twin-overlay. A transition eases between COMMITTED values, so every
+  // per-tick write restarted it and the rendered opacity LAGGED the law
+  // (measured: target 1.0, rendered 0.89) — then the commit snapped it up.
+  // That is the one-frame hard cut in the owner's recording.
+  // The fix, two parts: while the scrub owns the opacity the transition is
+  // suspended (`.scrubbing`), and the per-tick law stairs (~0.14 per wheel
+  // notch) are GLIDED by a per-frame follower (pumpScrubOpacity) — the law's
+  // value is the TARGET on every tick and the rendered inline value eases
+  // toward it each animation frame. Stairs would read as discrete opacity
+  // jumps on clicky wheels; the follower converges in ~120ms, so the commit
+  // hands a sub-0.1 remainder to the live transition, which eases it (a
+  // fade, never a snap).
   const html = readFileSync(new URL('../ops3d-map.html', import.meta.url), 'utf8');
   assert.ok(
     /#twin-overlay\.scrubbing\s*\{\s*transition:\s*none;?\s*\}/.test(html),

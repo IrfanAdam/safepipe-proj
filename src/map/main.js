@@ -802,6 +802,57 @@ let scrubFired = false;
 let stagedActive = false;
 let stagedS = 0;
 let stagedCommitted = false;
+// STAGED DISSOLVE FOLLOWER: the S law advances in per-tick stairs (~0.14
+// per wheel notch) — the rendered inline opacity eases toward the law's
+// latest target every animation frame, so the dissolve glides at any input
+// cadence instead of stair-stepping. The law stays pure: probe, commit,
+// and the release watch read S and the law, never the rendered value —
+// only the inline write is eased. The commit path already hands the
+// remainder to the live CSS transition (no snap), and the holds (blank /
+// near guards) ease down to their 0 floor instead of cutting. Reduced
+// motion jumps straight to the target. Self-stops when the hold ends.
+let scrubRenderTarget = 0;
+let scrubRenderShown = 0;
+let scrubPumpOn = false;
+const SCRUB_FOLLOW_PER_FRAME = 0.5; // exponential chase: ~120ms to converge
+function pumpScrubOpacity() {
+  if (scrubPumpOn) return;
+  if (typeof requestAnimationFrame !== 'function') return;
+  scrubPumpOn = true;
+  const frame = () => {
+    try {
+      const root = document.getElementById('twin-overlay');
+      const alive = stagedActive && !stagedCommitted && root && !root.hidden
+        && root.classList.contains('scrubbing');
+      if (!alive) { scrubPumpOn = false; return; }
+      let reduce = false;
+      try {
+        reduce = typeof window.matchMedia === 'function'
+          && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      } catch { reduce = false; }
+      const d = scrubRenderTarget - scrubRenderShown;
+      if (reduce || Math.abs(d) * 10000 < 1) {
+        if (root.style.opacity !== String(scrubRenderTarget)) root.style.opacity = String(scrubRenderTarget);
+        scrubRenderShown = scrubRenderTarget;
+      } else {
+        const next = scrubRenderShown + d * SCRUB_FOLLOW_PER_FRAME;
+        const s = String(+next.toFixed(4));
+        if (root.style.opacity !== s) root.style.opacity = s;
+        scrubRenderShown = next;
+      }
+    } catch { /* pump never breaks the frame */ }
+    try {
+      requestAnimationFrame(frame);
+    } catch {
+      scrubPumpOn = false;
+    }
+  };
+  try {
+    requestAnimationFrame(frame);
+  } catch {
+    scrubPumpOn = false;
+  }
+}
 // HARD-STOP (owner override): long bounded zero-hold favoring holding. The
 // S ramp (overlay opacity) stays at 0 until the twin holds real tiles
 // (twinFrameHasContent); forward scroll itself stalls at frozen S (see
@@ -2729,6 +2780,14 @@ function flyToSectorThenTwin(id, opts = {}) {
         pumpIsoPitch(); // live-hold carry: keep the per-frame tilt pump running under the clamp (it now converges the S-driven hold tilt, never parks on the prewarm)
       } catch { /* pump is best-effort */ }
       try {
+        // Fresh hold renders from the 0 floor: reset the dissolve follower so
+        // no eased value from the last hold leaks into this arm, and pin the
+        // inline 0 synchronously (prewarm stylesheet agrees — no flash).
+        scrubRenderTarget = 0; scrubRenderShown = 0;
+        const ov = document.getElementById('twin-overlay');
+        if (ov && ov.style.opacity !== '0') ov.style.opacity = '0';
+      } catch { /* follower seed is best-effort */ }
+      try {
         window.__mapProbe.staged = { active: true, s: 0, committed: false };
       } catch { /* probe cosmetic */ }
       // CENTER CONVERGENCE: the twin boots on the hotspot by construction
@@ -3139,12 +3198,18 @@ function driveStagedOverlay() {
   // law. Every value here derives from S (holds pin the law's 0 floor, the
   // dissolve writes the law, the commit pre-writes the law's clamp), so all
   // of them go through this helper: transition suspended first, then the
-  // synchronous inline write. Rendered IS the law on every tick.
+  // DISSOLVE FOLLOWER eases the rendered inline value toward the law's
+  // target every animation frame (pumpScrubOpacity). The law's value IS the
+  // target on every tick; the rendered value glides instead of stair-stepping
+  // (~0.14 per wheel notch). Commit/unwind paths release or clear the inline
+  // value as before — the follower self-stops when the hold ends.
   const scrubWrite = (v) => {
     try {
       if (!root.classList.contains('scrubbing')) root.classList.add('scrubbing');
-      const s = String(v);
-      if (root.style.opacity !== s) root.style.opacity = s;
+      const n = +v;
+      if (!Number.isFinite(n)) return;
+      scrubRenderTarget = Math.min(1, Math.max(0, n));
+      pumpScrubOpacity();
     } catch { /* cosmetic */ }
   };
   let ready = false;
