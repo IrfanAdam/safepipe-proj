@@ -205,3 +205,29 @@ test('progress beats the clock: a painting twin is never yanked out of its dive'
   );
   assert.ok(m.includes('releaseWatchFrames = -1;'), 'state resets when the watch disarms');
 });
+
+test('a pause is not a dead end: release reasons need live forward pressure', () => {
+  // Stopping to look at the twin ejected the dive home 2.4s later from a
+  // granted-but-short hold — measured. Idle fingers mean PAUSED, not stuck.
+  assert.equal(releaseImpossibleReason({ iframeAlive: true, readable: true, released: true, waitMs: 9999, driven: false }), null,
+    'an idle granted hold is a pause, never an unwind');
+  assert.equal(releaseImpossibleReason({ iframeAlive: true, readable: false, waitMs: 9999, driven: false }), null,
+    'an unreadable twin with no pressure waits too');
+  assert.equal(releaseImpossibleReason({ iframeAlive: false, waitMs: 0, driven: false }), 'iframe-gone',
+    'a gone iframe is unrecoverable whatever the fingers do');
+  assert.equal(releaseImpossibleReason({ iframeAlive: true, readable: true, released: true, waitMs: 9999, driven: true }), 'release-starved',
+    'live pressure still bounds a real starvation');
+  const m = main();
+  assert.ok(m.includes('lastStagedInputMs = nowMs()'), 'staged input stamps the pressure clock');
+  assert.ok(m.includes('const driven = lastStagedInputMs > 0 && now - lastStagedInputMs < STAGED_PRESS_MS'), 'pressure window is explicit');
+  assert.ok(m.includes('driven,'), 'the watch passes it to the law');
+});
+
+test('no twin re-boot under an opaque overlay + frame epoch resets proof', () => {
+  const m = main();
+  assert.ok(m.includes('REBOOT LOCK'), 'the navigation gate is documented');
+  assert.ok(m.includes('if (!tearing && twinOverlayOpaque() && stagedActive && !stagedCommitted)'),
+    'an opaque staged frame may only be torn down, never re-pointed');
+  assert.ok(m.includes('FRAME EPOCH'), 'a navigation invalidates the old document proof');
+  assert.ok(m.includes('window.__mapProbe.twinReady = false;'), 'proof resets with the epoch');
+});

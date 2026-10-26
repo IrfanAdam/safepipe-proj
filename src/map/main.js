@@ -603,11 +603,42 @@ function ensureOverlay() {
  * lands on a parent entry. data-url mirrors the target for the probe. */
 function setFrameUrl(frame, url) {
   if (frame.getAttribute('data-url') === url) return;
+  // REBOOT LOCK: once the twin overlay is opaque, the frame may only be torn
+  // down (about:blank), never re-pointed at another document. A dblclick or a
+  // late retarget there restarted the frame under a 100% overlay (measured
+  // frames 318 -> 1, blank document, controls only) with nothing to show for
+  // it — the worst state the owner has reported. Teardown stays allowed.
+  try {
+    const tearing = url === 'about:blank';
+    if (!tearing && twinOverlayOpaque() && stagedActive && !stagedCommitted) {
+      try {
+        window.__mapProbe.frameRebootBlocked = {
+          url: String(url).slice(0, 120),
+          z: mapRef && typeof mapRef.getZoom === 'function' ? +mapRef.getZoom() : null,
+        };
+      } catch { /* probe cosmetic */ }
+      return;
+    }
+  } catch { /* the lock never blocks a legitimate navigation */ }
   try {
     frame.contentWindow.location.replace(url);
   } catch (err) {
     frame.setAttribute('src', url); // same-origin fallback, shouldn't fire
     errors.push('FRAME: ' + (err && err.message));
+  }
+  // FRAME EPOCH: a navigation invalidates the previous document's proof. Its
+  // pagehide echo arrives after this dive's twinOpen flips, and "proven"
+  // (ready/painted/released) left over from the OLD document let that echo
+  // tear down the fresh frame — a blank document under an opaque overlay.
+  // Resetting here makes the stale-close guard cover the new boot instead.
+  if (url !== 'about:blank') {
+    try {
+      const nowN = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+      staleCloseGuardUntil = Math.max(staleCloseGuardUntil, nowN + STALE_CLOSE_GUARD_MS);
+      window.__mapProbe.twinReady = false;
+      window.__mapProbe.twinPainted = false;
+      window.__mapProbe.frameEpoch = (+window.__mapProbe.frameEpoch || 0) + 1;
+    } catch { /* epoch is best-effort */ }
   }
   try {
     frame.setAttribute('data-url', url);
@@ -3900,7 +3931,10 @@ let releaseWatchHoldT = 0; // when the CURRENT frozen-S wait started
 let releaseWatchS = NaN;
 let releaseWatchFrames = -1; // last seen twin frame count (progress signal)
 let releaseWatchZ = NaN; // last seen depth (progress signal for a granted hold)
+let lastStagedInputMs = 0; // last staged wheel input (pressure, not progress)
 const RELEASE_WATCH_POLL_MS = 200;
+// A pause is not a dead end: release reasons need forward pressure this fresh.
+const STAGED_PRESS_MS = 400;
 
 function releaseWatchDisarm() {
   releaseWatchOn = false;
@@ -4018,6 +4052,7 @@ function releaseWatchTick() {
     const readable = twinStateReadable();
     const released = readable ? twinReleased() : null;
     const phase = readable ? twinHandoffPhase() : null;
+    const driven = lastStagedInputMs > 0 && now - lastStagedInputMs < STAGED_PRESS_MS;
     const reason = releaseImpossibleReason({
       // A prewarm armed this instant may still be navigating (data-url not
       // applied yet) — that is a boot, not an impossibility.
@@ -4026,6 +4061,7 @@ function releaseWatchTick() {
       released,
       phase,
       waitMs,
+      driven,
     });
     try {
       window.__mapProbe.releaseWatch = {
@@ -4036,6 +4072,7 @@ function releaseWatchTick() {
         readable: !!readable,
         released,
         phase,
+        driven,
         boundMs: RELEASE_WAIT_BOUND_MS,
         reason: reason || null,
       };
@@ -5801,6 +5838,11 @@ function feedStagedScroll(dyFlip) {
     }
     const dy = +dyFlip;
     if (!Number.isFinite(dy) || dy === 0) return;
+    // Input pressure stamp: the release watch may only conclude "impossible"
+    // while the fingers are actually asking for forward progress. Without
+    // this, simply stopping to look at the twin ejected the dive home 2.4s
+    // later — a pause is not a dead end (measured).
+    lastStagedInputMs = nowMs();
     // HARD-STOP: forward (flip-space dy<0) stalls at frozen S until the twin
     // holds content — no accumulate, so neither the overlay dissolve nor the
     // twin-plane scrub (both pure fns of the same S) advances. The frozen

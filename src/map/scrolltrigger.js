@@ -279,12 +279,18 @@ export function releaseImpossibleReason({
   phase = null,
   waitMs = 0,
   boundMs = RELEASE_WAIT_BOUND_MS,
+  driven = true,
 } = {}) {
   if (iframeAlive === false) return 'iframe-gone';
   const b = Number(boundMs);
   const bound = Number.isFinite(b) && b > 0 ? b : RELEASE_WAIT_BOUND_MS;
   const w = Number(waitMs);
   if (!Number.isFinite(w) || w < bound) return null;
+  // A user who stopped scrolling is PAUSING, not blocked: the overlay holds
+  // exactly where the fingers left it and forward input resumes the ramp.
+  // Only live forward pressure can make a wait impossible (a gone iframe
+  // still unwinds above — that one is unrecoverable whatever the fingers do).
+  if (driven === false) return null;
   if (!readable) return 'twin-unreadable';
   if (released === true) return 'release-starved';
   if (phase === 'hold') return 'intro-held';
