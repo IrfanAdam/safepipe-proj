@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-26T06:27:37.877Z",
+  "generated": "2026-10-26T07:30:07.376Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "8410221",
+      "full": "84102217ccbfd7a5850a2bddde97ad6811e500d8",
+      "date": "2026-10-26",
+      "time": "11:57",
+      "subject": "fix(map): a pause is not a dead end + no twin re-boot under an opaque overlay [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "e0707a5",
       "full": "e0707a5ed08e3ea62b70f397e64bdee33b0d4cc0",
@@ -6502,8 +6511,6 @@
     }
   ],
   "wip": [
-    "public/version.json",
-    "src/map/main.js",
-    "src/map/scrolltrigger.js"
+    "src/map/main.js"
   ]
 }

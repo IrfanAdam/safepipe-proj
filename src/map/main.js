@@ -2872,7 +2872,19 @@ function reassertStagedAnchor(reason) {
           // converges the arrival center onto the hotspot as a pure fn of
           // S) — a center snap here would replay the lateral offset the
           // glide removes. Correct depth only; leave pan to the glide.
-          if (zDrift > 0.02) mapRef.jumpTo({ zoom: stagedAnchor.z });
+          // Depth follows progress, never the stale entry: the anchor froze
+          // at the staging-arm zoom, but the fingers' ease legitimately
+          // climbs past it mid-hold — snapping back to the entry zoom is the
+          // measured grant-time camera snap (z 10.74->10.52, +14% luma step).
+          // Above the anchor, advance the anchor to the live frame (the twin
+          // boots on the true end pose); below it, correct the regression.
+          if (zDrift > 0.02) {
+            if (Number.isFinite(z) && Number.isFinite(stagedAnchor.z) && z > stagedAnchor.z) {
+              stagedAnchor.z = z;
+            } else {
+              mapRef.jumpTo({ zoom: stagedAnchor.z });
+            }
+          }
         } else {
           mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy], zoom: stagedAnchor.z });
         }
@@ -3057,16 +3069,23 @@ function driveStagedHold(st) {
     }
   } catch { /* hold ring is best-effort */ }
   // (b2) LOCK-EARLY hard center pin: after lock-in the map stays on the SITE
-  // anchor on EVERY staged tick — no pan possible. This replaces the old
-  // S-glide (arrival seat -> hotspot as a fn of reveal): centering now lands
-  // at the arm tick, so mid-hold the frame is pinned, not travelled. Any
-  // drift (a drag that beat the handler lock, a synthetic panBy/jumpTo, a
-  // settle correction) is re-seated here, and scroll-up unwinds through
-  // exitStaged, never through this pin. jumpTo is instant (scroll-pure, no
-  // timers). The S-max recovery re-park stays the invisible backstop.
+  // anchor — but ONLY when it has actually drifted. An unconditional
+  // jumpTo({center}) on every staged tick calls MapLibre's stop(), which
+  // kills the native zoom ease the fingers just started: measured 700px of
+  // staged S moving depth only 0.15 levels (limit cycle z 10.511<->10.663),
+  // so the gate is never reached and the dive ejects. Re-seat only on real
+  // lateral drift (>2px); a seated frame skips the write entirely and the
+  // ease runs free. Scroll-up unwinds through exitStaged, never this pin.
   try {
     if (mapRef && stagedActive && stagedAnchor && stagedAnchor.site) {
-      try { mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] }); } catch { /* pin is best-effort */ }
+      try {
+        const c = mapRef.getCenter();
+        const pa = mapRef.project([stagedAnchor.cx, stagedAnchor.cy]);
+        const pl = c ? mapRef.project([+c.lng, +c.lat]) : null;
+        const drift = pa && pl && Number.isFinite(+pa.x) && Number.isFinite(+pl.x)
+          ? Math.hypot(pa.x - pl.x, pa.y - pl.y) : 99;
+        if (drift > 2) mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] });
+      } catch { /* pin is best-effort */ }
     }
   } catch { /* center pin never breaks the hold */ }
   // (c) satellite rides the same S progress as the overlay (the staged blend
@@ -3260,7 +3279,13 @@ function driveStagedOverlay() {
         if (mapRef && typeof mapRef.jumpTo === 'function' && (!proxNear || !scaleNear)) {
           const jump = {};
           if (!proxNear) jump.center = [ax, ay];
-          if (!scaleNear && stagedAnchor && Number.isFinite(stagedAnchor.z)) jump.zoom = stagedAnchor.z;
+          // Depth recovery parks on the GATE, never the entry zoom: the
+          // anchor froze at staging-arm depth (~10.5) and re-parking there
+          // pins the frame below the gate permanently (measured limit cycle
+          // z 10.511<->10.663 -> release-starved -> eject to z 1.13). The
+          // overlay is opaque at S-max so the correction is invisible; the
+          // next tick reads near and the commit lands.
+          if (!scaleNear) jump.zoom = Z_HANDOFF;
           if (jump.center || jump.zoom) {
             mapRef.jumpTo(jump);
             recovered = true;

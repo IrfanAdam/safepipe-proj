@@ -645,10 +645,14 @@ test('commit+superimpose: near-fail recovery, single radius law, center converge
   );
   assert.ok(
     main.includes('mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] })'),
-    'every staged tick hard-pins the center (no glide, no drift, no snap)',
+    'the hold re-seats the center only on real drift (no per-tick stop, the zoom ease runs free)',
   );
   assert.ok(
-    main.includes('if (zDrift > 0.02) mapRef.jumpTo({ zoom: stagedAnchor.z });'),
-    'the grant re-assert corrects depth only mid-glide (no center snap)',
+    main.includes('if (!scaleNear) jump.zoom = Z_HANDOFF;'),
+    'the S-max recovery re-parks depth on the gate, never the stale entry zoom',
+  );
+  assert.ok(
+    main.includes('stagedAnchor.z = z;'),
+    'the grant re-assert follows legitimate ease progress instead of snapping back to the entry zoom',
   );
 });

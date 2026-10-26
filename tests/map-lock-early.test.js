@@ -25,11 +25,15 @@ test('lock tick fires at the staged arm, onto the SITE anchor', () => {
   );
 });
 
-test('staged ticks hard-pin the center: no glide gate, no pan drift', () => {
+test('staged ticks re-seat the center only on real drift: no glide gate, no pan drift, no per-tick stop', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(
     main.includes('mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] })'),
-    'every staged tick re-seats the map on the anchor center',
+    'drift re-seats the map on the anchor center',
+  );
+  assert.ok(
+    main.includes('if (drift > 2) mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] });'),
+    'a seated frame skips the write entirely so the native zoom ease runs free',
   );
   assert.ok(
     !main.includes('stagedFreezeCenter.lng + (stagedAnchor.cx'),
