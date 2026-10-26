@@ -1063,7 +1063,16 @@ function edgeFade(x, z) {
      * irradiance. The rig is read from the LIVE lights at their ungraded
      * bases (AMBIENT_BASE/SUN_BASE — setToneGrade is a cosmetic multiplier
      * on top, never part of the derivation), so the numbers here are the
-     * same ones the renderer will multiply by. */
+     * same ones the renderer will multiply by.
+     *
+     * GROUND DERIVATION HOLD (2026-10-26, user call): grading the albedo to
+     * the basemap photo paints the twin ground the photo's pale sage and
+     * reads as a washed film over the terrain. Hold the fixed schematic
+     * base (the previous dark crisp ground) until the derivation is
+     * re-graded dark. The solve still runs for probe/diagnostics; only its
+     * application is held.
+     * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03] */
+    const APPLY_DERIVED_GROUND = false;
     let palette = {
       sea: srgb255ToLinear(GROUND_BASE_SRGB.sea),
       low: srgb255ToLinear(GROUND_BASE_SRGB.low),
@@ -1085,7 +1094,7 @@ function edgeFade(x, z) {
         irr,
         photo: getPhotoTone(),
       });
-      if (derived?.palette) palette = derived.palette;
+      if (APPLY_DERIVED_GROUND && derived?.palette) palette = derived.palette;
       groundTone = derived
         ? { ...derived, derived: true, photo: getPhotoTone(), irr: { meanDotNL: irr.meanDotNL } }
         : { derived: false, photo: getPhotoTone(), palette: null };
