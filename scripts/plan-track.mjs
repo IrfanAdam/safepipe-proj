@@ -52,6 +52,20 @@ for (const c of prev.commits || []) if (!seen.has(c.sha)) { commits.push(c); see
 // Plumbing exclusion: commits touching only tracker files are tracker output,
 // not work — drop them so triage can reach empty (skill: GENERATED filter).
 const GENERATED = new Set(['src/ds/plan-manifest.json', 'src/ds/plan-history.json', 'public/version.json', 'src/ds/plan-retro.json']);
+// Shallow-clone edge (production builds fetch shallow): a grafted boundary
+// commit has no resolvable parent, so `git show` cannot diff it and falls
+// back to listing the whole tree — the GENERATED check fail-opens and the
+// commit leaks into triage. A boundary verdict made earlier with full history
+// stands: if the previous manifest (built with fuller history) never listed
+// this sha, it was already excluded as tracker output, so drop it again when
+// it also wears a sync subject. Anything else stays for triage.
+const prevShas = new Set((prev.commits || []).map((c) => c.sha));
+const SYNC_SUBJECT = /^chore\(sync\)/;
+const isBoundary = (sha) => {
+  try {
+    return git(['rev-list', '--parents', '-n', '1', sha]).split(/\s+/).length < 2;
+  } catch { return false; }
+};
 const filesOf = (sha) => {
   try { return execFileSync('git', ['show', '--name-only', '--format=', sha], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean); }
   catch { return ['unknown']; }
@@ -59,7 +73,8 @@ const filesOf = (sha) => {
 for (let i = commits.length - 1; i >= 0; i--) {
   if (!commits[i].plan) {
     const fs = filesOf(commits[i].full);
-    if (fs.length && fs.every((f) => GENERATED.has(f))) commits.splice(i, 1);
+    if (fs.length && fs.every((f) => GENERATED.has(f))) { commits.splice(i, 1); continue; }
+    if (!prevShas.has(commits[i].sha) && SYNC_SUBJECT.test(commits[i].subject) && isBoundary(commits[i].full)) commits.splice(i, 1);
   }
 }
 
