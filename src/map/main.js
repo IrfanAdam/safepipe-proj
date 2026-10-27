@@ -894,6 +894,43 @@ let stallPollT = 0; // bounded presentation poll: one 500ms chain while holding 
 // dive. Visibility waits STALL_PILL_GRACE_MS of held time; the feeder gate
 // (zoom freeze) is unaffected and engages from tick 0.
 const STALL_PILL_GRACE_MS = 2000;
+// PRE-PHASE PROGRESS LAW (marker PRE_PHASE_PROGRESS): the mask-armed climb
+// must never freeze behind a twin that is not coming. A blank frame means
+// nothing is loading — boot it (earlyBootTwin is boot-once/idempotent) and
+// let the climb flow while it boots; freezing for a twin that is not even
+// loading is the owner-reported "freezing at that stage" with a dark pill.
+// A live frame that keeps painting is legitimate slowness (advancing frames
+// restart the short clock). A live frame with dead frames past
+// PRE_PHASE_DEAD_MS is not a load, it is a stall — release forward rather
+// than hold to the 30s wall bound. Staged is untouched (release watch owns
+// it). Fail-safe holds (never newly freezes on a read error). Never throws.
+const PRE_PHASE_DEAD_MS = 4000;
+let preHoldFrames = NaN; // last seen twin frame count while pre-holding
+let preHoldT0 = 0; // wall clock the current dead-frames wait started
+function preHoldProgressAlive() {
+  try {
+    if (!twinFrameLive()) {
+      try { earlyBootTwin(); } catch { /* boot kick is best-effort */ }
+      preHoldFrames = NaN;
+      preHoldT0 = 0;
+      return false;
+    }
+    const n = twinFrameCount();
+    const now = nowMs();
+    if (Number.isFinite(n) && (!Number.isFinite(preHoldFrames) || n > preHoldFrames)) {
+      preHoldFrames = n;
+      preHoldT0 = now;
+      return true;
+    }
+    if (!Number.isFinite(preHoldFrames)) {
+      preHoldFrames = Number.isFinite(n) ? n : 0;
+      preHoldT0 = now;
+      return true;
+    }
+    if (now - preHoldT0 > PRE_PHASE_DEAD_MS) return false;
+    return true;
+  } catch { return true; }
+}
 function stallPhase() {
   try {
     if (transitId) return null;
@@ -940,7 +977,11 @@ function stallArmed() {
     // at the next deep arrival.
     if (receding) return false;
     const phase = stallPhase();
-    if (phase === null || twinLoaded()) return false;
+    if (phase === null || twinLoaded()) {
+      preHoldFrames = NaN;
+      preHoldT0 = 0;
+      return false;
+    }
     // Gate-approach stop: the mask-armed ('pre') hold swallows forward only
     // on the gate approach — below it the climb flows and the stop happens
     // at the shut mask, never frozen mid-gesture below the arming threshold
@@ -949,7 +990,17 @@ function stallArmed() {
     if (phase === 'pre') {
       let zNow = NaN;
       try { zNow = mapRef ? +mapRef.getZoom() : NaN; } catch { zNow = NaN; }
-      if (!preStallSwallowDue({ phase, z: zNow })) return false;
+      if (!preStallSwallowDue({ phase, z: zNow })) {
+        preHoldFrames = NaN;
+        preHoldT0 = 0;
+        return false;
+      }
+      // PRE_PHASE_PROGRESS: blank boots + flows, painting holds briefly,
+      // dead frames release — a pre-hold with no twin coming never freezes.
+      if (!preHoldProgressAlive()) return false;
+    } else {
+      preHoldFrames = NaN;
+      preHoldT0 = 0;
     }
     return true;
   } catch { return false; }
@@ -1147,6 +1198,8 @@ function refreshStallLoading() {
       hold = stallWaitMs() < HARD_STOP_HOLD_MS;
     } else {
       stallT0 = 0;
+      preHoldFrames = NaN;
+      preHoldT0 = 0;
     }
   } catch { hold = false; }
   try {

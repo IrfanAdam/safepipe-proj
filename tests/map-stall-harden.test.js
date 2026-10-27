@@ -77,6 +77,32 @@ test('pill lights only while loading is actually in flight, never cold', () => {
   );
 });
 
+test('pre-phase hold never freezes behind a twin that is not coming', () => {
+  const main = srcOf('../src/map/main.js');
+  // Owner: linger in iso -> "TWIN LOADING" freeze that never released. The
+  // pre-hold used to arm on mask + unloaded with only the 30s wall bound as
+  // escape and nothing booting the twin — a blank frame froze forward with
+  // a dark pill and no feedback.
+  assert.ok(
+    main.includes('const PRE_PHASE_DEAD_MS = 4000;'),
+    'the pre-phase dead-frames bound is pinned (4s, far under the 30s wall cap)',
+  );
+  assert.ok(
+    main.includes('function preHoldProgressAlive()'),
+    'a pre-hold progress predicate exists (blank/live-painting/dead-frames)',
+  );
+  const law = main.slice(main.indexOf('function preHoldProgressAlive()'), main.indexOf('function stallPhase()'));
+  assert.ok(law.includes('earlyBootTwin()'), 'a blank frame kicks the boot instead of freezing');
+  assert.ok(law.includes('twinFrameCount()'), 'advancing twin frames keep the short wait legitimate');
+  assert.ok(law.includes('PRE_PHASE_DEAD_MS'), 'dead frames release forward past the bound');
+  const armed = main.slice(main.indexOf('function stallArmed('), main.indexOf('function stallWaitMs()'));
+  assert.ok(armed.includes('preHoldProgressAlive()'), 'the pre branch consults the progress law');
+  assert.ok(
+    armed.includes("// PRE_PHASE_PROGRESS: blank boots + flows, painting holds briefly,"),
+    'the pre-branch hook is marker-pinned',
+  );
+});
+
 test('depth ceiling pins live zoom in every phase, releases to the phase owner', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(
