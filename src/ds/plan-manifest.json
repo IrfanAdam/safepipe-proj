@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-26T08:43:30.235Z",
+  "generated": "2026-10-27T07:47:50.708Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "a129adc",
+      "full": "a129adcdca3eda3868e908f13e0a8d34051d0b5c",
+      "date": "2026-10-27",
+      "time": "13:17",
+      "subject": "fix(map): gesture reverse dissolve, adopt-only re-hand and loading-gated stall [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "a225c79",
       "full": "a225c7906175a50a4b8afa2f4ce7c528c5ba9d09",
@@ -6546,5 +6555,7 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "public/version.json"
+  ]
 }
