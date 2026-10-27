@@ -50,8 +50,30 @@ test('pill is fallback-only behind a grace delay', () => {
     'the pill grace delay is pinned',
   );
   assert.ok(
-    main.includes('el.hidden = !(hold && stallWaitMs() >= STALL_PILL_GRACE_MS);'),
+    main.includes('el.hidden = !(hold && loading && stallWaitMs() >= STALL_PILL_GRACE_MS);'),
     'pill visibility waits out the grace — fast-grant dives never flash it',
+  );
+});
+
+test('pill lights only while loading is actually in flight, never cold', () => {
+  const main = srcOf('../src/map/main.js');
+  // Owner: "the loading message only makes sense if there is loading" — a
+  // mask-armed linger on a cold twin (blank frame, nothing booting) held
+  // the pill lit past the grace with nothing to wait on.
+  assert.ok(
+    main.includes('function twinLoadingInFlight()'),
+    'a loading-in-flight predicate exists (frame live + boot started + no content yet)',
+  );
+  const gate = main.slice(main.indexOf('function twinLoadingInFlight()'), main.indexOf('function stallArmed('));
+  assert.ok(gate.includes("getAttribute('data-url') === 'about:blank'"), 'a blank frame is never loading');
+  assert.ok(gate.includes('if (twinLoaded()) return false;'), 'a content-ready twin is never loading');
+  assert.ok(
+    main.includes('LOADING-GATED'),
+    'the pill visibility is loading-gated (marker-pinned)',
+  );
+  assert.ok(
+    main.includes('loading: twinLoadingInFlight(),'),
+    'the stall probe publishes the loading bit for the linger trace',
   );
 });
 

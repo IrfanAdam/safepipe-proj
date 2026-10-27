@@ -31,6 +31,7 @@ import {
   shouldCenter,
   isTopDown,
   needsHandoff,
+  retraceOpacityForZoom,
   handoffScrubForZoom,
   handoffStagesForScroll,
   HANDOFF_STAGED_S_MAX,
@@ -915,8 +916,29 @@ function twinLoaded() {
   } catch { /* latch read is best-effort */ }
   try { return twinFrameHasContent(); } catch { return false; }
 }
+/** Loading actually in flight (pill gate): the twin shell exists (boot
+ * started — non-blank frame URL) but holds no content yet (navigating,
+ * compiling, or streaming tiles). A cold twin (blank frame — nothing
+ * booted, nothing fetching) is NOT loading: the pill would serve no
+ * purpose there, so it stays dark (the hold/ceiling mechanics underneath
+ * are untouched — this gates presentation only). Never throws. */
+function twinLoadingInFlight() {
+  try {
+    const fr = overlayEls && overlayEls.frame;
+    if (!fr || fr.getAttribute('data-url') === 'about:blank') return false;
+    if (twinLoaded()) return false;
+    return true;
+  } catch { return false; }
+}
 function stallArmed() {
   try {
+    // A gesture-owned recede just closed the twin: the frame is intentionally
+    // twinless while the fingers retrace home. Swallowing forward here would
+    // stall a re-dive behind a loader for a twin the user just closed (the
+    // retrace teardown lands mid-mask with a blanked frame) — forward stays
+    // free, the intent precache re-boots on the climb, and staging re-fires
+    // at the next deep arrival.
+    if (receding) return false;
     const phase = stallPhase();
     if (phase === null || twinLoaded()) return false;
     // Gate-approach stop: the mask-armed ('pre') hold swallows forward only
@@ -1132,7 +1154,14 @@ function refreshStallLoading() {
     // Pill grace: the freeze engages from tick 0, but the pill only shows
     // after STALL_PILL_GRACE_MS of held time — fast-grant dives release
     // before the grace and never flash it (fallback-only surface).
-    if (el) el.hidden = !(hold && stallWaitMs() >= STALL_PILL_GRACE_MS);
+    // LOADING-GATED: the pill additionally requires loading actually in
+    // flight (live shell, no content yet) — lingering mask-armed on a cold
+    // twin (blank frame, nothing booting/fetching) holds the pill dark,
+    // because the message serves no purpose there.
+    let loading = false;
+    try { loading = twinLoadingInFlight(); } catch { loading = false; }
+    if (el) el.hidden = !(hold && loading && stallWaitMs() >= STALL_PILL_GRACE_MS);
+    try { window.__mapProbe.stall.loading = loading; } catch { /* probe cosmetic */ }
   } catch { /* cosmetic */ }
   try { applyStallCeiling(hold); } catch { /* ceiling is best-effort */ }
   // NOTE: non-wheel forward input (touch pinch-in, keyboard +, double-click)
@@ -1143,6 +1172,7 @@ function refreshStallLoading() {
       holding: hold,
       phase,
       loaded,
+      loading: twinLoadingInFlight(),
       s: +((+stagedS || 0)).toFixed(1),
       waitMs: Math.round(stallWaitMs()),
       escape: !hold && phase !== null && !loaded,
@@ -1907,6 +1937,11 @@ function onNativeZoomStep(snap, source) {
         window.__mapProbe.maskArmed = false;
       } catch { /* probe cosmetic */ }
     }
+    // GESTURE-REVERSE DISSOLVE: repaint the zoom-keyed overlay fade on every
+    // native zoom step while it owns the overlay (begin/end own the state;
+    // this only repaints, so a parked retrace costs one pure-function read
+    // per tick and never strands).
+    try { if (retraceDissolve) driveRetraceDissolve(); } catch { /* dissolve repaint is best-effort */ }
     // CACHE-FAST: far-intent tile warm — one zoom level below the mask arm
     // (near && z >= Z_FAR_INTENT, ~6): warms the CURRENT-level site patch
     // hotspot-first, so the frame under the fingers resolves before the
@@ -2067,11 +2102,19 @@ function onNativeZoomStep(snap, source) {
     // Task-37: scrolling back up to the gate cancels an armed gesture
     // recede — the journey owns forward again (staging may re-fire below).
     if (receding && needsHandoff(z)) {
-      receding = false;
-      recedeLandHome = null;
-      try {
-        window.__mapProbe.recede = null;
-      } catch { /* probe cosmetic */ }
+      // While the reverse dissolve owns the overlay, the gate arrival is a
+      // re-open (driveRetraceDissolve), not a disarm — cancelling here would
+      // strand an opaque overlay with no twin behind it. Past the teardown
+      // (pure recede phase) the journey owns forward again as before.
+      if (retraceDissolve) {
+        try { driveRetraceDissolve(); } catch { /* re-open is best-effort */ }
+      } else {
+        receding = false;
+        recedeLandHome = null;
+        try {
+          window.__mapProbe.recede = null;
+        } catch { /* probe cosmetic */ }
+      }
     }
     const busyNow = !!(transitId || pendingReveal || reverseWait || receding);
     const busyFlight = !!transitId;
@@ -2901,10 +2944,18 @@ function freezeStagedFrame(seat = true) {
   } catch { /* probe cosmetic */ }
 }
 
-/** Grant-time re-hand: snap the map back onto the staged anchor when drift is
- * detected (center >2px or zoom >0.02 off), so the twin boots on the true end
- * pose — the handed URL frame. Pitch/bearing ride the frozen law and are
- * never touched here. Returns drift px (>=0) or -1 when unreadable. */
+/** Grant-time re-hand: adopt the fingers' live frame into the staged anchor,
+ * never move the camera. A grant (ready/painted) can land mid-hold while a
+ * native zoom ease is still travelling toward the gate — a jumpTo here
+ * (center or depth) calls MapLibre's stop(), kills that ease, and parks
+ * depth short of the gate under an opaque overlay (measured: 700px of S
+ * advancing depth 0.15 levels, limit cycle z 10.511<->10.663, then a
+ * release-starved eject to z 1.13). The twin already rides the live frame
+ * (the grant-time S re-emit posts live S + live zoom), so the anchor only
+ * needs to agree with it — depth adopts live, center stays on SITE (the
+ * freeze seat + takeover center law own pan). Returns drift px (>=0) for
+ * the probe, or -1 when unreadable.
+ */
 function reassertStagedAnchor(reason) {
   let driftPx = -1;
   let reasserted = false;
@@ -2924,31 +2975,21 @@ function reassertStagedAnchor(reason) {
     } catch { /* measure best-effort */ }
     const zDrift = Number.isFinite(z) && Number.isFinite(stagedAnchor.z)
       ? Math.abs(z - stagedAnchor.z) : 0;
-    if ((driftPx >= 0 && driftPx > 2) || zDrift > 0.02) {
+    // ADOPT-ONLY: the anchor follows the fingers, never leads them. Any
+    // jumpTo here — depth back to the entry zoom, center back to the
+    // anchor — calls MapLibre's stop() and kills the native zoom ease the
+    // fingers just started, parking depth below the gate (the measured
+    // grant-time snap z 10.74->10.52 is this write). The twin already rides
+    // the live frame via the grant-time S re-emit, so agreement means the
+    // anchor adopts live depth. Center is not adopted (it stays SITE by
+    // construction — the freeze seat + center laws own pan, not the anchor).
+    if (zDrift > 0.02) {
       try {
-        if (stagedActive && stagedAnchor && stagedAnchor.site) {
-          // CENTER CONVERGENCE: the S-glide owns centering mid-hold (it
-          // converges the arrival center onto the hotspot as a pure fn of
-          // S) — a center snap here would replay the lateral offset the
-          // glide removes. Correct depth only; leave pan to the glide.
-          // Depth follows progress, never the stale entry: the anchor froze
-          // at the staging-arm zoom, but the fingers' ease legitimately
-          // climbs past it mid-hold — snapping back to the entry zoom is the
-          // measured grant-time camera snap (z 10.74->10.52, +14% luma step).
-          // Above the anchor, advance the anchor to the live frame (the twin
-          // boots on the true end pose); below it, correct the regression.
-          if (zDrift > 0.02) {
-            if (Number.isFinite(z) && Number.isFinite(stagedAnchor.z) && z > stagedAnchor.z) {
-              stagedAnchor.z = z;
-            } else {
-              mapRef.jumpTo({ zoom: stagedAnchor.z });
-            }
-          }
-        } else {
-          mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy], zoom: stagedAnchor.z });
+        if (Number.isFinite(z)) {
+          stagedAnchor.z = z;
+          reasserted = true;
         }
-      } catch { /* re-assert is best-effort */ }
-      reasserted = true;
+      } catch { /* adopt is best-effort */ }
     }
   } catch { /* re-hand never breaks the grant */ }
   try {
@@ -3127,26 +3168,17 @@ function driveStagedHold(st) {
       }
     }
   } catch { /* hold ring is best-effort */ }
-  // (b2) LOCK-EARLY hard center pin: after lock-in the map stays on the SITE
-  // anchor — but ONLY when it has actually drifted. An unconditional
-  // jumpTo({center}) on every staged tick calls MapLibre's stop(), which
-  // kills the native zoom ease the fingers just started: measured 700px of
-  // staged S moving depth only 0.15 levels (limit cycle z 10.511<->10.663),
-  // so the gate is never reached and the dive ejects. Re-seat only on real
-  // lateral drift (>2px); a seated frame skips the write entirely and the
-  // ease runs free. Scroll-up unwinds through exitStaged, never this pin.
-  try {
-    if (mapRef && stagedActive && stagedAnchor && stagedAnchor.site) {
-      try {
-        const c = mapRef.getCenter();
-        const pa = mapRef.project([stagedAnchor.cx, stagedAnchor.cy]);
-        const pl = c ? mapRef.project([+c.lng, +c.lat]) : null;
-        const drift = pa && pl && Number.isFinite(+pa.x) && Number.isFinite(+pl.x)
-          ? Math.hypot(pa.x - pl.x, pa.y - pl.y) : 99;
-        if (drift > 2) mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] });
-      } catch { /* pin is best-effort */ }
-    }
-  } catch { /* center pin never breaks the hold */ }
+  // (b2) NO per-tick center pin: the freeze seat (arm tick) + the takeover
+  // center law + the canvas-center flip anchor already keep the frame on
+  // SITE, and every source of lateral drift they leave is finger-owned.
+  // An unconditional jumpTo({center}) on every staged tick calls MapLibre's
+  // stop(), which kills the native zoom ease the fingers just started:
+  // measured 700px of staged S moving depth only 0.15 levels (limit cycle
+  // z 10.511<->10.663), so the scale-near gate never reads true, S
+  // saturates under a 100%-opaque overlay, and the release watch ejects the
+  // dive (release-starved, 2.6s) to z 1.13. The S-max near-fail recovery
+  // below stays the single invisible backstop; nothing here moves the
+  // camera mid-hold.
   // (c) satellite rides the same S progress as the overlay (the staged blend
   // stage holds full sat): glued to the fingers through the hold, never to
   // the clamped z both laws agree on anyway.
@@ -3846,6 +3878,7 @@ function quiesceTwinLayers() {
       overlayEls.root.classList.remove('prewarm');
       overlayEls.root.classList.remove('scrubbing');
       try { overlayEls.root.style.opacity = ''; } catch { /* inline release is best-effort */ }
+      try { if (overlayEls.root.style.pointerEvents === 'none') overlayEls.root.style.pointerEvents = ''; } catch { /* pointer restore is best-effort */ }
       try { setFrameUrl(overlayEls.frame, 'about:blank'); } catch { /* frame teardown is best-effort */ }
     } else {
       const root = document.getElementById('twin-overlay');
@@ -3907,6 +3940,10 @@ function unwindDive(reason = 'esc', opts = {}) {
   try { unfreezeStagedFrame(); } catch { /* unlock is best-effort */ }
   // (3) TWIN LAYERS — the close theatre only when a twin is actually open;
   // anything else is a quiet teardown (a fork-resolved hold leaks otherwise).
+  // A mid-retrace Esc lands here with the overlay mounted but twinOpen
+  // false: end the zoom-keyed dissolve (hide + blank, no camera move — the
+  // restore below owns the camera, and the dive record is already consumed).
+  try { if (retraceDissolve) endRetraceDissolve(); } catch { /* dissolve teardown is best-effort */ }
   if (twinOpen) {
     try { finishTwinClose(); } catch (err) { errors.push('UNWIND-CLOSE: ' + (err && err.message)); }
   }
@@ -4727,6 +4764,15 @@ function openTwin(id, opts = {}) {
     root.classList.remove('closing');
     root.classList.remove('prewarm');
   } catch { /* cosmetic */ }
+  // A fresh open never inherits a reverse dissolve: the zoom-keyed fade may
+  // have parked a stale inline opacity / pointer-events:none on this same
+  // root (re-open path restores them, but a fork-resolved hold or a
+  // mid-retrace open must not start half-faded or click-dead).
+  try { stopRetraceMode(); } catch { /* mode clear is best-effort */ }
+  try {
+    root.classList.remove('scrubbing');
+    if (root.style.opacity !== '') root.style.opacity = '';
+  } catch { /* cosmetic */ }
   try {
     if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
   } catch { /* timer teardown is best-effort */ }
@@ -4858,11 +4904,22 @@ function doCloseTwin(opts = {}) {
       } catch { /* probe cosmetic */ }
     }
   };
-  // Instant cut: hide synchronously — no fade class, no fade timer. The
-  // map underneath sits at its law pose, so there is no blend to run.
-  try {
-    finishHide();
-  } catch { /* hide is best-effort */ }
+  // Instant cut — every path EXCEPT the gesture reverse: hiding
+  // synchronously there is the measured one-frame op 1->0 cut (the twin
+  // just walked back to the handoff pose, so the frames match, but the
+  // hide still drops a full overlay in one frame instead of retracing).
+  // The gesture path keeps the overlay mounted and dissolves it as a pure
+  // function of the live zoom (beginRetraceDissolve below) — the fingers
+  // carry it home through the same laws, and the teardown lands at Z_TOP.
+  // A begin that finds nothing to dissolve (already home, no frame) falls
+  // back to the instant hide so no overlay ever strands.
+  const gestureReverse = !!(opts && opts.gestureReverse);
+  let retraced = false;
+  if (!gestureReverse) {
+    try {
+      finishHide();
+    } catch { /* hide is best-effort */ }
+  }
   // Vignette stays through the cut (forward-symmetric); the recede below
   // lifts it while sat->flat + zoom-out run.
   window.__mapProbe.recede = 'fading';
@@ -4909,8 +4966,12 @@ function doCloseTwin(opts = {}) {
   // to wherever the dive began. Esc/X/back (closeSource set, or a close we
   // asked for) keep the restore exactly as before.
   if (!unwindActive) {
-    if (opts && opts.gestureReverse) {
+    if (gestureReverse) {
       try { holdHandoffPoseForReverse(); } catch { /* retrace hand-off never breaks teardown */ }
+      try { retraced = beginRetraceDissolve(); } catch { retraced = false; }
+      if (!retraced) {
+        try { finishHide(); } catch { /* fallback hide is best-effort */ }
+      }
     } else {
       try {
         const t0 = nowMs();
@@ -4938,10 +4999,163 @@ function holdHandoffPoseForReverse() {
   lastCeilingPin = null;
   stallT0 = 0;
   try { restoreMaxZoom(); } catch { /* unclamp is best-effort */ }
+  // The recede landing is armed by recedeToHome earlier in the close chain;
+  // re-arm here if anything disarmed it, so the zoom-step home check always
+  // has a landing to fire (an un-armed retrace would sit at 'out' forever).
+  // recedeToHome is idempotent-safe: re-entry only re-arms the closure.
+  try {
+    if (!recedeLandHome && !recedeDone) recedeToHome();
+  } catch { /* arming is best-effort */ }
   try {
     window.__mapProbe.diveCam = null;
-    window.__mapProbe.recede = 'retrace';
+    if (window.__mapProbe.recede !== 'out') window.__mapProbe.recede = 'out';
   } catch { /* probe cosmetic */ }
+}
+
+/* GESTURE-REVERSE DISSOLVE: the twin answered the user's own wheel-out, so
+ * the close keeps the overlay MOUNTED and dissolves it as a pure function
+ * of the live zoom (retraceOpacityForZoom: 1 at Z_HANDOFF, 0 at/below
+ * Z_TOP) instead of hiding it in one frame. The zoom-step driver repaints
+ * it on every tick; at 0 the twin is torn down and the native journey laws
+ * own the rest of the way home. No timer, no flight, no unwind — fingers
+ * own every pixel, both directions (scrolling back up re-dissolves by the
+ * same law; reaching the gate re-opens the twin with nothing to snap).
+ * State: retraceDissolve while the zoom-keyed fade owns the overlay. */
+let retraceDissolve = false;
+/** Stop owning the overlay fade without hiding anything (the active close /
+ * unwind path owns visibility). Restores twin interaction when the twin is
+ * still the frame (re-open / fresh open). Never throws. */
+function stopRetraceMode() {
+  retraceDissolve = false;
+  try {
+    const root = overlayEls && overlayEls.root;
+    if (root) {
+      if (root.style.pointerEvents === 'none') root.style.pointerEvents = '';
+    }
+  } catch { /* pointer restore is best-effort */ }
+}
+/** Begin the zoom-keyed reverse dissolve. True when the overlay is mounted
+ * on a live twin frame above Z_TOP (something to dissolve); false otherwise
+ * (the caller falls back to the instant hide). Reduced-motion skips the
+ * dissolve (instant path) — a fade the fingers cannot scrub is theatre. */
+function beginRetraceDissolve() {
+  stopRetraceMode();
+  try {
+    let reduced = false;
+    try {
+      reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch { reduced = false; }
+    if (reduced) return false;
+    const root = overlayEls && overlayEls.root;
+    const fr = overlayEls && overlayEls.frame;
+    if (!root || root.hidden) return false;
+    if (!fr || fr.getAttribute('data-url') === 'about:blank') return false;
+    let z = NaN;
+    try { z = mapRef ? +mapRef.getZoom() : NaN; } catch { z = NaN; }
+    if (!Number.isFinite(z) || z <= Z_TOP) return false;
+    retraceDissolve = true;
+    try {
+      // Suspend the transition FIRST: per-tick law writes must BE the
+      // rendered value (the forward scrub lesson) — otherwise each write
+      // restarts a 0.45s ease and the fade lags the fingers.
+      if (!root.classList.contains('scrubbing')) root.classList.add('scrubbing');
+      // The fade owns no interaction: wheels pass through to the map canvas
+      // so the fingers drive the zoom the fade reads. The twin already
+      // walked back; nothing up there needs the pointer.
+      root.style.pointerEvents = 'none';
+    } catch { /* presentation is best-effort */ }
+    try { window.__mapProbe.recede = 'out'; } catch { /* probe cosmetic */ }
+    driveRetraceDissolve();
+    return true;
+  } catch { return false; }
+}
+/** Repaint the reverse dissolve from the live zoom. Runs on every zoom step
+ * while the dissolve owns the overlay (wired in onNativeZoomStep). */
+function driveRetraceDissolve() {
+  if (!retraceDissolve) return;
+  try {
+    let z = NaN;
+    try { z = mapRef ? +mapRef.getZoom() : NaN; } catch { z = NaN; }
+    if (!Number.isFinite(z)) return;
+    const root = overlayEls && overlayEls.root;
+    if (!root || root.hidden) { stopRetraceMode(); return; }
+    if (z >= Z_HANDOFF) {
+      // Pushed back to the gate mid-retrace: re-open the twin. The law reads
+      // 1 there = the stylesheet's 1, so restoring the transition + releasing
+      // the inline value eases 1 -> 1 (nothing to snap), and the fingers are
+      // back inside the committed frame with the twin live. The reverse is
+      // over: disarm the recede (a later wheel-out starts a fresh twin-posted
+      // cycle), so no stale landing outlives the frame it was armed for.
+      retraceDissolve = false;
+      twinOpen = true;
+      try { window.__mapProbe.twinOpen = true; } catch { /* probe cosmetic */ }
+      receding = false;
+      recedeLandHome = null;
+      try { window.__mapProbe.recede = null; } catch { /* probe cosmetic */ }
+      stopRetraceMode();
+      try {
+        root.classList.remove('scrubbing');
+        root.style.opacity = '';
+      } catch { /* cosmetic */ }
+      try {
+        document.body.classList.add('twin-open');
+        if (overlayEls.frame) overlayEls.frame.focus?.();
+      } catch { /* chrome is cosmetic */ }
+      return;
+    }
+    if (z <= Z_TOP) {
+      endRetraceDissolve();
+      return;
+    }
+    const op = retraceOpacityForZoom(z);
+    try {
+      const s = String(+op.toFixed(4));
+      if (root.style.opacity !== s) root.style.opacity = s;
+    } catch { /* paint is best-effort */ }
+    try {
+      window.__mapProbe.recede = 'out';
+      window.__mapProbe.retraceOp = +op.toFixed(4);
+      window.__mapProbe.retraceZ = +z.toFixed(3);
+    } catch { /* probe cosmetic */ }
+  } catch { /* dissolve repaint never breaks the driver */ }
+}
+/** Land the reverse dissolve at Z_TOP: opacity already reads 0 by the law,
+ * so hiding + blanking snaps nothing. The gesture-owned recede stays armed
+ * (recede 'out') — the zoom-step home check still lands it. No camera move,
+ * no unwind. Never throws. */
+function endRetraceDissolve() {
+  retraceDissolve = false;
+  try {
+    const root = overlayEls && overlayEls.root;
+    const fr = overlayEls && overlayEls.frame;
+    if (root) {
+      try { root.classList.remove('scrubbing'); } catch { /* cosmetic */ }
+      try { root.style.opacity = ''; } catch { /* cosmetic */ }
+      try { root.style.pointerEvents = ''; } catch { /* cosmetic */ }
+      try { root.hidden = true; } catch { /* hide is best-effort */ }
+      try { root.classList.remove('closing'); } catch { /* cosmetic */ }
+      try { root.classList.remove('prewarm'); } catch { /* cosmetic */ }
+    }
+    if (fr) {
+      try { setFrameUrl(fr, 'about:blank'); } catch { /* teardown is best-effort */ }
+      twinBootKey = null;
+      try { window.__mapProbe.twinBootKey = null; } catch { /* probe cosmetic */ }
+    }
+    try {
+      window.__mapProbe.twinReady = false;
+      window.__mapProbe.twinPainted = false;
+      window.__mapProbe.reveal = null;
+      window.__mapProbe.revealFallback = false;
+      window.__mapProbe.revealLate = false;
+      window.__mapProbe.revealPaint = false;
+      window.__mapProbe.retraceOp = 0;
+    } catch { /* probe cosmetic */ }
+    try { document.body.classList.remove('twin-open'); } catch { /* chrome class is cosmetic */ }
+    try {
+      if (history.state && history.state.twin) history.replaceState(null, '', mapUrlWithSector(null));
+    } catch { /* history is best-effort */ }
+    try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
+  } catch { /* teardown never breaks the driver */ }
 }
 
 /** Close-time flatten guarantor (shared): the last zoomend fired while the

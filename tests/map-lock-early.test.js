@@ -25,23 +25,32 @@ test('lock tick fires at the staged arm, onto the SITE anchor', () => {
   );
 });
 
-test('staged ticks re-seat the center only on real drift: no glide gate, no pan drift, no per-tick stop', () => {
+test('staged ticks never move the camera mid-hold: the per-tick pin is gone', () => {
   const main = srcOf('../src/map/main.js');
+  // Root cause of the never-committing dive: a per-tick jumpTo({center})
+  // calls MapLibre's stop() and kills the native zoom ease, so S climbs
+  // while depth crawls (700px of S for 0.15 levels) and the release watch
+  // ejects the dive. The hold owns no camera write now — the arm seat +
+  // center laws keep SITE framed, and the S-max recovery stays the single
+  // invisible backstop.
   assert.ok(
-    main.includes('mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] })'),
-    'drift re-seats the map on the anchor center',
+    !main.includes('if (drift > 2) mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] });'),
+    'no drift-gated per-tick re-seat: any jumpTo here would stop() the zoom ease',
   );
   assert.ok(
-    main.includes('if (drift > 2) mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] });'),
-    'a seated frame skips the write entirely so the native zoom ease runs free',
+    !main.includes('LOCK-EARLY hard center pin'),
+    'the hard pin is gone with its ease-killing write',
   );
   assert.ok(
     !main.includes('stagedFreezeCenter.lng + (stagedAnchor.cx'),
     'the k-gated S-glide is gone: centering no longer waits on reveal progress',
   );
+  const hold = main.slice(main.indexOf('function driveStagedHold('), main.indexOf('function driveStagedOverlay('));
+  assert.ok(hold.length > 500, 'driveStagedHold body is intact');
+  assert.ok(!hold.includes('mapRef.jumpTo') && !hold.includes('mapRef.easeTo'), 'the hold issues no camera writes mid-hold (ring/tilt/sat are DOM + pitch writes only)');
   assert.ok(
-    main.includes('LOCK-EARLY hard center pin'),
-    'the hard pin is marker-pinned',
+    main.includes('NEAR-FAIL RECOVERY'),
+    'the S-max near-fail recovery stays the single invisible backstop',
   );
 });
 

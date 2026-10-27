@@ -341,6 +341,21 @@ export function needsHandoff(z) {
   return Number.isFinite(+z) && +z >= Z_HANDOFF;
 }
 
+/* GESTURE-REVERSE DISSOLVE (owner rev 2026-10-26: the way back must retrace
+ * the phases, never cut to the full map). The twin-initiated recede keeps
+ * the overlay mounted while the fingers drive the zoom home; the overlay
+ * opacity is a pure function of the LIVE zoom — 1 at the handoff gate (the
+ * committed frame), 0 at/below the iso checkpoint Z_TOP (the twin is torn
+ * down there and the native journey laws own the rest of the way home).
+ * Smoothstepped so the fade starts and ends at rest (no snap at either
+ * end); zoom-out retraces it, zoom-in re-dissolves it, by construction.
+ * Pure + node-checkable; the map-side reverse driver owns the writes. */
+export function retraceOpacityForZoom(z) {
+  const n = +z;
+  if (!Number.isFinite(n)) return 0;
+  return smooth01((n - Z_TOP) / (Z_HANDOFF - Z_TOP));
+}
+
 /* Handoff dissolve band (Task 35): past Z_HANDOFF the map HOLDS its scrubbed
  * end-frame (pitch carried at ISO_PITCH_DEG, center on the spot — native zoom
  * still owns z) while further zoom deltas dissolve into the twin pose. 0

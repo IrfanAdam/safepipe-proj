@@ -163,7 +163,7 @@ test('an aborted close restores the frame it left, not merely home', () => {
   // GESTURE REVERSE: a twin-initiated recede (the user scrolling out) keeps
   // the handoff pose instead of teleporting to the frame the dive left, so
   // the way out retraces through the laws and hands over to the native dolly.
-  assert.ok(close.includes('if (opts && opts.gestureReverse) {'), 'the close forks on a gesture reverse');
+  assert.ok(close.includes('if (gestureReverse) {'), 'the close forks on a gesture reverse');
   assert.ok(close.includes('holdHandoffPoseForReverse()'), 'a gesture reverse keeps the handoff pose (no jump home)');
   const holdStart = main().indexOf('function holdHandoffPoseForReverse(');
   const hold = main().slice(holdStart, main().indexOf('\n}\n', holdStart));

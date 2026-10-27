@@ -622,11 +622,11 @@ test('commit+superimpose: near-fail recovery, single radius law, center converge
     main.includes('with the spot clamped to the viewport'),
     'the hold entry refresh keeps its clamp contract',
   );
-  // (b) center convergence: anchor + boot + mask + pin on the hotspot.
-  // LOCK-EARLY revision: the S-glide (arrival seat -> hotspot as a fn of
-  // reveal) is replaced by the arm lock tick + per-tick hard pin — centering
-  // lands when the hold arms, and mid-hold the frame is pinned, never
-  // travelled. Twin center == mask center by construction, unchanged.
+  // (b) center convergence: anchor + boot + mask on the hotspot. The
+  // per-tick hard pin is GONE (it stop()d the zoom ease and the dive never
+  // committed): centering lands at the arm lock tick, and mid-hold nothing
+  // moves the camera — the S-max recovery below stays the single backstop.
+  // Twin center == mask center by construction, unchanged.
   assert.ok(
     main.includes('cx: SITE_LNGLAT[0],'),
     'the staged anchor sits ON the hotspot, never on the drifted camera',
@@ -644,8 +644,8 @@ test('commit+superimpose: near-fail recovery, single radius law, center converge
     'the arm lock tick seats the live map onto the hotspot when the hold arms',
   );
   assert.ok(
-    main.includes('mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] })'),
-    'the hold re-seats the center only on real drift (no per-tick stop, the zoom ease runs free)',
+    !main.includes('mapRef.jumpTo({ center: [stagedAnchor.cx, stagedAnchor.cy] })'),
+    'no per-tick re-seat mid-hold (any jumpTo here stop()s the zoom ease and the dive never commits)',
   );
   assert.ok(
     main.includes('if (!scaleNear) jump.zoom = Z_HANDOFF;'),
