@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-27T08:34:37.352Z",
+  "generated": "2026-10-27T08:36:20.558Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "01a2426",
+      "full": "01a2426abcb147bdaff6f1416d1b8a61f5b6e245",
+      "date": "2026-10-27",
+      "time": "14:04",
+      "subject": "fix(map): pre-phase hold boots-or-flows, dead-frames release after 4s [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "a129adc",
       "full": "a129adcdca3eda3868e908f13e0a8d34051d0b5c",
@@ -6556,7 +6565,6 @@
     }
   ],
   "wip": [
-    "public/version.json",
-    "src/map/main.js"
+    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ]
 }
