@@ -172,6 +172,14 @@ test('the map writers ride the one law: arm on the mask edge, apply before the r
     'the pass re-reads proximity after the jump (no stale ring centre)');
   // The takeover carries the same law synchronously on its tick.
   assert.ok(main.includes('const t = centerSettleTargetFor(target);'), 'the band takeover carries the law');
+  // The staged band writes SITE every tick: the twin is built on SITE, so a
+  // cursor anchor inside the band is a measured boresight drift
+  // (169 m E / 82 m S = +8.3/+2.5 px at the commit).
+  const takeover = main.slice(main.indexOf('function installBandTakeover('), main.indexOf('function installWheelFlip('));
+  assert.ok(takeover.includes('const stagedHold = stagedActive && !stagedCommitted;'),
+    'the staged band holds one centre for its whole run');
+  assert.ok(takeover.includes('if (stagedHold) correctTo = { lng: SITE_LNGLAT[0], lat: SITE_LNGLAT[1] };'),
+    'the hold pins the twin anchor, never the cursor anchor');
   // Flights keep the camera: the law must never steer a programmatic flight.
   const apply = main.slice(main.indexOf('function applyCenterSettle('), main.indexOf('function updateRingClip('));
   assert.ok(apply.includes('transitId'), 'flights are exempt from the settle');

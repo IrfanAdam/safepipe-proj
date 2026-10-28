@@ -5907,6 +5907,13 @@ function installBandTakeover() {
       // framing never pans around the cursor after the mask appears. Mask
       // down keeps the cursor anchor (finger-owned framing, park-safe).
       const maskNow = centerBlendForZoom(z) > 0 && !!(prox && prox.near);
+      // Staged band: the twin is built on SITE, so every tick of the band has to
+      // write the same centre or the dissolve exposes the cursor anchor as a
+      // boresight offset (measured 169 m E / 82 m S, +8.3/+2.5 px at the commit).
+      // SITE is already the settle law's value past CENTER_SETTLE_SPAN_Z, so this
+      // only removes the drift — it never fights the law or adds a constant.
+      const stagedHold = stagedActive && !stagedCommitted;
+      if (stagedHold) correctTo = { lng: SITE_LNGLAT[0], lat: SITE_LNGLAT[1] };
       let holdCenter = null;
       if (maskNow && !correctTo) {
         try {
