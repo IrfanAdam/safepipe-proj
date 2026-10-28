@@ -751,41 +751,6 @@ export function flipWheelDelta(deltaY) {
   return Number.isFinite(n) ? -n : 0;
 }
 
-/* THE WHEEL-ZOOM LAW (single source, mirrored by every lane that owns a
- * wheel). One notch of raw wheel is one step of zoom, and the step is the
- * same on BOTH sides of the handover: the map's in-band takeover tick and
- * the twin's post-commit dolly read this law, so the gesture never changes
- * speed or direction when the pointer crosses from the map canvas into the
- * twin iframe. Measured reason: with the twin on OrbitControls' own dolly
- * (a fixed RATIO per notch) the handover dropped the travel from
- * 0.165-0.267 zoom/tick on the map to 0.089 on the twin — a 2-3x speed
- * cliff exactly at the seam, and a ratio law also drifts with depth while
- * the map's is a constant increment.
- *
- * Two rates, both gesture-shaped (never geometry): a wheel notch is coarse
- * and slow, trackpad dust is fine and fast. deltaMode 1 (lines) is scaled to
- * px by the caller before it gets here (the DOM gives no honest px for it).
- * Pure + node-checkable. */
-export const WHEEL_ZOOM_RATE = 1 / 450; // zoom per wheel px (native scrollZoom cadence)
-export const WHEEL_ZOOM_RATE_FINE = 1 / 100; // sub-notch / trackpad dust
-export const WHEEL_FINE_PX = 4; // |delta| below this is dust, not a notch
-/** Zoom step for one raw wheel delta. Raw sign convention is the OWNER's:
- * deltaY > 0 = drag DOWN = zoom IN (the flip lane negates before the native
- * handler; lanes that read raw deltas add this step as-is). */
-export function wheelZoomRate(deltaY) {
-  const d = Math.abs(+deltaY);
-  if (!Number.isFinite(d) || d === 0) return 0;
-  return d < WHEEL_FINE_PX ? WHEEL_ZOOM_RATE_FINE : WHEEL_ZOOM_RATE;
-}
-/** The law itself: the zoom a tick lands on from z. Non-finite input holds. */
-export function zoomAfterWheel(z, deltaY) {
-  const n = +z;
-  const d = +deltaY;
-  if (!Number.isFinite(n)) return n;
-  if (!Number.isFinite(d) || d === 0) return n;
-  return n + d * wheelZoomRate(d);
-}
-
 /* Journey-lock anchor (pure, node-checkable): the screen point the native
  * zoom should circle while locked. Zooming IN anchors beyond the spot, so
  * the spot drifts toward center coupled to the user's own scroll speed and
@@ -798,22 +763,6 @@ export function lockAroundPoint(hx, hy, cx, cy, zoomIn) {
   if (!zoomIn) return { x: +cx, y: +cy };
   const K = 0.9;
   return { x: +hx + (+hx - +cx) * K, y: +hy + (+hy - +cy) * K };
-}
-
-/* IN-VIEW ARM (owner rev: the lock must engage when the site is in view,
- * not only when the cursor sits on it). Pure: true when the projected site
- * lies inside the viewport expanded by `marginPx` on every side. The margin
- * is the caller's own near radius (PROX_CURSOR_PX on the map side), so the
- * arm region is continuous with the near region — no new constant, no cliff
- * at the frame edge. A site already off-screen never arms (nothing to glide
- * without a visible anchor); once armed the settle law centres it, so it
- * cannot leave the frame mid-dive. */
-export function siteInView(sx, sy, w, h, marginPx) {
-  const x = +sx, y = +sy, W = +w, H = +h;
-  let m = +marginPx;
-  if (![x, y, W, H].every(Number.isFinite) || W <= 0 || H <= 0) return false;
-  if (!Number.isFinite(m) || m < 0) m = 0;
-  return x >= -m && y >= -m && x <= W + m && y <= H + m;
 }
 
 /* Mask-anchored scroll-gain dip (pure, node-checkable): the slowdown rides

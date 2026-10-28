@@ -185,35 +185,9 @@ export function poseAtRangePure(pose, range) {
     const L = Math.hypot(dx, dy, dz);
     if (!(L > 0)) return pose;
     const k = range / L;
-    // Carry every non-pose field (mix, legIndex, t, ...) across the rescale:
-    // the staged forward tick drives mix from the RESCALED pose every frame,
-    // and a dropped mix read as undefined -> Math.round -> NaN -> the
-    // clampMix non-finite fallback (50), pinning the dissolve mid-fade.
-    return { ...pose, eye: { x: t.x + dx * k, y: (t.y ?? 0) + dy * k, z: t.z + dz * k }, target: { ...t } };
+    return { eye: { x: t.x + dx * k, y: (t.y ?? 0) + dy * k, z: t.z + dz * k }, target: { ...t } };
   } catch {
     return pose;
-  }
-}
-
-/* CAMERA-WRITE FINGERPRINT (write-dedupe, stutter). The hold pin and the
- * flight pose writers re-issue absolute camera poses every frame; at rest
- * (no new staged post, settled progress, steady viewport) the commanded
- * pose is bit-identical, so re-writing it only re-runs controls + damping
- * against itself — the per-tick fight that reads as stutter. The writers
- * skip the write when this fingerprint matches the last one they applied.
- * Exact float rendering (no epsilon): the inputs are deterministic functions
- * of (S, posts, viewport), so identical inputs render identically and any
- * real change — however small — renders differently and still writes. Null
- * when either end is unreadable (caller writes through, never skips blind).
- * Pure + node-checkable. */
-export function poseWriteFp(eye, target) {
-  try {
-    if (!eye || !target) return null;
-    const vs = [eye.x, eye.y, eye.z, target.x, target.y, target.z];
-    if (vs.some((v) => typeof v !== 'number' || !Number.isFinite(v))) return null;
-    return vs.map((v) => String(v)).join('|');
-  } catch {
-    return null;
   }
 }
 
@@ -248,54 +222,6 @@ export function stagedReleaseAnchors({ startPose, mid, to, range, polar = HANDOF
       to: to?.eye && to?.target ? poseAtRangePure(to, lock) : poseAtRangePure(mid, lock),
       range: lock,
     };
-  } catch {
-    return null;
-  }
-}
-
-/* STAGED LIVE SCALE (boresight, mid-band) — which zoom the dissolve is sized
- * from.
- *
- * The staged band is NOT a parked gate frame: the fingers keep wheeling while
- * S accumulates, so the live zoom travels from the arm zoom up to the gate
- * over the band (measured 10.666 -> 11.5 across S 0..700 on the 1280x800
- * harness). Sizing the twin from the Z_HANDOFF constant alone therefore put
- * its ground scale 1.78x inside the map's at the release, unwinding to 1.0
- * only at the commit — a pure scale error: zero at the boresight, 44 px at
- * 3 km and ~110 px at the frame edge, peaking at overlay 0.39. That is the
- * shape the eye catches mid-dissolve, and why both ENDPOINTS stayed green.
- * The lock must read the zoom the parent rides along with every staged post
- * (buildTwinStagedMessage(s, z)) through the same frameRange law, with the
- * handed frame zoom as the fallback — live zoom, never a literal.
- * Null when neither zoom is finite so the caller keeps its own anchor
- * instead of guessing. Pure + node-checkable. */
-export function stagedLiveZoom({ zStaged = null, zFrame = null } = {}) {
-  try {
-    const zs = Number(zStaged);
-    if (Number.isFinite(zs) && zs > 0) return zs;
-    const zf = Number(zFrame);
-    if (Number.isFinite(zf) && zf > 0) return zf;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/** Pure: the staged band's ground-scale range for the FRESHEST live zoom —
- * frameRange (the exact inverse of the map's metres-per-pixel, 512-px tile
- * convention) through the shared orbit rails. viewportPx/fovDeg/lat must be
- * the twin camera's own, so the lock is the map's footprint projected
- * through THIS camera. Null when no zoom is known or the result is unusable
- * (caller keeps its anchor, never a canned pose). */
-export function stagedRangeLock({
-  zStaged = null, zFrame = null, viewportPx = 600, lat = null, fovDeg = MAP_TRUE_FOV_DEG,
-} = {}) {
-  try {
-    const z = stagedLiveZoom({ zStaged, zFrame });
-    if (z === null) return null;
-    const r = frameRange(z, { viewportPx, lat, fovDeg });
-    const cl = clampHandoffRange(r);
-    return Number.isFinite(cl) && cl > 0 ? cl : null;
   } catch {
     return null;
   }

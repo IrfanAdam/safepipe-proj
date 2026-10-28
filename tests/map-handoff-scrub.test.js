@@ -478,7 +478,7 @@ test('round-10 dive-start prewarm: early boot fires once per dive with no state 
   // display:none suspends rAF) with zero open-state side effects.
   const main = srcOf('../src/map/main.js');
   assert.ok(main.includes('function earlyBootTwin()'), 'dive-start boot exists');
-  assert.ok(main.includes('if (prox && (prox.near || prox.inView))'), 'takeover fires the boot on armed (near or in-view) engagement');
+  assert.ok(main.includes('if (prox && prox.near)'), 'takeover fires the boot on aimed engagement');
   assert.ok(
     main.includes('earlyTwinArmed || twinOpen'),
     'the boot fires once per dive and never under an open/staged twin',
@@ -490,7 +490,7 @@ test('round-10 dive-start prewarm: early boot fires once per dive with no state 
   assert.ok(main.includes('function abortEarlyBootTwin()'), 'retreat abort exists');
   assert.ok(main.includes('abortEarlyBootTwin();'), 'the zoom step aborts a retreated dive-start boot');
   assert.ok(
-    main.includes('if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && !(prox && (prox.near || prox.inView) && blend > 0)) {'),
+    main.includes('if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && !(prox && prox.near && blend > 0)) {'),
     'the abort fires on intent loss (mask down / off-site) — the INTENT-PRECACHE revision moved it off the old z-band',
   );
   const abortStart = main.indexOf('function abortEarlyBootTwin()');

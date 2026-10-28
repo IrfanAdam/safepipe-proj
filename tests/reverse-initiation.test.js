@@ -42,19 +42,11 @@ test('twin wheel lane: done-phase entry is not gated on the zoom clamp', () => {
   );
 });
 
-test('twin wheel lane: inward still moves (the shared dolly law), pinch still stays native', () => {
+test('twin wheel lane: inward still dollies, pinch still stays native', () => {
   const main = srcOf('../src/ring2/main.js');
   assert.ok(
-    main.includes('if (!pinch && dollyByWheelLaw(e, dY)) {'),
-    'inward wheels run the shared wheel-zoom dolly (rate parity at the seam), not OrbitControls’ ratio dolly',
-  );
-  assert.ok(
-    main.includes('function dollyByWheelLaw(e, dY, bandEnd)'),
-    'the dolly law is one function, shared by the inward tick and the outward band',
-  );
-  assert.ok(
-    !main.includes('if (dY >= 0) { handoff.entryAccum = 0; if (!pinch) twinFlipToOrbit(e); return; }'),
-    'the old inward pass-through (a ratio dolly, measured 0.089/tick vs the map’s 0.267) is gone',
+    main.includes('if (dY >= 0) { handoff.entryAccum = 0; if (!pinch) twinFlipToOrbit(e); return; }'),
+    'inward wheels still pass through to OrbitControls',
   );
   assert.ok(
     main.includes('if (!Number.isFinite(r) || !isAtMaxZoom(r)) { handoff.entryAccum = 0; return; }'),

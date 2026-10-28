@@ -1082,9 +1082,8 @@ function edgeFade(x, z) {
       high: srgb255ToLinear(GROUND_BASE_SRGB.high),
     };
     let derived = null;
-    let irr = null;
     try {
-      irr = meanIrradiance({
+      const irr = meanIrradiance({
         normals: g.getAttribute('normal')?.array,
         sunDir: [takeSun.position.x, takeSun.position.y, takeSun.position.z],
         ambientColor: [ambLight.color.r, ambLight.color.g, ambLight.color.b],
@@ -1106,11 +1105,6 @@ function edgeFade(x, z) {
     } catch {
       groundTone = { derived: false, applied: false, photo: null, palette: null };
     }
-
-    /* Owner verdict 2026-10-28: the procedural detail modulation read as milky
-     * fade blotches over the terrain (screenshot: cloudy mottling at slider~twin,
-     * explicitly rejected — no fade stuff). Removed: the ground stays the
-     * solved tone palette, flat. See ground-detail.js deletion note. */
 
     const cSea = new THREE.Color(palette.sea[0], palette.sea[1], palette.sea[2]);
     const cLow = new THREE.Color(palette.low[0], palette.low[1], palette.low[2]);

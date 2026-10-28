@@ -391,7 +391,7 @@ test('map vignette: ellipse from projected R, brackets ride the same law', () =>
   assert.ok(main.includes("app.style.setProperty('--vr'"), 'journey writes the vignette radius');
   assert.ok(main.includes("app.style.setProperty('--vr-y'"), 'journey writes the squashed vertical radius');
   assert.ok(main.includes('enclosureEllipsePxForZoom(z, SITE.lat'), 'display ellipse rides the forming law');
-  assert.ok(main.includes('showVignette((proxUse.near || proxUse.inView) && blend > 0)'), 'enclosure gated past z=8: sub-pixel ring never blacks the frame (reads the post-settle proximity)');
+  assert.ok(main.includes('showVignette(proxUse.near && blend > 0)'), 'enclosure gated past z=8: sub-pixel ring never blacks the frame (reads the post-settle proximity)');
   assert.ok(!main.includes('showVignette(prox.near);'), 'ungated proximity enclosure is gone');
   const html = srcOf('../ops3d-map.html');
   assert.ok(html.includes('@property --vr'), 'radius is registered animatable so the close-in glides');
