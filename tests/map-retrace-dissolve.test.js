@@ -19,6 +19,8 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   retraceOpacityForZoom,
+  stagedIntroProgressForS,
+  HANDOFF_STAGED_S_MAX,
   Z_TOP,
   Z_HANDOFF,
 } from '../src/map/scrolltrigger.js';
@@ -52,12 +54,19 @@ test('retrace law: 1 at the gate, 0 at/below the checkpoint, monotone', () => {
   assert.ok(worst < 0.5, `max per-tick step is a fade (${worst.toFixed(3)}), never a cut`);
 });
 
-test('retrace law starts and ends at rest (smoothstep, no snap at either end)', () => {
-  const e = 1e-3;
-  const startSlope = (retraceOpacityForZoom(Z_TOP + e) - retraceOpacityForZoom(Z_TOP)) / e;
-  const endSlope = (retraceOpacityForZoom(Z_HANDOFF) - retraceOpacityForZoom(Z_HANDOFF - e)) / e;
-  assert.ok(Math.abs(startSlope) < 0.05, `zero slope at the teardown end (got ${startSlope})`);
-  assert.ok(Math.abs(endSlope) < 0.05, `zero slope at the gate end (got ${endSlope})`);
+test('retrace law is the forward S law at the zoom-mapped S (shared knees, both ways)', () => {
+  // The reverse reads stagedIntroProgressForS at S(z) = SMAX*(z-Z_TOP)/(Z_HANDOFF-Z_TOP):
+  // the knees sit exactly where the forward climb put them, mirrored.
+  for (const z of [10.6, 10.75, 11.0, 11.25, 11.4]) {
+    const s = HANDOFF_STAGED_S_MAX * ((z - Z_TOP) / (Z_HANDOFF - Z_TOP));
+    assert.equal(
+      retraceOpacityForZoom(z), stagedIntroProgressForS(s),
+      `z=${z} reads the shared S law at S=${s.toFixed(1)} (no second fade band)`,
+    );
+  }
+  // Fixed points of the retrace: commit gate and checkpoint.
+  assert.equal(retraceOpacityForZoom(Z_HANDOFF), 1, 'the committed frame starts opaque');
+  assert.equal(retraceOpacityForZoom(Z_TOP), 0, 'the checkpoint lands at 0 (teardown snaps nothing)');
 });
 
 /* ---------- the grant-time re-hand adopts, never yanks ---------- */

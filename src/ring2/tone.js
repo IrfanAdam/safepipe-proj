@@ -318,6 +318,21 @@ export function lumaDelta(a, b) {
   return Math.abs(x - y) / den;
 }
 
+/* Palette selection (pure): the solved basemap derivation wins whenever it
+ * exists — the ground RENDERS the photo it replaces, so the swap has no
+ * exposure step by construction. The authored albedo stands only with no
+ * sample yet (a shape fallback, never a guessed dark). Returns { palette,
+ * applied } so the probe reports the rendered truth, not the solve's
+ * prediction. */
+export function appliedGroundPalette(authored, derived) {
+  try {
+    if (derived && derived.palette && derived.palette.sea && derived.palette.low && derived.palette.high) {
+      return { palette: derived.palette, applied: true };
+    }
+  } catch { /* fall through to the authored shape */ }
+  return { palette: authored, applied: false };
+}
+
 /* ── PHOTO-TONE REGISTRY ─────────────────────────────────────────────────
  * The measured basemap tone, in the pure module that owns tone math: the
  * sampler (mapbase.js, which owns the live MapLibre canvas) publishes here,

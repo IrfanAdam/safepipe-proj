@@ -729,6 +729,26 @@ export function fwdProgressForStagedS(
   return stagedIntroProgressForS(s, { revealStartPx, pushEndPx, stagedMaxPx, swoopW });
 }
 
+/** Pure: staged S -> intro progress with an arrival rebase point. A
+ * post-release leg rebuild re-anchors the band at the arrival S (sBase):
+ * the arrival S must map to progress 0 (rebuilt legs start at the live
+ * pose, so any nonzero progress would jump), with commit still landing at
+ * the band end. sBase null/0/absent (no rebuild this flight) behaves
+ * exactly like fwdProgressForStagedS — same pacing, same parks.
+ * Node-checkable. */
+export function fwdProgressRebasedForS(sNow, sBase, opts) {
+  try {
+    const base = Number(sBase);
+    if (!Number.isFinite(base) || !(base > 0)) return fwdProgressForStagedS(sNow, opts);
+    const fBase = fwdProgressForStagedS(base, opts);
+    if (!(fBase < 1)) return 1;
+    const fNow = fwdProgressForStagedS(sNow, opts);
+    return Math.min(1, Math.max(0, (fNow - fBase) / (1 - fBase)));
+  } catch {
+    return fwdProgressForStagedS(sNow, opts);
+  }
+}
+
 /** Pure: build the forward intro legs for poseForScrubProgress from the
  * live anchors. startPose = { eye, target } at the ring-frame hold pose
  * (main.js startEye); mid = ring-frame iso (swoop end / push start); to =

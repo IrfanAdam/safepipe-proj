@@ -423,7 +423,7 @@ test('driver: twin-open keeps hook ownership until the overlay is opaque', () =>
   assert.ok(main.includes('TWIN_OVERLAY_OPAQUE'), 'opaque threshold is a named constant');
   assert.ok(main.includes('twinOverlayOpaque()'), 'the hook consults the guard');
   assert.ok(
-    main.includes('if (!dissolving && (twinOpen && !hookRevThrough)) return next;'),
+    main.includes('if (!dissolving && twinOpen) return next;'),
     'the hook owns the pitch law everywhere except under an opaque twin; dissolving keeps ownership, flights/prewarm/recede keep the law',
   );
   assert.ok(main.includes('TWIN_READY_MSG'), 'twin-ready wire still owned by twinlink');

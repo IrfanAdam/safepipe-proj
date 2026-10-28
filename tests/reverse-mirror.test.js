@@ -164,7 +164,17 @@ test('wheel scrub mirrors both ways; pinch never counts toward progress', () => 
   assert.equal(scrubProgressForWheel(0.1, 600), 0, 'parks at the terminal side');
 });
 
-test('reverse pose law: live pose at 0, ring top-down at 1, symmetric mid', () => {
+test('map close: single synchronous cut, single-law dissolve, one leg pinned', () => {
+  const main = srcOf('../src/map/main.js');
+  assert.ok(!main.includes('reverseWait'), 'no reverse-wait state in the map lane');
+  assert.ok(!main.includes('TWIN_REVERSE_WAIT_MS'), 'no close-chain timer constant');
+  assert.ok(!main.includes('if (reverseWait) return;'), 'no armed-wait close guard (the old sticky)');
+  assert.ok(main.includes('window.__mapProbe.retraceLegs = 1;'), 'the dissolve pins a single law');
+  assert.ok(main.includes('recede: null, mapZoom: null, retraceLegs: null'),
+    'the probe carries the single-law leg pin from boot');
+});
+
+test('retrace leg count equals the shared forward legs (one list, both ways)', () => {
   const R0 = 40000;
   const C = Math.SQRT1_2;
   const legs = buildForwardLegs({
@@ -200,17 +210,25 @@ test('twin consumer present: staged listener feeds the intro scrub', () => {
   assert.ok(main.includes('fwdProgressForStagedS(handoff.fwdStagedS'), 'staged S still drives progress (autoplay fallback intact)');
 });
 
-test('twin reverse: scrub-owned from live, explicit close completes, no clock, no dwell', () => {
+test('twin reverse: one shared leg list mirrored, explicit close is a cut, no clock, no walk', () => {
   const main = srcOf('../src/ring2/main.js');
+  assert.ok(!main.includes('buildReverseWalk'), 'no staged close-walk builder — the way back is not a stage list');
+  assert.ok(!main.includes('handoff.walk'), 'no walk state — the scrub owns the shared forward legs');
+  assert.ok(!main.includes('function completeScrubReverse'), 'no explicit-close scrub jump — a discrete close cuts at once');
+  assert.ok(!main.includes('scrubProgressForWalk(handoff'), 'no live-progress walk takeover');
+  assert.ok(main.includes('poseForScrubProgress(handoff.fwd?.legs, 1 - handoff.scrub.progress)'),
+    'the scrub reads the shared forward legs mirrored (1 - progress)');
+  assert.ok(main.includes('poseForScrubProgress(handoff.fwd?.legs, 1 - sc.progress)'),
+    'the wheel paint path mirrors on the same shared legs');
+  assert.ok(main.includes('legs: handoff.fwd && Array.isArray(handoff.fwd.legs)'),
+    'the probe reports the shared forward legs on the reverse');
+  assert.ok(main.includes('window.__ring2retraceLegs = legs.length;'),
+    'the reverse pins its single-law leg count on the probe');
   assert.ok(!main.includes('TWIN_SCRUB_DWELL_FRAMES'), 'frame-counter entry is gone');
   assert.ok(!main.includes('scrubToTimed'), 'wall-clock rescue is gone');
   assert.ok(!main.includes('atMaxFrames'), 'dwell counter state is gone');
   assert.ok(main.includes('scrubEntryForDelta(handoff.entryAccum'), 'delta accumulation owns entry');
-  assert.ok(main.includes('function completeScrubReverse()'), 'explicit-close completion exists');
-  assert.ok(main.includes('sc.progress = 1;'), 'close drives progress to 1');
-  assert.ok(main.includes('paintScrubPose();\n      finishScrubReverse();'), 'completion paints through the scrub law');
-  assert.ok(main.includes('completeScrubReverse();\n      return true;'), 'close path completes instead of re-flying');
-  assert.ok(main.includes('handoff.scrub = { active: true, progress: 0, accum: 0, justEntered: false };'), 'walk hands to the scrub at the live pose');
+  assert.ok(main.includes('enterScrubReverse()'), 'gesture entry still exists — owned by the wheel, on shared legs');
   assert.ok(main.includes("if (pinch && handoff.phase !== 'done') return;"), 'pinch stays native outside the clamp entry');
 });
 
