@@ -43,6 +43,7 @@ import {
   MAP_VIGNETTE_RING_M,
   isHomeZoom,
   flipWheelDelta,
+  wheelZoomRate,
   lockAroundPoint,
   maskGainForBlend,
   pitchTargetForZoom,
@@ -3630,9 +3631,22 @@ function finalizeStagedReveal(root) {
       root.style.opacity = '';
     }
   } catch { /* cosmetic */ }
-  // The ceiling stays clamped while the twin owns the frame — restoring here
-  // handed post-gate wheel ticks a runaway (measured 11.651, one 14.0).
-  // doCloseTwin releases it on close; exitStaged on unwind.
+  // COMMIT RELEASES THE GATE CLAMP: from this tick the twin owns the wheel
+  // (the overlay is opaque and holds the pointer) and the parent map streams
+  // no camera — so a Z_HANDOFF ceiling here is a pin on a camera nobody is
+  // driving. It stayed pinned before and cost two things: the retrace dissolve
+  // could not leave the gate without a stale clamp, and every later map-owned
+  // tick (a re-dive, a discrete close) had to fight it. The old runaway
+  // (11.651, one 14.0) came from MAP-owned post-gate wheel ticks under a
+  // clamped ceiling; while the twin holds the pointer no tick reaches the map
+  // canvas, and once the retrace dissolve hands it back the motion is outward.
+  // Z_MAX stays the hard cap, re-asserted by doCloseTwin/exitStaged.
+  try {
+    restoreMaxZoom();
+  } catch { /* follower release is best-effort */ }
+  try {
+    window.__mapProbe.ceilingAfterCommit = mapRef && mapRef.getMaxZoom ? +mapRef.getMaxZoom().toFixed(3) : null;
+  } catch { /* probe cosmetic */ }
   try {
     window.__mapProbe.staged = { active: false, s: +stagedS.toFixed(1), committed: true };
   } catch { /* probe cosmetic */ }
@@ -5061,6 +5075,9 @@ function holdHandoffPoseForReverse() {
  * same law; reaching the gate re-opens the twin with nothing to snap).
  * State: retraceDissolve while the zoom-keyed fade owns the overlay. */
 let retraceDissolve = false;
+/* Float guard for the re-open edge (not a design constant): the gate is a
+ * crossing, so a zoom parked ON it must not read as "pushed back inside". */
+const RETRACE_REOPEN_EPS = 1e-6;
 /** Stop owning the overlay fade without hiding anything (the active close /
  * unwind path owns visibility). Restores twin interaction when the twin is
  * still the frame (re-open / fresh open). Never throws. */
@@ -5122,8 +5139,17 @@ function driveRetraceDissolve() {
     if (!Number.isFinite(z)) return;
     const root = overlayEls && overlayEls.root;
     if (!root || root.hidden) { stopRetraceMode(); return; }
-    if (z >= Z_HANDOFF) {
-      // Pushed back to the gate mid-retrace: re-open the twin. The law reads
+    /* RE-OPEN only when the fingers push the frame back INSIDE the gate.
+     * Measured defect: the handover starts the dissolve AT the gate (the twin
+     * walked back to exactly the pose the map is pinned to), so a plain
+     * `z >= Z_HANDOFF` re-opened the twin on the very first drive call —
+     * the dissolve died one frame after it began, the overlay kept the
+     * pointer, and the reverse never left the twin (range dollied out to
+     * 42 km under the still-opaque frame while the map sat at 11.5).
+     * At the gate the law reads 1, which IS the current opacity, so the
+     * dissolve simply holds full until the zoom actually leaves the gate. */
+    if (z > Z_HANDOFF + RETRACE_REOPEN_EPS) {
+      // Pushed back inside the gate mid-retrace: re-open the twin. The law reads
       // 1 there = the stylesheet's 1, so restoring the transition + releasing
       // the inline value eases 1 -> 1 (nothing to snap), and the fingers are
       // back inside the committed frame with the twin live. The reverse is
@@ -5756,9 +5782,9 @@ function guardEaseQueue(map) {
 function installBandTakeover() {
   // Native rates, mirrored from the scroll handler so in-band speed matches:
   // trackpad ticks are small and fast, wheel ticks large and slow; line-mode
-  // deltas scale like the native lane.
-  const TRACK_RATE = 1 / 100;
-  const WHEEL_RATE = 1 / 450;
+  // deltas scale like the native lane. The rates themselves live in the ONE
+  // wheel-zoom law (scrolltrigger) because the twin's post-commit dolly reads
+  // the same law — one gesture, one step, both sides of the handover.
   const onWheel = (e) => {
     try {
       if (!mapRef || !e || e.ctrlKey) return;
@@ -5821,7 +5847,6 @@ function installBandTakeover() {
       } catch { /* stall never breaks input */ }
       e.preventDefault();
       e.stopPropagation();
-      const rate = Math.abs(dy) < 4 ? TRACK_RATE : WHEEL_RATE;
       // GAIN-LINK: while the enclosing mask is armed (hotspot near — the
       // blend itself is the mask's forming parameter, 0 while the mask is
       // down), the tick runs at the mask-anchored dip gain — a pure
@@ -5833,7 +5858,7 @@ function installBandTakeover() {
       let dipGain = 1;
       try { dipGain = maskGainForBlend(centerBlendForZoom(z), !!(prox && prox.near)); } catch { dipGain = 1; }
       if (!Number.isFinite(dipGain) || dipGain <= 0) dipGain = 1;
-      const target = z + dy * rate * dipGain;
+      const target = z + dy * wheelZoomRate(dy) * dipGain;
       let around = null;
       try {
         const ctn = mapRef.getContainer();

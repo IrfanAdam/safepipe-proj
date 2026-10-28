@@ -751,6 +751,41 @@ export function flipWheelDelta(deltaY) {
   return Number.isFinite(n) ? -n : 0;
 }
 
+/* THE WHEEL-ZOOM LAW (single source, mirrored by every lane that owns a
+ * wheel). One notch of raw wheel is one step of zoom, and the step is the
+ * same on BOTH sides of the handover: the map's in-band takeover tick and
+ * the twin's post-commit dolly read this law, so the gesture never changes
+ * speed or direction when the pointer crosses from the map canvas into the
+ * twin iframe. Measured reason: with the twin on OrbitControls' own dolly
+ * (a fixed RATIO per notch) the handover dropped the travel from
+ * 0.165-0.267 zoom/tick on the map to 0.089 on the twin — a 2-3x speed
+ * cliff exactly at the seam, and a ratio law also drifts with depth while
+ * the map's is a constant increment.
+ *
+ * Two rates, both gesture-shaped (never geometry): a wheel notch is coarse
+ * and slow, trackpad dust is fine and fast. deltaMode 1 (lines) is scaled to
+ * px by the caller before it gets here (the DOM gives no honest px for it).
+ * Pure + node-checkable. */
+export const WHEEL_ZOOM_RATE = 1 / 450; // zoom per wheel px (native scrollZoom cadence)
+export const WHEEL_ZOOM_RATE_FINE = 1 / 100; // sub-notch / trackpad dust
+export const WHEEL_FINE_PX = 4; // |delta| below this is dust, not a notch
+/** Zoom step for one raw wheel delta. Raw sign convention is the OWNER's:
+ * deltaY > 0 = drag DOWN = zoom IN (the flip lane negates before the native
+ * handler; lanes that read raw deltas add this step as-is). */
+export function wheelZoomRate(deltaY) {
+  const d = Math.abs(+deltaY);
+  if (!Number.isFinite(d) || d === 0) return 0;
+  return d < WHEEL_FINE_PX ? WHEEL_ZOOM_RATE_FINE : WHEEL_ZOOM_RATE;
+}
+/** The law itself: the zoom a tick lands on from z. Non-finite input holds. */
+export function zoomAfterWheel(z, deltaY) {
+  const n = +z;
+  const d = +deltaY;
+  if (!Number.isFinite(n)) return n;
+  if (!Number.isFinite(d) || d === 0) return n;
+  return n + d * wheelZoomRate(d);
+}
+
 /* Journey-lock anchor (pure, node-checkable): the screen point the native
  * zoom should circle while locked. Zooming IN anchors beyond the spot, so
  * the spot drifts toward center coupled to the user's own scroll speed and

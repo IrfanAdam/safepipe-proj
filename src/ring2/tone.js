@@ -76,6 +76,16 @@ function percentile(sorted, p) {
  * any imagery buffer). `stride` skips pixels for cost; `bg`/`tol` drop the
  * masked background so only the ring's photo is measured.
  *
+ * Alongside the tone it measures the photo's CONTRAST — the half of the seam
+ * the tone solve cannot carry (ground-detail.js):
+ *   sdLuma    total luma spread over the sample (0..255 units).
+ *   detailSd  RMS deviation from the 4-lattice-neighbour mean, i.e. the
+ *             photo's structure at the sample lattice (stride px of the
+ *             readback). This is the number the twin ground's procedural
+ *             detail amplitude is solved against, so it matches the photo's
+ *             measured texture energy instead of a dial.
+ *   detailAbs mean |deviation| — the same thing in L1, steadier under outliers.
+ *
  * Returns null when nothing usable was sampled (all background / empty
  * buffer) — callers keep the previous tone rather than guessing a dark one. */
 export function photoStats(rgba, width, height, { stride = 4, bg = TONE_BG_RGB, tol = TONE_BG_TOL } = {}) {
@@ -85,11 +95,18 @@ export function photoStats(rgba, width, height, { stride = 4, bg = TONE_BG_RGB, 
   if (!rgba || !w || !h || rgba.length < 4) return null;
   const [br, bgc, bb] = bg;
   let n = 0;
-  let sr = 0, sg = 0, sb = 0, sl = 0;
+  let sr = 0, sg = 0, sb = 0, sl = 0, sl2 = 0;
+  let dAbs = 0, d2 = 0, dN = 0;
   const hist = new Uint32Array(256);
-  const px = (x, y) => {
+  /* Luma at a lattice point, or null where the pixel is mask/void/off-buffer
+   * (the masked disc edge must not read as contrast). */
+  const lumaAt = (x, y) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return null;
     const i = ((y * w) + x) * 4;
-    return [rgba[i], rgba[i + 1], rgba[i + 2]];
+    const r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+    if (Math.abs(r - br) <= tol && Math.abs(g - bgc) <= tol && Math.abs(b - bb) <= tol) return null;
+    const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return l > 1 ? l : null;
   };
   for (let y = 0; y < h; y += st) {
     for (let x = 0; x < w; x += st) {
@@ -100,8 +117,21 @@ export function photoStats(rgba, width, height, { stride = 4, bg = TONE_BG_RGB, 
       const l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
       if (!(l > 1)) continue;
       n++;
-      sr += r; sg += g; sb += b; sl += l;
+      sr += r; sg += g; sb += b; sl += l; sl2 += l * l;
       hist[Math.min(255, Math.max(0, Math.round(l)))]++;
+      /* High-pass at the sample lattice: this pixel against its four lattice
+       * neighbours. At least two neighbours must be photo, else an isolated
+       * pixel at the masked edge would read as enormous contrast. */
+      let acc = 0, cnt = 0;
+      for (const v of [lumaAt(x - st, y), lumaAt(x + st, y), lumaAt(x, y - st), lumaAt(x, y + st)]) {
+        if (v != null) { acc += v; cnt++; }
+      }
+      if (cnt >= 2) {
+        const dv = l - acc / cnt;
+        dAbs += Math.abs(dv);
+        d2 += dv * dv;
+        dN++;
+      }
     }
   }
   const total = Math.ceil(w / st) * Math.ceil(h / st);
@@ -110,6 +140,7 @@ export function photoStats(rgba, width, height, { stride = 4, bg = TONE_BG_RGB, 
   if (coverage < 0.05) return null; // nothing but mask: no usable photo tone
   const meanColor = [sr / n, sg / n, sb / n];
   const meanLuma = sl / n;
+  const sdLuma = Math.sqrt(Math.max(0, sl2 / n - meanLuma * meanLuma));
   // Percentiles from the histogram (cheap, exact enough for a palette range).
   const sorted = [];
   for (let v = 0; v < 256; v++) if (hist[v]) sorted.push([v, hist[v]]);
@@ -128,6 +159,12 @@ export function photoStats(rgba, width, height, { stride = 4, bg = TONE_BG_RGB, 
     meanLuma: +meanLuma.toFixed(2),
     meanColor: meanColor.map((v) => +v.toFixed(1)),
     p10: at(0.1), p50: at(0.5), p90: at(0.9),
+    // CONTRAST (the detail law's input): spread + structure of what is on
+    // screen, at the lattice the sample was taken on.
+    sdLuma: +sdLuma.toFixed(2),
+    detailSd: dN ? +Math.sqrt(d2 / dN).toFixed(2) : 0,
+    detailAbs: dN ? +(dAbs / dN).toFixed(2) : 0,
+    detailScale: st, // readback pixels per high-pass step
   };
 }
 

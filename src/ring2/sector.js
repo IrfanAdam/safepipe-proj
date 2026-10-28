@@ -227,6 +227,54 @@ export function stagedReleaseAnchors({ startPose, mid, to, range, polar = HANDOF
   }
 }
 
+/* STAGED LIVE SCALE (boresight, mid-band) — which zoom the dissolve is sized
+ * from.
+ *
+ * The staged band is NOT a parked gate frame: the fingers keep wheeling while
+ * S accumulates, so the live zoom travels from the arm zoom up to the gate
+ * over the band (measured 10.666 -> 11.5 across S 0..700 on the 1280x800
+ * harness). Sizing the twin from the Z_HANDOFF constant alone therefore put
+ * its ground scale 1.78x inside the map's at the release, unwinding to 1.0
+ * only at the commit — a pure scale error: zero at the boresight, 44 px at
+ * 3 km and ~110 px at the frame edge, peaking at overlay 0.39. That is the
+ * shape the eye catches mid-dissolve, and why both ENDPOINTS stayed green.
+ * The lock must read the zoom the parent rides along with every staged post
+ * (buildTwinStagedMessage(s, z)) through the same frameRange law, with the
+ * handed frame zoom as the fallback — live zoom, never a literal.
+ * Null when neither zoom is finite so the caller keeps its own anchor
+ * instead of guessing. Pure + node-checkable. */
+export function stagedLiveZoom({ zStaged = null, zFrame = null } = {}) {
+  try {
+    const zs = Number(zStaged);
+    if (Number.isFinite(zs) && zs > 0) return zs;
+    const zf = Number(zFrame);
+    if (Number.isFinite(zf) && zf > 0) return zf;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Pure: the staged band's ground-scale range for the FRESHEST live zoom —
+ * frameRange (the exact inverse of the map's metres-per-pixel, 512-px tile
+ * convention) through the shared orbit rails. viewportPx/fovDeg/lat must be
+ * the twin camera's own, so the lock is the map's footprint projected
+ * through THIS camera. Null when no zoom is known or the result is unusable
+ * (caller keeps its anchor, never a canned pose). */
+export function stagedRangeLock({
+  zStaged = null, zFrame = null, viewportPx = 600, lat = null, fovDeg = MAP_TRUE_FOV_DEG,
+} = {}) {
+  try {
+    const z = stagedLiveZoom({ zStaged, zFrame });
+    if (z === null) return null;
+    const r = frameRange(z, { viewportPx, lat, fovDeg });
+    const cl = clampHandoffRange(r);
+    return Number.isFinite(cl) && cl > 0 ? cl : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Raw ?sector= / ?embed= values from a search string. Frame params
  * (cx/cy/z/bearing) ride along when the map overlay opens the twin. */
 export function parseSectorQuery(search = '') {
