@@ -100,7 +100,14 @@ test('way in: the twin moves by the shared law, the gate clamp is released at co
 
 test('way back: every outward tick moves until the gate, then one handover tick', () => {
   const t = twinMain();
-  assert.ok(t.includes('const holdR = holdRangeNow();'), 'the band end is derived from the shared legs (no constant)');
+  assert.ok(t.includes('const holdR = holdRangeNow();'), 'the band end is derived from the shared law (no constant)');
+  // The band end is the GATE frame, not the scrub entry: the frozen leg's p=1
+  // pose sits 1.6x farther out (39.6 km vs 24.8 km), which let the outward
+  // dolly run three ticks past the gate and snap back 0.53 zoom on handover.
+  const hold = t.slice(t.indexOf('function holdRangeNow('), t.indexOf('function handBackToMap('));
+  assert.ok(hold.includes('frameRange(zNow'), 'the band end is the map gate frame law');
+  assert.ok(hold.includes('handoff.fwdStagedZ'), 'read at the committed staged zoom');
+  assert.ok(!hold.includes("poseForScrubProgress(handoff.fwd?.legs, 1)"), 'never the scrub entry pose');
   assert.ok(t.includes('liveR < holdR * (1 - DOLLY_BAND_EPS)'), 'deeper than the gate still dollies');
   assert.ok(t.includes('if (dollyByWheelLaw(e, dY, holdR)) {'), 'the outward dolly clamps to the gate: no overshoot');
   assert.ok(t.includes('if (handBackToMap()) {'), 'the gate tick hands the frame to the map on that same tick');

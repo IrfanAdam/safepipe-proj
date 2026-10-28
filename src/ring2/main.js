@@ -1914,19 +1914,16 @@ async function boot() {
       return false;
     }
   }
-  /* The pose the forward flight ENDED on, as a camera range: the mirrored
-   * scrub law's p=1 pose (the last shared leg — the gate pose the map is
-   * pinned to while the twin owns the frame). That is the boundary where the
-   * twin's own travel is spent: outward of it every step belongs to the map's
-   * zoom law. Derived from the frozen legs — never a constant. */
+  /* The gate frame the map is pinned to, as a camera range: the same pure
+   * frameRange law the map's gate pose uses, read at the committed staged
+   * zoom. NOT the frozen leg's p=1 pose — that is the scrub ENTRY, and it sits
+   * 1.6x farther out than the gate (measured 39.6 km vs 24.8 km), which let the
+   * outward dolly run three ticks past the gate and then snap back 0.53 zoom on
+   * the handover tick. Derived from the shared zoom, never a constant. */
   function holdRangeNow() {
     try {
-      const s = poseForScrubProgress(handoff.fwd?.legs, 1);
-      if (!s?.eye || !s?.target) return null;
-      const dx = s.eye.x - s.target.x;
-      const dy = s.eye.y - s.target.y;
-      const dz = s.eye.z - s.target.z;
-      const r = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const zNow = Number.isFinite(+handoff.fwdStagedZ) ? +handoff.fwdStagedZ : Z_HANDOFF;
+      const r = frameRange(zNow, { viewportPx: viewportPxNow(), fovDeg: FOV_DEG, lat: SANGACHAL.lat });
       return Number.isFinite(r) && r > 0 ? r : null;
     } catch {
       return null;
