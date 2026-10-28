@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-28T10:29:39.392Z",
+  "generated": "2026-10-28T10:30:34.317Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,24 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "32c2234",
+      "full": "32c22348f2b58f00f4d114eb81df3be07996f397",
+      "date": "2026-10-28",
+      "time": "16:00",
+      "subject": "docs(plan): REF GATE 3 rev note for regression fixes [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "fa6b78d",
+      "full": "fa6b78d0b7a5c05d29da6fb4b18dfd74bd0682a7",
+      "date": "2026-10-28",
+      "time": "16:00",
+      "subject": "fix(map-twin): carry mix across rescale, twin-owned reverse, in-view lock-in [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "7fe5a5a",
       "full": "7fe5a5a5160ede6e310c782f8faa6651131f1741",
@@ -6636,10 +6654,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/map/main.js",
-    "src/map/scrolltrigger.js",
-    "src/ring2/main.js",
-    "src/ring2/sector.js"
-  ]
+  "wip": []
 }
