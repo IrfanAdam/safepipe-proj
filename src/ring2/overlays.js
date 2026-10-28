@@ -34,7 +34,7 @@ import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
 import { DRAPE_LIFTS, RIM_FADE_IN, RIM_TILT_GAIN } from './drape.js';
 import { ringRevealForProgress, TWIN_CONTENT_SAMPLE_N, TWIN_CONTENT_MID_DIV, TWIN_RGBA_STRIDE, TWIN_PIXEL_FIRST, TWIN_PIXEL_STEP, twinContentFromRgba } from './sector.js';
 import { TIER } from './facilities/dims.js';
-import { srgb255ToLinear, meanIrradiance, deriveGroundPalette, appliedGroundPalette, getPhotoTone, onPhotoTone } from './tone.js';
+import { srgb255ToLinear, meanIrradiance, deriveGroundPalette, getPhotoTone, onPhotoTone } from './tone.js';
 
 /* REF GATE 2: every overlay renderable carries userData.tier. All overlay
  * geometry is computed from the real field/site constants (mapped radius,
@@ -1065,17 +1065,14 @@ function edgeFade(x, z) {
      * on top, never part of the derivation), so the numbers here are the
      * same ones the renderer will multiply by.
      *
-     * FADE LANE (2026-10-28): the solved palette is APPLIED — the ground
-     * renders the basemap it replaces, so the dissolve has no exposure
-     * step by construction (measured -58% endpoint fall with the authored
-     * dark ground held). The 2026-10-26 HOLD (derived pale-sage reading as
-     * a washed film) is answered by the mechanism, never the gain: the
-     * solve keeps its quantile shape + screen-area weights + residual onto
-     * the photo mean (tone.js), and any remaining flat-film reading is a
-     * ground-detail pass (texture/relief breakup of the smooth albedo),
-     * not a reason to re-darken the albedo and re-break the seam law.
-     * With no sample yet the authored palette stands (never a guessed dark).
+     * GROUND DERIVATION HOLD (2026-10-26, user call): grading the albedo to
+     * the basemap photo paints the twin ground the photo's pale sage and
+     * reads as a washed film over the terrain. Hold the fixed schematic
+     * base (the previous dark crisp ground) until the derivation is
+     * re-graded dark. The solve still runs for probe/diagnostics; only its
+     * application is held.
      * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03] */
+    const APPLY_DERIVED_GROUND = false;
     let palette = {
       sea: srgb255ToLinear(GROUND_BASE_SRGB.sea),
       low: srgb255ToLinear(GROUND_BASE_SRGB.low),
@@ -1097,13 +1094,12 @@ function edgeFade(x, z) {
         irr,
         photo: getPhotoTone(),
       });
-      const pick = appliedGroundPalette(palette, derived);
-      palette = pick.palette;
+      if (APPLY_DERIVED_GROUND && derived?.palette) palette = derived.palette;
       groundTone = derived
-        ? { ...derived, derived: true, applied: pick.applied, photo: getPhotoTone(), irr: { meanDotNL: irr.meanDotNL } }
-        : { derived: false, applied: false, photo: getPhotoTone(), palette: null };
+        ? { ...derived, derived: true, photo: getPhotoTone(), irr: { meanDotNL: irr.meanDotNL } }
+        : { derived: false, photo: getPhotoTone(), palette: null };
     } catch {
-      groundTone = { derived: false, applied: false, photo: null, palette: null };
+      groundTone = { derived: false, photo: null, palette: null };
     }
 
     const cSea = new THREE.Color(palette.sea[0], palette.sea[1], palette.sea[2]);
@@ -1495,7 +1491,6 @@ function edgeFade(x, z) {
     // the predicted lit tone vs that target. Probe + regression surface.
     getTone: () => (groundTone ? {
       derived: !!groundTone.derived,
-      applied: groundTone.applied ?? null,
       gain: groundTone.gain ?? null,
       tint: groundTone.tint ?? null,
       litLuma: groundTone.litLuma ?? null,

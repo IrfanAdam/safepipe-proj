@@ -92,21 +92,21 @@ test('the escape covers the focus hole: the same-origin parent document is hooke
     'the hook is boot-wired');
 });
 
-test('no reverse-wait exists: closeTwin is a synchronous cut, never an armed wait', () => {
+test('a superseded reverse-wait disarms instead of leaking armed forever', () => {
   const m = main();
-  assert.ok(!m.includes('reverseWait'), 'no reverse-wait state anywhere in the map lane');
-  assert.ok(!m.includes('TWIN_REVERSE_WAIT_MS'), 'no reverse-wait timer constant');
-  assert.ok(!m.includes('clearReverseWait'), 'no wait teardown — nothing is ever armed');
+  assert.ok(
+    m.includes('if (reverseWait && reverseWait.timer === timerHandle) clearReverseWait();'),
+    'the seq-guard branch clears the wait it owns — the old bare `return` left reverseWait armed with no timer, and closeTwin() bails while it is armed (Esc dead for the session)',
+  );
   const close = m.slice(m.indexOf('function closeTwin()'), m.indexOf("window.addEventListener('popstate'"));
-  assert.ok(close.includes('postTwinReverseRequest();'), 'the twin is still notified so it stops');
-  assert.ok(close.includes('finishTwinClose();'), 'teardown follows synchronously — no deferred reply, no fallback timer');
-  assert.ok(!close.includes('setTimeout'), 'no timer in the close path');
+  assert.ok(close.includes('if (reverseWait) return;'), 'the reverse-first guard still exists — it just can no longer leak');
 });
 
 test('the unwind clears every wait a dive can own', () => {
   const u = main().slice(main().indexOf('function unwindDive('), main().indexOf('function escapeKeyDown('));
   assert.ok(u.length > 1200, 'unwindDive body is intact');
   for (const [needle, why] of [
+    ['clearReverseWait()', 'the reverse-first timer'],
     ['releaseWatchDisarm()', 'the release-impossible watch'],
     ['clearTimeout(pendingReveal.timer)', 'the prewarm/fallback timer'],
     ['clearTimeout(stallPollT)', 'the stall presentation poll'],
@@ -118,7 +118,6 @@ test('the unwind clears every wait a dive can own', () => {
   ]) {
     assert.ok(u.includes(needle), `unwindDive must clear/handle ${why}`);
   }
-  assert.ok(!main().includes('reverseWait'), 'no reverse-first timer exists to clear — the close is synchronous');
 });
 
 /* ---------- pre-dive camera record + exact restore ---------- */

@@ -341,23 +341,19 @@ export function needsHandoff(z) {
   return Number.isFinite(+z) && +z >= Z_HANDOFF;
 }
 
-/* GESTURE-REVERSE DISSOLVE (owner rev 2026-10-26: the way back must retrace,
- * never cut to the full map; lane-gesture revision: on the SAME law, not a
- * second one). The twin-initiated recede keeps the overlay mounted while the
- * fingers drive the zoom home; the overlay opacity is the forward staged
- * reveal law (stagedIntroProgressForS — the exact function the map drove the
- * dissolve up with) read at the zoom-mapped S, so dissolve and camera share
- * every knee in both directions by construction. 1 at the handoff gate (the
+/* GESTURE-REVERSE DISSOLVE (owner rev 2026-10-26: the way back must retrace
+ * the phases, never cut to the full map). The twin-initiated recede keeps
+ * the overlay mounted while the fingers drive the zoom home; the overlay
+ * opacity is a pure function of the LIVE zoom — 1 at the handoff gate (the
  * committed frame), 0 at/below the iso checkpoint Z_TOP (the twin is torn
  * down there and the native journey laws own the rest of the way home).
- * Zoom-out retraces it, zoom-in re-dissolves it, by construction.
+ * Smoothstepped so the fade starts and ends at rest (no snap at either
+ * end); zoom-out retraces it, zoom-in re-dissolves it, by construction.
  * Pure + node-checkable; the map-side reverse driver owns the writes. */
 export function retraceOpacityForZoom(z) {
   const n = +z;
   if (!Number.isFinite(n)) return 0;
-  if (n >= Z_HANDOFF) return 1;
-  if (n <= Z_TOP) return 0;
-  return stagedIntroProgressForS(HANDOFF_STAGED_S_MAX * ((n - Z_TOP) / (Z_HANDOFF - Z_TOP)));
+  return smooth01((n - Z_TOP) / (Z_HANDOFF - Z_TOP));
 }
 
 /* Handoff dissolve band (Task 35): past Z_HANDOFF the map HOLDS its scrubbed

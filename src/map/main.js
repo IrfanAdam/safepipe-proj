@@ -192,7 +192,7 @@ window.__mapProbe = {
   // CACHE-FAST wall-clock boot budget: idle/intent/boot/arm/grant timestamps
   // (performance.now ms) + live ready-by-arm verdict for the slow-net regression.
   bootTiming: { idleArmed: false, idleFiredMs: 0, intentMs: 0, bootMs: 0, firstBootMs: 0, armMs: 0, readyMs: 0, paintedMs: 0, bootToReadyMs: 0, bootToPaintedMs: 0, readyByArm: null },
-  recede: null, mapZoom: null, retraceLegs: null, reverseFallback: false,
+  recede: null, mapZoom: null, reverseWait: false, reverseFallback: false,
   // UNWIND LAW (resilience half): the frame this dive left, the last unwind
   // (named reason + what it left/restored), Esc routing, close-echo drops, and
   // the release-impossible watch. A harness proves escape by reading these.
@@ -1265,6 +1265,7 @@ function refreshStallLoading() {
 // Task-37 staged-S producer: last S value posted to the twin frame
 // (postTwinStagedS throttles to value-change; null = nothing posted yet).
 let lastPostedStagedS = null;
+let lastStagedPostT = 0; // 60ms min interval alongside the value-change check: wheel bursts post dozens per frame otherwise
 let cachedVectorStyle = null;
 let recedeStartT = 0;
 let lastCursor = null; // {x,y} client px, passive mousemove only
@@ -1322,17 +1323,17 @@ function pumpIsoPitch() {
       // under the clamp), the pump keeps running and carries the S-driven
       // hold tilt per-frame — otherwise tilt freezes mid-gesture exactly when
       // the fingers need it. Flights still park (they own the camera), and
-      // the translucent dissolve start still parks. Prewarm-hidden and recede
-      // let the pump through: pitch-only, the map is visible, and the law
-      // has to track there (measured: parking on
+      // the translucent dissolve start still parks. Prewarm-hidden, recede,
+      // and the opaque reverse-walk let the pump through: pitch-only, the map
+      // is visible, and the law has to track there (measured: parking on
       // pendingReveal froze pitch at the first slew-capped write).
       const holdOwned = stagedActive && !stagedCommitted;
-      // LANE-GESTURE (single scroll-owned reverse): no reverse-wait state
-      // exists anymore — the twin never walks back on its own clock (its
-      // close is a cut, its wheel reverse rides the shared forward legs),
-      // so the pump needs no reverse exception: while the overlay reads
-      // translucent the law tracks through the dissolve by construction.
-      if (!isoScrubOwned || !mapRef || ((twinOpen || transitId) && !holdOwned)) {
+      let revThrough = false;
+      try {
+        revThrough = !!reverseWait && typeof twinOverlayOpaque === 'function' && twinOverlayOpaque();
+      } catch { revThrough = false; }
+      const revPark = !!reverseWait && !revThrough;
+      if (!isoScrubOwned || !mapRef || (((twinOpen && !revThrough) || transitId || revPark) && !holdOwned)) {
         isoPumpOn = false; // ownership ended — park, never fight the camera
         return;
       }
@@ -2168,10 +2169,10 @@ function onNativeZoomStep(snap, source) {
         } catch { /* probe cosmetic */ }
       }
     }
-    const busyNow = !!(transitId || pendingReveal || receding);
+    const busyNow = !!(transitId || pendingReveal || reverseWait || receding);
     const busyFlight = !!transitId;
     // Flight-only gate for pitch drivers (scrub, settles): a programmatic
-    // flight owns the camera outright, but prewarm/recede must
+    // flight owns the camera outright, but prewarm/reverse-wait/recede must
     // NOT park pitch — the map is visible through prewarm and the fade, and
     // the tilt has to track the law there (measured: parking on pendingReveal
     // froze pitch at the first slew-capped write for the whole dive).
@@ -3082,19 +3083,17 @@ function unfreezeStagedFrame() {
  * (lastPostedStagedS); mirrors the postTwinReverseRequest pattern
  * (contentWindow + '*' — same-origin iframe). The twin consumes it through
  * its existing staged listener; with no twin/no frame this is a silent
- * no-op and autoplay still owns the intro. Never throws.
- * PACING (forward smoothness): delivery is rAF-coalesced — a burst schedules
- * at most one post per frame and the flush reads the LIVE S, so the twin
- * tracks the fingers at frame rate (the old 60ms floor applied the band in
- * ~0.13-progress jumps at 16Hz while the overlay glided per tick). Laws,
- * predicates, endpoints, and the value-change throttle are untouched. */
-let stagedPostQueued = false; // a flush is scheduled — it reads the live S, so later ticks just join it
-function flushTwinStagedS() {
-  stagedPostQueued = false;
+ * no-op and autoplay still owns the intro. Never throws. */
+function postTwinStagedS() {
   try {
     if (!stagedActive || stagedCommitted) return false;
     const s = Math.max(0, +stagedS || 0);
     if (lastPostedStagedS !== null && s === lastPostedStagedS) return false;
+    let nowPost = 0;
+    try {
+      nowPost = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    } catch { nowPost = Date.now(); }
+    if (nowPost - lastStagedPostT < 60) return false;
     const fr = overlayEls && overlayEls.frame;
     if (!fr || fr.getAttribute('data-url') === 'about:blank') return false;
     const win = fr.contentWindow;
@@ -3106,25 +3105,10 @@ function flushTwinStagedS() {
     try { zPost = mapRef ? +mapRef.getZoom() : null; } catch { zPost = null; }
     win.postMessage(buildTwinStagedMessage(s, zPost), '*');
     lastPostedStagedS = s;
+    lastStagedPostT = nowPost;
     try {
       window.__mapProbe.stagedPost = +s.toFixed(1);
     } catch { /* probe cosmetic */ }
-    return true;
-  } catch {
-    return false;
-  }
-}
-function postTwinStagedS() {
-  try {
-    if (!stagedActive || stagedCommitted) return false;
-    const s = Math.max(0, +stagedS || 0);
-    if (lastPostedStagedS !== null && s === lastPostedStagedS) return false;
-    if (typeof requestAnimationFrame !== 'function') return flushTwinStagedS();
-    if (stagedPostQueued) return false; // a flush is already scheduled — it reads the live S
-    stagedPostQueued = true;
-    try {
-      requestAnimationFrame(() => { try { flushTwinStagedS(); } catch { /* flush never breaks the frame */ } });
-    } catch { stagedPostQueued = false; return flushTwinStagedS(); }
     return true;
   } catch {
     return false;
@@ -3806,7 +3790,7 @@ function liveCamFrame() {
 function diveInProgress() {
   try {
     if (twinOpen || stagedActive || stagedCommitted || pendingReveal) return true;
-    if (transitId || receding) return true;
+    if (transitId || reverseWait || receding) return true;
     if (stagedS > 0 || stagedFrozen || stallCeilingOn || isoRestoreDue) return true;
     return !!stallArmed();
   } catch { return false; }
@@ -3859,6 +3843,7 @@ function escapeStateSnapshot() {
     stagedS: +((+stagedS || 0)).toFixed(1),
     committed: !!stagedCommitted,
     prewarm: !!pendingReveal,
+    reverseWait: !!reverseWait,
     transit: !!transitId,
     intentLock: !!stagedFrozen,
     ceilingPinned: !!stallCeilingOn,
@@ -3983,10 +3968,11 @@ function unwindDive(reason = 'esc', opts = {}) {
   const restore = opts.restore !== false;
   unwindActive = true;
   try { window.__mapProbe.escRequests = (+window.__mapProbe.escRequests || 0) + 1; } catch { /* probe cosmetic */ }
-  // (1) PENDING-WORK SET — every timer/wait the dive can own.
-  // LANE-GESTURE: no reverse-wait exists anymore (closeTwin is synchronous —
-  // the twin close is a cut, never a waited walk), so there is no armed wait
-  // that could strand a later Esc.
+  // (1) PENDING-WORK SET — every timer/wait the dive can own. The reverse
+  // wait is first: a timer that bailed on its seq guard used to leave
+  // reverseWait armed forever, and closeTwin() returns early while it holds —
+  // that alone made Esc a permanent no-op (measured).
+  try { clearReverseWait(); } catch { /* timer teardown is best-effort */ }
   try { releaseWatchDisarm(); } catch { /* watch teardown is best-effort */ }
   try {
     if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
@@ -4053,12 +4039,10 @@ function publishUnwind(reason, source, restored, from, t0) {
 }
 
 /** Esc routing (map + same-origin parent document). True when Esc was
- * consumed by the dive. LANE-GESTURE (single scroll-owned reverse): a
- * HEALTHY committed twin closes synchronously (closeTwin notifies the twin
- * and tears down at once — a cut, never a waited walk), so Esc behaves the
- * same from every dive state: healthy twins cut, everything else — held,
- * stalled, unreadable, mid-dissolve, mid-commit — unwinds immediately. One
- * Esc behavior, no second press needed, no timer in between. */
+ * consumed by the dive. A HEALTHY committed twin keeps its reverse walk
+ * (product: the twin retraces its stages, bounded by TWIN_REVERSE_WAIT_MS);
+ * every other state — held, stalled, unreadable, mid-dissolve, mid-commit —
+ * unwinds immediately, because there is no walk to wait for. */
 function escapeKeyDown(e, source) {
   try {
     if (!e || e.key !== 'Escape') return false;
@@ -4074,8 +4058,16 @@ function escapeKeyDown(e, source) {
     if (e.stopPropagation) e.stopPropagation();
     try { window.__mapProbe.escSource = source; } catch { /* probe cosmetic */ }
     if (healthy) {
-      closeSource = 'esc'; // the probe names the close an Escape
-      closeTwin(); // synchronous cut: notify the twin, teardown follows at once
+      closeSource = 'esc'; // the probe names the close an Escape even when the twin walks back first
+      if (reverseWait) {
+        // A reverse walk is already in flight: a second Esc takes the cut
+        // immediately instead of waiting out the walk (an Esc that answers
+        // nothing is the exact failure this law exists to remove).
+        try { clearReverseWait(); } catch { /* timer teardown is best-effort */ }
+        try { finishTwinClose(); } catch { /* close is best-effort */ }
+        return true;
+      }
+      closeTwin(); // reverse-first: the twin walks back, teardown + restore follow
       return true;
     }
     unwindDive('esc-' + source, { source: 'esc' });
@@ -4505,6 +4497,9 @@ function prewarmThenReveal(id, frame, opts = {}) {
   const url = twinUrl(h3, frame);
   // Handoff-5-close: a fresh open cancels any pending close hide/recede.
   closeSeq++;
+  // Handoff-6-retrace: also settle a reverse-first wait (stale reply must
+  // not tear down the fresh twin).
+  clearReverseWait();
   try {
     window.__mapProbe.reverseFallback = false;
   } catch { /* probe cosmetic */ }
@@ -4801,6 +4796,9 @@ function openTwin(id, opts = {}) {
   const h3 = h3map[id];
   // Handoff-5-close: a fresh open cancels any pending close hide/recede.
   closeSeq++;
+  // Handoff-6-retrace: also settle a reverse-first wait (stale reply must
+  // not tear down the fresh twin).
+  clearReverseWait();
   try {
     window.__mapProbe.reverseFallback = false;
   } catch { /* probe cosmetic */ }
@@ -5109,18 +5107,14 @@ function beginRetraceDissolve() {
     try { z = mapRef ? +mapRef.getZoom() : NaN; } catch { z = NaN; }
     if (!Number.isFinite(z) || z <= Z_TOP) return false;
     retraceDissolve = true;
-    // LANE-GESTURE pin: the reverse is ONE law (the shared staged reveal law
-    // read at the zoom-mapped S — retraceOpacityForZoom), not a stage list.
-    try { window.__mapProbe.retraceLegs = 1; } catch { /* probe cosmetic */ }
     try {
       // Suspend the transition FIRST: per-tick law writes must BE the
       // rendered value (the forward scrub lesson) — otherwise each write
       // restarts a 0.45s ease and the fade lags the fingers.
       if (!root.classList.contains('scrubbing')) root.classList.add('scrubbing');
       // The fade owns no interaction: wheels pass through to the map canvas
-      // so the fingers drive the zoom the fade reads. The twin already cut
-      // (discrete close) or is reversing on the shared legs (wheel); nothing
-      // up there needs the pointer.
+      // so the fingers drive the zoom the fade reads. The twin already
+      // walked back; nothing up there needs the pointer.
       root.style.pointerEvents = 'none';
     } catch { /* presentation is best-effort */ }
     try { window.__mapProbe.recede = 'out'; } catch { /* probe cosmetic */ }
@@ -5246,13 +5240,12 @@ function flattenJourneyTiltToLaw(reason) {
 /** Task 19: X/Esc/twin-Esc close. Direct teardown + replaceState — never
  * history.back(): subframe loads share the joint history, so back() can
  * step the twin instead of the parent entry.
- * LANE-GESTURE (single scroll-owned reverse): EVERY map-side close entry
- * (X/Esc/back) goes through closeTwin() (synchronous cut) — never straight
- * to finishTwinClose(). The twin is notified so it stops, but nothing waits
- * for a twin walk: the wheel reverse owns the shared forward legs, and a
- * discrete close is a cut by the scroll-pure rule. */
+ * Handoff-6-retrace: EVERY map-side close entry (X/Esc/back) goes through
+ * closeTwin() (reverse-first) — never straight to finishTwinClose(), which
+ * would skip the twin's staged inbound. */
 function finishTwinClose(opts = {}) {
   if (!twinOpen) return;
+  clearReverseWait();
   doCloseTwin(opts);
   try {
     if (history.state && history.state.twin) {
@@ -5263,13 +5256,28 @@ function finishTwinClose(opts = {}) {
   }
 }
 
-/* LANE-GESTURE synchronous close: X/Esc/back notify the live twin (it cuts
- * its own frame at once — no stage walk, no timers) and tear down
- * synchronously. No reverse-first wait, no fallback timer: while a wait was
- * armed the map ignored wheel input (sticky), then teleported (jump). A
- * discrete close is a cut; the continuous way back is the wheel-owned
- * retrace dissolve. Probe: __mapProbe.reverseFallback (kept for the shape;
- * never armed — the fallback timer is gone). */
+/* Handoff-6-retrace reverse-first close: X/Esc/back must NOT tear the
+ * overlay down directly — that jumps straight to the map satellite view and
+ * skips the twin's inbound stages. Instead ask the live twin to walk back
+ * through every stage actually passed (pull to ring frame -> pitch back to
+ * top-down -> slider 100->0); its {recede:true} reply then runs the single
+ * fade+recede chain. Timeout fallback tears down anyway so a dead twin can
+ * never strand the map (capped near the walk duration + margin, not minutes).
+ * Probe: __mapProbe.reverseWait/reverseFallback. */
+const TWIN_REVERSE_WAIT_MS = 2000;
+let reverseWait = null; // { timer } while a twin reverse flight is awaited
+function clearReverseWait() {
+  try {
+    if (reverseWait && reverseWait.timer) clearTimeout(reverseWait.timer);
+  } catch { /* timer teardown is best-effort */ }
+  reverseWait = null;
+  try {
+    window.__mapProbe.reverseWait = false;
+  } catch { /* probe cosmetic */ }
+}
+/* Post the reverse request to the live twin iframe: the object form WITHOUT
+ * recede — the twin matches it as a reverse request and replies with
+ * {recede:true} after the stage walk. True when posted. */
 function postTwinReverseRequest() {
   try {
     const fr = overlayEls && overlayEls.frame;
@@ -5283,13 +5291,42 @@ function postTwinReverseRequest() {
     return false;
   }
 }
-/* Synchronous entry for X/Esc/back: notify, then teardown. Repeat entries
- * are harmless — finishTwinClose returns early once the twin is down. */
+/* Reverse-first entry for X/Esc/back: request the twin's stage walk, defer
+ * teardown to its {recede:true} reply (or the timeout fallback). Repeat
+ * entries while a reverse is awaited are ignored — the flight already runs. */
 function closeTwin() {
   if (!twinOpen) return;
+  if (reverseWait) return;
   try {
-    postTwinReverseRequest();
-  } catch { /* request is best-effort; teardown still runs */ }
+    if (postTwinReverseRequest()) {
+      const seq = closeSeq;
+      try {
+        window.__mapProbe.reverseWait = true;
+      } catch { /* probe cosmetic */ }
+      reverseWait = {
+        timer: setTimeout(() => {
+          // UNWIND LAW: a superseded wait must still DISARM itself. The old
+          // early return left reverseWait armed with no timer, and closeTwin()
+          // bails while it is armed — one stale wait made Esc a permanent
+          // no-op for the rest of the session (measured run-4).
+          if (seq !== closeSeq) {
+            if (reverseWait && reverseWait.timer === timerHandle) clearReverseWait();
+            return;
+          }
+          if (!twinOpen) {
+            clearReverseWait();
+            return;
+          }
+          try {
+            window.__mapProbe.reverseFallback = true;
+          } catch { /* probe cosmetic */ }
+          finishTwinClose();
+        }, TWIN_REVERSE_WAIT_MS),
+      };
+      const timerHandle = reverseWait.timer;
+      return;
+    }
+  } catch { /* request is best-effort; fall through to teardown */ }
   finishTwinClose();
 }
 
@@ -5551,14 +5588,12 @@ window.addEventListener('message', (e) => {
     // map-sat ON underneath the twin fade, then finishTwinClose() runs the
     // single close chain (fade ~450ms, then sat->flat + zoom out to the
     // blip). Never cut, never fade over flat. Handoff-6-retrace: the reply
-    // also settles the close (a stale reply must not tear down a fresh twin —
-    // closeSeq guards the hide inside doCloseTwin).
+    // also settles the reverse-first wait armed by closeTwin().
     // GESTURE REVERSE (see doCloseTwin): a recede nobody here asked for is
     // the twin answering the user's own wheel — the camera keeps the handoff
     // pose so the fingers retrace the journey continuously instead of the
-    // close teleporting back to the frame the dive left. LANE-GESTURE: no
-    // reverse-first wait exists, so the only question is who asked.
-    const gestureReverse = !closeSource;
+    // close teleporting back to the frame the dive left.
+    const gestureReverse = !reverseWait && !closeSource;
     setSatForced(true);
     finishTwinClose({ gestureReverse });
     return;
@@ -5788,7 +5823,7 @@ function installBandTakeover() {
       if (dy > 0) {
         try { noteDiveFrame('takeover'); } catch { /* dive frame is best-effort */ }
       }
-      if (twinOpen || transitId || pendingReveal) return;
+      if (twinOpen || transitId || pendingReveal || reverseWait) return;
       // HARD-STOP staged hold: staging never drives here (the clamp owns
       // depth), but forward intent must still stall — returning before the
       // gate below lets zoom leak under the hold below the gate
@@ -6266,11 +6301,11 @@ async function boot() {
         try {
           dissolving = !!((twinOpen || pendingReveal) && !twinOverlayOpaque());
         } catch { dissolving = false; }
-        // LANE-GESTURE: no reverse-wait state exists — while the overlay reads
-        // translucent the law tracks through the dissolve by construction, so
-        // the hook holds everywhere except under an opaque twin (which owns
-        // its own pose).
-        if (!dissolving && twinOpen) return next;
+        let hookRevThrough = false;
+        try {
+          hookRevThrough = !!reverseWait && !twinOverlayOpaque();
+        } catch { hookRevThrough = false; }
+        if (!dissolving && (twinOpen && !hookRevThrough)) return next;
         const z = +next.zoom;
         if (!Number.isFinite(z)) return next;
         const pLaw = pitchTargetForZoom(z);
@@ -6495,7 +6530,7 @@ async function boot() {
       installZoomJourney({
         map,
         isOpen: () => twinOpen,
-        isBusy: () => !!transitId || !!pendingReveal || receding,
+        isBusy: () => !!transitId || !!pendingReveal || !!reverseWait || receding,
         onProgress: (snap, source) => scheduleNativeZoomStep(snap, source),
         onDown: () => {
           try {

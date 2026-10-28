@@ -28,9 +28,14 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, fwdProgressRebasedForS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor, twinContentPass, frameAnchorOnSite, twinContentVerdict, TWIN_CONTENT_MIN_MIX, stagedReleaseAnchors, poseAtRangePure } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor, twinContentPass, frameAnchorOnSite, twinContentVerdict, TWIN_CONTENT_MIN_MIX, stagedReleaseAnchors, poseAtRangePure } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import { overlayPaintsNow, renderDue, sampleDue } from '../map/frame-pacing.js';
+/* Namespace read of the inbound stage table (Handoff-6-closewalk): the
+ * generic reverse walker resolves stage ORDER + values through here so a
+ * Lane A constant move applies with no further edits. Named imports above
+ * stay the static contract; this is the forward-compatible lookup. */
+import * as sectorNs from './sector.js';
 import { Z_HANDOFF } from '../map/scrolltrigger.js';
 import {
   createCtxMon,
@@ -643,9 +648,10 @@ async function boot() {
     mid: null, // ring-frame iso { eye, target } (swoop end / push start)
     from: null, // flight segment start { eye, target, mix }
     to: null, // terminal iso { eye, target, mix }
-    revMode: null, // reverse plan label for THIS close: snap|pitch|full (sector.js reversePlanForPhase, probe only)
-    scrub: null, // scroll-scrub reverse: { progress:0..1 (0 terminal, 1 ring hold), accum, justEntered } or null (the wheel owns the shared forward legs, mirrored)
-    fwd: null, // Task-36 intro scrub: { legs:[swoop,push,settle], progress:0..1, t0, staged } or null (pose = pure fn of progress; the reverse reads the SAME legs at 1-progress)
+    revMode: null, // reverse plan for THIS close: snap|pitch|full (sector.js reversePlanForPhase)
+    walk: null, // generic reverse walk: { legs:[{name,eye,target,mix,ms,from,fromMix}], i, legT0 } or null
+    scrub: null, // scroll-scrub reverse: { progress:0..1, accum, justEntered } or null (wheel owns the walk)
+    fwd: null, // Task-36 intro scrub: { legs:[swoop,push], progress:0..1, t0, staged } or null (pose = pure fn of progress)
     fwdStagedS: null, // last parent-posted staged scroll S (px); null = no staged driver, autoplay advances the scalar
     fwdStagedAt: null, // handoffNow() ms of the last staged-S post (freshness stamp for the release seed cap)
     capExpired: false, // hold parked past HOLD+CAP with no ready post (shelved-cap observability for the probe)
@@ -869,6 +875,7 @@ async function boot() {
     handoff.fwdStagedAt = null;
     handoff.capExpired = false;
     handoff.revMode = null;
+    handoff.walk = null;
     handoff.scrub = null;
     handoff.entryAccum = 0;
     handoff.readyPosted = false;
@@ -929,6 +936,7 @@ async function boot() {
   }
   function endHandoffFlight() {
     handoff.phase = 'done';
+    handoff.walk = null;
     try {
       twin.controls.enabled = true;
     } catch { /* input stays as-is */ }
@@ -1069,19 +1077,13 @@ async function boot() {
       // pin even at an identical (rail-clamped) range, or a reused shell
       // pins its boot anchor through the whole climb.
       if (!handoffRefitDue(handoff.start, handoff.anchor, r)) return false;
-      // Pose-match: the refit rebuilds the pinned hold at the ARRIVAL polar
-      // (the handed pitch when the parent sends it, else the pitch law at
-      // the arrival zoom — the same derivation the boot pin uses). The old
-      // keepPolar preserved the BOOT polar through the whole climb, so a
-      // warm shell booted top-down held top-down while the map tilted to
-      // iso under it, and the release froze a 0° start that replayed the
-      // whole tilt ramp inside the visible dissolve (measured 45° of tilt
-      // travel with ~100px vertical shear at 18% overlay). The pin — and
-      // the hard-pinned hold camera with it — now tracks the tilt climb,
-      // so the release starts where the map is. The settle count restarts
-      // below so the post tracks the CURRENT pin.
-      const livePolar = holdPolarForFrame(handoff.frame);
-      const s = pinHold(handoff.anchor.x, handoff.anchor.z, r, handoff.frame.bearing ?? 0, livePolar);
+      // Pose-match: the refit rebuilds the pinned hold at the handed polar
+      // (never a top-down snap) — the settle count restarts below so the
+      // post tracks the CURRENT pin.
+      const keepPolar = Number.isFinite(handoff.start?.polar)
+        ? handoff.start.polar
+        : holdPolarForFrame(handoff.frame);
+      const s = pinHold(handoff.anchor.x, handoff.anchor.z, r, handoff.frame.bearing ?? 0, keepPolar);
       handoff.start = s;
       const aty = groundYNear(handoff.anchor.x, handoff.anchor.z);
       const eye = poseAt(handoff.anchor.x, aty, handoff.anchor.z, r, HANDOFF_ISO_POLAR_DEG, handoff.azim);
@@ -1100,13 +1102,117 @@ async function boot() {
       return false;
     }
   }
-  /* LANE-GESTURE (single scroll-owned reverse): the staged reverse walk is
-   * retired. The wheel reverse reads the SHARED forward legs
-   * (handoff.fwd.legs — swoop/push/settle) at mirrored progress through
-   * poseForScrubProgress, so the way out visits exactly the frames the way
-   * in visited, knee for knee; a discrete close is a cut (requestTwinClose
-   * posts at once, no walk). No stage table, no per-stage ms, no walk. */
-  /* (retired with the staged reverse walk — see above) */
+  /* Generic reverse-walk table (Handoff-6-closewalk): the inbound flight is
+   * an ordered list of NAMED stages. The order is read from sector.js when
+   * it names one (HANDOFF_STAGE_ORDER / INBOUND_STAGES / STAGE_ORDER),
+   * else the canonical hold->swoop->push->done. Every value below comes
+   * from the sector.js imports or the live handoff anchors — no pose
+   * numbers live here, so Lane A moves apply with no further edits. */
+  function inboundStageOrder() {
+    try {
+      const o = sectorNs.HANDOFF_STAGE_ORDER ?? sectorNs.INBOUND_STAGES ?? sectorNs.STAGE_ORDER;
+      if (Array.isArray(o) && o.length) return o.map((s) => String(s).toLowerCase());
+    } catch { /* canonical fallback below */ }
+    return ['hold', 'swoop', 'push', 'done'];
+  }
+  /* Forward ms for undoing a stage (its own replay duration, sector-owned). */
+  function stageUndoMs(name) {
+    if (name === 'push' || name === 'done') return HANDOFF_PUSH_MS;
+    if (name === 'hold') return HANDOFF_HOLD_MS;
+    return HANDOFF_SWOOP_MS; // swoop + any future pitch-scale stage
+  }
+  /* Named stage pose at close time (null when its anchor is unknown — the
+   * walker skips that leg and the final pin still guarantees top-down).
+   * A Lane A resolver (sectorNs.stagePoseFor / *_STAGE_POSES) wins when
+   * present; otherwise poses resolve from the live anchors. */
+  function stagePose(name) {
+    try {
+      if (typeof sectorNs.stagePoseFor === 'function') {
+        const p = sectorNs.stagePoseFor(name, { start: handoff.start, mid: handoff.mid, to: handoff.to });
+        if (p && p.eye && p.target) {
+          return {
+            name,
+            eye: { ...p.eye },
+            target: { ...p.target },
+            mix: Number.isFinite(p.mix) ? p.mix : HANDOFF_START_MIX,
+          };
+        }
+      }
+      const table = sectorNs.HANDOFF_STAGE_POSES ?? sectorNs.STAGE_POSES;
+      if (table && typeof table === 'object' && table[name] && table[name].eye && table[name].target) {
+        const p = table[name];
+        return {
+          name,
+          eye: { ...p.eye },
+          target: { ...p.target },
+          mix: Number.isFinite(p.mix) ? p.mix : HANDOFF_START_MIX,
+        };
+      }
+    } catch { /* live-anchor resolution below */ }
+    try {
+      if (name === 'hold') {
+        const s = handoff.start;
+        if (!s) return null;
+        const se = startEye(s);
+        return { name, eye: se, target: { x: s.tx, y: s.ty, z: s.tz }, mix: HANDOFF_START_MIX };
+      }
+      if (name === 'swoop') {
+        const mid = handoff.mid;
+        if (!mid) return null;
+        return { name, eye: { ...mid.eye }, target: { ...mid.target }, mix: HANDOFF_START_MIX };
+      }
+      if (name === 'push' || name === 'done') {
+        const to = handoff.to;
+        if (!to) return null;
+        return { name, eye: { ...to.eye }, target: { ...to.target }, mix: HANDOFF_END_MIX };
+      }
+    } catch { /* null below */ }
+    return null;
+  }
+  /* Build the close-time walk: every inbound stage actually passed, newest
+   * first, each leg undoing its stage over that stage's forward ms. Done
+   * rests AT the push end pose, so it undoes push (no terminal leg — the
+   * pull starts from wherever the camera is, never a canned start). An
+   * unknown phase walks everything (terminal-side full walk). Zero legs =
+   * still at the ring-frame hold pose: the engine pins + posts immediately. */
+  function buildReverseWalk(closePhase) {
+    const order = inboundStageOrder();
+    const phase = String(closePhase ?? '').toLowerCase();
+    let idx = order.indexOf(phase);
+    if (phase === 'done') idx = order.indexOf('push');
+    if (idx < 0) idx = order.length - 1;
+    const cur = capturePose();
+    const curMix = Number.isFinite(cur?.mix) ? cur.mix : HANDOFF_START_MIX;
+    const legs = [];
+    let from = cur;
+    let fromMix = curMix;
+    for (let i = idx - 1; i >= 0; i--) {
+      const pose = stagePose(order[i]);
+      if (!pose) continue;
+      const undone = order[i + 1] ?? order[idx];
+      legs.push({ ...pose, ms: stageUndoMs(undone), from, fromMix });
+      from = { eye: { ...pose.eye }, target: { ...pose.target } };
+      fromMix = pose.mix;
+    }
+    // Round-5 way-back lockstep: the reverse ENDS at the ring-iso waypoint
+    // (legs through the first 'swoop' leg) — never the top-down hold frame.
+    // The parent cuts to its tilted-satellite law pose there, so a top-down
+    // end snaps the cut 45°. Closes that never reached ring-iso (hold, or
+    // mid-swoop) complete FORWARD to it instead of undoing away from the map.
+    try {
+      const si = legs.findIndex((l) => String(l && l.name).toLowerCase() === 'swoop');
+      if (si >= 0) {
+        legs.length = si + 1;
+      } else {
+        const sw = stagePose('swoop');
+        if (sw) {
+          legs.length = 0;
+          legs.push({ ...sw, ms: stageUndoMs('swoop'), from: cur, fromMix: curMix });
+        }
+      }
+    } catch { /* keep the built legs */ }
+    return { legs, order: order.slice(0, idx), from: cur };
+  }
   /* GATE-3 ring-from-corners (defect 5, twin side): flight-phase -> ring
    * reveal progress 0..1, or null when no flight owns the ring (idle/done/
    * standalone — the normal mix law stands). Hold 0, swoop 0->1 on the same
@@ -1123,9 +1229,11 @@ async function boot() {
         return forwardRingPForProgress(handoff.fwd?.legs, handoff.fwd?.progress ?? 0);
       }
       if (ph === 'reverse') {
-        // LANE-GESTURE: the ring mirrors the scrub on the SHARED forward legs
-        // (1 - progress), so stroke and pose agree exactly — no walk, no clock.
         if (handoff.scrub?.active) return Math.min(1, Math.max(0, 1 - handoff.scrub.progress));
+        const w = handoff.walk;
+        if (w && Array.isArray(w.legs) && w.legs.length) {
+          return Math.min(1, Math.max(0, 1 - scrubProgressForWalk(w.legs, w.i, w.legT0, handoffNow())));
+        }
         return 0;
       }
     } catch { /* normal law below */ }
@@ -1141,9 +1249,9 @@ async function boot() {
    * Forward: hold (ring hold pose = handed center/range/polar, mix 0) ->
    * swoop (ring hold -> ring iso at the attached angle, mix STAYS 0) ->
    * push (ring iso -> terminal iso, mix 0->100 with the push-in). Reverse
-   * mirrors exactly inside the single 'reverse' phase by scrubbing the SAME
-   * forward legs at mirrored progress (see paintScrubPose), then the
-   * {recede:true} close posts. */
+   * mirrors exactly inside the single 'reverse' phase by stepping the
+   * close-time leg list (see buildReverseWalk), then the {recede:true}
+   * close posts. */
   function stepHandoff() {
     if (!handoff || handoff.phase === 'idle') return;
     /* GATE-3 SCROLL-SCRUB clamp rail (handoff12-B: the cap is an EXIT
@@ -1155,7 +1263,7 @@ async function boot() {
      * Gated on a flown handoff (start set) so standalone free orbit never
      * trips it; re-arms when range drops back. */
     if (handoff.phase === 'done') {
-      if (handoff.start && !handoff.closePosted && !handoff.scrub?.active) {
+      if (handoff.start && !handoff.closePosted && !handoff.walk) {
         let r = null;
         try {
           r = twin?.camera?.position?.distanceTo?.(twin?.controls?.target);
@@ -1401,19 +1509,14 @@ async function boot() {
         // advances the scalar on a single clock until staged scroll takes
         // over (parent posts S; symmetric — scroll-up retreats the pose).
         // The phase label follows progress so probes + the close-time
-        // reverse mirrors them at 1 - progress (see paintScrubPose).
+        // reverse walker (buildReverseWalk) still see swoop vs push.
         const fwd = handoff.fwd;
         if (!fwd || !Array.isArray(fwd.legs) || !fwd.legs.length) {
           endHandoffFlight();
           return;
         }
         if (fwdAutoplayHeld({ staged: fwd.staged, stagedS: handoff.fwdStagedS })) {
-          // Arrival-rebased progress: a post-release leg rebuild re-anchors
-          // the band at the arrival S (progressSBase) so the rebuild frame
-          // maps to progress 0 (legs start at the live pose — no jump).
-          // No rebuild this flight: progressSBase is absent and this reads
-          // exactly like fwdProgressForStagedS (same pacing, same parks).
-          fwd.progress = fwdProgressRebasedForS(handoff.fwdStagedS ?? 0, fwd.progressSBase);
+          fwd.progress = fwdProgressForStagedS(handoff.fwdStagedS ?? 0);
         } else {
           const total = scrubTotalMs(fwd.legs);
           fwd.progress = total > 0
@@ -1456,15 +1559,14 @@ async function boot() {
         return;
       }
       if (handoff.phase === 'reverse') {
-        /* LANE-GESTURE (single scroll-owned reverse): the scrub owns the pose
-         * on the SHARED forward legs at mirrored progress (1 - progress), so
-         * scrub and intro agree pose-for-pose with no second leg list. At
-         * progress 1 the final pin + {recede:true} post run the shared path.
-         * An unowned reverse (no scrub — defensive only, every close hands a
-         * scrub now) cuts at once: pin the reverse end and post, never a
-         * wall-clock walk. No timer owns camera motion on this path. */
+        /* GATE-3 SCROLL-SCRUB: while scrub is active the wheel owns the walk
+         * — pose comes from journey progress (same legs, same smootherstep,
+         * same slider law as the timed engine, so scrub and timed renders
+         * agree pose-for-pose) and the timed clock below is bypassed. At
+         * progress 1 the final pin + {recede:true} post run the shared path. */
         if (handoff.scrub?.active) {
-          const s = poseForScrubProgress(handoff.fwd?.legs, 1 - handoff.scrub.progress);
+          const swalk = handoff.walk;
+          const s = poseForScrubProgress(swalk?.legs, handoff.scrub.progress);
           if (!s) {
             const sd = handoff.start;
             if (sd) {
@@ -1491,11 +1593,48 @@ async function boot() {
           }
           return;
         }
-        // Unowned reverse: cut, never walk the clock.
-        pinReverseEnd();
-        endHandoffFlight();
-        postTwinClose();
-        return;
+        // Generic reverse walk: step the leg list built at close time from
+        // the named inbound stages actually passed. Each leg flies from the
+        // previous waypoint to the next stage pose over that stage's own
+        // forward ms with the slider riding down to full satellite; the
+        // final pin restores the hold pose + slider 0 even if an anchor went
+        // missing mid-walk — then the {recede:true} close posts.
+        const walk = handoff.walk;
+        if (!walk || !Array.isArray(walk.legs) || walk.i >= walk.legs.length) {
+          // Round-5: post from ring-iso (matches the parent cut) — never top-down.
+          pinReverseEnd();
+          endHandoffFlight();
+          postTwinClose();
+          return;
+        }
+        const leg = walk.legs[walk.i];
+        const span = Number.isFinite(leg.ms) && leg.ms > 0 ? leg.ms : HANDOFF_SWOOP_MS;
+        const t = Math.min(1, Math.max(0, (now - walk.legT0) / span));
+        const k = easeInOutSmoother(t); // GATE-3 REVISION tempo: mirror curve
+        const fe = (leg.from && leg.from.eye) || leg.eye;
+        const ft = (leg.from && leg.from.target) || leg.target;
+        try {
+          applyFlightPose(
+            { x: lerp(fe.x, leg.eye.x, k), y: lerp(fe.y, leg.eye.y, k), z: lerp(fe.z, leg.eye.z, k) },
+            { x: lerp(ft.x, leg.target.x, k), y: lerp(ft.y, leg.target.y, k), z: lerp(ft.z, leg.target.z, k) },
+          );
+        } catch { /* pose drive is best-effort */ }
+        driveMix(lerp(Number.isFinite(leg.fromMix) ? leg.fromMix : HANDOFF_START_MIX, leg.mix, k));
+        if (t >= 1) {
+          walk.i += 1;
+          walk.legT0 = now;
+          if (walk.i >= walk.legs.length) {
+            const s = handoff.start;
+            if (s) {
+              try {
+                pinHold(s.tx, s.tz, s.range, s.bearing, s.polar ?? 0);
+              } catch { /* pin is best-effort */ }
+            }
+            driveMix(HANDOFF_START_MIX);
+            endHandoffFlight();
+            postTwinClose();
+          }
+        }
       }
     } catch { /* flight never breaks the frame */ }
   }
@@ -1514,20 +1653,68 @@ async function boot() {
       (window.__ring2closeOut ?? (window.__ring2closeOut = [])).push(buildTwinCloseMessage(true));
     } catch { /* probe log is best-effort */ }
   }
-  /* Close entry: LANE-GESTURE single-path cut. A discrete close (Esc, the
-   * sister HUD lane, a parent close message) posts {recede:true} at once —
-   * no stage walk, no scrub jump, no timers. The continuous way back is the
-   * wheel-owned reverse on the shared forward legs (enterScrubReverse below);
-   * a cut and a scrub never co-own the frame. X (parent chrome) +
-   * browser-back are parent-owned — the parent tears the iframe down
-   * directly. Safe standalone (no frame): notifies now. Idempotent: a close
-   * after the post re-posts, never re-flies. */
+  /* Close entry: REVERSE-FROM-ANYWHERE — captures the live pose + mix at
+   * close time and walks back through the stages actually passed (never a
+   * jump to a canned start), then signals the parent with {recede:true}.
+   * X (parent chrome) + browser-back are parent-owned — the parent tears the
+   * iframe down directly; Esc, the sister HUD lane, and parent close
+   * messages call this. Safe standalone (no frame): notifies now.
+   * Idempotent: a close after the post re-posts without re-flying.
+   * Task 37: the reverse is ALWAYS scrub-owned — the walk is built from the
+   * live pose, handed to handoff.scrub at the live progress, and an explicit
+   * close drives that scrub to 1 through paintScrubPose (completeScrubReverse).
+   * No wall clock ever restarts here; the wheel stays the analog path. */
   function requestTwinClose() {
     try {
-      handoff.revMode = reversePlanForPhase(handoff.phase);
-      handoff.scrub = null;
-      if (handoff.phase === 'reverse') endHandoffFlight();
-      postTwinClose();
+      if (handoff.phase === 'reverse') {
+        if (handoff.scrub?.active) completeScrubReverse();
+        return true; // already running: drive it home, never re-fly
+      }
+      if (!handoff.start) {
+        postTwinClose(); // standalone: no frame to reverse to
+        return true;
+      }
+      if (handoff.closePosted && handoff.phase === 'done') {
+        postTwinClose(); // repeat close: re-post, never re-fly
+        return true;
+      }
+      const prevPhase = handoff.phase;
+      // Generic reverse walk over the named inbound stages actually passed
+      // (sector.js order + poses — never a jump to a canned start). The
+      // sector-owned plan label stays on the probe for compat.
+      handoff.revMode = reversePlanForPhase(prevPhase);
+      const walk = buildReverseWalk(prevPhase);
+      if (!walk.legs.length) {
+        // Still at the ring-frame hold pose: no stage was entered, so
+        // the mirror is a pin + mix 0 + immediate post.
+        try {
+          const s = handoff.start;
+          pinHold(s.tx, s.tz, s.range, s.bearing, s.polar ?? 0);
+          driveMix(HANDOFF_START_MIX);
+        } catch { /* pin is best-effort */ }
+        handoff.walk = null;
+        endHandoffFlight();
+        postTwinClose();
+        return true;
+      }
+      const cur = walk.from;
+      if (!cur || !cur.eye || !cur.target) {
+        postTwinClose();
+        return false;
+      }
+      // Hand the live-posed walk to the scrub at the live progress (0: the
+      // walk starts where the camera is) and drive it home now — the same
+      // legs, same smootherstep, same slider law as the wheel path, so Esc
+      // and the wheel agree pose-for-pose.
+      handoff.from = cur;
+      handoff.walk = { legs: walk.legs, i: 0, legT0: handoffNow() };
+      handoff.scrub = { active: true, progress: 0, accum: 0, justEntered: false };
+      handoff.entryAccum = 0;
+      handoff.phase = 'reverse';
+      try {
+        twin.controls.enabled = false;
+      } catch { /* flight still drives the camera */ }
+      completeScrubReverse();
       return true;
     } catch {
       try {
@@ -1558,14 +1745,10 @@ async function boot() {
       return null;
     }
   }
-  /* Enter the wheel-owned reverse from twin mode (done). Reads the SHARED
-   * forward legs (handoff.fwd.legs — swoop/push/settle) at mirrored progress,
-   * so the way out visits exactly the frames the way in visited, knee for
-   * knee — no stage list, no replayed phases. Non-done phases cut at once
-   * (requestTwinClose): a mid-flight wheel-out is a discrete close, never a
-   * staged walk. Entry still gesture-owned (first-notch outward wheel or
-   * accumulated pinch delta at the clamp); the probe records the single-law
-   * leg count (the forward legs) so a re-added stage list fails loudly. */
+  /* Enter the wheel-owned staged reverse from twin mode (done). Same leg
+   * list as the timed close-from-done — push, swoop, hold waypoints — so the
+   * journey back walks the identical stages. Non-done phases defer to the
+   * timed requestTwinClose path. */
   function enterScrubReverse() {
     try {
       if (handoff.phase === 'reverse') return true;
@@ -1575,40 +1758,60 @@ async function boot() {
         return true;
       }
       handoff.revMode = reversePlanForPhase('done');
-      const legs = handoff.fwd?.legs;
-      if (!Array.isArray(legs) || !legs.length) {
-        // No shared legs alive (never happens post-commit — the intro froze
-        // them): cut instead of inventing a walk.
+      const walk = buildReverseWalk('done');
+      if (!walk.legs.length) {
+        try {
+          const s = handoff.start;
+          pinHold(s.tx, s.tz, s.range, s.bearing, s.polar ?? 0);
+          driveMix(HANDOFF_START_MIX);
+        } catch { /* pin is best-effort */ }
+        handoff.walk = null;
+        handoff.scrub = null;
+        endHandoffFlight();
         postTwinClose();
         return true;
       }
+      const cur = walk.from;
+      if (!cur || !cur.eye || !cur.target) return false;
+      handoff.from = cur;
+      handoff.walk = { legs: walk.legs, i: 0, legT0: handoffNow() };
       handoff.scrub = { active: true, progress: 0, accum: 0, justEntered: true };
       handoff.entryAccum = 0;
       handoff.phase = 'reverse';
       try {
         twin.controls.enabled = false;
       } catch { /* flight still drives the camera */ }
-      try {
-        window.__ring2retraceLegs = legs.length;
-      } catch { /* probe cosmetic */ }
       return true;
     } catch {
       return false;
     }
   }
-  /* (completeScrubReverse retired with the staged close walk: an explicit
-   * close is a cut now — see requestTwinClose. The wheel path completes
-   * through the shared finishScrubReverse exit below.) */
+  /* Explicit-close completion (Task 37 — Esc / parent-X / close message):
+   * drives the scrub-owned reverse to progress 1 through paintScrubPose,
+   * then the shared pin + {recede:true} post. Same legs, same smootherstep,
+   * same slider law as the wheel path — never a wall clock, never a pose
+   * jump. False when no scrub owns the reverse. */
+  function completeScrubReverse() {
+    try {
+      const sc = handoff.scrub;
+      if (!sc?.active) return false;
+      sc.progress = 1;
+      sc.justEntered = false;
+      paintScrubPose();
+      finishScrubReverse();
+      return true;
+    } catch {
+      return false;
+    }
+  }
   /* Paint the scrubbed pose immediately (called from the wheel handler so
    * high-frequency bursts read continuously instead of waiting a frame).
-   * LANE-GESTURE: reads the SHARED forward legs at mirrored progress
-   * (1 - progress) — the way out is the way in, reversed. True when the
-   * journey completed (caller pins + posts). */
+   * True when the journey completed (caller pins + posts). */
   function paintScrubPose() {
     try {
       const sc = handoff.scrub;
       if (!sc?.active) return false;
-      const s = poseForScrubProgress(handoff.fwd?.legs, 1 - sc.progress);
+      const s = poseForScrubProgress(handoff.walk?.legs, sc.progress);
       if (!s) return false;
       try {
         applyFlightPose(s.eye, s.target);
@@ -1671,58 +1874,6 @@ async function boot() {
           }
         }
       } catch { /* iso convergence never breaks the staged drive */ }
-      /* STAGED-ARRIVAL REBUILD (boresight): a warm shell can release BEFORE
-       * the first staged post lands (ready posts on the hold pin while the
-       * map still parks S at the gate; the grant-time re-emit arrives a
-       * frame later), freezing legs from stale pins — top-down start,
-       * arrival-scale mid, constant-metre terminal — while the map dissolves
-       * S-driven over them. When the first staged post of the flight lands
-       * after such a release, re-derive the legs from the ARRIVAL stream
-       * (fresh posted zoom via releaseFreshMid + live pose) through the same
-       * range law the release uses, and rebase progress so the arrival S
-       * maps to progress 0: legs start at the live pose, so the pose cannot
-       * jump, and the rest of the band rides the gate lock instead of the
-       * stale pins. One rebuild per flight; later posts only advance
-       * progress. Releases that already froze staged legs (fwd.staged)
-       * never enter here. */
-      try {
-        const fwd0 = handoff.fwd;
-        if (fwd0 && !fwd0.staged && !fwd0.rebuilt
-          && (handoff.phase === 'swoop' || handoff.phase === 'push')) {
-          const live = capturePose();
-          const rLock = lockStagedRange(handoff.frame?.cy);
-          if (live?.eye && live?.target && Number.isFinite(rLock) && rLock > 0) {
-            // Mid stays on the ARRIVAL scale (fresh posted zoom, arrival
-            // anchor — no gate lock): the swoop leg is then tilt-only, and
-            // the tilt already rode the climb, so the swoop is static. The
-            // whole zoom travel rides the push leg alongside the map's own
-            // travel to the gate instead of rushing gate-scale in the first
-            // two ticks (measured: locking mid rushed 24.6→13.0 km over
-            // S 0→240 while the map only travelled to ~19 km — a 0.67x
-            // mid-band dip). The terminal takes the gate lock so the commit
-            // still lands registered.
-            const midPose = releaseFreshMid(handoff.mid);
-            let toPose = handoff.to;
-            if (toPose?.eye && toPose?.target) toPose = poseAtRange(toPose, rLock);
-            // Continuity: legs start at the LIVE pose, never a lifted one —
-            // a lift under nonzero overlay reads as a snap. The gate lock
-            // owns the terminal so the commit lands registered; the pole
-            // already rode the tilt climb (arrival-polar refit), so the
-            // live start sits at the map's tilt.
-            const legs = buildForwardLegs({
-              startPose: { eye: { ...live.eye }, target: { ...live.target } },
-              mid: midPose,
-              to: toPose,
-            });
-            if (legs) {
-              fwd0.legs = legs;
-              fwd0.staged = true;
-              fwd0.progressSBase = handoff.fwdStagedS;
-              fwd0.rebuilt = true;
-            }
-          }
-        }
-      } catch { /* rebuild never breaks the staged drive */ }
       if (handoff.fwd && (handoff.phase === 'swoop' || handoff.phase === 'push')) {
         handoff.fwd.staged = true;
       }
@@ -1872,14 +2023,16 @@ async function boot() {
         if (!enterScrubReverse()) { twinFlipToOrbit(e); return; }
         if (handoff.phase !== 'reverse' || !handoff.scrub?.active) { twinFlipToOrbit(e); return; }
       } else if (handoff.phase === 'reverse' && !handoff.scrub?.active) {
-        // Unowned reverse (defensive only — every close hands a scrub or
-        // cuts now, so no walk exists to take over): re-enter through the
-        // shared-legs entry when the shared legs are alive, else flip to
-        // orbit. No timed takeover, no live-progress estimate.
+        // Unowned reverse (defensive — closes always hand a scrub now):
+        // outward non-pinch wheels take over at the live progress.
         if (pinch) return;
-        if (dY >= 0) return;
-        if (!enterScrubReverse()) { twinFlipToOrbit(e); return; }
-        if (!handoff.scrub?.active) { twinFlipToOrbit(e); return; }
+        if (dY >= 0 || !handoff.walk) return;
+        handoff.scrub = {
+          active: true,
+          progress: scrubProgressForWalk(handoff.walk.legs, handoff.walk.i, handoff.walk.legT0, handoffNow()),
+          accum: 0,
+          justEntered: false,
+        };
       } else if (!(handoff.phase === 'reverse' && handoff.scrub?.active)) {
         twinFlipToOrbit(e); return;
       }
@@ -1908,6 +2061,7 @@ async function boot() {
       if (sc.progress <= 0 && !wasEnter) {
         paintScrubPose();
         handoff.scrub = null;
+        handoff.walk = null;
         endHandoffFlight();
         return;
       }
@@ -2078,8 +2232,7 @@ async function boot() {
       out: (window.__ring2readyOut ?? []).length,
     }),
     revMode: () => handoff.revMode,
-    revWalk: () => null, // retired with the staged walk: the reverse reads the shared forward legs
-    retraceLegs: () => { try { return window.__ring2retraceLegs ?? null; } catch { return null; } },
+    revWalk: () => (handoff.walk ? handoff.walk.legs.map((l) => l.name) : null),
     scrub: () => {
       let range = null;
       try {
@@ -2091,7 +2244,7 @@ async function boot() {
         progress: handoff.scrub?.progress ?? null,
         accum: handoff.scrub?.accum ?? null,
         entryAccum: handoff.entryAccum ?? null,
-        legs: handoff.fwd && Array.isArray(handoff.fwd.legs) ? handoff.fwd.legs.map((l) => l.name) : null,
+        legs: handoff.walk ? handoff.walk.legs.map((l) => l.name) : null,
         range,
         atMax: Number.isFinite(range) ? isAtMaxZoom(range) : null,
         closeOut: (window.__ring2closeOut ?? []).length,

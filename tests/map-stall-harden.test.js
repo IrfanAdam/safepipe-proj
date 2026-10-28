@@ -25,8 +25,8 @@ test('all three wheel lanes swallow forward with no stagedActive exemption', () 
 test('takeover stalls staged holds instead of early-returning past them', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(
-    main.includes('if (twinOpen || transitId || pendingReveal) return;'),
-    'the takeover early-return no longer skips stagedActive (and no reverse-wait state exists to exempt)',
+    main.includes('if (twinOpen || transitId || pendingReveal || reverseWait) return;'),
+    'the takeover early-return no longer skips stagedActive',
   );
   assert.ok(
     main.includes('HARD-STOP staged hold: staging never drives here'),
