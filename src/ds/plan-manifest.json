@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-27T08:36:20.558Z",
+  "generated": "2026-10-28T11:14:59.355Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,141 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "2821284",
+      "full": "2821284ff3da3fcfb968dadaafa50d5822372aa2",
+      "date": "2026-10-28",
+      "time": "16:44",
+      "subject": "revert(map-twin): restore production-live tree, mark perceptual-eval FAILED [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "6234988",
+      "full": "62349881f197f43fda6923ee54a80da28e69efb9",
+      "date": "2026-10-28",
+      "time": "16:40",
+      "subject": "docs(plan): restore retrace note + step 1 [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "6a653b6",
+      "full": "6a653b6291a289eb60e06d5a10c15a0306656cd0",
+      "date": "2026-10-28",
+      "time": "16:39",
+      "subject": "fix(map): rAF-coalesce staged-S posts, drop 60ms floor for smooth forward band [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "ab0f182",
+      "full": "ab0f18255cec7cc81ceec3bac86521acdaa9c2a8",
+      "date": "2026-10-28",
+      "time": "16:08",
+      "subject": "docs(plan): REF GATE 3 rev note for retrace [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "de8de6e",
+      "full": "de8de6e40c2c7a5e4cd3cc7cccb76d1218d1d96c",
+      "date": "2026-10-28",
+      "time": "16:08",
+      "subject": "revert(map-twin): retrace perceptual-eval stack to pre-eval tree, smoothness redo follows [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "32c2234",
+      "full": "32c22348f2b58f00f4d114eb81df3be07996f397",
+      "date": "2026-10-28",
+      "time": "16:00",
+      "subject": "docs(plan): REF GATE 3 rev note for regression fixes [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "fa6b78d",
+      "full": "fa6b78d0b7a5c05d29da6fb4b18dfd74bd0682a7",
+      "date": "2026-10-28",
+      "time": "16:00",
+      "subject": "fix(map-twin): carry mix across rescale, twin-owned reverse, in-view lock-in [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "7fe5a5a",
+      "full": "7fe5a5a5160ede6e310c782f8faa6651131f1741",
+      "date": "2026-10-28",
+      "time": "15:44",
+      "subject": "revert(twin): remove procedural ground-detail modulation, owner rejected milky fade blotches [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "9dcd57e",
+      "full": "9dcd57e26c562773eaf0580520f9a84f63943629",
+      "date": "2026-10-28",
+      "time": "15:14",
+      "subject": "docs(plan): REF GATE 3 rev note for perceptual-eval [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "37980fe",
+      "full": "37980fedbad28feaba68843dc03087c355f67f48",
+      "date": "2026-10-28",
+      "time": "15:13",
+      "subject": "fix(twin): hand the frame back on the gate tick, not three ticks past it [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "d91b5f0",
+      "full": "d91b5f004ddd673bb222659c11ce5e874ed3c8e1",
+      "date": "2026-10-28",
+      "time": "14:51",
+      "subject": "fix(map): pin the staged band centre to the site so the twin never offsets low [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "8bf1397",
+      "full": "8bf13975c54db3684d57a31fa6b25d6af439391b",
+      "date": "2026-10-28",
+      "time": "14:44",
+      "subject": "fix(map-twin): live-scale staged band + ground detail + seamless wheel handover [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "75c4ed9",
+      "full": "75c4ed9353639145b0fbec1e2b5f32c8824380b2",
+      "date": "2026-10-28",
+      "time": "13:47",
+      "subject": "docs(plan): REF GATE 3 rev note for map-twin-eval [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "d11b721",
+      "full": "d11b7219f11c84ce6befc9030fb045b339cb266f",
+      "date": "2026-10-28",
+      "time": "13:46",
+      "subject": "fix(map-twin): align boresight + seamless fade + single-law gesture retrace [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "7ecf1d7",
+      "full": "7ecf1d722a521ab8b74629dda2461cb275719de0",
+      "date": "2026-10-27",
+      "time": "14:06",
+      "subject": "docs(plan): REF GATE 3 rev note for commit-reverse-freeze [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "01a2426",
       "full": "01a2426abcb147bdaff6f1416d1b8a61f5b6e245",
@@ -6564,7 +6699,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
-  ]
+  "wip": []
 }
