@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-28T08:16:26.371Z",
+  "generated": "2026-10-28T08:17:20.894Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,24 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "75c4ed9",
+      "full": "75c4ed9353639145b0fbec1e2b5f32c8824380b2",
+      "date": "2026-10-28",
+      "time": "13:47",
+      "subject": "docs(plan): REF GATE 3 rev note for map-twin-eval [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "d11b721",
+      "full": "d11b7219f11c84ce6befc9030fb045b339cb266f",
+      "date": "2026-10-28",
+      "time": "13:46",
+      "subject": "fix(map-twin): align boresight + seamless fade + single-law gesture retrace [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "7ecf1d7",
       "full": "7ecf1d722a521ab8b74629dda2461cb275719de0",
@@ -6573,12 +6591,5 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": [
-    "src/map/main.js",
-    "src/map/scrolltrigger.js",
-    "src/ring2/main.js",
-    "src/ring2/overlays.js",
-    "src/ring2/sector.js",
-    "src/ring2/tone.js"
-  ]
+  "wip": []
 }
