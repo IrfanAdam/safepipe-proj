@@ -800,6 +800,22 @@ export function lockAroundPoint(hx, hy, cx, cy, zoomIn) {
   return { x: +hx + (+hx - +cx) * K, y: +hy + (+hy - +cy) * K };
 }
 
+/* IN-VIEW ARM (owner rev: the lock must engage when the site is in view,
+ * not only when the cursor sits on it). Pure: true when the projected site
+ * lies inside the viewport expanded by `marginPx` on every side. The margin
+ * is the caller's own near radius (PROX_CURSOR_PX on the map side), so the
+ * arm region is continuous with the near region — no new constant, no cliff
+ * at the frame edge. A site already off-screen never arms (nothing to glide
+ * without a visible anchor); once armed the settle law centres it, so it
+ * cannot leave the frame mid-dive. */
+export function siteInView(sx, sy, w, h, marginPx) {
+  const x = +sx, y = +sy, W = +w, H = +h;
+  let m = +marginPx;
+  if (![x, y, W, H].every(Number.isFinite) || W <= 0 || H <= 0) return false;
+  if (!Number.isFinite(m) || m < 0) m = 0;
+  return x >= -m && y >= -m && x <= W + m && y <= H + m;
+}
+
 /* Mask-anchored scroll-gain dip (pure, node-checkable): the slowdown rides
  * the enclosing mask itself, not absolute zoom. Input is the live enclosure
  * blend b (centerBlendForZoom — 0 while the mask is down) plus the mask-arm

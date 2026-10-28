@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, fwdProgressRebasedForS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor, twinContentPass, frameAnchorOnSite, twinContentVerdict, TWIN_CONTENT_MIN_MIX, stagedReleaseAnchors, poseAtRangePure, stagedRangeLock } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, fwdProgressRebasedForS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor, twinContentPass, frameAnchorOnSite, twinContentVerdict, stagedReleaseAnchors, poseAtRangePure, stagedRangeLock, poseWriteFp } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import { overlayPaintsNow, renderDue, sampleDue } from '../map/frame-pacing.js';
 import { Z_HANDOFF, zoomAfterWheel } from '../map/scrolltrigger.js';
@@ -689,6 +689,14 @@ async function boot() {
   /* Relative tolerance for the dolly band edges (float comparison, not a
    * design constant): inside 0.1% of a band edge the band is spent. */
   const DOLLY_BAND_EPS = 1e-3;
+  /* ONE camera writer per tick (stutter): the hold pin and the flight pose
+   * writers share this fingerprint of the last APPLIED absolute pose
+   * (poseWriteFp, sector.js). At rest the commanded pose is bit-identical,
+   * so the writers skip the set + updateControls instead of re-running
+   * controls and damping against themselves. Reset on every new flight: a
+   * coincidentally identical pose from a previous handoff must still seat
+   * (the live camera may have orbited away since). */
+  let lastCamFp = null;
   function viewportPxNow() {
     try {
       return Math.max(twinDiv.clientHeight || window.innerHeight, 1);
@@ -725,10 +733,17 @@ async function boot() {
     if (!Number.isFinite(polar)) polar = 0;
     const s = { tx, ty, tz, range, bearing: (((Number(bearingDeg) || 0) % 360) + 360) % 360, polar };
     try {
-      twin.controls.target.set(tx, ty, tz);
+      // No-op when the frame already holds this pose: the hold re-pins
+      // every frame, and at rest (steady S, steady viewport) the rescale is
+      // identical — skip the set so damping settles instead of re-fighting.
       const e = startEye(s);
-      twin.camera.position.set(e.x, e.y, e.z);
-      twin.updateControls();
+      const fp = poseWriteFp(e, { x: tx, y: ty, z: tz });
+      if (fp === null || fp !== lastCamFp) {
+        lastCamFp = fp;
+        twin.controls.target.set(tx, ty, tz);
+        twin.camera.position.set(e.x, e.y, e.z);
+        twin.updateControls();
+      }
     } catch { /* flight steps pin per-frame anyway */ }
     return s;
   }
@@ -900,6 +915,7 @@ async function boot() {
   }
   function beginHandoffFlight(pinnedStart, ringIso, terminal) {
     handoff.start = pinnedStart;
+    lastCamFp = null; // new flight, new anchor: the first pin always seats
     handoff.mid = ringIso;
     handoff.to = terminal;
     handoff.from = null;
@@ -975,8 +991,22 @@ async function boot() {
   }
   const lerp = (a, b, k) => a + (b - a) * k;
   function applyFlightPose(eye, target) {
-    twin.controls.target.set(target.x, target.y, target.z);
-    twin.camera.position.set(eye.x, eye.y, eye.z);
+    // Same no-op as the hold pin: progress advances on a clock or on staged
+    // posts, and between advances the commanded pose is bit-identical — skip
+    // the set so the frame is not re-driven against settled damping.
+    try {
+      const fp = poseWriteFp(eye, target);
+      if (fp === null || fp !== lastCamFp) {
+        lastCamFp = fp;
+        twin.controls.target.set(target.x, target.y, target.z);
+        twin.camera.position.set(eye.x, eye.y, eye.z);
+      }
+    } catch {
+      try {
+        twin.controls.target.set(target.x, target.y, target.z);
+        twin.camera.position.set(eye.x, eye.y, eye.z);
+      } catch { /* pose drive is best-effort */ }
+    }
   }
   /* FRAME-MATCH read (Lane B): true once the hold satellite frame
    * is actually on screen — map instance up, at least one twin frame
@@ -1914,37 +1944,11 @@ async function boot() {
       return false;
     }
   }
-  /* The gate frame the map is pinned to, as a camera range: the same pure
-   * frameRange law the map's gate pose uses, read at the committed staged
-   * zoom. NOT the frozen leg's p=1 pose — that is the scrub ENTRY, and it sits
-   * 1.6x farther out than the gate (measured 39.6 km vs 24.8 km), which let the
-   * outward dolly run three ticks past the gate and then snap back 0.53 zoom on
-   * the handover tick. Derived from the shared zoom, never a constant. */
-  function holdRangeNow() {
-    try {
-      const zNow = Number.isFinite(+handoff.fwdStagedZ) ? +handoff.fwdStagedZ : Z_HANDOFF;
-      const r = frameRange(zNow, { viewportPx: viewportPxNow(), fovDeg: FOV_DEG, lat: SANGACHAL.lat });
-      return Number.isFinite(r) && r > 0 ? r : null;
-    } catch {
-      return null;
-    }
-  }
-  /* HANDOVER TICK: the dolly band is spent, so the twin hands the frame to the
-   * map on THIS tick (one close post — the parent mounts the zoom-keyed
-   * retrace dissolve at the live zoom, where the shared S law reads 1, so the
-   * overlay's opacity is continuous) and every later tick lands on the map
-   * canvas. Idempotent: a second call never re-posts. */
-  function handBackToMap() {
-    try {
-      if (handoff.closePosted) return true;
-      postTwinClose();
-      handoff.scrub = null;
-      try { window.__ring2handover = { at: handoffNow(), range: +(+rangeNow() || 0).toFixed(1) }; } catch { /* probe cosmetic */ }
-      return true;
-    } catch {
-      return false;
-    }
-  }
+  /* LANE-REV retired: the mid-walk gate handover (gate-range band end +
+   * handover poster) is gone with the consume-forever block below. The
+   * reverse is owned end-to-end by the scrub walk on the shared forward
+   * legs; the single close posts at the walk end (finishScrubReverse),
+   * never mid-walk. */
   function twinFlipToOrbit(e) {
     // Fail-open: no canvas, bad delta, or unclonable event => native runs.
     try {
@@ -1989,28 +1993,25 @@ async function boot() {
       // flipping a pinch clone would convert it into a plain dolly.
       if (pinch && handoff.phase !== 'done') return;
       if (handoff.phase === 'done') {
-        /* THE HANDOVER BAND (LANE-GESTURE): once the staged overlay is up, the
-         * twin owns the wheel for as long as it has a pose of its own to move.
-         * The parent map streams no camera, so its pose stays parked on the
-         * frame the handoff handed it — which is exactly why the way back walks
-         * the twin TO that same pose before handing the frame over: the two
-         * sides can never disagree at the switch. Two movements, in the order
-         * the forward journey made them, mirrored:
+        /* THE WAY BACK (LANE-REV): once the staged overlay is up, outward
+         * wheels enter the scrub reverse on the SHARED forward legs and walk
+         * them to progress 1 — entry pose == live pose (no snap), walk end ==
+         * gate pose, and finishScrubReverse posts the single close there.
+         * Forward and reverse, mirrored:
          *
          *   forward: map zoom law -> S dissolve at the gate -> twin dolly in
-         *   reverse: twin dolly out -> gate -> map zoom law + S dissolve out
+         *   reverse: twin scrub walk out -> gate -> map zoom law + S dissolve out
          *
-         * Each tick has exactly ONE owner and moves: inward/outward inside the
-         * dolly band runs the shared wheel-zoom law (the same step the map ran
-         * on the other side — OrbitControls' own dolly is a fixed RATIO per
-         * notch, measured a 2-3x speed cliff at the seam); the tick that
-         * reaches the pose the flight ENDED on hands the frame to the map
-         * (one close post: the parent mounts its retrace dissolve at the live
-         * zoom, where the shared S law reads 1 — nothing to snap). Measured
-         * before this: 8 inward ticks at half speed with the map frozen 0.71
-         * zoom behind, then the first outward tick snapped that 0.71 back.
-         * Pinch stays native (its zoom belongs to OrbitControls); only at the
-         * clamp does accumulated outward pinch delta cross in, pose-native. */
+         * Each tick has exactly ONE owner and moves: inward runs the shared
+         * wheel-zoom dolly law (the same step the map ran on the other side —
+         * OrbitControls' own dolly is a fixed RATIO per notch, measured a
+         * 2-3x speed cliff at the seam); outward enters/walks the scrub, and
+         * the close posts once at the walk end. The old gate-tick handover
+         * posted the close mid-walk and then consumed every later outward
+         * tick (closePosted gate shut the scrub entry) — the reverse
+         * dead-ended with the frame still up. Pinch stays native (its zoom
+         * belongs to OrbitControls); only at the clamp does accumulated
+         * outward pinch delta cross in, pose-native. */
         if (dY >= 0) {
           handoff.entryAccum = 0;
           if (!pinch && dollyByWheelLaw(e, dY)) {
@@ -2032,33 +2033,14 @@ async function boot() {
           return; // entered on pinch: pose stays native, wheel owns it from here
         }
         handoff.entryAccum = 0;
-        /* THE WAY BACK IS THE WAY IN, reversed. While the twin's pose is still
-         * DEEPER than the gate the outward tick keeps dollying by the same law
-         * (clamped to the gate, so it can never overshoot the frame the map is
-         * pinned to); the tick that lands on the gate hands the frame over in
-         * that same tick — every tick moved, one owner per tick, no jump.
-         * Measured before this: 1 tick snapping 0.71 zoom, then 3 dead ticks,
-         * then 1 tick swallowed by the iframe teardown. */
-        const holdR = holdRangeNow();
-        const liveR = rangeNow();
-        if (Number.isFinite(holdR) && Number.isFinite(liveR)
-          && liveR < holdR * (1 - DOLLY_BAND_EPS)) {
-          if (dollyByWheelLaw(e, dY, holdR)) {
-            // Landed on the gate (same threshold the band test uses)? Hand
-            // over ON this tick, so the tick that arrives at the gate is the
-            // twin's LAST and the next one is already the map's.
-            const nowR = rangeNow();
-            if (!(Number.isFinite(nowR) && nowR < holdR * (1 - DOLLY_BAND_EPS))) handBackToMap();
-            try { e.preventDefault(); } catch { /* consume is best-effort */ }
-            try { e.stopPropagation(); } catch { /* consume is best-effort */ }
-            return;
-          }
-        }
-        if (handBackToMap()) {
-          try { e.preventDefault(); } catch { /* consume is best-effort */ }
-          try { e.stopPropagation(); } catch { /* consume is best-effort */ }
-          return;
-        }
+        /* LANE-REV: the whole way back is the scrub walk on the shared legs.
+         * Entry pose == live pose, so progress 0 paints nothing to snap;
+         * walking to progress 1 lands the gate pose and finishScrubReverse
+         * posts the single close. No mid-walk handover: the old gate tick
+         * posted the close while the twin still owned the frame, and its
+         * idempotent re-post then consumed every later outward tick while
+         * the scrub entry stayed shut on closePosted — the reverse
+         * dead-ended with the frame still up. */
         if (!enterScrubReverse()) { twinFlipToOrbit(e); return; }
         if (handoff.phase !== 'reverse' || !handoff.scrub?.active) { twinFlipToOrbit(e); return; }
       } else if (handoff.phase === 'reverse' && !handoff.scrub?.active) {

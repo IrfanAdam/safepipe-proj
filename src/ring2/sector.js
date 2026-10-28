@@ -185,9 +185,35 @@ export function poseAtRangePure(pose, range) {
     const L = Math.hypot(dx, dy, dz);
     if (!(L > 0)) return pose;
     const k = range / L;
-    return { eye: { x: t.x + dx * k, y: (t.y ?? 0) + dy * k, z: t.z + dz * k }, target: { ...t } };
+    // Carry every non-pose field (mix, legIndex, t, ...) across the rescale:
+    // the staged forward tick drives mix from the RESCALED pose every frame,
+    // and a dropped mix read as undefined -> Math.round -> NaN -> the
+    // clampMix non-finite fallback (50), pinning the dissolve mid-fade.
+    return { ...pose, eye: { x: t.x + dx * k, y: (t.y ?? 0) + dy * k, z: t.z + dz * k }, target: { ...t } };
   } catch {
     return pose;
+  }
+}
+
+/* CAMERA-WRITE FINGERPRINT (write-dedupe, stutter). The hold pin and the
+ * flight pose writers re-issue absolute camera poses every frame; at rest
+ * (no new staged post, settled progress, steady viewport) the commanded
+ * pose is bit-identical, so re-writing it only re-runs controls + damping
+ * against itself — the per-tick fight that reads as stutter. The writers
+ * skip the write when this fingerprint matches the last one they applied.
+ * Exact float rendering (no epsilon): the inputs are deterministic functions
+ * of (S, posts, viewport), so identical inputs render identically and any
+ * real change — however small — renders differently and still writes. Null
+ * when either end is unreadable (caller writes through, never skips blind).
+ * Pure + node-checkable. */
+export function poseWriteFp(eye, target) {
+  try {
+    if (!eye || !target) return null;
+    const vs = [eye.x, eye.y, eye.z, target.x, target.y, target.z];
+    if (vs.some((v) => typeof v !== 'number' || !Number.isFinite(v))) return null;
+    return vs.map((v) => String(v)).join('|');
+  } catch {
+    return null;
   }
 }
 

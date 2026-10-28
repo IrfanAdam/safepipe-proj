@@ -1,6 +1,7 @@
 // tests/map-intent-precache.test.js — lane intent-precache: the twin boots
-// + arrival tiles warm at lock intent (the mask arm: near && blend>0, first
-// true just past Z_CENTER — pre-iso, center-predictable), NOT at the gate.
+// + arrival tiles warm at lock intent (the mask arm: near-or-in-view &&
+// blend>0, first true just past Z_CENTER — pre-iso, center-predictable),
+// NOT at the gate.
 // Guards: the intent block names no opener (no flyToSectorThenTwin /
 // prewarmThenReveal / openTwin), flips no twin state, and re-arms when
 // intent drops; the in-band takeover boot stays a backstop.
@@ -24,7 +25,7 @@ function intentBlock() {
 
 test('intent boots the twin + warms arrival tiles at the mask arm', () => {
   const block = intentBlock();
-  assert.ok(block.includes('prox && prox.near && blend > 0'), 'the lock-intent signal is the mask arm (near && blend>0)');
+  assert.ok(block.includes('prox && (prox.near || prox.inView) && blend > 0'), 'the lock-intent signal is the mask arm (near-or-in-view && blend>0)');
   assert.ok(block.includes('earlyBootTwin()'), 'lock intent boots the twin iframe early');
   for (const z of ['9', '10', '11']) {
     assert.ok(block.includes(`prefetchSatTiles(SITE_LNGLAT, ${z})`), `lock intent warms the arrival-level site tiles (z${z})`);
@@ -47,14 +48,14 @@ test('intent re-arms when intent drops; the takeover boot stays a backstop', () 
   const block = intentBlock();
   assert.ok(block.includes('intentWarmed = false'), 'lost intent re-arms the per-dive warm for the next dive');
   const main = srcOf('../src/map/main.js');
-  assert.ok(main.includes('// Round-10 dive-start prewarm: first aimed engagement boots the twin'), 'the in-band dive-start boot stays as the backstop');
+  assert.ok(main.includes('// Round-10 dive-start prewarm: first armed (near or in-view) engagement'), 'the in-band dive-start boot stays as the backstop');
 });
 
 test('the early-boot abort keys off intent-loss, not the old z-band', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(
-    main.includes('!(prox && prox.near && blend > 0)) {'),
-    'the armed-boot abort fires on intent-loss (the same near && blend>0 predicate)',
+    main.includes('!(prox && (prox.near || prox.inView) && blend > 0)) {'),
+    'the armed-boot abort fires on intent-loss (the same near-or-in-view && blend>0 predicate)',
   );
   assert.ok(
     !main.includes('!pendingReveal && z < Z_ISO_START - 1'),

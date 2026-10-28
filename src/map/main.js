@@ -45,6 +45,7 @@ import {
   flipWheelDelta,
   wheelZoomRate,
   lockAroundPoint,
+  siteInView,
   maskGainForBlend,
   pitchTargetForZoom,
   metersPerPixel,
@@ -1388,10 +1389,12 @@ function smooth01(t) {
 }
 /** Mask arm (the single zoom-anchor gate): true exactly when the enclosing
  * mask is up — the live zoom is past Z_CENTER (shared blend > 0) AND the
- * hotspot reads near, with no twin owning the frame. This is the same
- * predicate as the vignette write below (near && blend > 0 under !twinOpen),
- * so center-anchored zoom starts on the exact tick the mask appears and
- * cursor-anchored zoom runs only while the mask is down. Busy flags are
+ * hotspot reads near OR in view (siteInView: the site projects inside the
+ * viewport, cursor or no cursor), with no twin owning the frame. This is
+ * the same predicate as the vignette write below (near/in-view && blend > 0
+ * under !twinOpen), so center-anchored zoom starts on the exact tick the
+ * mask appears and cursor-anchored zoom runs only while the mask is down.
+ * Busy flags are
  * deliberately NOT consulted: the mask stays up through recede/prewarm, and
  * the anchor must follow the mask, not the lock. Replaces lockEngaged. */
 function maskArmed() {
@@ -1400,7 +1403,7 @@ function maskArmed() {
     const z = +mapRef.getZoom();
     if (!Number.isFinite(z) || centerBlendForZoom(z) <= 0) return false;
     const prox = proximityInfo();
-    return !!(prox && prox.near);
+    return !!((prox && (prox.near || prox.inView)));
   } catch { return false; }
 }
 /** Proximity read: hotspot screen px vs cursor + vs canvas center.
@@ -1435,11 +1438,19 @@ function proximityInfo() {
       } catch { /* cursor math is best-effort */ }
     }
     const centerNear = distCenter <= PROX_CENTER_PX;
+    // In-view arm: the site projects inside the viewport (with the near
+    // radius as margin, so the arm region is continuous with near) whether
+    // or not the cursor sits on it. Gated by the caller on blend > 0 like
+    // near is; off-screen sites never arm.
+    let inView = false;
+    try {
+      inView = siteInView(pt.x, pt.y, box.w, box.h, PROX_CURSOR_PX);
+    } catch { inView = false; }
     const out = {
       sx: Math.round(pt.x), sy: Math.round(pt.y),
       distCursor: distCursor == null ? null : +distCursor.toFixed(1),
       distCenter: +distCenter.toFixed(1),
-      cursorNear, centerNear, near: cursorNear || centerNear,
+      cursorNear, centerNear, near: cursorNear || centerNear, inView,
     };
     // Memoised for the rest of THIS pass only: the driver, the ring clip and
     // the staged hold ask the same question about the same camera. Reads
@@ -1947,7 +1958,10 @@ function onNativeZoomStep(snap, source) {
       // takes the frame.
       let proxUse = prox;
       try {
-        if (prox.near && blend > 0) {
+        // Lock when near OR in view: the cursor sitting elsewhere must not
+        // veto the glide — an in-view site arms the same settle, so it
+        // centres early instead of drifting out under a cursor anchor.
+        if ((prox.near || prox.inView) && blend > 0) {
           noteCenterArm(prox, z);
           if (applyCenterSettle(z)) {
             frameProxCache = null; // the pass memo predates the camera jump
@@ -1965,8 +1979,10 @@ function onNativeZoomStep(snap, source) {
         // the corner law 100x (measured 21000px radii) — invisible while the
         // wash is off, but a stale giant the moment anything re-arms it. The
         // arrival path still writes true off-centre sizes directly (its clamp
-        // must not depend on nearness); the driver only tracks nearness.
-        if (proxUse.near) {
+        // must not depend on nearness); the driver only tracks the lock
+        // (near or in view — an in-view site is locking, so the ring tracks
+        // it instead of parking).
+        if (proxUse.near || proxUse.inView) {
           if (!writeEnclosureEllipse(proxUse, z)) parkEnclosureEllipse();
         } else {
           parkEnclosureEllipse();
@@ -1978,9 +1994,9 @@ function onNativeZoomStep(snap, source) {
       // parks seconds before a timer-fired twin. Radii/park writes above
       // still run (the staged entry caches them); maskArmed below is
       // untouched (telemetry still reads the arm predicate).
-      if (!transitId) showVignette(proxUse.near && blend > 0);
+      if (!transitId) showVignette((proxUse.near || proxUse.inView) && blend > 0);
       try {
-        window.__mapProbe.maskArmed = !!(proxUse.near && blend > 0);
+        window.__mapProbe.maskArmed = !!((proxUse.near || proxUse.inView) && blend > 0);
       } catch { /* probe cosmetic */ }
     } else {
       // The twin owns the frame: the settle arm dies with it, so a close at
@@ -2028,8 +2044,10 @@ function onNativeZoomStep(snap, source) {
     // warm shell via retarget — no reload).
     // Runs on every zoom tick (native + takeover-driven), so the
     // in-band takeover call below stays a backstop, never the first boot.
+    // Near or in view: an in-view dive is a dive — it needs the warm shell
+    // at the gate exactly like a near one.
     try {
-      if (prox && prox.near && blend > 0) {
+      if (prox && (prox.near || prox.inView) && blend > 0) {
         if (!twinOpen && !transitId && !pendingReveal && !stagedActive && !earlyTwinArmed) {
           try {
             earlyBootTwin();
@@ -2060,7 +2078,7 @@ function onNativeZoomStep(snap, source) {
     // would trip the twin's painted deep-release pre-arm
     // (see progressiveRetargetDue).
     try {
-      if (prox && prox.near && !twinOpen && !transitId && !pendingReveal && !stagedActive) {
+      if (prox && (prox.near || prox.inView) && !twinOpen && !transitId && !pendingReveal && !stagedActive) {
         if (progressiveRetargetDue({ z, lastZ: lastRetargetZ, lastT: lastRetargetT, nowT: nowMs() })) {
           try {
             const h3 = h3map[siteSector];
@@ -2394,24 +2412,25 @@ function onNativeZoomStep(snap, source) {
     // arrival aborts here — frame blanked, overlay re-hidden, map untouched.
     // INTENT-PRECACHE: the boot now arms at the mask arm (z>Z_CENTER, below
     // the old band floor), so the abort keys off intent-loss — the same
-    // near && blend>0 predicate — instead of the z-band. Retreating below
-    // the mask or drifting off-site aborts; holding intent keeps the boot
-    // through the whole pre-iso climb the old floor would have killed.
-    if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && !(prox && prox.near && blend > 0)) {
+    // near-or-in-view && blend>0 predicate — instead of the z-band.
+    // Retreating below the mask or drifting off-site aborts; holding intent
+    // keeps the boot through the whole pre-iso climb the old floor would
+    // have killed.
+    if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && !(prox && (prox.near || prox.inView) && blend > 0)) {
       try {
         abortEarlyBootTwin();
       } catch { /* abort is best-effort */ }
     }
     // INTENT-LOCK: the hotspot lock engages at intent (the mask arm,
-    // near && blend>0, first true just past Z_CENTER) — not at the late
-    // staged arm. Snapshot-only freeze (seat=false): the SITE anchor is
-    // recorded and pan inputs lock, but the center is NOT seated — the
+    // near-or-in-view && blend>0, first true just past Z_CENTER) — not at
+    // the late staged arm. Snapshot-only freeze (seat=false): the SITE anchor
+    // is recorded and pan inputs lock, but the center is NOT seated — the
     // phantom/correctTo writers are already gliding it and seating a fresh
     // ~175px drift here would snap. The staged arm re-freezes with seat=true
     // once drift is ~0. Intent loss releases (same predicate as the boot
     // abort above) so pan restores the moment the journey is abandoned;
     // Esc/close/commit/unwind release through the existing unfreeze sites.
-    if (!twinOpen && !transitId && !stagedActive && prox && prox.near && blend > 0) {
+    if (!twinOpen && !transitId && !stagedActive && prox && (prox.near || prox.inView) && blend > 0) {
       if (!stagedFrozen) {
         try {
           freezeStagedFrame(false);
@@ -5820,16 +5839,17 @@ function installBandTakeover() {
       if (z < Z_TAKEOVER_FLOOR || z > Z_HANDOFF + 0.5) return;
       let prox = null;
       try { prox = proximityInfo(); } catch { prox = null; }
-      // Aimed (hotspot near cursor/center) OR already journeying (the scrub
-      // engaged): below the band the law is flat so native is exact there;
-      // inside the band an engaged journey must stay single-writer even when
-      // the projection drifts off the cursor.
+      // Aimed (hotspot near cursor/center), in view (the site projects
+      // inside the frame, cursor or no cursor) OR already journeying (the
+      // scrub engaged): below the band the law is flat so native is exact
+      // there; inside the band an engaged journey must stay single-writer
+      // even when the projection drifts off the cursor.
       let journeying = false;
       try { journeying = isoScrubOwned || isoRestoreDue || scrubProgress > 0; } catch { journeying = false; }
-      if (!prox || !(prox.near || (z >= Z_ISO_START && journeying))) return;
-      // Round-10 dive-start prewarm: first aimed engagement boots the twin
-      // iframe early (once per dive — guarded inside). No state flips.
-      if (prox && prox.near) {
+      if (!prox || !(prox.near || prox.inView || (z >= Z_ISO_START && journeying))) return;
+      // Round-10 dive-start prewarm: first armed (near or in-view) engagement
+      // boots the twin iframe early (once per dive — guarded inside). No state flips.
+      if (prox && (prox.near || prox.inView)) {
         try {
           earlyBootTwin();
         } catch { /* prewarm never breaks input */ }
@@ -5885,7 +5905,8 @@ function installBandTakeover() {
       // re-anchors and would void it).
       let correctTo = null;
       let cBlend = 0;
-      if (prox && prox.near) {
+      // Near OR in view: a cursor parked elsewhere must not veto the glide.
+      if (prox && (prox.near || prox.inView)) {
         try {
           const b = centerBlendForZoom(z);
           if (Number.isFinite(b) && b > 0) {
@@ -5906,14 +5927,7 @@ function installBandTakeover() {
       // the cursor anchor — zoom-out ticks hold the live center instead, so
       // framing never pans around the cursor after the mask appears. Mask
       // down keeps the cursor anchor (finger-owned framing, park-safe).
-      const maskNow = centerBlendForZoom(z) > 0 && !!(prox && prox.near);
-      // Staged band: the twin is built on SITE, so every tick of the band has to
-      // write the same centre or the dissolve exposes the cursor anchor as a
-      // boresight offset (measured 169 m E / 82 m S, +8.3/+2.5 px at the commit).
-      // SITE is already the settle law's value past CENTER_SETTLE_SPAN_Z, so this
-      // only removes the drift — it never fights the law or adds a constant.
-      const stagedHold = stagedActive && !stagedCommitted;
-      if (stagedHold) correctTo = { lng: SITE_LNGLAT[0], lat: SITE_LNGLAT[1] };
+      const maskNow = centerBlendForZoom(z) > 0 && !!(prox && (prox.near || prox.inView));
       let holdCenter = null;
       if (maskNow && !correctTo) {
         try {
@@ -5957,10 +5971,11 @@ function installBandTakeover() {
 // the native event is left alone.
 //
 // Journey lock: while maskArmed() holds (the enclosing mask is up — live
-// zoom past Z_CENTER with the hotspot near), the clone carries a phantom
-// zoom anchor — beyond the spot when zooming in, canvas center when zooming
-// out — so the NATIVE handler glides the spot to center itself. No custom
-// animation exists to stutter. Mask down keeps the user's cursor anchor.
+// zoom past Z_CENTER with the hotspot near or in view), the clone carries
+// the canvas-center anchor in both directions, so the NATIVE handler holds
+// the frame while the settle law (takeover correctTo / driver jumpTo) owns
+// the glide. No custom animation exists to stutter. Mask down keeps the
+// user's cursor anchor.
 // ctx = { map, maskArmed } (optional; without it this is flip-only).
 function installWheelFlip(rootEl, laneEl, ctx) {
   if (!rootEl || !laneEl || rootEl.__wheelFlipInstalled) return;

@@ -98,20 +98,19 @@ test('way in: the twin moves by the shared law, the gate clamp is released at co
   );
 });
 
-test('way back: every outward tick moves until the gate, then one handover tick', () => {
+test('way back: outward enters the scrub walk, the close posts once at the walk end', () => {
   const t = twinMain();
-  assert.ok(t.includes('const holdR = holdRangeNow();'), 'the band end is derived from the shared law (no constant)');
-  // The band end is the GATE frame, not the scrub entry: the frozen leg's p=1
-  // pose sits 1.6x farther out (39.6 km vs 24.8 km), which let the outward
-  // dolly run three ticks past the gate and snap back 0.53 zoom on handover.
-  const hold = t.slice(t.indexOf('function holdRangeNow('), t.indexOf('function handBackToMap('));
-  assert.ok(hold.includes('frameRange(zNow'), 'the band end is the map gate frame law');
-  assert.ok(hold.includes('handoff.fwdStagedZ'), 'read at the committed staged zoom');
-  assert.ok(!hold.includes("poseForScrubProgress(handoff.fwd?.legs, 1)"), 'never the scrub entry pose');
-  assert.ok(t.includes('liveR < holdR * (1 - DOLLY_BAND_EPS)'), 'deeper than the gate still dollies');
-  assert.ok(t.includes('if (dollyByWheelLaw(e, dY, holdR)) {'), 'the outward dolly clamps to the gate: no overshoot');
-  assert.ok(t.includes('if (handBackToMap()) {'), 'the gate tick hands the frame to the map on that same tick');
-  assert.ok(t.includes('if (!enterScrubReverse()) { twinFlipToOrbit(e); return; }'), 'the staged-leg walk survives as the fallback only');
+  // LANE-REV: the gate-tick handover is gone — no mid-walk close, no
+  // consume-forever idempotent re-post. The whole way back is the scrub walk.
+  assert.ok(!t.includes('function holdRangeNow('), 'no gate-range band end (the dolly band is gone)');
+  assert.ok(!t.includes('function handBackToMap('), 'no handover poster (the close no longer fires mid-walk)');
+  assert.ok(!t.includes('if (handBackToMap()) {'), 'no consume-forever block swallows post-gate outward ticks');
+  assert.ok(!t.includes('liveR < holdR * (1 - DOLLY_BAND_EPS)'), 'no deeper-than-gate dolly branch');
+  assert.ok(t.includes('if (!enterScrubReverse()) { twinFlipToOrbit(e); return; }'), 'the first outward wheel enters the scrub reverse (orbit is the fallback, not the default)');
+  // The single close lives at the walk end only.
+  const fin = t.slice(t.indexOf('function finishScrubReverse()'), t.indexOf('/* Task-36 staged forward driver'));
+  assert.ok(fin.includes('postTwinClose();'), 'the walk end posts the close');
+  assert.ok(fin.includes('handoff.scrub = null;'), 'the walk end releases the scrub');
 });
 
 test('one close post: the dissolve is never cut by a duplicate protocol message', () => {
@@ -138,17 +137,17 @@ test('the retrace dissolve starts at the gate and holds 1 there (no re-open on t
 
 /* ---------- the reverse is one law, and the count is pinned ---------- */
 
-test('retrace legs are pinned: ONE law on the map side, no stage walk on the wheel path', () => {
+test('retrace legs are pinned: ONE law on the map side, scrub-owned wheel path', () => {
   const m = mapMain();
   assert.ok(m.includes('window.__mapProbe.retraceLegs = 1;'), 'the map reverse is a single zoom-keyed law');
   const t = twinMain();
-  // The wheel-path handover must post the close WITHOUT touching the staged
-  // scrub: a re-added stage boundary (a leg list to replay) fails loudly here.
-  const hand = t.slice(t.indexOf('function handBackToMap()'), t.indexOf('function twinFlipToOrbit('));
-  assert.ok(!hand.includes('handoff.fwd'), 'the handover replay reads no leg list');
-  assert.ok(!hand.includes('scrubProgressForWheel'), 'and advances no scrub progress');
-  assert.ok(hand.includes('postTwinClose();'), 'it is one message: hand the frame over');
-  // The staged-leg counter still exists for the pinch/defensive entry, so the
+  // LANE-REV: the wheel-path reverse IS the staged scrub on the shared legs
+  // (no handover replay, no gate tick) — a re-added mid-walk close fails loudly here.
+  assert.ok(!t.includes('handBackToMap'), 'no handover call remains on the wheel path');
+  assert.ok(!t.includes('scrubProgressForWalk(handoff'), 'no live-progress walk takeover');
+  assert.ok(t.includes('poseForScrubProgress(handoff.fwd?.legs, 1 - sc.progress)'),
+    'the wheel paint path mirrors on the same shared legs');
+  // The staged-leg counter still exists on the scrub entry, so the
   // shared-legs law cannot silently disappear.
   assert.ok(t.includes('window.__ring2retraceLegs = legs.length;'), 'the legs law is still counted when it IS used');
 });

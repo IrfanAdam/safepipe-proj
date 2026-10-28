@@ -172,18 +172,26 @@ test('the map writers ride the one law: arm on the mask edge, apply before the r
     'the pass re-reads proximity after the jump (no stale ring centre)');
   // The takeover carries the same law synchronously on its tick.
   assert.ok(main.includes('const t = centerSettleTargetFor(target);'), 'the band takeover carries the law');
-  // The staged band writes SITE every tick: the twin is built on SITE, so a
-  // cursor anchor inside the band is a measured boresight drift
-  // (169 m E / 82 m S = +8.3/+2.5 px at the commit).
+  // No second centre writer in the band: the d91b5f0 stagedHold SITE pin was
+  // dead code (installBandTakeover returns on stagedActive before reaching
+  // it), and a per-tick jumpTo there killed the native zoom ease (measured
+  // limit cycle z 10.511<->10.663). The freeze seat + the settle law own the
+  // band centre; the takeover carries exactly one of them per tick.
   const takeover = main.slice(main.indexOf('function installBandTakeover('), main.indexOf('function installWheelFlip('));
-  assert.ok(takeover.includes('const stagedHold = stagedActive && !stagedCommitted;'),
-    'the staged band holds one centre for its whole run');
-  assert.ok(takeover.includes('if (stagedHold) correctTo = { lng: SITE_LNGLAT[0], lat: SITE_LNGLAT[1] };'),
-    'the hold pins the twin anchor, never the cursor anchor');
+  assert.ok(!takeover.includes('stagedHold'), 'no stagedHold second writer in the takeover');
+  assert.ok(takeover.includes('if (correctTo) opts.center = correctTo;'), 'the takeover writes the law centre when it has one');
+  assert.ok(takeover.includes('else if (holdCenter) opts.center = holdCenter;'), 'otherwise it holds the live centre under the mask');
+  assert.ok(takeover.includes('else if (around) opts.around = around;'), 'otherwise it keeps the finger anchor — exactly one centre source per tick');
+  // The lock engages when the site is in view, not only when the cursor
+  // sits on it: a parked cursor must never veto the glide (measured: the
+  // site drifted 176px -> 992px off-centre and out of the frame in 6 ticks).
+  assert.ok(takeover.includes('prox.near || prox.inView'), 'the band takeover claims in-view ticks, not just near ones');
+  assert.ok(main.includes('siteInView(pt.x, pt.y, box.w, box.h, PROX_CURSOR_PX)'),
+    'in-view arms on the projection with the near radius as margin (no new constant)');
   // Flights keep the camera: the law must never steer a programmatic flight.
   const apply = main.slice(main.indexOf('function applyCenterSettle('), main.indexOf('function updateRingClip('));
   assert.ok(apply.includes('transitId'), 'flights are exempt from the settle');
-  assert.ok(apply.includes('stagedActive'), 'the staged hold keeps its own SITE pin');
+  assert.ok(apply.includes('stagedActive'), 'the staged hold keeps the freeze seat (no settle steering mid-hold)');
   // The flip anchors the native zoom on the canvas centre while armed — the
   // law owns the pan, so a beyond-spot phantom would fight it tick by tick.
   const flip = main.slice(main.indexOf('function installWheelFlip('), main.indexOf('function installAnchorGuard('));
