@@ -34,11 +34,7 @@ import { sampleH, sampleSource, onStatus, getStatus } from './field.js';
 import { DRAPE_LIFTS, RIM_FADE_IN, RIM_TILT_GAIN } from './drape.js';
 import { ringRevealForProgress, TWIN_CONTENT_SAMPLE_N, TWIN_CONTENT_MID_DIV, TWIN_RGBA_STRIDE, TWIN_PIXEL_FIRST, TWIN_PIXEL_STEP, twinContentFromRgba } from './sector.js';
 import { TIER } from './facilities/dims.js';
-import { srgb255ToLinear, meanIrradiance, deriveGroundPalette, appliedGroundPalette, getPhotoTone, onPhotoTone, ALBEDO_MAX } from './tone.js';
-import {
-  detailWavelengths, fieldStats, solveDetailAmplitude,
-  groundDetailVertexPars, groundDetailFragmentPars, groundDetailFragmentBody,
-} from './ground-detail.js';
+import { srgb255ToLinear, meanIrradiance, deriveGroundPalette, appliedGroundPalette, getPhotoTone, onPhotoTone } from './tone.js';
 
 /* REF GATE 2: every overlay renderable carries userData.tier. All overlay
  * geometry is computed from the real field/site constants (mapped radius,
@@ -1111,39 +1107,10 @@ function edgeFade(x, z) {
       groundTone = { derived: false, applied: false, photo: null, palette: null };
     }
 
-    /* SEAM DETAIL (Phase-03 rev): the tone law lands the MEAN, which leaves
-     * the ground a smooth albedo where the photo had texture — measured, the
-     * dissolve endpoint kept the photo's tone to ~6% but only ~6% of its
-     * LOCAL contrast (lap 1.23 vs 20.25 over the same disc), which is the
-     * owner's "washed flat film". This solves a ZERO-MEAN albedo modulation
-     * whose amplitude comes from the photo's own measured high-pass
-     * (tone.js photoStats.detailSd), so the mean is untouched by construction
-     * — detail, never brightness. No sample, no detail: the solve returns
-     * null and the ground stays flat rather than inventing grain.
-     * [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03] */
-    let groundDetail = null;
-    try {
-      const wavelengths = detailWavelengths(RING_RADIUS_M);
-      const seed = [SANGACHAL.lon, SANGACHAL.lat];
-      // Statistics of the COMPOSED field (warp + ridged octaves), measured —
-      // not assumed: the ridging gives the field a real positive mean, which
-      // the shader subtracts so the modulation stays zero-mean.
-      const stats = fieldStats({ discR: RING_RADIUS_M, seed });
-      const solved = solveDetailAmplitude({
-        photo: getPhotoTone(),
-        palette,
-        irr,
-        weights: bandCount,
-        sigmaN: stats?.sigma,
-        albedoMax: ALBEDO_MAX,
-      });
-      if (wavelengths && solved && solved.amp > 0) {
-        groundDetail = { ...solved, wavelengths, seed, mean: stats?.mean ?? 0 };
-        if (groundTone) groundTone.detail = groundDetail;
-      }
-    } catch {
-      groundDetail = null;
-    }
+    /* Owner verdict 2026-10-28: the procedural detail modulation read as milky
+     * fade blotches over the terrain (screenshot: cloudy mottling at slider~twin,
+     * explicitly rejected — no fade stuff). Removed: the ground stays the
+     * solved tone palette, flat. See ground-detail.js deletion note. */
 
     const cSea = new THREE.Color(palette.sea[0], palette.sea[1], palette.sea[2]);
     const cLow = new THREE.Color(palette.low[0], palette.low[1], palette.low[2]);
@@ -1163,31 +1130,6 @@ function edgeFade(x, z) {
       vertexColors: true, transparent: true, opacity: 0,
       depthWrite: false, side: THREE.DoubleSide,
     }));
-    /* Detail rides the ALBEDO only: `diffuseColor.rgb *=` a zero-mean field,
-     * `diffuseColor.a` untouched — the ground's alpha is still the single
-     * property that owns the crossfade (mix.js law). World-anchored (world xz
-     * in, not a screen uv), so nothing crawls when the camera moves, and every
-     * octave is band-limited by fwidth in the fragment. */
-    if (groundDetail) {
-      const d = groundDetail;
-      groundMat.onBeforeCompile = (sh) => {
-        sh.uniforms.uGdAmp = { value: d.amp };
-        sh.uniforms.uGdSigmaN = { value: d.sigmaN };
-        sh.uniforms.uGdMean = { value: d.mean };
-        sh.uniforms.uGdSeed = { value: new THREE.Vector2(d.seed[0], d.seed[1]) };
-        sh.uniforms.uGdLam = { value: new THREE.Vector4(d.wavelengths[0], d.wavelengths[1], d.wavelengths[2], d.wavelengths[3]) };
-        sh.vertexShader = groundDetailVertexPars() + '\n' + sh.vertexShader.replace(
-          '#include <begin_vertex>',
-          '#include <begin_vertex>\n vGdP = (modelMatrix * vec4(position, 1.0)).xz;',
-        );
-        sh.fragmentShader = groundDetailFragmentPars() + '\n' + sh.fragmentShader.replace(
-          '#include <color_fragment>',
-          '#include <color_fragment>\n' + groundDetailFragmentBody(),
-        );
-      };
-      groundMat.customProgramCacheKey = () => 'ring2-ground-detail';
-      groundMat.needsUpdate = true;
-    }
     groundMesh = tagDerived(new THREE.Mesh(g, groundMat));
     groundMesh.name = 'ring2-ground';
     groundMesh.renderOrder = -5;
@@ -1567,17 +1509,6 @@ function edgeFade(x, z) {
       delta: groundTone.delta ?? null,
       meanDotNL: groundTone.irr?.meanDotNL ?? null,
       photo: groundTone.photo ?? null,
-      // SEAM DETAIL: the solved albedo modulation (amp), the photo's measured
-      // high-pass it was solved against, and whether headroom clamped it.
-      detail: groundTone.detail ? {
-        amp: groundTone.detail.amp,
-        targetDetailSd: groundTone.detail.targetDetailSd,
-        predictedDetailSd: groundTone.detail.predictedDetailSd,
-        sigmaN: groundTone.detail.sigmaN,
-        mean: groundTone.detail.mean,
-        wavelengths: groundTone.detail.wavelengths,
-        capped: groundTone.detail.capped,
-      } : null,
     } : null),
     getInfo: () => ({ ...(lastInfo ?? {}), takeoverU: lastU, status: getStatus(), pills: getPillState() }),
   };
