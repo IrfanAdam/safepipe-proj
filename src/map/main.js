@@ -1265,7 +1265,6 @@ function refreshStallLoading() {
 // Task-37 staged-S producer: last S value posted to the twin frame
 // (postTwinStagedS throttles to value-change; null = nothing posted yet).
 let lastPostedStagedS = null;
-let lastStagedPostT = 0; // 60ms min interval alongside the value-change check: wheel bursts post dozens per frame otherwise
 let cachedVectorStyle = null;
 let recedeStartT = 0;
 let lastCursor = null; // {x,y} client px, passive mousemove only
@@ -3083,17 +3082,19 @@ function unfreezeStagedFrame() {
  * (lastPostedStagedS); mirrors the postTwinReverseRequest pattern
  * (contentWindow + '*' — same-origin iframe). The twin consumes it through
  * its existing staged listener; with no twin/no frame this is a silent
- * no-op and autoplay still owns the intro. Never throws. */
-function postTwinStagedS() {
+ * no-op and autoplay still owns the intro. Never throws.
+ * PACING (forward smoothness): delivery is rAF-coalesced — a burst schedules
+ * at most one post per frame and the flush reads the LIVE S, so the twin
+ * tracks the fingers at frame rate (the old 60ms floor applied the band in
+ * ~0.13-progress jumps at 16Hz while the overlay glided per tick). Laws,
+ * predicates, endpoints, and the value-change throttle are untouched. */
+let stagedPostQueued = false; // a flush is scheduled — it reads the live S, so later ticks just join it
+function flushTwinStagedS() {
+  stagedPostQueued = false;
   try {
     if (!stagedActive || stagedCommitted) return false;
     const s = Math.max(0, +stagedS || 0);
     if (lastPostedStagedS !== null && s === lastPostedStagedS) return false;
-    let nowPost = 0;
-    try {
-      nowPost = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-    } catch { nowPost = Date.now(); }
-    if (nowPost - lastStagedPostT < 60) return false;
     const fr = overlayEls && overlayEls.frame;
     if (!fr || fr.getAttribute('data-url') === 'about:blank') return false;
     const win = fr.contentWindow;
@@ -3105,10 +3106,25 @@ function postTwinStagedS() {
     try { zPost = mapRef ? +mapRef.getZoom() : null; } catch { zPost = null; }
     win.postMessage(buildTwinStagedMessage(s, zPost), '*');
     lastPostedStagedS = s;
-    lastStagedPostT = nowPost;
     try {
       window.__mapProbe.stagedPost = +s.toFixed(1);
     } catch { /* probe cosmetic */ }
+    return true;
+  } catch {
+    return false;
+  }
+}
+function postTwinStagedS() {
+  try {
+    if (!stagedActive || stagedCommitted) return false;
+    const s = Math.max(0, +stagedS || 0);
+    if (lastPostedStagedS !== null && s === lastPostedStagedS) return false;
+    if (typeof requestAnimationFrame !== 'function') return flushTwinStagedS();
+    if (stagedPostQueued) return false; // a flush is already scheduled — it reads the live S
+    stagedPostQueued = true;
+    try {
+      requestAnimationFrame(() => { try { flushTwinStagedS(); } catch { /* flush never breaks the frame */ } });
+    } catch { stagedPostQueued = false; return flushTwinStagedS(); }
     return true;
   } catch {
     return false;
