@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-28T08:17:20.894Z",
+  "generated": "2026-10-28T09:44:08.199Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,42 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "9dcd57e",
+      "full": "9dcd57e26c562773eaf0580520f9a84f63943629",
+      "date": "2026-10-28",
+      "time": "15:14",
+      "subject": "docs(plan): REF GATE 3 rev note for perceptual-eval [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "37980fe",
+      "full": "37980fedbad28feaba68843dc03087c355f67f48",
+      "date": "2026-10-28",
+      "time": "15:13",
+      "subject": "fix(twin): hand the frame back on the gate tick, not three ticks past it [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "d91b5f0",
+      "full": "d91b5f004ddd673bb222659c11ce5e874ed3c8e1",
+      "date": "2026-10-28",
+      "time": "14:51",
+      "subject": "fix(map): pin the staged band centre to the site so the twin never offsets low [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "8bf1397",
+      "full": "8bf13975c54db3684d57a31fa6b25d6af439391b",
+      "date": "2026-10-28",
+      "time": "14:44",
+      "subject": "fix(map-twin): live-scale staged band + ground detail + seamless wheel handover [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "75c4ed9",
       "full": "75c4ed9353639145b0fbec1e2b5f32c8824380b2",
@@ -6591,5 +6627,7 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    "public/version.json"
+  ]
 }
