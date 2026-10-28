@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-28T09:44:08.199Z",
+  "generated": "2026-10-28T10:14:07.040Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "7fe5a5a",
+      "full": "7fe5a5a5160ede6e310c782f8faa6651131f1741",
+      "date": "2026-10-28",
+      "time": "15:44",
+      "subject": "revert(twin): remove procedural ground-detail modulation, owner rejected milky fade blotches [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "9dcd57e",
       "full": "9dcd57e26c562773eaf0580520f9a84f63943629",
