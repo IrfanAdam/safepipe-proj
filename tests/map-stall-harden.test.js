@@ -43,15 +43,27 @@ test('swallowed staged ticks repaint the frozen hold inline', () => {
   );
 });
 
-test('pill is fallback-only behind a grace delay', () => {
+test('pill is fallback-only behind a grace delay and a fast-intent gate', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(
     main.includes('const STALL_PILL_GRACE_MS = 2000;'),
     'the pill grace delay is pinned',
   );
   assert.ok(
-    main.includes('el.hidden = !(hold && loading && stallWaitMs() >= STALL_PILL_GRACE_MS);'),
-    'pill visibility waits out the grace — fast-grant dives never flash it',
+    main.includes('const show = hold && loading && intent.ok && stallWaitMs() >= STALL_PILL_GRACE_MS;'),
+    'pill visibility waits out the grace AND the dive-intent gate — slow warm dives never flash it',
+  );
+  assert.ok(
+    main.includes('function stallPillIntent()'),
+    'the dive-intent meter exists (arm-to-gate travel, not stall age alone)',
+  );
+  assert.ok(
+    main.includes('STALL_PILL_MIN_INTENT_PX_PER_S') && main.includes('STALL_PILL_MAX_ARM_TO_GATE_MS'),
+    'the fast-intent thresholds are named constants, never inline literals',
+  );
+  assert.ok(
+    main.includes('centerBlendForZoom(') && main.includes('Z_HANDOFF - 0.01'),
+    'the intent window is derived from the mask law and the handoff law, never new geometry',
   );
 });
 

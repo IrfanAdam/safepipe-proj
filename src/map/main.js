@@ -36,6 +36,10 @@ import {
   handoffStagesForScroll,
   HANDOFF_STAGED_S_MAX,
   accumStagedS,
+  stagedBaseParity,
+  stagedPostStep,
+  stagedPostSettled,
+  STAGED_POST_EPS_PX,
   stagedHoldPitchForS,
   stagedHoldRingCloseForS,
   seamHoldEllipseForS,
@@ -801,6 +805,19 @@ let scrubFired = false;
 let stagedActive = false;
 let stagedS = 0;
 let stagedCommitted = false;
+// SEAM POP / APPLY ORDER: the frame this hold handed to the twin ({ z, cx, cy }
+// at arm — SITE-centered by construction) and the patience flags that bound
+// the base-parity gate. The twin's own satellite base applies that handed
+// frame a beat late (measured: z10.687 inside a z11.5 clip on the first
+// visible dissolve tick), so the written overlay may not rise until the
+// frame's base has APPLIED it (see stagedBaseParity). The gate is forward
+// only — reverse never waits on it — and is bounded by the same patience the
+// pixel verdict gets, so a dead frame can never park the dive.
+let stagedHanded = null;
+let stagedFeedFwd = true; // last staged tick direction: true = forward/dive
+let baseParityFalseMs = 0;
+let baseParityIgnored = false;
+let stagedDriveBusy = false; // re-entrancy guard: the eased-S pump retries the commit
 // STAGED DISSOLVE FOLLOWER: the S law advances in per-tick stairs (~0.14
 // per wheel notch) — the rendered inline opacity eases toward the law's
 // latest target every animation frame, so the dissolve glides at any input
@@ -868,6 +885,17 @@ const STAGED_TILES_HOLD_MS = HARD_STOP_HOLD_MS; // the overlay ramp shares the s
 const CONTENT_VERDICT_HOLD_MS = 1200;
 let contentVerdictFalseMs = 0;
 let contentVerdictIgnored = false;
+// SEAM POP (base parity) patience: the twin's own satellite base must APPLY the
+// handed frame before the overlay may rise over it. Same bound as the pixel
+// verdict — a frame that never applies it buys this much patience, then the
+// dissolve proceeds flagged (baseParityIgnored), so a dead/wedged frame can
+// never park the dive.
+const BASE_PARITY_HOLD_MS = CONTENT_VERDICT_HOLD_MS;
+// Post dedupe epsilon (px of S): a gliding follower changes every frame; this
+// only suppresses true no-ops, never a step of the glide.
+const STAGED_POST_VALUE_EPS_PX = 0.25;
+// Commit retry cadence while the eased post is still landing the melt.
+const STAGED_COMMIT_RETRY_MS = 120;
 // READINESS-HYSTERESIS: the tiles grant latches. twinFrameHasContent flaps
 // mid-dissolve (the twin camera moves => fresh tiles => mapIdle false for a
 // few frames), and without a latch each gap re-armed the zero-hold and the
@@ -894,6 +922,118 @@ let stallPollT = 0; // bounded presentation poll: one 500ms chain while holding 
 // dive. Visibility waits STALL_PILL_GRACE_MS of held time; the feeder gate
 // (zoom freeze) is unaffected and engages from tick 0.
 const STALL_PILL_GRACE_MS = 2000;
+// FAST-INTENT (pill PRESENTATION only): the loader is a FAST-DIVE fallback,
+// not a dive badge. A slow approach boots the twin while the fingers travel,
+// so it is already preloaded at the gate and must never see the message even
+// when the arrival frame is still cold; only a burst can outrun the boot.
+// Intent is measured from the dive itself, not asserted from a new threshold
+// on the dive's shape: wheel distance and time are stamped at the MASK ARM
+// (centerBlendForZoom owning the frame — the mask law's own threshold) and at
+// the GATE ARRIVAL (Z_HANDOFF — the handoff law's own threshold), so the two
+// stamps read laws that already exist. Only the intent rate / travel bound
+// are new, and they never touch the hold, the ceiling, S or any camera law:
+// they gate the pill's visibility alone (the hold still protects the commit).
+const STALL_PILL_MIN_INTENT_PX_PER_S = 3200; // gesture px/s across mask->gate
+const STALL_PILL_MAX_ARM_TO_GATE_MS = 900; // ... or the whole approach fit in this
+// Measured on the frozen base (live chromium, 1000x620): a slow dive
+// (100 px / 85 ms) crosses mask->gate at 2136 px/s over 1217 ms, a fast burst
+// (320 px / 16 ms) at 4457-18174 px/s over 291-718 ms. Both bounds sit
+// between the two with margin, and the EITHER clause keeps a janky-but-fast
+// burst qualifying on rate alone when frame pacing stretches its wall time.
+let diveIntentArmT = 0; // mask-arm stamp (0 = the mask is not up yet this dive)
+let diveIntentArmPx = 0; // wheel px already travelled at the mask arm
+let diveIntentGateT = 0; // gate-arrival stamp (0 = not at the gate yet)
+let diveIntentGatePx = 0; // wheel px already travelled at the gate arrival
+let diveIntentPx = 0; // forward wheel px accumulated in the current dive window
+let diveIntentSeen = false; // a forward wheel sampled inside the window
+/** Close the dive-intent window (mask down or the dive unwound): the next
+ * dive measures itself from scratch. Presentation-only, never throws. */
+function resetDiveIntent() {
+  diveIntentArmT = 0;
+  diveIntentArmPx = 0;
+  diveIntentGateT = 0;
+  diveIntentGatePx = 0;
+  diveIntentPx = 0;
+  diveIntentSeen = false;
+  try {
+    if (window.__mapProbe) window.__mapProbe.diveIntent = null;
+  } catch { /* probe cosmetic */ }
+}
+/** Measure one sample of the dive (a forward wheel tick, or a bare refresh).
+ * Stamps the mask arm and the gate arrival once each, accumulating forward
+ * wheel px between them. Reads the live zoom only — writes no camera state,
+ * touches no hold/ceiling/S value. Never throws. */
+function noteDiveIntent(dy) {
+  let z = NaN;
+  let masked = false;
+  try { z = mapRef ? +mapRef.getZoom() : NaN; } catch { z = NaN; }
+  if (!Number.isFinite(z)) return;
+  try { masked = centerBlendForZoom(z) > 0; } catch { masked = false; }
+  if (!masked) {
+    // Mask down: pre-dive or a reverse retreat past the arm — the window is
+    // over, so a re-dive re-measures instead of inheriting stale travel.
+    if (diveIntentArmT || diveIntentGateT || diveIntentPx || diveIntentSeen) resetDiveIntent();
+    return;
+  }
+  if (+dy > 0) {
+    diveIntentPx += +dy;
+    diveIntentSeen = true;
+  }
+  const now = nowMs();
+  if (!diveIntentArmT) {
+    diveIntentArmT = now;
+    diveIntentArmPx = diveIntentPx;
+  }
+  if (!diveIntentGateT && z >= Z_HANDOFF - 0.01) {
+    diveIntentGateT = now;
+    diveIntentGatePx = diveIntentPx;
+  }
+  try {
+    if (window.__mapProbe) window.__mapProbe.diveIntent = diveIntentReadout();
+  } catch { /* probe cosmetic */ }
+}
+/** The measured fast-intent decision: rate = wheel px/s across mask->gate,
+ * travel = arm->gate wall time. A dive qualifies when EITHER its gesture
+ * rate clears the intent rate OR its whole approach fits the travel bound.
+ * Unmeasured dives (no wheel in the window: pinch, keys, a bare arrival)
+ * never qualify — the pill stays a wheel-burst surface. Never throws. */
+function stallPillIntent() {
+  let z = NaN;
+  try { z = mapRef ? +mapRef.getZoom() : NaN; } catch { z = NaN; }
+  // Late gate stamp: a dive whose ease tail settles on the gate with no
+  // further wheel tick still gets its arrival measured (the dive's own trip
+  // time, never a poll guess).
+  try {
+    if (diveIntentArmT && !diveIntentGateT && Number.isFinite(z) && z >= Z_HANDOFF - 0.01) {
+      diveIntentGateT = nowMs();
+      diveIntentGatePx = diveIntentPx;
+    }
+  } catch { /* stamp is best-effort */ }
+  return diveIntentReadout();
+}
+/** Readout shared by the decision and the probe (no side effects). */
+function diveIntentReadout() {
+  const hasArm = diveIntentArmT > 0;
+  const hasGate = diveIntentGateT > 0;
+  const travelMs = hasArm && hasGate ? Math.max(0, diveIntentGateT - diveIntentArmT) : -1;
+  const px = hasArm && hasGate ? Math.max(0, diveIntentGatePx - diveIntentArmPx) : -1;
+  let rate = null;
+  if (hasArm && hasGate && diveIntentSeen) {
+    if (travelMs > 0) rate = (px / travelMs) * 1000;
+    else if (px > 0) rate = Infinity; // one-gate-free burst: no elapsed window
+  }
+  const measured = rate != null;
+  const fastRate = measured && rate >= STALL_PILL_MIN_INTENT_PX_PER_S;
+  const fastTravel = measured && travelMs >= 0 && travelMs <= STALL_PILL_MAX_ARM_TO_GATE_MS;
+  return {
+    ok: !!(fastRate || fastTravel),
+    basis: measured ? 'wheel' : 'none',
+    armToGateMs: travelMs,
+    wheelPx: px,
+    ratePxPerS: rate == null ? null : (Number.isFinite(rate) ? Math.round(rate) : -1),
+    basisBy: fastRate ? 'rate' : (fastTravel ? 'travel' : 'none'),
+  };
+}
 function stallPhase() {
   try {
     if (transitId) return null;
@@ -1126,6 +1266,10 @@ function refreshStallLoading() {
   let hold = false;
   let phase = null;
   let loaded = false;
+  // FAST-INTENT meter: a refresh samples the dive too, so a gate reached by
+  // an ease tail (or a non-wheel dive) still closes/advances the intent
+  // window. Read-only: one zoom read, no camera write.
+  try { noteDiveIntent(0); } catch { /* meter is best-effort */ }
   try { phase = stallPhase(); } catch { phase = null; }
   try { loaded = twinLoaded(); } catch { loaded = false; }
   // Single gate: stallArmed() owns the arm (mask/staged phase + unloaded +
@@ -1158,8 +1302,17 @@ function refreshStallLoading() {
     // because the message serves no purpose there.
     let loading = false;
     try { loading = twinLoadingInFlight(); } catch { loading = false; }
-    if (el) el.hidden = !(hold && loading && stallWaitMs() >= STALL_PILL_GRACE_MS);
+    // FAST-INTENT: the pill is a fast-dive fallback only. A slow approach
+    // preloads the twin on the way in, so a cold arrival there keeps the
+    // message dark (the hold still protects the commit underneath — this
+    // gates presentation, nothing else). The decision is measured from this
+    // dive (mask arm -> gate arrival), never asserted.
+    let intent = { ok: false, basis: 'none', armToGateMs: -1, wheelPx: -1, ratePxPerS: null, basisBy: 'none' };
+    try { intent = stallPillIntent(); } catch { intent = { ok: false, basis: 'none', armToGateMs: -1, wheelPx: -1, ratePxPerS: null, basisBy: 'none' }; }
+    const show = hold && loading && intent.ok && stallWaitMs() >= STALL_PILL_GRACE_MS;
+    if (el) el.hidden = !show;
     try { window.__mapProbe.stall.loading = loading; } catch { /* probe cosmetic */ }
+    try { window.__mapProbe.pill = { shown: show, intent }; } catch { /* probe cosmetic */ }
   } catch { /* cosmetic */ }
   try { applyStallCeiling(hold); } catch { /* ceiling is best-effort */ }
   // NOTE: non-wheel forward input (touch pinch-in, keyboard +, double-click)
@@ -1174,6 +1327,15 @@ function refreshStallLoading() {
       s: +((+stagedS || 0)).toFixed(1),
       waitMs: Math.round(stallWaitMs()),
       escape: !hold && phase !== null && !loaded,
+      // FAST-INTENT: the measured dive values + the pill decision, published
+      // so a harness reads the same numbers the presentation acted on.
+      intent: (() => { try { return stallPillIntent(); } catch { return null; } })(),
+      pill: (() => {
+        try {
+          const el = document.getElementById('twin-loading');
+          return { visible: el ? !el.hidden : false, graceMs: STALL_PILL_GRACE_MS, minIntentPxPerS: STALL_PILL_MIN_INTENT_PX_PER_S, maxArmToGateMs: STALL_PILL_MAX_ARM_TO_GATE_MS };
+        } catch { return null; }
+      })(),
     };
     window.__mapProbe.twinLoaded = loaded;
   } catch { /* probe cosmetic */ }
@@ -1208,9 +1370,18 @@ function refreshStallLoading() {
   return hold;
 }
 // Task-37 staged-S producer: last S value posted to the twin frame
-// (postTwinStagedS throttles to value-change; null = nothing posted yet).
+// (postTwinStagedS dedupes on value change; null = nothing posted yet, so the
+// grant-time re-emits force a fresh post).
 let lastPostedStagedS = null;
-let lastStagedPostT = 0; // 60ms min interval alongside the value-change check: wheel bursts post dozens per frame otherwise
+let lastStagedPostT = 0; // diagnostics stamp of the last post (the 60ms gate is gone: the pump glides per frame)
+// EASED POSTED S: stagedS is the exact law (probe/commit/laws read it); the
+// twin's melt only ever sees what we POST, so the posted value rides this
+// per-frame follower toward stagedS (stagedPostStep). That is what turns the
+// forward mix from seven per-notch stairs into a glide — the reverse already
+// drained continuously only because its law happened to move on every frame.
+let stagedPostCur = 0;
+let stagedPostPumpOn = false;
+let stagedCommitRetryT = 0;
 let cachedVectorStyle = null;
 let recedeStartT = 0;
 let lastCursor = null; // {x,y} client px, passive mousemove only
@@ -2469,7 +2640,24 @@ function resetScrubJourney() {
 const PRECACHE_LOOKAHEAD_S = 0.25; // predict 250ms of motion ahead
 const PRECACHE_MIN_P_DELTA = 0.02; // refetch only when prediction moved on
 const PRECACHE_MIN_MS = 600; // ... or this long elapsed
-const PRECACHE_MAX_TILES = 128; // cap the warm image cache: the journey crosses integer zooms 6..11 at two centers plus deep-warm levels, ~54 tiles before headroom
+/* LADDER-DEPTH: one integer level per trigger left the level the camera was
+ * about to cross cold every time — the warm always landed one crossing late.
+ * A trigger now warms the LIVE integer level plus the next two along the
+ * predicted climb around the site (3 levels x the 3x3 patch = 27 URLs, the
+ * hard per-trigger budget), on intent/mask arm and on integer-level
+ * crossings only — never per tick, so a speculative ladder never contends
+ * the live frame. The cap steps up as the set fills (oldest-first eviction
+ * beyond the current step) instead of refusing the deeper levels. */
+const PRECACHE_LADDER_LEVELS = 3; // live integer level + the next two along the climb
+const PRECACHE_LADDER_MAX_LEVELS = 6; // ... and further while the 27-URL budget is unspent (ahead levels already warm are free)
+const PRECACHE_LEVEL_MAX = Math.ceil(Z_MAX); // never warm past the map's own ceiling (14): those tiles can never be shown
+const PRECACHE_TRIGGER_MAX_URLS = 27; // hard per-trigger budget: 3 levels x the 3x3 patch
+const PRECACHE_CAP_STEPS = Object.freeze([192, 256]); // stepped warm-set cap (oldest-first beyond it)
+const PRECACHE_CAP_STEP_HEADROOM = 12; // step up when the set sits this close to the current cap
+let precacheCapStep = 0;
+let precacheLadderActive = false; // a ladder owns the per-trigger budget across its levels
+let precacheTriggerAttempts = 0; // attempted fetches in the CURRENT trigger
+let precacheTriggerName = ''; // named trigger (probe: 'intent' | 'crossing' | 'predict' | 'single')
 const satTileSeen = new Set(); // url -> warm (insertion-ordered oldest-first evict)
 let precachePrefetched = 0;
 let precacheHits = 0;
@@ -2479,6 +2667,105 @@ let precVel = 0; // journey progress per second (EMA)
 let lastPrefetchPred = -1;
 let lastPrefetchT = 0;
 let lastPrecLevel = -1; // live integer zoom already gated: crossings prefetch even when the prediction barely moved
+let satLadderDive = false; // mask-arm/intent latched per dive (re-arms on intent loss)
+let satLadderDeepest = -1; // deepest integer level the last ladder warmed
+/** Current warm-set cap (the stepped ceiling, never a bare literal at a call site). */
+function precacheCapNow() {
+  return PRECACHE_CAP_STEPS[precacheCapStep] | 0;
+}
+/** Step the cap up one rung (192 -> 256) once, when the set is nearly full. */
+function stepPrecacheCap() {
+  if (precacheCapStep < PRECACHE_CAP_STEPS.length - 1) precacheCapStep += 1;
+}
+/** Live precache probe row (never throws; created lazily so the probe shape
+ * stays additive for harnesses that predate the ladder telemetry). */
+function precacheProbe() {
+  try {
+    const p = window.__mapProbe && window.__mapProbe.precache;
+    return p && typeof p === 'object' ? p : null;
+  } catch {
+    return null;
+  }
+}
+function precacheNowMs() {
+  try {
+    return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  } catch {
+    return Date.now();
+  }
+}
+/** Per-integer-level coverage row: when the level was warmed, when the camera
+ * first reached it, and how much of the site 3x3 was already warm then. */
+function satLevelRow(z, create) {
+  const p = precacheProbe();
+  if (!p) return null;
+  try {
+    if (!p.levels || typeof p.levels !== 'object') p.levels = {};
+    let row = p.levels[z];
+    if (!row && create !== false) {
+      row = { z, warmT: null, attempts: 0, warm: 0, ladder: false, arrivedT: null, patchAtArrival: null, fullBefore: null };
+      p.levels[z] = row;
+    }
+    return row || null;
+  } catch {
+    return null;
+  }
+}
+/** Note that the 3x3 patch at integer level z was warmed (first time wins). */
+function noteSatLevelWarm(z, attempts, trigger) {
+  const row = satLevelRow(z);
+  if (!row) return;
+  try {
+    if (row.warmT === null) row.warmT = +precacheNowMs().toFixed(1);
+    row.attempts = (row.attempts | 0) + (attempts | 0);
+    row.warm = Math.min(9, (row.warm | 0) + (attempts | 0));
+    if (trigger && trigger !== 'single' && trigger !== 'predict') row.ladder = true;
+  } catch { /* probe cosmetic */ }
+}
+/** Count the site 3x3 URLs already in the warm set at integer level z (read
+ * only: never fetches). Used by the arrival snapshot. */
+function satPatchWarmCount(center, z) {
+  try {
+    const c = Array.isArray(center) && center.length === 2 ? center : COUNTRY_CENTER;
+    if (!Number.isFinite(+c[0]) || !Number.isFinite(+c[1])) return 0;
+    const n = Math.pow(2, z);
+    const t = lngLatToTile(c[0], c[1], z);
+    let warm = 0;
+    for (let dx = -1; dx <= 1; dx += 1) {
+      for (let dy = -1; dy <= 1; dy += 1) {
+        const x = t.x + dx;
+        const y = t.y + dy;
+        if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= n || y >= n) continue;
+        if (satTileSeen.has(satTileUrl(z, x, y))) warm += 1;
+      }
+    }
+    return warm;
+  } catch {
+    return 0;
+  }
+}
+/** Snapshot level coverage the moment the camera reaches integer level z:
+ * 9/9 means the whole 3x3 was warm BEFORE arrival. First arrival in a dive
+ * wins; the table resets when intent re-arms so each dive reads clean. */
+function noteSatLevelArrival(z, now) {
+  try {
+    if (!Number.isFinite(+z)) return;
+    const row = satLevelRow(z);
+    if (!row || row.arrivedT !== null) return;
+    const patch = satPatchWarmCount(SITE_LNGLAT, z);
+    row.arrivedT = +(Number.isFinite(+now) ? +now : precacheNowMs()).toFixed(1);
+    row.patchAtArrival = patch;
+    row.fullBefore = patch >= 9;
+  } catch { /* probe cosmetic */ }
+}
+/** Reset the per-dive coverage table (intent lost / new dive). */
+function resetPrecacheLevels() {
+  const p = precacheProbe();
+  if (!p) return;
+  try {
+    p.levels = {};
+  } catch { /* probe cosmetic */ }
+}
 function satTileUrl(z, x, y) {
   return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + z + '/' + y + '/' + x;
 }
@@ -2489,8 +2776,11 @@ function lngLatToTile(lon, lat, z) {
   const y = Math.floor(((1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2) * n);
   return { x, y };
 }
-/** Pre-fetch the 3x3 sat tile patch around center at zoom (best-effort). */
-function prefetchSatTiles(center, zoom) {
+/** Pre-fetch the 3x3 sat tile patch around center at zoom (best-effort).
+ * `reason` names the trigger for the probe + the coverage table. Unwrapped
+ * calls are their own trigger (fresh budget); a ladder (warmSatLadder) owns
+ * ONE budget across its three levels. */
+function prefetchSatTiles(center, zoom, reason) {
   try {
     const z = Math.max(0, Math.min(19, Math.floor(+zoom)));
     if (!Number.isFinite(z)) return;
@@ -2509,22 +2799,36 @@ function prefetchSatTiles(center, zoom) {
       if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= n || y >= n) continue;
       urls.push({ url: satTileUrl(z, x, y), hot: dx === 0 && dy === 0 });
     }
+    if (!precacheLadderActive) { // an unwrapped patch is its own single trigger
+      precacheTriggerAttempts = 0;
+      precacheTriggerName = reason || 'single';
+    }
+    const probe = precacheProbe();
     try {
-      window.__mapProbe.precache.tiles = { z, x: t.x, y: t.y, n: urls.length };
+      if (probe) probe.tiles = { z, x: t.x, y: t.y, n: urls.length };
     } catch { /* probe cosmetic */ }
+    let attempts = 0;
     for (const { url, hot } of urls) {
       try {
         if (satTileSeen.has(url)) {
           precacheHits += 1;
           continue;
         }
+        // Per-trigger budget: a ladder's three patches share it, so one
+        // trigger can never exceed 27 attempts (dedupe hits are free).
+        if (precacheTriggerAttempts >= PRECACHE_TRIGGER_MAX_URLS) break;
+        precacheTriggerAttempts += 1;
+        attempts += 1;
         satTileSeen.add(url);
-        while (satTileSeen.size > PRECACHE_MAX_TILES) {
+        // Stepped cap: oldest-first eviction beyond the CURRENT rung.
+        while (satTileSeen.size > precacheCapNow()) {
           const oldest = satTileSeen.values().next();
           if (oldest && !oldest.done) {
             try { satTileSeen.delete(oldest.value); } catch { break; }
           } else break;
         }
+        // Filling up: open the next rung so the deeper levels still fit.
+        if (satTileSeen.size >= precacheCapNow() - PRECACHE_CAP_STEP_HEADROOM) stepPrecacheCap();
         try {
           const img = new Image();
           img.decoding = 'async';
@@ -2535,11 +2839,79 @@ function prefetchSatTiles(center, zoom) {
         precachePrefetched += 1;
       } catch { /* per-tile best-effort */ }
     }
+    // Only a level that actually cost a fetch mints a warm stamp: a dedupe-only
+    // pass means the level was warmed earlier, and stamping it now would report
+    // a warm that never happened at this point in the dive.
+    if (attempts > 0) noteSatLevelWarm(z, attempts, precacheTriggerName);
     try {
-      window.__mapProbe.precache.prefetched = precachePrefetched;
-      window.__mapProbe.precache.hits = precacheHits;
+      if (probe) {
+        probe.prefetched = precachePrefetched;
+        probe.fetched = precachePrefetched; // alias: the probe contract names `fetched`
+        probe.hits = precacheHits;
+        probe.warm = satTileSeen.size;
+        probe.cap = precacheCapNow();
+        probe.capStep = precacheCapStep;
+        probe.trigger = { name: precacheTriggerName, attempts, budget: PRECACHE_TRIGGER_MAX_URLS };
+        probe.maxTrigger = Math.max(probe.maxTrigger | 0, precacheTriggerAttempts);
+        probe.deepest = satLadderDeepest;
+      }
     } catch { /* probe cosmetic */ }
   } catch { /* precache never breaks the map */ }
+}
+/** LADDER-DEPTH trigger: warm the live integer level plus the next two along
+ * the predicted climb around the site. At most PRECACHE_TRIGGER_MAX_URLS
+ * attempts per call (3 x 9 cold levels, hotspot-first per level, live level
+ * first) — and it keeps walking deeper while the budget is unspent, because
+ * a level that is already warm costs dedupe hits, not URLs. So a dive that
+ * crosses into z8 with 9/10/11 pre-warmed spends its 27 URLs on z8, z12, z13
+ * instead of refetching what is already there. */
+function warmSatLadder(center, levelNow, dir, reason) {
+  const before = precachePrefetched;
+  try {
+    const base = Math.floor(+levelNow);
+    if (!Number.isFinite(base)) return 0;
+    const d = dir < 0 ? -1 : 1;
+    const name = reason || 'crossing';
+    precacheLadderActive = true;
+    precacheTriggerAttempts = 0;
+    precacheTriggerName = name;
+    let levels = 0;
+    let deepest = base;
+    for (let i = 0; i < PRECACHE_LADDER_MAX_LEVELS; i += 1) {
+      if (precacheTriggerAttempts >= PRECACHE_TRIGGER_MAX_URLS) break;
+      const z = base + d * i;
+      if (z < 0 || z > 19 || z > PRECACHE_LEVEL_MAX) continue;
+      prefetchSatTiles(center, z, name);
+      levels += 1;
+      deepest = z;
+      // The first three levels are the contract; beyond that the walk only
+      // continues while a whole cold patch still fits the remaining budget.
+      if (i + 1 >= PRECACHE_LADDER_LEVELS && precacheTriggerAttempts > PRECACHE_TRIGGER_MAX_URLS - 9) break;
+    }
+    satLadderDeepest = deepest;
+    const probe = precacheProbe();
+    try {
+      if (probe) {
+        const prevT = (probe.ladder && probe.ladder.triggers) | 0;
+        probe.ladder = {
+          triggers: prevT + 1,
+          reason: name,
+          dir: d,
+          levels,
+          attempts: precachePrefetched - before,
+          budget: PRECACHE_TRIGGER_MAX_URLS,
+          base,
+          deepest: satLadderDeepest,
+        };
+        probe.deepest = satLadderDeepest;
+      }
+    } catch { /* probe cosmetic */ }
+    return precachePrefetched - before;
+  } catch {
+    return precachePrefetched - before;
+  } finally {
+    precacheLadderActive = false;
+  }
 }
 /** Track journey velocity, predict the next frame, keep it warm. Called on
  * every scrub step (both directions). Vector hold re-asserts on fast
@@ -2570,11 +2942,47 @@ function trackAndPrecache(p) {
     // Integer-crossing trigger: tile swaps happen at whole zooms, so a slow
     // scroll that barely moves the prediction still prefetches the new level.
     let levelNow = -1;
+    let liveZoom = NaN;
     try {
-      const lz = mapRef ? +mapRef.getZoom() : NaN;
-      if (Number.isFinite(lz)) levelNow = Math.floor(lz);
+      liveZoom = mapRef ? +mapRef.getZoom() : NaN;
+      if (Number.isFinite(liveZoom)) levelNow = Math.floor(liveZoom);
     } catch { levelNow = -1; }
+    /* LADDER-DEPTH intent latch: the mask arm (or a hotspot near/in view) is
+     * the per-dive warm intent. The tick publishes proximity one frame ahead
+     * of this read at worst — a latched boolean, so staleness costs nothing.
+     * On the arm edge (and only there) warm the live level + the next two
+     * around the site; intent loss re-arms the latch and clears the per-dive
+     * coverage table. */
+    let intentOn = false;
+    let warmedThisTick = false; // one trigger per tick: the budget is per trigger
+    try {
+      const prox = window.__mapProbe.proximity;
+      intentOn = !!(prox && prox.armed) && Number.isFinite(liveZoom) && liveZoom >= Z_FAR_INTENT - 0.5;
+    } catch { intentOn = false; }
+    if (!intentOn) {
+      if (satLadderDive) {
+        satLadderDive = false;
+        resetPrecacheLevels(); // next dive reads a clean coverage table
+      }
+    } else if (!satLadderDive) {
+      satLadderDive = true;
+      resetPrecacheLevels();
+      if (levelNow !== -1) {
+        try {
+          noteSatLevelArrival(levelNow, now);
+          warmSatLadder(SITE_LNGLAT, levelNow, precVel < -0.05 ? -1 : 1, 'intent');
+          warmedThisTick = true; // one ladder per tick: no crossing ladder this frame
+        } catch { /* intent ladder is best-effort */ }
+      }
+    } else if (levelNow !== -1 && levelNow !== lastPrecLevel) {
+      // Level crossing: snapshot coverage BEFORE warming (was the patch warm
+      // when the camera got here?), then ladder the live level + two ahead.
+      try {
+        noteSatLevelArrival(levelNow, now);
+      } catch { /* arrival snapshot is best-effort */ }
+    }
     if (Math.abs(pPred - lastPrefetchPred) >= PRECACHE_MIN_P_DELTA || now - lastPrefetchT >= PRECACHE_MIN_MS || levelNow !== lastPrecLevel) {
+      const crossed = !warmedThisTick && levelNow !== -1 && lastPrecLevel !== -1 && levelNow !== lastPrecLevel;
       lastPrefetchPred = pPred;
       lastPrefetchT = now;
       lastPrecLevel = levelNow;
@@ -2591,7 +2999,16 @@ function trackAndPrecache(p) {
           if (Number.isFinite(+z)) predZoom = +z + precVel * PRECACHE_LOOKAHEAD_S * (Z_HANDOFF - Z_MIN);
         }
       } catch { /* live frame read is best-effort */ }
-      prefetchSatTiles(predCenter, predZoom);
+      if (warmedThisTick) {
+        // The intent ladder owns this tick's budget (see above): nothing to
+        // add here, the gate bookkeeping above already advanced.
+      } else if (crossed && intentOn && levelNow >= Math.floor(Z_FAR_INTENT) - 1) {
+        // Level crossing on an armed dive: the ladder owns this trigger
+        // (live + two ahead along the predicted climb, <= 27 URLs).
+        warmSatLadder(SITE_LNGLAT, levelNow, precVel < -0.05 ? -1 : 1, 'crossing');
+      } else {
+        prefetchSatTiles(predCenter, predZoom, 'predict');
+      }
       if (Math.abs(precVel) > 0.5) holdVectorWarm('predict');
     }
   } catch { /* precache never breaks the map */ }
@@ -2836,6 +3253,11 @@ function flyToSectorThenTwin(id, opts = {}) {
       } catch { try { stagedTilesT0 = Date.now(); } catch { stagedTilesT0 = 0; } }
       stagedTilesGranted = false; // HYSTERESIS: re-entry restages cold — the old grant died with the reloaded frame
       contentVerdictFalseMs = 0; contentVerdictIgnored = false;
+      // SEAM POP: the parity gate and the eased post are per-hold state — a
+      // fresh hold starts with nothing applied, no patience spent and nothing
+      // posted.
+      baseParityFalseMs = 0; baseParityIgnored = false;
+      stagedPostCur = 0; stagedCommitRetryT = 0; stagedFeedFwd = true;
       try {
         pumpIsoPitch(); // live-hold carry: keep the per-frame tilt pump running under the clamp (it now converges the S-driven hold tilt, never parks on the prewarm)
       } catch { /* pump is best-effort */ }
@@ -2861,6 +3283,15 @@ function flyToSectorThenTwin(id, opts = {}) {
         stagedFrame.cx = SITE_LNGLAT[0];
         stagedFrame.cy = SITE_LNGLAT[1];
       }
+      // SEAM POP: remember exactly the frame this hold HANDS OVER (SITE-centered,
+      // gate zoom). The base-parity gate compares the twin's OWN satellite base
+      // against this — not against whatever the map's zoom reads later.
+      stagedHanded = stagedFrame && Number.isFinite(+stagedFrame.z)
+        ? { z: +stagedFrame.z, cx: +stagedFrame.cx, cy: +stagedFrame.cy }
+        : null;
+      try {
+        window.__mapProbe.stagedHanded = stagedHanded ? { ...stagedHanded } : null;
+      } catch { /* probe cosmetic */ }
       prewarmThenReveal(id, stagedFrame || liveFrame(), { ...opts, staged: true });
       // HARD-STOP idle poll: one fallback slide so content detection retries
       // even with no scroll ticks (the staged branch never blind-reveals;
@@ -3043,21 +3474,24 @@ function unfreezeStagedFrame() {
 
 /** Task-37 staged-S producer (map -> twin): posts { type, s } to the live
  * twin frame as S accumulates past the gate, so the twin intro scrub tracks
- * the fingers instead of its autoplay clock. Throttled to value-change
- * (lastPostedStagedS); mirrors the postTwinReverseRequest pattern
- * (contentWindow + '*' — same-origin iframe). The twin consumes it through
- * its existing staged listener; with no twin/no frame this is a silent
- * no-op and autoplay still owns the intro. Never throws. */
-function postTwinStagedS() {
+ * the fingers instead of its autoplay clock. The value posted is the EASED
+ * follower (pumpStagedPostS), never the raw per-notch law — that is what makes
+ * the forward melt glide (see STAGED_POST_EASE). Deduped on value change
+ * (lastPostedStagedS, STAGED_POST_VALUE_EPS_PX) so a gliding follower posts
+ * once per frame; mirrors the postTwinReverseRequest pattern (contentWindow +
+ * '*' — same-origin iframe). The twin consumes it through its existing staged
+ * listener; with no twin/no frame this is a silent no-op and autoplay still
+ * owns the intro. Never throws. */
+function postTwinStagedS(sPost) {
   try {
     if (!stagedActive || stagedCommitted) return false;
-    const s = Math.max(0, +stagedS || 0);
-    if (lastPostedStagedS !== null && s === lastPostedStagedS) return false;
+    const raw = Number(sPost);
+    const s = Number.isFinite(raw) ? Math.max(0, raw) : Math.max(0, +stagedS || 0);
+    if (lastPostedStagedS !== null && Math.abs(s - lastPostedStagedS) < STAGED_POST_VALUE_EPS_PX) return false;
     let nowPost = 0;
     try {
       nowPost = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     } catch { nowPost = Date.now(); }
-    if (nowPost - lastStagedPostT < 60) return false;
     const fr = overlayEls && overlayEls.frame;
     if (!fr || fr.getAttribute('data-url') === 'about:blank') return false;
     const win = fr.contentWindow;
@@ -3077,6 +3511,75 @@ function postTwinStagedS() {
   } catch {
     return false;
   }
+}
+
+/** EASED S STREAM (stair steps): the twin's melt is a pure function of the S
+ * WE POST, so posting the raw per-notch law made the forward mix stair-step
+ * 0,35,50,75,87,100 over seven wheel ticks while the reverse retraced
+ * continuously — one direction glided, the other stepped. The fix is on this
+ * side of the wire only: stagedS stays the exact law (probe, commit, the hold
+ * laws and the release watch all read it) and this pump advances a follower
+ * (stagedPostCur) toward it every animation frame, posting each step. Same
+ * tempo as the opacity follower (STAGED_POST_FOLLOW, ~120ms), reduced motion
+ * jumps, and the follower self-stops with the hold. It also LAND THE CUT: once
+ * the eased post has reached S max the twin has finished its melt, so a commit
+ * left waiting on it is retried here (the fingers may already have stopped,
+ * and no further tick would ever retry it). Never throws. */
+function pumpStagedPostS(snapToLaw = false) {
+  try {
+    if (snapToLaw) stagedPostCur = Math.max(0, +stagedS || 0);
+    if (stagedPostPumpOn) return;
+    if (typeof requestAnimationFrame !== 'function') {
+      // No frame clock (headless/odd host): post the law directly rather than
+      // starving the twin of S entirely — correctness over smoothness.
+      stagedPostCur = Math.max(0, +stagedS || 0);
+      postTwinStagedS(stagedPostCur);
+      return;
+    }
+    stagedPostPumpOn = true;
+    const frame = () => {
+      try {
+        const alive = stagedActive && !stagedCommitted;
+        if (!alive) { stagedPostPumpOn = false; return; }
+        let reduce = false;
+        try {
+          reduce = typeof window.matchMedia === 'function'
+            && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        } catch { reduce = false; }
+        stagedPostCur = stagedPostStep({ cur: stagedPostCur, target: stagedS, reduce });
+        postTwinStagedS(stagedPostCur);
+        try {
+          window.__mapProbe.stagedPostEased = +stagedPostCur.toFixed(2);
+        } catch { /* probe cosmetic */ }
+        // LAND THE CUT (see above): the eased post owns the last ~120ms of the
+        // melt, so the commit waits on it here rather than on the fingers.
+        try {
+          if (stagedS >= HANDOFF_STAGED_S_MAX - STAGED_POST_EPS_PX && stagedPostSettled({ cur: stagedPostCur })) {
+            let nowR = 0;
+            try {
+              nowR = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            } catch { nowR = Date.now(); }
+            // Bounded retry cadence: the commit path can jumpTo a recovery
+            // park, so it must not run on every frame of a standing hold.
+            if (nowR - stagedCommitRetryT >= STAGED_COMMIT_RETRY_MS) {
+              stagedCommitRetryT = nowR;
+              driveStagedOverlay();
+            }
+          }
+        } catch { /* commit retry is best-effort */ }
+      } catch { /* pump never breaks the frame */ }
+      try {
+        requestAnimationFrame(frame);
+      } catch {
+        stagedPostPumpOn = false;
+      }
+    };
+    try {
+      requestAnimationFrame(frame);
+    } catch {
+      stagedPostPumpOn = false;
+    }
+  } catch { /* producer never breaks the drive */ }
 }
 
 /** Live-hold travel: apply the S stages to VISIBLE map chrome on every staged
@@ -3241,6 +3744,107 @@ function driveStagedHold(st) {
   return { pitchExtra, ringClose };
 }
 
+/** SEAM POP reader: the twin frame's OWN satellite base. The twin is a
+ * same-origin iframe and exposes window.__ring2.map (the LiveMap under the 3D
+ * draw), so the map side can read the pose the dissolve would open over
+ * instead of assuming it applied. Unreadable (no frame, about:blank, booting
+ * map) returns null — the caller treats that as no parity, never as approval.
+ * Never throws. */
+function twinBasePose() {
+  try {
+    const fr = overlayEls && overlayEls.frame;
+    if (!fr || fr.getAttribute('data-url') === 'about:blank') return null;
+    const win = fr.contentWindow;
+    const r2 = win && win.__ring2;
+    const m = r2 && r2.map;
+    if (!m || typeof m.getZoom !== 'function' || typeof m.getCenter !== 'function') return null;
+    const z = +m.getZoom();
+    const c = m.getCenter();
+    if (!Number.isFinite(z) || !c || !Number.isFinite(+c.lng) || !Number.isFinite(+c.lat)) return null;
+    return { z, lng: +c.lng, lat: +c.lat };
+  } catch {
+    return null;
+  }
+}
+
+/** The zoom the dissolve is actually DRAWN OVER (parity target). The arm-time
+ * frame z is the arrival's ENTRY depth — the staged edge fires at the iso
+ * checkpoint and the clamp then holds the map at Z_HANDOFF for the whole band,
+ * so the clip (and the twin base the frame re-derives from our posts) sits at
+ * the gate, not at the entry zoom. Read the live (clamped) zoom and fall back
+ * to the handed frame. Never throws. */
+function stagedBaseTargetZ() {
+  let live = NaN;
+  try { live = mapRef ? +mapRef.getZoom() : NaN; } catch { live = NaN; }
+  if (Number.isFinite(live)) return Math.min(Z_HANDOFF, live);
+  return stagedHanded && Number.isFinite(+stagedHanded.z) ? +stagedHanded.z : NaN;
+}
+
+/** SEAM POP verdict + patience: has the twin's base APPLIED the frame this hold
+ * handed it (stagedHanded — SITE-centered, gate zoom)? Forward only: reverse
+ * never waits on this, because the drain must never be gated by the thing it is
+ * retreating from. Bounded exactly like the pixel verdict — a base that stays
+ * behind buys BASE_PARITY_HOLD_MS, then the gate releases flagged, so a dead or
+ * wedged frame can never park the dive. Publishes the read values for the
+ * probe. Never throws. */
+function stagedBaseParityCheck(inBand = false, released = false) {
+  const pose = twinBasePose();
+  const handed = stagedHanded;
+  const targetZ = stagedBaseTargetZ();
+  const v = stagedBaseParity({
+    handedZ: targetZ,
+    handedLng: handed ? +handed.cx : NaN,
+    handedLat: handed ? +handed.cy : NaN,
+    baseZ: pose ? pose.z : NaN,
+    baseLng: pose ? pose.lng : NaN,
+    baseLat: pose ? pose.lat : NaN,
+  });
+  const now = nowMs();
+  let waitMs = 0;
+  // Patience runs while the gate can actually be satisfied FAILING: inside the
+  // band, with the frame's base readable. It is bounded whether or not the
+  // twin has released yet, because the FEEDER now freezes S on this gate too
+  // (a pre-release wait that never expired would park the forward scroll with
+  // nothing to escape it). Past BASE_PARITY_HOLD_MS the gate releases flagged,
+  // so a frame that never applies the pose can never park the dive; the
+  // tiles/grant hold still owns an absent frame.
+  if (inBand && v.readable && !v.ok) {
+    if (baseParityFalseMs === 0) baseParityFalseMs = now;
+    waitMs = Math.max(0, now - baseParityFalseMs);
+    if (waitMs >= BASE_PARITY_HOLD_MS) baseParityIgnored = true;
+  } else if (v.ok) {
+    baseParityFalseMs = 0;
+    baseParityIgnored = false;
+  }
+  // GATE: inside the band only, forward only, readable only, and only while it
+  // has not been ignored.
+  const gate = inBand && !!handed && v.readable && !v.ok && !baseParityIgnored && stagedFeedFwd;
+  return {
+    ...v,
+    handed: handed ? { z: +handed.z, cx: +handed.cx, cy: +handed.cy } : null,
+    read: pose,
+    targetZ: Number.isFinite(targetZ) ? +targetZ.toFixed(3) : null,
+    waitMs: Math.round(waitMs),
+    ignored: baseParityIgnored,
+    feedFwd: stagedFeedFwd,
+    gate,
+  };
+}
+
+/** RE-ENTRANCY GUARD: driveStagedOverlay is called from the wheel feeder, the
+ * grant handlers, the idle fallback and the eased-S pump (which retries the
+ * commit once the post has landed). The wrapper makes nested calls no-ops
+ * instead of re-running the hold writes or the commit path mid-commit. */
+function driveStagedOverlay() {
+  if (stagedDriveBusy) return;
+  stagedDriveBusy = true;
+  try {
+    return driveStagedOverlayInner();
+  } finally {
+    stagedDriveBusy = false;
+  }
+}
+
 /** Drive the staged overlay dissolve from accumulated scroll S. Twin TILE
  * readiness GRANTS the ramp (opacity stays 0 until the twin holds real
  * tiles, then follows the law); past a bounded hold the ramp releases
@@ -3249,7 +3853,7 @@ function driveStagedHold(st) {
  * rhythm — so the law stays a pure function of S and only the written
  * opacity is gated. At full reveal the hold commits (finalizeStagedReveal).
  * Pure-law in, DOM out. */
-function driveStagedOverlay() {
+function driveStagedOverlayInner() {
   if (!stagedActive || stagedCommitted) return;
   // RELEASE-IMPOSSIBLE WATCH: sampled on every drive (it also self-chains at
   // 200ms while armed, so a hold with idle fingers is still bounded). Firing
@@ -3257,12 +3861,9 @@ function driveStagedOverlay() {
   try {
     if (releaseWatchTick()) return;
   } catch { /* watch never breaks the drive */ }
-  // Task-37: feed S to the twin on every drive (value-change throttled
-  // inside) — including the unready hold, where it seeds the release
-  // progress without moving the pin.
-  try {
-    postTwinStagedS();
-  } catch { /* producer never breaks the drive */ }
+  // Task-37: feed S to the twin on every drive — moved below the effective
+  // ramp (the eased pump needs to know whether the dissolve is still invisible
+  // so a grant-time re-emit may snap instead of glide).
   const st = handoffStagesForScroll(stagedS);
   let root = null;
   try {
@@ -3328,11 +3929,36 @@ function driveStagedOverlay() {
   // content, so the latch can never commit a blank twin.
   if (tilesReady || tilesFallback) stagedTilesGranted = true;
   const tilesHold = !stagedTilesGranted;
-  // Effective ramp: the law when granted, 0 while held. Single writer: every
+  // SEAM POP (apply order): the twin's own satellite base applies the handed
+  // frame a beat AFTER the band opens, so a dissolve that rose on the S law
+  // alone opened over the PREVIOUS zoom's imagery and popped when the base
+  // snapped (measured on the frozen base: overlay 0 -> 0.131 at base z10.908
+  // inside the z11.5 clip, base corrected two ticks later). The S laws are
+  // untouched; only the written ramp waits: 0 until the frame's base has
+  // APPLIED the handed zoom/centre, then the law. Forward only (reverse never
+  // waits on the thing it is retreating from) and bounded by BASE_PARITY_HOLD_MS,
+  // so a frame that never applies it releases flagged instead of parking the
+  // dive — the commit gate below samples parity live as well.
+  let parity = null;
+  const releasedNow = (() => { try { return twinReleased(); } catch { return false; } })();
+  try {
+    parity = stagedBaseParityCheck(st.reveal > 0, releasedNow);
+  } catch { parity = null; }
+  const parityHold = !!(parity && parity.gate);
+  // EASED S STREAM: post the follower (one eased step per animation frame,
+  // ~120ms), never the raw per-notch law — the twin's melt reads what we post.
+  // stagedS itself stays exact for the probe/commit/laws. A re-emit forced by
+  // a grant (lastPostedStagedS reset) snaps while the dissolve is still
+  // invisible, so a boot-raced stream seeds the twin with the true S at once.
+  try {
+    pumpStagedPostS(lastPostedStagedS === null && tilesHold);
+  } catch { /* producer never breaks the drive */ }
+  // Effective ramp: the law when granted — and only once the twin's base has
+  // applied the handed frame — 0 while either holds. Single writer: every
   // opacity value on this path goes through scrubWrite (transition suspended,
   // synchronous inline write) — revealTwin's timed leg is barred mid-hold
   // (see its guard), so no second writer can ease against the law.
-  const effReveal = tilesHold ? 0 : st.reveal;
+  const effReveal = (tilesHold || parityHold) ? 0 : st.reveal;
   let released = false;
   try {
     released = twinReleased();
@@ -3356,6 +3982,21 @@ function driveStagedOverlay() {
       tilesFallback,
       tilesGranted: stagedTilesGranted,
       tilesWaitMs: Math.round(tilesWaitMs),
+      // SEAM POP probe: the verdict AND the values it was read from, so the
+      // apply-order defect is measurable from outside (first visible tick =>
+      // baseParity true, baseZ within STAGED_BASE_Z_TOL of the handed z).
+      baseParity: parity ? !!parity.ok : null,
+      baseGate: parityHold,
+      baseZ: parity && parity.read ? +parity.read.z.toFixed(4) : null,
+      baseCenter: parity && parity.read ? [+parity.read.lng.toFixed(6), +parity.read.lat.toFixed(6)] : null,
+      handedZ: parity && Number.isFinite(parity.targetZ) ? parity.targetZ : null,
+      armZ: parity && parity.handed ? parity.handed.z : null,
+      baseDz: parity && Number.isFinite(parity.dz) ? +parity.dz.toFixed(4) : null,
+      baseCenterM: parity && Number.isFinite(parity.centerM) ? +parity.centerM.toFixed(2) : null,
+      baseWaitMs: parity ? parity.waitMs : 0,
+      baseIgnored: parity ? !!parity.ignored : false,
+      feedFwd: parity ? !!parity.feedFwd : null,
+      postS: +stagedPostCur.toFixed(2),
     };
   } catch { /* probe cosmetic */ }
   // HARD-STOP presentation: loader + ceiling + probe track the content gate
@@ -3389,6 +4030,33 @@ function driveStagedOverlay() {
   // the staged frame). A failed gate HOLDS the map at opacity 0 and retries
   // on the next tick/timer — never commits blind, never strands.
   if (st.reveal >= 1) {
+    // SEAM POP: never cut while the twin's base still trails the handed pose —
+    // a commit over a stale base pops the seam at exactly the frame the overlay
+    // goes opaque. Bounded by the same patience as the ramp gate above, so a
+    // frame that never applies it releases flagged (baseIgnored) and the cut
+    // still lands.
+    if (parityHold) {
+      scrubWrite('0');
+      try {
+        window.__mapProbe.staged.baseHold = true;
+        window.__mapProbe.staged.postWait = false;
+      } catch { /* probe cosmetic */ }
+      return;
+    }
+    // EASED-POST SETTLE: the cut may only land once the POSTED S has reached S
+    // max. The melt follows the eased post (~120ms behind the fingers), so a
+    // commit that outran it would cut away the last steps of the crossfade the
+    // fingers paid for. The eased pump retries this path the moment the post
+    // lands, so standing fingers still commit with no extra scroll.
+    if (!stagedPostSettled({ cur: stagedPostCur })) {
+      scrubWrite(String(+effReveal.toFixed(4)));
+      try {
+        window.__mapProbe.staged.baseHold = false;
+        window.__mapProbe.staged.postWait = true;
+      } catch { /* probe cosmetic */ }
+      try { pumpStagedPostS(); } catch { /* pump retries the commit */ }
+      return;
+    }
     const hasContent = twinFrameHasContent();
     let proxNear = false;
     try {
@@ -3602,6 +4270,9 @@ function finalizeStagedReveal(root) {
   stagedTilesT0 = 0; // HARD-STOP: commit disarms the hold (loader already cleared by content)
   stagedTilesGranted = false; // HYSTERESIS: commit consumes the grant — the next hold restages cold
   contentVerdictFalseMs = 0;
+  baseParityFalseMs = 0; baseParityIgnored = false; // SEAM POP: the parity wait dies with the hold
+  stagedPostCur = 0; // eased post ends with the S stream
+  stagedCommitRetryT = 0;
   try {
     unfreezeStagedFrame(); // MAP FRAME FREEZE: commit releases the camera lock
   } catch { /* unlock is best-effort */ }
@@ -3649,6 +4320,9 @@ function exitStaged() {
   stagedTilesT0 = 0; // HARD-STOP: unwind disarms the hold
   stagedTilesGranted = false; // HYSTERESIS: unwind consumes the grant — the next hold restages cold
   contentVerdictFalseMs = 0;
+  baseParityFalseMs = 0; baseParityIgnored = false; // SEAM POP: unwind releases the parity wait
+  stagedPostCur = 0; stagedCommitRetryT = 0; // eased post ends with the S stream
+  stagedHanded = null;
   entryRx = null; // unwind clears the entry radii — the next hold re-caches its own arrival
   entryRy = null;
   entryCy = null;
@@ -6207,6 +6881,11 @@ function feedStagedScroll(dyFlip) {
     // this, simply stopping to look at the twin ejected the dive home 2.4s
     // later — a pause is not a dead end (measured).
     lastStagedInputMs = nowMs();
+    // SEAM POP direction: the parity gate is FORWARD only — a reverse tick must
+    // never be gated by the pose it is retreating from, so the drain always
+    // writes the law. Set before the stall/arrival guards: a swallowed forward
+    // tick is still forward intent.
+    stagedFeedFwd = dy < 0;
     // HARD-STOP: forward (flip-space dy<0) stalls at frozen S until the twin
     // holds content — no accumulate, so neither the overlay dissolve nor the
     // twin-plane scrub (both pure fns of the same S) advances. The frozen
@@ -6229,6 +6908,23 @@ function feedStagedScroll(dyFlip) {
       try { zNow = +mapRef.getZoom(); } catch { zNow = null; }
       if (Number.isFinite(zNow) && zNow < Z_HANDOFF - 0.01) {
         try { driveStagedOverlay(); } catch { /* hold repaint is best-effort */ }
+        return;
+      }
+    }
+    // SEAM POP (feeder): a forward tick must not advance the law past the point
+    // the twin frame can show. The opacity gate alone still let S run to the
+    // band end while the twin applied its base, so the first visible frame
+    // landed at the law's 1.0 (a 120ms follower cut) instead of dissolving
+    // across the band. Freezing S BEFORE the accumulate keeps the law and the
+    // twin together: the fingers pause (bounded by the same parity patience),
+    // then the dissolve plays across the remaining band. Reverse never
+    // consults it, and S=0 always advances (the gate arms in-band only).
+    if (dy < 0 && stagedS > 0) {
+      let released = false;
+      try { released = twinReleased(); } catch { released = false; }
+      const parity = stagedBaseParityCheck(true, released);
+      if (parity.gate) {
+        try { driveStagedOverlay(); } catch { /* frozen repaint is best-effort */ }
         return;
       }
     }
@@ -6382,6 +7078,20 @@ async function boot() {
       try {
         if (e && +e.deltaY > 0) noteDiveFrame('wheel-any');
       } catch { /* dive frame is best-effort */ }
+    }, { capture: true, passive: true });
+  } catch { /* listener is best-effort */ }
+  // FAST-INTENT meter: the same first-in-line window lane, passive and
+  // read-only — it accumulates forward wheel px and stamps the mask arm /
+  // gate arrival so the loading pill can tell a burst from a slow approach.
+  // The per-event flag keeps the flip clones (re-dispatched tick) from
+  // counting the same gesture twice; it writes no camera or hold state.
+  try {
+    window.addEventListener('wheel', (e) => {
+      try {
+        if (!e || e.__diveIntent) return;
+        e.__diveIntent = true;
+        noteDiveIntent(+e.deltaY);
+      } catch { /* meter is best-effort */ }
     }, { capture: true, passive: true });
   } catch { /* listener is best-effort */ }
   // UNWIND LAW: Esc must work with focus anywhere on the embedding page, not

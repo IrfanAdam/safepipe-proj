@@ -69,8 +69,8 @@ test('stage gates: ring -> blend -> tilt in order, reveal spans the hold', () =>
   // same dissolve — and the invisible swoop leg is a third of it, so the
   // visible push/melt owns the motion instead of the tail.
   assert.equal(HANDOFF_STAGE_PX, 80, 'one stage per 80px of scroll');
-  assert.equal(HANDOFF_REVEAL_LEN_PX, 460, 'reveal band constant still sizes the staged band');
-  assert.equal(HANDOFF_STAGED_S_MAX, 700, 'full commit at 700px past the gate (was 1250)');
+  assert.equal(HANDOFF_REVEAL_LEN_PX, 320, 'reveal band constant still sizes the staged band (owner eval 2026-10-29: switch lands ~29% sooner in wheel distance)');
+  assert.equal(HANDOFF_STAGED_S_MAX, 560, 'full commit at 560px past the gate (was 700 before the 2026-10-29 eval)');
   assert.equal(3 * HANDOFF_STAGE_PX, STAGED_SWOOP_END_PX, 'the swoop anchor is three stages in');
   const zero = handoffStagesForScroll(0);
   assert.deepEqual(zero, { ring: 0, blend: 0, tilt: 0, reveal: 0 }, 'gate entry starts every stage at 0');
@@ -85,7 +85,7 @@ test('stage gates: ring -> blend -> tilt in order, reveal spans the hold', () =>
   const atRing = handoffStagesForScroll(HANDOFF_STAGE_PX);
   assert.equal(atRing.ring, 1, 'ring holds complete at its gate');
   assert.equal(atRing.blend, 0, 'blend still gated');
-  const midReveal = handoffStagesForScroll(560);
+  const midReveal = handoffStagesForScroll(HANDOFF_STAGED_S_MAX - 2 * HANDOFF_STAGE_PX);
   assert.equal(midReveal.ring, 1, 'ring holds');
   assert.equal(midReveal.blend, 1, 'blend holds');
   assert.equal(midReveal.tilt, 1, 'tilt holds');
@@ -278,8 +278,12 @@ test('readiness-hold: overlay ramp waits for twin tiles, law stays pure', () => 
     'a release signal exists (fwd allocated / phase past hold)',
   );
   assert.ok(
-    main.includes('const effReveal = tilesHold ? 0 : st.reveal;'),
-    'the effective ramp is the law when granted, 0 while the tiles hold',
+    main.includes('const effReveal = (tilesHold || parityHold) ? 0 : st.reveal;'),
+    'the effective ramp is the law when granted and the base has applied it, 0 while either holds',
+  );
+  assert.ok(
+    main.includes('const parityHold = !!(parity && parity.gate);'),
+    'the seam-pop base-parity gate rides the same single writer (forward only, patience-bounded)',
   );
   assert.ok(
     main.includes("scrubWrite(effReveal <= 0 ? '0' : String(+effReveal.toFixed(4)));"),
@@ -359,7 +363,7 @@ test('readiness-hysteresis: the tiles grant latches, tile gaps never re-arm the 
     'the latch never feeds the commit gate — a gap at full reveal holds the commit, never lands it blind',
   );
   assert.ok(
-    main.includes('const effReveal = tilesHold ? 0 : st.reveal;'),
+    main.includes('const effReveal = (tilesHold || parityHold) ? 0 : st.reveal;'),
     'pre-grant ov stays 0 — the latch only ever releases, never pre-grants',
   );
 });

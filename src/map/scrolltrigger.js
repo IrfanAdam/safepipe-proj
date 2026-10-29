@@ -502,8 +502,14 @@ export function handoffScrubForZoom(z) {
  * the map-side wheel accumulator owns S, Task 36 consumes S for the
  * range-scrubbed twin intro. */
 export const HANDOFF_STAGE_PX = 80;
-export const HANDOFF_REVEAL_LEN_PX = 460;
-export const HANDOFF_STAGED_S_MAX = 3 * HANDOFF_STAGE_PX + HANDOFF_REVEAL_LEN_PX; // 700
+/* Owner eval 2026-10-29: "the twin switch can happen sooner". The visible
+ * fade already waits for the twin frame to apply the handed pose (parity
+ * gate, ~S200 on the live page), so a 460 px tail meant five more notches of
+ * scroll after the twin was ready and matched. 320 px keeps the same three
+ * staging beats and the same glide, and lands the commit ~29% sooner in
+ * wheel distance; probe/commit still read the pure law. */
+export const HANDOFF_REVEAL_LEN_PX = 320;
+export const HANDOFF_STAGED_S_MAX = 3 * HANDOFF_STAGE_PX + HANDOFF_REVEAL_LEN_PX; // 560
 
 /* Shared intro/reveal pacing (map + twin, ONE law): the forward intro is
  * three legs — swoop (invisible convergence), push (rigid satellite move),
@@ -585,6 +591,120 @@ export function accumStagedS(s, deltaY) {
   const dy = +deltaY;
   if (!Number.isFinite(dy) || dy === 0) return Math.min(HANDOFF_STAGED_S_MAX, cur);
   return Math.min(HANDOFF_STAGED_S_MAX, Math.max(0, cur - dy));
+}
+
+/* STAGED BASE PARITY (seam pop, apply-order law): the twin frame keeps its
+ * OWN satellite base under the 3D draw, and that base applies the handed
+ * frame a beat AFTER the staged band opens — measured on 4ebde07: base z10.687
+ * still inside the z11.5 clip on the first visible dissolve tick, corrected
+ * one S tick later. The dissolve therefore opened over a stale base and the
+ * seam popped when the twin's base snapped to the handed zoom. The map cannot
+ * reorder the twin's boot; it can refuse to RAISE THE OVERLAY over a base that
+ * has not applied yet. This law is that verdict: pure, reads two poses and
+ * says whether the twin's base has APPLIED the handed frame — same zoom
+ * (|dz| <= zTol) and the same centre (<= centerPx at the handed zoom, converted
+ * through the shared metres-per-pixel law, never a degree literal).
+ * The S laws stay untouched: only the WRITTEN opacity and the commit wait on
+ * this. Unreadable/non-finite input is never "parity" (ok:false) — the caller
+ * bounds the wait instead of trusting it. Never throws. */
+export const STAGED_BASE_Z_TOL = 0.05; // handed z vs the twin base's own z
+export const STAGED_BASE_CENTER_PX = 1.5; // handed centre vs base centre, at the handed z
+export function stagedBaseParity({
+  handedZ = NaN,
+  handedLng = NaN,
+  handedLat = NaN,
+  baseZ = NaN,
+  baseLng = NaN,
+  baseLat = NaN,
+  zTol = STAGED_BASE_Z_TOL,
+  centerPx = STAGED_BASE_CENTER_PX,
+} = {}) {
+  const out = { ok: false, readable: false, dz: null, centerM: null, epsM: null, mpp: null };
+  try {
+    const bz = Number(baseZ);
+    const blng = Number(baseLng);
+    const blat = Number(baseLat);
+    if (!Number.isFinite(bz) || !Number.isFinite(blng) || !Number.isFinite(blat)) return out;
+    out.readable = true;
+    const hz = Number(handedZ);
+    const hlng = Number(handedLng);
+    const hlat = Number(handedLat);
+    if (!Number.isFinite(hz) || !Number.isFinite(hlng) || !Number.isFinite(hlat)) return out;
+    const dz = bz - hz;
+    out.dz = dz;
+    const mpp = metersPerPixel(hz, hlat);
+    out.mpp = mpp;
+    // Centre error in metres on the handed parallel (equirectangular over a
+    // ~1.5px budget is exact to well under a pixel at this scale).
+    const mLat = 111320;
+    const mLng = 111320 * Math.cos((hlat * Math.PI) / 180);
+    const centerM = Math.hypot((blng - hlng) * mLng, (blat - hlat) * mLat);
+    out.centerM = centerM;
+    const px = Number(centerPx);
+    const epsM = Number.isFinite(mpp) ? mpp * (Number.isFinite(px) && px >= 0 ? px : STAGED_BASE_CENTER_PX) : null;
+    out.epsM = epsM;
+    const zt = Number.isFinite(+zTol) ? Math.abs(+zTol) : STAGED_BASE_Z_TOL;
+    // 1e-6 is float slack for an exact-edge pose (1/50th of the tolerance, far
+    // below a single tile step) — it never widens the gate in practice.
+    out.ok = Math.abs(dz) <= zt + 1e-6 && Number.isFinite(epsM) && centerM <= epsM + 1e-6;
+    return out;
+  } catch {
+    return out;
+  }
+}
+
+/* STAGED POST EASE (stair steps): the twin's melt reads the S this side posts,
+ * so posting the RAW per-notch S made the forward mix step 0,35,50,75,75,87,100
+ * over seven wheel ticks while the reverse retraced continuously — the forward
+ * melt stair-stepped, the reverse glided. The map therefore posts an EASED S:
+ * one step per animation frame toward the law's S, same tempo as the opacity
+ * follower (~120ms to converge), reduced motion jumps. S itself stays exact
+ * for the probe, the commit and every law; only the POSTED value glides. */
+export const STAGED_POST_FOLLOW = 0.5; // exponential chase per animation frame (~120ms)
+export const STAGED_POST_EPS_PX = 0.5; // convergence epsilon, px of staged S
+/** Pure: one eased step of the posted S toward the law's S. Parks on target
+ * inside epsPx (and immediately under reduced motion), never overshoots,
+ * non-finite target holds the current value. Never throws. */
+export function stagedPostStep({
+  cur = 0,
+  target = 0,
+  k = STAGED_POST_FOLLOW,
+  epsPx = STAGED_POST_EPS_PX,
+  reduce = false,
+} = {}) {
+  try {
+    const t = Number(target);
+    const c0 = Number(cur);
+    if (!Number.isFinite(t)) return Number.isFinite(c0) ? Math.max(0, c0) : 0;
+    const c = Number.isFinite(c0) ? c0 : t;
+    if (reduce === true) return t;
+    const kk = Number.isFinite(+k) && +k > 0 && +k <= 1 ? +k : STAGED_POST_FOLLOW;
+    const eps = Number.isFinite(+epsPx) && +epsPx >= 0 ? +epsPx : STAGED_POST_EPS_PX;
+    const d = t - c;
+    if (Math.abs(d) <= eps) return t;
+    return c + d * kk;
+  } catch {
+    return 0;
+  }
+}
+
+/** Pure: has the posted (eased) S reached the commit end of the band within
+ * epsPx? The cut may only land once the twin's melt has finished, so the
+ * commit waits on this instead of on the raw law's S. Never throws. */
+export function stagedPostSettled({
+  cur = NaN,
+  stagedMaxPx = HANDOFF_STAGED_S_MAX,
+  epsPx = STAGED_POST_EPS_PX,
+} = {}) {
+  try {
+    const c = Number(cur);
+    const m = Number(stagedMaxPx);
+    const e = Number.isFinite(+epsPx) && +epsPx >= 0 ? +epsPx : STAGED_POST_EPS_PX;
+    if (!Number.isFinite(c) || !Number.isFinite(m)) return false;
+    return c >= m - e;
+  } catch {
+    return false;
+  }
 }
 
 /* Live-hold travel past the gate (map side): z clamps at Z_HANDOFF while

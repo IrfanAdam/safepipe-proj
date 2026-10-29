@@ -195,12 +195,24 @@ test('reverse pose law: live pose at 0, ring top-down at 1, symmetric mid', () =
   assert.deepEqual(poseForScrubProgress(legs, 0.3), poseForScrubProgress(legs, 0.3), 'retrace reads the same law');
 });
 
-test('map producer wired: S posts to the twin frame, value-change throttled', () => {
+test('map producer wired: S posts to the twin frame, eased per frame', () => {
   const main = srcOf('../src/map/main.js');
-  assert.ok(main.includes('function postTwinStagedS()'), 'producer exists');
+  assert.ok(main.includes('function postTwinStagedS(sPost)'), 'producer exists and takes the posted value');
   assert.ok(main.includes('postMessage(buildTwinStagedMessage(s, zPost)'), 'posts S + live zoom to the frame (round-8 release-fresh anchors)');
-  assert.ok(main.includes('lastPostedStagedS !== null && s === lastPostedStagedS'), 'throttles to value-change');
-  assert.ok((main.match(/postTwinStagedS\(\)/g) || []).length >= 2, 'driver calls the producer (def + call)');
+  assert.ok(
+    main.includes('Math.abs(s - lastPostedStagedS) < STAGED_POST_VALUE_EPS_PX'),
+    'dedupes on value change inside a fraction of a pixel — a gliding follower posts every frame',
+  );
+  assert.ok(main.includes('function pumpStagedPostS('), 'the eased per-frame post pump exists');
+  assert.ok(
+    main.includes('stagedPostCur = stagedPostStep({ cur: stagedPostCur, target: stagedS, reduce });'),
+    'the posted S eases toward the law every animation frame (reduced motion jumps)',
+  );
+  assert.ok(
+    main.includes('stagedPostSettled({ cur: stagedPostCur })'),
+    'the commit waits for the posted value to reach S max',
+  );
+  assert.ok((main.match(/postTwinStagedS\(/g) || []).length >= 2, 'driver calls the producer (def + pump)');
   assert.ok(main.includes('accumStagedS(stagedS, dy)'), 'accumulator owns S through the shared law');
 });
 
