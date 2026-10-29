@@ -18,8 +18,10 @@ import {
   seamHoldEllipseForS,
   SEAM_HOLD_RX_PX,
   vignetteRadiusPxForZoom,
+  pitchTargetForZoom,
   Z_CENTER,
   Z_HANDOFF,
+  Z_TOP,
   MAP_VIGNETTE_RING_M,
 } from '../src/map/scrolltrigger.js';
 import { SITE } from '../src/map/feed.js';
@@ -68,16 +70,42 @@ function vignette() {
   return vignetteRadiusPxForZoom(Z_HANDOFF, SITE.lat);
 }
 
-test('one shape: the forming law converges onto the projected seam exactly', () => {
+test('one shape: the mask seals onto the ring at Z_TOP, then scales to the seam', () => {
   const seam = projectedSeamEllipse(H, SITE.lat);
   assert.ok(seam, 'the seam projects at the live height');
   const atGate = enclosureEllipsePxForZoom(Z_HANDOFF, SITE.lat, MAP_VIGNETTE_RING_M, CORNER, H);
   assert.ok(atGate, 'the enclosure exists at the gate');
-  assert.equal(atGate.rx, seam.rx, 't=1 rx is the projected seam rx');
-  assert.equal(atGate.ry, seam.ry, 't=1 ry is the projected seam ry');
-  assert.equal(atGate.cy, seam.cy, 't=1 cy is the projected seam centre');
+  assert.equal(atGate.rx, seam.rx, 'at the gate rx is the projected seam rx');
+  assert.equal(atGate.ry, seam.ry, 'at the gate ry is the projected seam ry');
+  assert.equal(atGate.cy, seam.cy, 'at the gate cy is the projected seam centre');
+  // Owner rev 2026-10-29: the final level is the ENCLOSURE scaling up with
+  // the ring, not the map zooming inside a fixed porthole. At the iso
+  // checkpoint the mask IS the projected ring; halfway to the handoff it is
+  // still that zoom's ring; at the handoff it is the seam.
+  const ringAt = (zoom) => projectedRingEllipse({
+    zoom,
+    pitchDeg: pitchTargetForZoom(zoom),
+    heightPx: H,
+    latDeg: SITE.lat,
+    ringM: MAP_VIGNETTE_RING_M,
+  });
+  const atTop = enclosureEllipsePxForZoom(Z_TOP, SITE.lat, MAP_VIGNETTE_RING_M, CORNER, H);
+  const topRing = ringAt(Z_TOP);
+  assert.ok(atTop && topRing, 'the checkpoint ring projects');
+  assert.equal(+atTop.rx.toFixed(3), +topRing.rx.toFixed(3), 'at Z_TOP the mask IS the ring');
+  const midZ = (Z_TOP + Z_HANDOFF) / 2;
+  const atMid = enclosureEllipsePxForZoom(midZ, SITE.lat, MAP_VIGNETTE_RING_M, CORNER, H);
+  const midRing = ringAt(midZ);
+  assert.ok(atMid && midRing, 'the mid ring projects');
+  assert.equal(+atMid.rx.toFixed(3), +midRing.rx.toFixed(3), 'the mask tracks the ring at every zoom');
+  assert.ok(atTop.rx < atMid.rx && atMid.rx < atGate.rx, 'the enclosure scales UP to the seam');
+  assert.equal(
+    +enclosureEllipsePxForZoom(Z_HANDOFF + 0.5, SITE.lat, MAP_VIGNETTE_RING_M, CORNER, H).rx.toFixed(3),
+    +seam.rx.toFixed(3),
+    'past the gate the mask holds the seam (the twin clip)',
+  );
   // Just inside the band the display is still a circle that covers the frame
-  // (ry == rx, cy == 0) — the morph to the projection rides the same t.
+  // (ry == rx, cy == 0) — the morph to the projection rides the forming t.
   const justIn = enclosureEllipsePxForZoom(Z_CENTER + 0.01, SITE.lat, MAP_VIGNETTE_RING_M, CORNER, H);
   assert.ok(justIn, 'the ellipse exists just inside the band');
   assert.ok(Math.abs(justIn.ry / justIn.rx - 1) < 0.01, 't≈0 is a circle (ry≈rx)');

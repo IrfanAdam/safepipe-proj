@@ -77,29 +77,25 @@ test('pill lights only while loading is actually in flight, never cold', () => {
   );
 });
 
-test('pre-phase hold never freezes behind a twin that is not coming', () => {
+test('pre-phase hold retired: only the staged arrival hold waits', () => {
   const main = srcOf('../src/map/main.js');
-  // Owner: linger in iso -> "TWIN LOADING" freeze that never released. The
-  // pre-hold used to arm on mask + unloaded with only the 30s wall bound as
-  // escape and nothing booting the twin — a blank frame froze forward with
-  // a dark pill and no feedback.
+  // Owner rev 2026-10-29: the camera now runs to Z_HANDOFF continuously; a
+  // cold twin waits at the gate with the overlay dark, never frozen mid-dive.
+  assert.ok(!main.includes('PRE_PHASE_DEAD_MS'), 'the pre-phase dead-frames bound is gone');
+  assert.ok(!main.includes('function preHoldProgressAlive()'), 'the pre-hold progress law is gone');
+  assert.ok(!main.includes('preStallSwallowDue'), 'the pre-phase swallow gate is gone');
+  assert.ok(!main.includes("return 'pre'"), 'stallPhase has no pre branch');
+  const phase = main.slice(main.indexOf('function stallPhase()'), main.indexOf('function twinLoaded()'));
   assert.ok(
-    main.includes('const PRE_PHASE_DEAD_MS = 4000;'),
-    'the pre-phase dead-frames bound is pinned (4s, far under the 30s wall cap)',
+    phase.includes("if (stagedActive && !stagedCommitted) return 'staged';"),
+    'staged is the only hold phase',
   );
-  assert.ok(
-    main.includes('function preHoldProgressAlive()'),
-    'a pre-hold progress predicate exists (blank/live-painting/dead-frames)',
-  );
-  const law = main.slice(main.indexOf('function preHoldProgressAlive()'), main.indexOf('function stallPhase()'));
-  assert.ok(law.includes('earlyBootTwin()'), 'a blank frame kicks the boot instead of freezing');
-  assert.ok(law.includes('twinFrameCount()'), 'advancing twin frames keep the short wait legitimate');
-  assert.ok(law.includes('PRE_PHASE_DEAD_MS'), 'dead frames release forward past the bound');
+  assert.ok(!phase.includes("'pre'"), 'no pre path remains');
   const armed = main.slice(main.indexOf('function stallArmed('), main.indexOf('function stallWaitMs()'));
-  assert.ok(armed.includes('preHoldProgressAlive()'), 'the pre branch consults the progress law');
+  assert.ok(!armed.includes('preHold'), 'stallArmed no longer consults a pre-hold');
   assert.ok(
-    armed.includes("// PRE_PHASE_PROGRESS: blank boots + flows, painting holds briefly,"),
-    'the pre-branch hook is marker-pinned',
+    armed.includes('if (phase === null || twinLoaded()) return false;'),
+    'the staged hold still gates on content',
   );
 });
 

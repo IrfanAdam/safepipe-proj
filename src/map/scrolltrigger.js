@@ -125,11 +125,11 @@ export function satOpacityForZoom(z) {
   return smooth01((n - Z_FADE0) / (Z_FADE1 - Z_FADE0));
 }
 
-/** Shared enclosure law: the bracket clip-k AND the vignette circle-t ride
- * this ONE span (Z_CENTER..Z_HANDOFF, smoothstepped) so the brackets and the
- * circle stay in sync on the way in and on retrace. The span now ends at the
- * handoff, not the iso checkpoint: the circle keeps closing while the twin
- * dissolves in, and it never shrinks past the twin's own clip radius. */
+/** Shared blend span for the bracket clip-k and the proximity-centre gate
+ * (Z_CENTER..Z_HANDOFF, smoothstepped), so the chrome and the centre settle
+ * stay in sync on the way in and on retrace. The vignette radius itself is
+ * the projected ground ring (enclosureEllipsePxForZoom), which seals onto the
+ * ring at Z_TOP and then scales with it — the mask no longer rides this t. */
 export function enclosureTForZoom(z) {
   const n = +z;
   if (!Number.isFinite(n)) return 0;
@@ -232,19 +232,6 @@ export function stallCeilingPin(liveZ, floorZ = Z_TOP) {
   const floor = Number.isFinite(f) ? Math.max(f, Z_TOP) : Z_TOP;
   if (!Number.isFinite(z)) return floor;
   return Math.max(z, floor);
-}
-
-/** Pre-phase stall swallow gate: the mask-armed ('pre') hold swallows
- * forward only on the gate approach (z at/above REARM_DOWN_BELOW) — below
- * that the climb flows (mask forms, tilt glides, tiles warm) and the stop
- * happens at the shut mask, never frozen mid-gesture. The staged hold is
- * untouched (its S stall owns the fingers regardless of zoom). Pure +
- * node-checkable. */
-export function preStallSwallowDue({ phase = null, z = NaN } = {}) {
-  if (phase !== 'pre') return true;
-  const zz = Number(z);
-  if (!Number.isFinite(zz)) return false;
-  return zz >= REARM_DOWN_BELOW;
 }
 
 /* RELEASE-IMPOSSIBLE LAW (resilience half of the handoff contract): a staged
@@ -382,36 +369,64 @@ export function projectedSeamEllipse(heightPx, latDeg = SANGACHAL.lat, ringM = M
     ringM,
   });
 }
-/** Enclosure ellipse while it forms: the display radius starts at the
- * viewport corner (a circle that just covers the frame) and converges onto
- * the projected seam ellipse across the shared enclosure span. rx and ry
- * blend independently so t=0 is a true circle (ry==rx) and t=1 is the exact
- * projection; cy drifts from 0 to the projection's centre offset on the same
- * t. No cos-squash literal and no viewport literal — the endpoint is the
- * camera's own projection. Parks (null) below the band or without a corner. */
+/** Enclosure ellipse: the clear core IS the projected ground ring, so the
+ * mask and the twin clip are one shape at every zoom. It forms from the
+ * viewport corner onto the ring by the iso checkpoint (Z_TOP), then SCALES
+ * WITH the ring to the handoff seam (Z_HANDOFF) and holds there. Owner rev
+ * 2026-10-29: the final level must read as the enclosure scaling up to meet
+ * the twin, not as the map zooming inside a fixed window. rx/ry/cy come from
+ * projectedRingEllipse at the live zoom; the forming blend uses the same
+ * projection evaluated at Z_TOP, so the seal is continuous. No cos-squash
+ * literal and no viewport literal — the endpoint is the camera's own
+ * projection. Parks (null) below the band or without a corner. */
 export function enclosureEllipsePxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M, cornerPx = null, heightPx = null) {
   const n = +zoom;
   const c = +cornerPx;
+  const h = +heightPx;
   if (!Number.isFinite(n) || !Number.isFinite(c) || !(c > 0)) return null;
-  const t = enclosureTForZoom(n);
-  if (!(t > 0)) return null;
   const seam = projectedSeamEllipse(heightPx, latDeg, ringM);
-  if (seam) {
-    const rx = c * (1 - t) + seam.rx * t;
-    const ry = c * (1 - t) + seam.ry * t;
-    const cy = seam.cy * t;
-    if (![rx, ry, cy].every((v) => Number.isFinite(v))) return null;
-    return { rx, ry, cy, seam };
-  }
+  const ringAt = (zz) => projectedRingEllipse({
+    zoom: zz,
+    pitchDeg: pitchTargetForZoom(zz),
+    heightPx: h,
+    latDeg,
+    ringM,
+  });
   // Horizon-crossing fallback (very short viewport): keep the old end-shape
   // squash at the iso pole, but still start from a true circle.
-  const vr = vignetteRadiusPxForZoom(Z_HANDOFF, latDeg, ringM);
-  if (!Number.isFinite(vr)) return null;
-  const squashEnd = Math.cos(pitchTargetForZoom(Z_HANDOFF) * DEG2RAD);
-  const rx = c * (1 - t) + vr * t;
-  const ry = c * (1 - t) + vr * squashEnd * t;
-  if (![rx, ry].every((v) => Number.isFinite(v))) return null;
-  return { rx, ry, cy: 0, seam: null };
+  const fallback = (() => {
+    const vr = vignetteRadiusPxForZoom(Z_HANDOFF, latDeg, ringM);
+    if (!Number.isFinite(vr)) return null;
+    const squashEnd = Math.cos(pitchTargetForZoom(Z_HANDOFF) * DEG2RAD);
+    return { rx: vr, ry: vr * squashEnd, cy: 0 };
+  })();
+  // Past the gate the camera holds the handoff pose: the mask holds the seam
+  // exactly (the twin clip's own ellipse), never growing past it.
+  if (n >= Z_HANDOFF) {
+    const end = seam || fallback;
+    if (!end) return null;
+    return { rx: end.rx, ry: end.ry, cy: Number.isFinite(end.cy) ? end.cy : 0, seam };
+  }
+  // Final stage: the mask is the ring's projection at the live zoom. As the
+  // ring grows 2x on the last level, the enclosure grows with it instead of
+  // holding a fixed porthole while the imagery scales inside.
+  if (n >= Z_TOP) {
+    const ring = ringAt(n) || fallback;
+    if (!ring) return null;
+    return { rx: ring.rx, ry: ring.ry, cy: Number.isFinite(ring.cy) ? ring.cy : 0, seam: seam || ring };
+  }
+  // Forming stage: corner circle -> the ring at the iso checkpoint. The
+  // endpoint is the same projection the scaling stage starts from, so the
+  // mask seals onto the ring with no jump.
+  const t = smooth01((n - Z_CENTER) / (Z_TOP - Z_CENTER));
+  if (!(t > 0)) return null;
+  const end = ringAt(Z_TOP) || fallback;
+  if (!end) return null;
+  const rx = c * (1 - t) + end.rx * t;
+  const ry = c * (1 - t) + end.ry * t;
+  const cy = (Number.isFinite(end.cy) ? end.cy : 0) * t;
+  if (![rx, ry, cy].every((v) => Number.isFinite(v))) return null;
+  return { rx, ry, cy, seam };
 }
 /** Top-down checkpoint reached (bearing/pitch -> 0). */
 export function isTopDown(z) {

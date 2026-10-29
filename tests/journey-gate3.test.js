@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 
 import {
   enclosureEllipsePxForZoom,
+  projectedRingEllipse,
   projectedSeamEllipse,
   vignetteRadiusPxForZoom,
   enclosureTForZoom,
@@ -118,21 +119,37 @@ test('FIX 3: the enclosure holds at the handoff instead of over-zooming', () => 
     atHandoff - oldHold > 20,
     `the old ground-radius hold under-shot by ${(atHandoff - oldHold).toFixed(1)}px`,
   );
-  // The ellipse keeps closing through the band, then HOLDS on the twin clip.
+  // Owner rev 2026-10-29: the final level is the ENCLOSURE scaling up with
+  // the ring, not the map zooming inside a fixed window. At Z_TOP the mask
+  // is the ring's own projection; it grows with the ring to the seam.
   const atTop = E(Z_TOP)?.rx;
-  assert.ok(atTop > atHandoff, 'the ellipse still has room to close at Z_TOP');
+  const topRing = projectedRingEllipse({
+    zoom: Z_TOP,
+    pitchDeg: pitchTargetForZoom(Z_TOP),
+    heightPx: H,
+    latDeg: SITE.lat,
+  });
+  assert.ok(atTop && topRing, 'the checkpoint ring projects');
+  assert.equal(+atTop.toFixed(3), +topRing.rx.toFixed(3), 'at Z_TOP the enclosure IS the ring');
+  assert.ok(atTop < atHandoff, 'the enclosure scales UP to the handoff seam');
   for (const z of [Z_HANDOFF, 12, 12.1, 13, 13.4, Z_MAX]) {
     assert.equal(E(z)?.rx, atHandoff, `z=${z} holds the handoff enclosure`);
   }
-  // The forming law is untouched: it still starts at the screen corners and
-  // closes in across the shared span.
+  // Forming stage: corner circle -> the ring at the iso checkpoint.
   assert.equal(E(6.9), null, 'parks below the band');
   assert.ok(Math.abs(E(7.01).rx - C) < 5, 'still starts AT the corners');
   let prev = Infinity;
-  for (let z = 7.5; z <= Z_HANDOFF; z += 0.5) {
+  for (let z = 7.5; z <= Z_TOP; z += 0.5) {
     const r = E(z).rx;
     assert.ok(r < prev, `z=${z} still closes in from the edges`);
     prev = r;
+  }
+  // Scaling stage: the mask grows with the ring from the checkpoint up.
+  let lower = atTop;
+  for (let z = Z_TOP + 0.5; z <= Z_HANDOFF; z += 0.5) {
+    const r = E(z).rx;
+    assert.ok(r > lower, `z=${z} scales UP with the ring`);
+    lower = r;
   }
   // Symmetric on retrace: the law is a pure function of z.
   assert.equal(E(9).rx, E(9).rx, 'the law is pure in z');

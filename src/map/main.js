@@ -62,7 +62,6 @@ import {
   REARM_DOWN_BELOW,
   progressiveRetargetDue,
   stallCeilingPin,
-  preStallSwallowDue,
   releaseImpossibleReason,
   RELEASE_WAIT_BOUND_MS,
 } from './scrolltrigger.js';
@@ -879,8 +878,10 @@ let stagedTilesGranted = false;
 
 // HARD-STOP state: wall-clock arming of the zero-hold (0 = none armed).
 // stallPhase() names where the fingers are: 'staged' while the staged hold
-// owns S, 'pre' while the enclosing mask is armed on the native-zoom climb.
-// stallArmed() adds the unloaded twin; stallHolding() adds the long cap.
+// owns S. The old pre-gate ('pre') hold is retired with the arrival gate:
+// the camera runs to Z_HANDOFF continuously, and a cold twin waits at the
+// gate with the overlay dark instead of freezing mid-dive. stallArmed()
+// adds the unloaded twin; stallHolding() adds the long cap.
 // Reverse (scroll-up) never consults any of this — every reverse path runs
 // untouched, so fingers always escape by going back.
 let stallT0 = 0;
@@ -888,57 +889,19 @@ let stallCeilingOn = false; // pre-gate depth freeze applied (restored only when
 let lastCeilingPin = null; // last applied ceiling value (unchanged pins write nothing)
 let stallPollT = 0; // bounded presentation poll: one 500ms chain while holding (cleared on release)
 // HARD-STOP pill grace: the loader is a FALLBACK surface, not a dive badge.
-// stallPhase arms at the mask (z~7) while fast-grant dives release almost
+// The staged hold arms at arrival while fast-grant dives release almost
 // immediately — showing the pill from tick 0 flashes it on every healthy
 // dive. Visibility waits STALL_PILL_GRACE_MS of held time; the feeder gate
 // (zoom freeze) is unaffected and engages from tick 0.
 const STALL_PILL_GRACE_MS = 2000;
-// PRE-PHASE PROGRESS LAW (marker PRE_PHASE_PROGRESS): the mask-armed climb
-// must never freeze behind a twin that is not coming. A blank frame means
-// nothing is loading — boot it (earlyBootTwin is boot-once/idempotent) and
-// let the climb flow while it boots; freezing for a twin that is not even
-// loading is the owner-reported "freezing at that stage" with a dark pill.
-// A live frame that keeps painting is legitimate slowness (advancing frames
-// restart the short clock). A live frame with dead frames past
-// PRE_PHASE_DEAD_MS is not a load, it is a stall — release forward rather
-// than hold to the 30s wall bound. Staged is untouched (release watch owns
-// it). Fail-safe holds (never newly freezes on a read error). Never throws.
-const PRE_PHASE_DEAD_MS = 4000;
-let preHoldFrames = NaN; // last seen twin frame count while pre-holding
-let preHoldT0 = 0; // wall clock the current dead-frames wait started
-function preHoldProgressAlive() {
-  try {
-    if (!twinFrameLive()) {
-      try { earlyBootTwin(); } catch { /* boot kick is best-effort */ }
-      preHoldFrames = NaN;
-      preHoldT0 = 0;
-      return false;
-    }
-    const n = twinFrameCount();
-    const now = nowMs();
-    if (Number.isFinite(n) && (!Number.isFinite(preHoldFrames) || n > preHoldFrames)) {
-      preHoldFrames = n;
-      preHoldT0 = now;
-      return true;
-    }
-    if (!Number.isFinite(preHoldFrames)) {
-      preHoldFrames = Number.isFinite(n) ? n : 0;
-      preHoldT0 = now;
-      return true;
-    }
-    if (now - preHoldT0 > PRE_PHASE_DEAD_MS) return false;
-    return true;
-  } catch { return true; }
-}
 function stallPhase() {
   try {
     if (transitId) return null;
-    // Staged first: the hold owns S while twinOpen is already true (prewarm),
+    // Staged only: the hold owns S while twinOpen is already true (prewarm),
     // so the twinOpen check below must not mask it — the loader and the S
-    // freeze apply inside the mask exactly as on the climb.
+    // freeze apply at the gate exactly as on the climb.
     if (stagedActive && !stagedCommitted) return 'staged';
     if (twinOpen) return null;
-    if (maskArmed()) return 'pre';
   } catch { /* predicate is best-effort */ }
   return null;
 }
@@ -976,31 +939,15 @@ function stallArmed() {
     // at the next deep arrival.
     if (receding) return false;
     const phase = stallPhase();
-    if (phase === null || twinLoaded()) {
-      preHoldFrames = NaN;
-      preHoldT0 = 0;
-      return false;
-    }
-    // Gate-approach stop: the mask-armed ('pre') hold swallows forward only
-    // on the gate approach — below it the climb flows and the stop happens
-    // at the shut mask, never frozen mid-gesture below the arming threshold
-    // (a sub-gate freeze the ceiling then had to bound was the trap). The
-    // staged hold's S stall is zoom-independent and untouched.
-    if (phase === 'pre') {
-      let zNow = NaN;
-      try { zNow = mapRef ? +mapRef.getZoom() : NaN; } catch { zNow = NaN; }
-      if (!preStallSwallowDue({ phase, z: zNow })) {
-        preHoldFrames = NaN;
-        preHoldT0 = 0;
-        return false;
-      }
-      // PRE_PHASE_PROGRESS: blank boots + flows, painting holds briefly,
-      // dead frames release — a pre-hold with no twin coming never freezes.
-      if (!preHoldProgressAlive()) return false;
-    } else {
-      preHoldFrames = NaN;
-      preHoldT0 = 0;
-    }
+    if (phase === null || twinLoaded()) return false;
+    // ARRIVAL-ONLY HOLD: below the gate the camera must reach the handoff —
+    // the final level is the enclosure scaling with the ring, and freezing
+    // here was the pause-then-zoom the owner reported. The S gate owns the
+    // wait once the camera is at the gate (overlay still dark), and the
+    // staged hold protects the dissolve from there.
+    let zNow = NaN;
+    try { zNow = mapRef ? +mapRef.getZoom() : NaN; } catch { zNow = NaN; }
+    if (!(zNow >= Z_HANDOFF - 0.01)) return false;
     return true;
   } catch { return false; }
 }
@@ -1067,9 +1014,10 @@ function applyStallCeiling(hold) {
         // live zoom and the hold refreshes on every pass, so re-applying an
         // unchanged ceiling re-ran MapLibre's constrain setup per frame for
         // the whole stall window (the region the owner reports as worst).
-        // Phase floor: staged holds need the gate reachable (Z_HANDOFF), the
-        // pre-gate lanes only need the staging arm (Z_TOP). Pinning staged at
-        // Z_TOP parked a 100%-opaque dive at z10.59 forever.
+        // Phase floor: a staged hold needs the gate reachable (Z_HANDOFF);
+        // a legacy ceiling outside the staged hold keeps the staging arm
+        // (Z_TOP). Pinning staged at Z_TOP parked a 100%-opaque dive at
+        // z10.59 forever.
         const floorZ = stagedActive && !stagedCommitted ? Z_HANDOFF : Z_TOP;
         const pin = stallCeilingPin(z, floorZ);
         if (!stallCeilingOn || pin !== lastCeilingPin) {
@@ -1197,8 +1145,6 @@ function refreshStallLoading() {
       hold = stallWaitMs() < HARD_STOP_HOLD_MS;
     } else {
       stallT0 = 0;
-      preHoldFrames = NaN;
-      preHoldT0 = 0;
     }
   } catch { hold = false; }
   try {
@@ -1938,18 +1884,16 @@ function onNativeZoomStep(snap, source) {
     // far away it rests at the canvas edges (k=0) so zoom reads the same.
     const clipK = prox && prox.armed ? blend : 0;
     updateRingClip(clipK, prox);
-    // Journey enclosure: the vignette ellipse starts at the hotspot's farthest
-    // screen corner (clear frame, darkness biasing in from the edges) and
-    // closes onto the PROJECTED ring radius across the shared enclosure
-    // span Z_CENTER..Z_HANDOFF (enclosureEllipsePxForZoom: rx is the forming
-    // law circle corner*(1-t) + R/mpp*t — the SAME law as the bracket
-    // clip-k, so ellipse and brackets stay in sync — ry is rx squashed by
-    // the tilt projection cos(pitch), exact R at/above Z_HANDOFF: the same
-    // ground circle the twin clip cuts), so the enclosing coincides with
-    // the twin clip exactly at handoff and never shrinks past it. The
-    // corner brackets ride the SAME --vx/--vy/--vr/--vr-y (lefts on the
-    // horizontal axis, tops on the vertical axis), so one write moves
-    // both — the old canvas-percentage corner law is gone. Gate: blend>0 (z>7) — below
+    // Journey enclosure: the clear core IS the projected ground ring, so the
+    // mask and the twin clip are one ellipse at every zoom. It forms from the
+    // hotspot's farthest screen corner onto the ring by the iso checkpoint
+    // (Z_TOP), then SCALES WITH the ring to the handoff seam (Z_HANDOFF),
+    // where it holds. Owner rev 2026-10-29: the final level reads as the
+    // enclosure growing to meet the twin, not the map zooming inside a fixed
+    // porthole. rx/ry/cy come from enclosureEllipsePxForZoom (the camera's own
+    // pitched projection); the corner brackets ride the SAME
+    // --vx/--vy/--vr/--vr-y (lefts on the horizontal axis, tops on the
+    // vertical axis), so one write moves both. Gate: blend>0 (z>7) — below
     // that the ring is sub-pixel and the surround would black the frame.
     // Zoom-out retraces it symmetrically (pure function of z + viewport).
     // Twin paths own it while open.
@@ -3186,16 +3130,19 @@ function driveStagedHold(st) {
   try {
     const app = document.getElementById('app');
     if (app && mapRef) {
-      // Reveal continuity: while the twin is still booting (pre-grant), the
-      // blend's entry endpoint tracks the live zoom — the ceiling clamps at
-      // 11.5 but zoom still travels under it (measured 10.94->11.48 over 3
-      // ticks with the ring frozen at 286: static circle, zooming terrain =
-      // the owner's report). Refreshing the entry from the live law keeps
-      // blend==driver==zoom; at grant the entry freezes and the S-sweep
-      // continues from exactly what the ring shows.
+      // Reveal continuity: the blend's entry endpoint tracks the live zoom
+      // until the camera actually reaches the handoff. The twin can be
+      // granted early (prewarm) — freezing the entry on grant left the ring
+      // at ~280 while the map travelled the last level to a 512px ring
+      // (measured: static circle, zooming terrain = the owner's report).
+      // Below the gate, refresh from the live law every tick; at the gate the
+      // entry is pinned to the seam, so the S-sweep holds the twin clip and
+      // the mask does not grow during the fade.
+      let atGate = false;
+      try { atGate = +mapRef.getZoom() >= Z_HANDOFF - 0.01; } catch { atGate = false; }
       try {
         const grantedHold = !!(window.__mapProbe && (window.__mapProbe.twinReady || window.__mapProbe.twinPainted));
-        if (!grantedHold) {
+        if (!grantedHold || !atGate) {
           let zLive = NaN;
           try { zLive = +mapRef.getZoom(); } catch { zLive = NaN; }
           const proxLive = proximityInfo();
@@ -3230,6 +3177,14 @@ function driveStagedHold(st) {
         }
       } catch { /* entry refresh is best-effort; stale entry still blends */ }
       const seam = seamHoldEllipseForS(stagedS, frameSize().h);
+      if (seam && atGate) {
+        // At the gate the mask IS the twin clip: pin the entry to the seam so
+        // the S-sweep cannot grow the ring during the fade (the entry caches
+        // one tick behind the camera; without this it lags the seam by ~20px).
+        entryRx = +seam.rx.toFixed(1);
+        entryRy = +seam.ry.toFixed(1);
+        entryCy = Number.isFinite(seam.cy) ? +seam.cy.toFixed(1) : 0;
+      }
       if (seam && Number.isFinite(seam.rx) && Number.isFinite(seam.ry) && seam.rx > 0) {
         const rev = clamp01(st && Number.isFinite(st.reveal) ? st.reveal : 0);
         const eRx = Number.isFinite(entryRx) && entryRx > 0 ? entryRx : seam.rx;

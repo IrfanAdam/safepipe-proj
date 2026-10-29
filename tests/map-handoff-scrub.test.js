@@ -363,15 +363,21 @@ test('readiness-hysteresis: the tiles grant latches, tile gaps never re-arm the 
     'pre-grant ov stays 0 — the latch only ever releases, never pre-grants',
   );
 });
-test('round-7 sync audit: parked pre-grant entry tracks the live zoom', () => {
-  // Measured: zoom 10.94->11.48 over 3 ticks with the ring frozen at the
-  // arrival entry (286px) — static circle, zooming terrain. The ceiling
-  // clamps at 11.5 but zoom still travels under it while S is parked, so
-  // the blend's rev-0 endpoint must be the live law, not the stale entry.
+test('round-7 sync audit: parked pre-grant entry tracks the live zoom until the gate', () => {
+  // Measured: zoom 10.94->11.48 with the ring frozen at the arrival entry
+  // (286px) — static circle, zooming terrain. The ceiling clamps at 11.5 but
+  // zoom still travels under it while S is parked, so the blend's rev-0
+  // endpoint must be the live law, not the stale entry. Owner rev 2026-10-29:
+  // the freeze waits for the GATE, not for the twin grant — an early-granted
+  // prewarm froze the ring at the arm (~280) while the map ran to 512.
   const main = srcOf('../src/map/main.js');
   assert.ok(
-    main.includes('if (!grantedHold) {'),
-    'the hold refreshes its entry while the twin is still booting',
+    main.includes('if (!grantedHold || !atGate) {'),
+    'the hold refreshes its entry until the camera reaches the gate (even if granted early)',
+  );
+  assert.ok(
+    main.includes('if (seam && atGate) {'),
+    'at the gate the entry is pinned to the seam (no mask growth during the fade)',
   );
   assert.ok(
     main.includes('entryRx = +e.rx.toFixed(1); entryRy = +e.ry.toFixed(1);'),

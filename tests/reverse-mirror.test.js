@@ -24,6 +24,8 @@ import {
   projectedSeamEllipse,
   MAP_VIGNETTE_RING_M,
   metersPerPixel,
+  Z_TOP,
+  Z_HANDOFF,
 } from '../src/map/scrolltrigger.js';
 import { TWIN_STAGED_MSG as MAP_STAGED_MSG, buildTwinStagedMessage, TWIN_PAINTED_MSG as MAP_PAINTED_MSG, parseTwinPaintedMessage } from '../src/map/twinlink.js';
 import {
@@ -106,7 +108,7 @@ test('vignette radius: projected R, coincides with the twin clip at handoff', ()
   assert.equal(vignetteRadiusPxForZoom(12, SITE.lat, -1), null, 'non-positive ring parks');
 });
 
-test('enclosure forming wash: screen corners close onto the projected clip', () => {
+test('enclosure: corners close onto the ring, then the ring scales to the clip', () => {
   const C = 900; // hotspot farthest-corner distance on the test viewport
   const H = 700;
   const E = (z, c = C) => enclosureEllipsePxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, c, H);
@@ -115,16 +117,26 @@ test('enclosure forming wash: screen corners close onto the projected clip', () 
   assert.equal(E(8, -4), null, 'parks on a non-positive corner');
   const at7 = E(7.01).rx;
   assert.ok(Math.abs(at7 - C) < 5, `forming starts AT the corners (got ${at7.toFixed(1)}px)`);
+  // Act 1 — the forming wash closes from the corners onto the ring by Z_TOP.
   let prev = Infinity;
-  for (let z = 7.5; z <= 11.5; z += 0.5) {
+  for (let z = 7.5; z <= Z_TOP; z += 0.5) {
     const r = E(z).rx;
     assert.ok(r < prev, `z=${z} closes in from the edges (${r.toFixed(0)}px < ${prev === Infinity ? 'inf' : prev.toFixed(0)}px)`);
     prev = r;
   }
+  // Act 2 — owner rev 2026-10-29: the mask IS the ring and scales UP with it
+  // to the handoff seam; the final level grows the enclosure, not a zoom
+  // inside a fixed porthole.
+  let lower = E(Z_TOP).rx;
+  for (let z = Z_TOP + 0.25; z <= Z_HANDOFF; z += 0.25) {
+    const r = E(z).rx;
+    assert.ok(r > lower, `z=${z} scales UP with the ring (${r.toFixed(0)}px > ${lower.toFixed(0)}px)`);
+    lower = r;
+  }
   // Past the HANDOFF the enclosure HOLDS at the projected seam — the twin's
   // fixed ground clip projected by the same camera law.
-  const atHandoff = E(11.5).rx;
-  for (const z of [11.5, 12, 12.1, 13, 13.4]) {
+  const atHandoff = E(Z_HANDOFF).rx;
+  for (const z of [Z_HANDOFF, 12, 12.1, 13, 13.4]) {
     assert.equal(E(z).rx, atHandoff, `z=${z} HOLDS the handoff enclosure (no over-zoom past the ring)`);
   }
   assert.equal(

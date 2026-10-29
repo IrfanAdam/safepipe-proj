@@ -1531,7 +1531,14 @@ async function boot() {
         try {
           applyFlightPose(fs.eye, fs.target);
         } catch { /* pose drive is best-effort */ }
-        driveMix(fs.mix);
+        // Owner rev 2026-10-29: the staged melt follows the S reveal, not
+        // the settle leg's last 1.3 ticks — the satellite->3D morph spreads
+        // across the visible fade, so the switch is a crossfade, not a cut.
+        // Autoplay intros keep the leg mix; staged scroll is the parent's S.
+        const mixNow = fwd.staged
+          ? HANDOFF_END_MIX * fwdProgressForStagedS(handoff.fwdStagedS ?? 0)
+          : fs.mix;
+        driveMix(mixNow);
         let swoopW = 0.5;
         try {
           const total = scrubTotalMs(fwd.legs);

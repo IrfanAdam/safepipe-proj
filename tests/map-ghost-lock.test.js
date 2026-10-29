@@ -3,8 +3,9 @@
 // the pre-gate stall parked the journey BELOW the staging gate (sub-gate
 // ceiling pin + mid-climb swallow) so the twin never arrived; (b) the lock
 // engaged at the late staged arm (t43/z10.74) instead of at intent (z~7).
-// Guards: the stall ceiling never pins below Z_TOP, the mask-armed hold
-// swallows only on the gate approach, a set ceiling always re-evaluates,
+// Guards: the stall ceiling never pins below Z_TOP, the pre-phase hold is
+// retired (the camera runs to the gate; only the staged arrival hold waits),
+// a set ceiling always re-evaluates,
 // and the intent-lock freezes the SITE anchor + pan at the mask arm with no
 // center snap (seating stays at the staged arm, drift ~0 by then).
 import { test } from 'node:test';
@@ -15,9 +16,7 @@ import { fileURLToPath } from 'node:url';
 import {
   Z_TOP,
   Z_HANDOFF,
-  REARM_DOWN_BELOW,
   stallCeilingPin,
-  preStallSwallowDue,
 } from '../src/map/scrolltrigger.js';
 
 const srcOf = (rel) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), rel), 'utf8');
@@ -47,41 +46,22 @@ test('staged stall pins at the commit gate, not the iso checkpoint', () => {
   assert.equal(stallCeilingPin(NaN, Z_HANDOFF), Z_HANDOFF, 'non-finite reads fall back to the given floor');
 });
 
-test('pre-phase stall swallows only on the gate approach', () => {
-  assert.equal(
-    preStallSwallowDue({ phase: 'pre', z: REARM_DOWN_BELOW }),
-    true,
-    'at the approach the mask-armed hold still stops forward',
+test('pre-phase hold retired: the camera runs to the gate, only the staged hold waits', () => {
+  const main = srcOf('../src/map/main.js');
+  assert.ok(!main.includes("return 'pre'"), 'stallPhase has no pre branch');
+  assert.ok(!main.includes('preStallSwallowDue'), 'the pre-phase swallow gate is gone');
+  assert.ok(!main.includes('PRE_PHASE_DEAD_MS'), 'the pre-phase dead-frames bound is gone');
+  const phase = main.slice(main.indexOf('function stallPhase()'), main.indexOf('function twinLoaded()'));
+  assert.ok(
+    phase.includes("if (stagedActive && !stagedCommitted) return 'staged';"),
+    'staged is the only hold phase',
   );
-  assert.equal(
-    preStallSwallowDue({ phase: 'pre', z: REARM_DOWN_BELOW + 0.5 }),
-    true,
-    'inside the approach the stop holds',
-  );
-  assert.equal(
-    preStallSwallowDue({ phase: 'pre', z: REARM_DOWN_BELOW - 0.01 }),
-    false,
-    'below the approach the climb flows — never frozen mid-gesture',
-  );
-  assert.equal(
-    preStallSwallowDue({ phase: 'pre', z: 7.0 }),
-    false,
-    'at the mask arm the climb flows (mask forms, tilt glides, tiles warm)',
-  );
-  assert.equal(
-    preStallSwallowDue({ phase: 'pre', z: NaN }),
-    false,
-    'unreadable zoom never swallows',
-  );
-  assert.equal(
-    preStallSwallowDue({ phase: 'staged', z: 7.0 }),
-    true,
-    'the staged S stall is zoom-independent and untouched',
-  );
-  assert.equal(
-    preStallSwallowDue({ phase: null, z: 11 }),
-    true,
-    'no phase means no gate to apply',
+  assert.ok(!phase.includes("'pre'"), 'no pre path remains');
+  const armed = main.slice(main.indexOf('function stallArmed('), main.indexOf('function stallWaitMs()'));
+  assert.ok(!armed.includes('preHold'), 'stallArmed no longer consults a pre-hold');
+  assert.ok(
+    armed.includes('if (phase === null || twinLoaded()) return false;'),
+    'the staged hold still gates on content',
   );
 });
 
@@ -96,16 +76,16 @@ test('stall ceiling + swallow gates are wired in the driver', () => {
     'a set ceiling re-evaluates on the poll chain even with zero input (no frozen-frame deadlock)',
   );
   assert.ok(
-    main.includes('preStallSwallowDue({ phase, z: zNow })'),
-    "the mask-armed hold consults the approach gate before swallowing",
+    !main.includes('preStallSwallowDue'),
+    'the pre-phase approach gate is gone (the camera runs to the gate)',
   );
   assert.ok(
     main.includes('try { armed = stallArmed(); } catch { armed = false; }'),
     'the hold presentation/ceiling runs on the single stallArmed gate (no bypass re-arming the hold below the approach)',
   );
   assert.ok(
-    main.includes("import {") && main.includes('stallCeilingPin,') && main.includes('preStallSwallowDue,'),
-    'both laws are imported (single source, no restated literals)',
+    main.includes('import {') && main.includes('stallCeilingPin,') && !main.includes('preStallSwallowDue,'),
+    'the ceiling law is imported (single source, no restated literals); the retired pre gate is not',
   );
 });
 
