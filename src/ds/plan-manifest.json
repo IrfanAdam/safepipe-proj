@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-29T08:52:27.292Z",
+  "generated": "2026-10-29T17:22:43.472Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "4ebde07",
+      "full": "4ebde07a80404b700eec01b9a9c950213d9f8715",
+      "date": "2026-10-29",
+      "time": "14:23",
+      "subject": "chore(sync): plan manifest + version after sync land [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "c919af3",
       "full": "c919af37b1a7c93d4b1de90c133fc4e96245c5e3",
@@ -6744,5 +6753,10 @@
       "anchor": "phase-4"
     }
   ],
-  "wip": []
+  "wip": [
+    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+    "public/version.json",
+    "src/map/main.js",
+    "src/map/scrolltrigger.js"
+  ]
 }
