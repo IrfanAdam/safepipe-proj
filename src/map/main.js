@@ -44,19 +44,18 @@ import {
   isHomeZoom,
   flipWheelDelta,
   lockAroundPoint,
-  maskGainForBlend,
   pitchTargetForZoom,
   metersPerPixel,
   formatGround,
   spanFrac,
   EARTH_CIRC_M,
   Z_MIN,
+  Z_CENTER,
   Z_FADE1,
   Z_ISO_START,
   Z_HANDOFF,
   Z_TOP,
   Z_MAX,
-  Z_TAKEOVER_FLOOR,
   Z_FAR_INTENT,
   CACHE_FAST_IDLE_DELAY_MS,
   CACHE_FAST_IDLE_TTL_MS,
@@ -1399,7 +1398,7 @@ function maskArmed() {
     const z = +mapRef.getZoom();
     if (!Number.isFinite(z) || centerBlendForZoom(z) <= 0) return false;
     const prox = proximityInfo();
-    return !!(prox && prox.near);
+    return !!(prox && prox.armed);
   } catch { return false; }
 }
 /** Proximity read: hotspot screen px vs cursor + vs canvas center.
@@ -1434,11 +1433,24 @@ function proximityInfo() {
       } catch { /* cursor math is best-effort */ }
     }
     const centerNear = distCenter <= PROX_CENTER_PX;
+    // SITE-IN-VIEW: the journey arms on the hotspot being on screen, not
+    // only on the cursor being within 140px of it. With one hotspot visible
+    // and the cursor elsewhere, every old `near` gate stayed false (measured:
+    // 48 wheel ticks, mask never armed, site 101k px off-centre). The margin
+    // REUSES the cursor radius — no new constant — so a spot just outside the
+    // frame still counts as intent.
+    const inView =
+      pt.x >= -PROX_CURSOR_PX && pt.x <= cw + PROX_CURSOR_PX &&
+      pt.y >= -PROX_CURSOR_PX && pt.y <= ch + PROX_CURSOR_PX;
     const out = {
       sx: Math.round(pt.x), sy: Math.round(pt.y),
       distCursor: distCursor == null ? null : +distCursor.toFixed(1),
       distCenter: +distCenter.toFixed(1),
-      cursorNear, centerNear, near: cursorNear || centerNear,
+      cursorNear, centerNear, inView,
+      near: cursorNear || centerNear,
+      // Every journey predicate (mask, settle, takeover, prewarm, abort,
+      // intent-lock) reads `armed`: near OR in view, one gate, no second door.
+      armed: cursorNear || centerNear || inView,
     };
     // Memoised for the rest of THIS pass only: the driver, the ring clip and
     // the staged hold ask the same question about the same camera. Reads
@@ -1684,6 +1696,7 @@ let lastVyWritten = null; // Guards stay inline at each setProperty site (never 
 // driver keeps one literal per-site write of the horizontal and vertical radii.
 let entryRx = null; // staged-entry radii: the arrival's live-law write, cached so the hold ring blends entry->seam on scroll instead of snapping to the seam constant (cleared on unwind)
 let entryRy = null;
+let entryCy = null; // staged-entry ellipse centre offset (projected near half sits lower than the site)
 /** SINGLE RADIUS LAW: viewport-clamped farthest-corner distance. An
  * off-screen hotspot inflates the true corner 100x (measured 21000px
  * blowups that parked the mask off-frame), while the staged-hold entry
@@ -1722,34 +1735,39 @@ function writeEnclosureEllipse(proxArg, zArg) {
     // UNLESS a site-anchored hold owns the frame: then the mask rides the
     // ANCHOR projection (the twin's handed center, SITE by construction),
     // so mask and twin agree even off-centre, zero lateral offset.
-    if (prox.near) {
-      const vxStr = Math.round(prox.sx) + 'px';
-      const vyStr = Math.round(prox.sy) + 'px';
-      if (lastVxWritten !== vxStr) { app.style.setProperty('--vx', vxStr); lastVxWritten = vxStr; }
-      if (lastVyWritten !== vyStr) { app.style.setProperty('--vy', vyStr); lastVyWritten = vyStr; }
-    } else if (stagedActive && stagedAnchor && stagedAnchor.site && mapRef) {
-      try {
-        const pa = mapRef.project([stagedAnchor.cx, stagedAnchor.cy]);
-        if (pa && Number.isFinite(+pa.x) && Number.isFinite(+pa.y)) {
-          const vxStr = Math.round(pa.x) + 'px';
-          const vyStr = Math.round(pa.y) + 'px';
-          if (lastVxWritten !== vxStr) { app.style.setProperty('--vx', vxStr); lastVxWritten = vxStr; }
-          if (lastVyWritten !== vyStr) { app.style.setProperty('--vy', vyStr); lastVyWritten = vyStr; }
-        }
-      } catch { /* anchor-center write is best-effort */ }
-    }
     let corner = null;
+    let h = null;
     try {
       // ONE box read per pass (frameSize — shared with proximity + the HUD).
       const box = frameSize();
-      const w = box.w;
-      const h = box.h;
-      // SINGLE RADIUS LAW: the clamped corner (shared with the staged-hold
-      // entry refresh below) — never the true off-screen projection.
-      corner = viewportCornerPx(prox.sx, prox.sy, w, h);
+      h = box.h;
+      corner = viewportCornerPx(prox.sx, prox.sy, box.w, box.h);
     } catch { corner = null; }
-    const ellipse = enclosureEllipsePxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, corner);
+    const ellipse = enclosureEllipsePxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, corner, h);
     if (ellipse && Number.isFinite(ellipse.rx) && Number.isFinite(ellipse.ry)) {
+      // Center follows the journey arm (near OR in view): an off-screen
+      // projection parks the spot 100k+ px out, and writing it would snap the
+      // mask across the frame when nearness resumes. The ellipse centre adds
+      // the projection's own cy — the pitched near half projects farther than
+      // the far half, so the mask and the twin clip share one centre instead
+      // of the old site-centred circle.
+      const cy = Number.isFinite(ellipse.cy) ? ellipse.cy : 0;
+      if (prox.armed) {
+        const vxStr = Math.round(prox.sx) + 'px';
+        const vyStr = Math.round(prox.sy + cy) + 'px';
+        if (lastVxWritten !== vxStr) { app.style.setProperty('--vx', vxStr); lastVxWritten = vxStr; }
+        if (lastVyWritten !== vyStr) { app.style.setProperty('--vy', vyStr); lastVyWritten = vyStr; }
+      } else if (stagedActive && stagedAnchor && stagedAnchor.site && mapRef) {
+        try {
+          const pa = mapRef.project([stagedAnchor.cx, stagedAnchor.cy]);
+          if (pa && Number.isFinite(+pa.x) && Number.isFinite(+pa.y)) {
+            const vxStr = Math.round(pa.x) + 'px';
+            const vyStr = Math.round(pa.y + cy) + 'px';
+            if (lastVxWritten !== vxStr) { app.style.setProperty('--vx', vxStr); lastVxWritten = vxStr; }
+            if (lastVyWritten !== vyStr) { app.style.setProperty('--vy', vyStr); lastVyWritten = vyStr; }
+          }
+        } catch { /* anchor-center write is best-effort */ }
+      }
       const vrStr = ellipse.rx.toFixed(1) + 'px';
       const vrYStr = ellipse.ry.toFixed(1) + 'px';
       if (lastVrWritten !== vrStr) { app.style.setProperty('--vr', vrStr); lastVrWritten = vrStr; }
@@ -1776,7 +1794,7 @@ function parkEnclosureEllipse() {
     let ry = lastEllipseRy;
     if (!Number.isFinite(rx) || !Number.isFinite(ry)) {
       try {
-        const seam = seamHoldEllipseForS(0);
+        const seam = seamHoldEllipseForS(0, frameSize().h);
         if (seam && Number.isFinite(seam.rx) && Number.isFinite(seam.ry)) { rx = seam.rx; ry = seam.ry; }
       } catch { /* seam fallback is best-effort */ }
     }
@@ -1918,7 +1936,7 @@ function onNativeZoomStep(snap, source) {
     const blend = centerBlendForZoom(z);
     // Ring clip converges canvas-edges -> ring-edges only while near;
     // far away it rests at the canvas edges (k=0) so zoom reads the same.
-    const clipK = prox && prox.near ? blend : 0;
+    const clipK = prox && prox.armed ? blend : 0;
     updateRingClip(clipK, prox);
     // Journey enclosure: the vignette ellipse starts at the hotspot's farthest
     // screen corner (clear frame, darkness biasing in from the edges) and
@@ -1946,9 +1964,9 @@ function onNativeZoomStep(snap, source) {
       // takes the frame.
       let proxUse = prox;
       try {
-        if (prox.near && blend > 0) {
+        if (prox.armed) {
           noteCenterArm(prox, z);
-          if (applyCenterSettle(z)) {
+          if (blend > 0 && applyCenterSettle(z)) {
             frameProxCache = null; // the pass memo predates the camera jump
             const fresh = proximityInfo();
             if (fresh) proxUse = fresh;
@@ -1965,7 +1983,7 @@ function onNativeZoomStep(snap, source) {
         // wash is off, but a stale giant the moment anything re-arms it. The
         // arrival path still writes true off-centre sizes directly (its clamp
         // must not depend on nearness); the driver only tracks nearness.
-        if (proxUse.near) {
+        if (proxUse.armed) {
           if (!writeEnclosureEllipse(proxUse, z)) parkEnclosureEllipse();
         } else {
           parkEnclosureEllipse();
@@ -1977,9 +1995,9 @@ function onNativeZoomStep(snap, source) {
       // parks seconds before a timer-fired twin. Radii/park writes above
       // still run (the staged entry caches them); maskArmed below is
       // untouched (telemetry still reads the arm predicate).
-      if (!transitId) showVignette(proxUse.near && blend > 0);
+      if (!transitId) showVignette(proxUse.armed && blend > 0);
       try {
-        window.__mapProbe.maskArmed = !!(proxUse.near && blend > 0);
+        window.__mapProbe.maskArmed = !!(proxUse.armed && blend > 0);
       } catch { /* probe cosmetic */ }
     } else {
       // The twin owns the frame: the settle arm dies with it, so a close at
@@ -2001,7 +2019,7 @@ function onNativeZoomStep(snap, source) {
     // arrival band streams. Tiles only — never boots, never flips twin
     // state, so the mask-arm abort lifecycle is untouched.
     try {
-      if (prox && prox.near && z >= Z_FAR_INTENT && !twinOpen) {
+      if (prox && prox.armed && z >= Z_FAR_INTENT && !twinOpen) {
         const fz = Math.floor(z);
         if (fz !== lastFarWarmZ) {
           lastFarWarmZ = fz;
@@ -2010,7 +2028,7 @@ function onNativeZoomStep(snap, source) {
         try {
           if (!window.__mapProbe.bootTiming.intentMs) window.__mapProbe.bootTiming.intentMs = nowMs();
         } catch { /* probe cosmetic */ }
-      } else if (lastFarWarmZ !== -1 && !(prox && prox.near)) {
+      } else if (lastFarWarmZ !== -1 && !(prox && prox.armed)) {
         lastFarWarmZ = -1; // intent lost: re-arm for the next dive
       }
     } catch { /* far-intent warm never breaks the journey */ }
@@ -2028,7 +2046,7 @@ function onNativeZoomStep(snap, source) {
     // Runs on every zoom tick (native + takeover-driven), so the
     // in-band takeover call below stays a backstop, never the first boot.
     try {
-      if (prox && prox.near && blend > 0) {
+      if (prox && prox.armed && blend > 0) {
         if (!twinOpen && !transitId && !pendingReveal && !stagedActive && !earlyTwinArmed) {
           try {
             earlyBootTwin();
@@ -2059,7 +2077,7 @@ function onNativeZoomStep(snap, source) {
     // would trip the twin's painted deep-release pre-arm
     // (see progressiveRetargetDue).
     try {
-      if (prox && prox.near && !twinOpen && !transitId && !pendingReveal && !stagedActive) {
+      if (prox && prox.armed && !twinOpen && !transitId && !pendingReveal && !stagedActive) {
         if (progressiveRetargetDue({ z, lastZ: lastRetargetZ, lastT: lastRetargetT, nowT: nowMs() })) {
           try {
             const h3 = h3map[siteSector];
@@ -2108,7 +2126,7 @@ function onNativeZoomStep(snap, source) {
             }
           } catch { /* retarget is best-effort */ }
         }
-      } else if (lastRetargetZ !== -1 && (!prox || !prox.near)) {
+      } else if (lastRetargetZ !== -1 && (!prox || !prox.armed)) {
         lastRetargetZ = -1; // intent lost: re-arm for the next dive
       }
     } catch { /* progressive retarget never breaks the journey */ }
@@ -2244,7 +2262,7 @@ function onNativeZoomStep(snap, source) {
     // (z >= Z_ISO_START) OR the tilt is still stranded above the law's target
     // (the flatten case). The law is ONE law — pitchTargetForZoom(z) —
     // and it is 0 below the band, so the reverse retraces it exactly.
-    if (!twinOpen && !busyFlight && prox && (prox.near || isoScrubOwned || z >= Z_ISO_START || isoRestoreDue)) {
+    if (!twinOpen && !busyFlight && prox && (prox.armed || isoScrubOwned || z >= Z_ISO_START || isoRestoreDue)) {
       const pLaw = pitchTargetForZoom(z);
       let pCur = null;
       try {
@@ -2318,7 +2336,7 @@ function onNativeZoomStep(snap, source) {
     // a second ease here would supersede its center glide, so this covers
     // far settles only). At-target settles no-op here. Zoom is never touched.
     // Recede-exempt like the reconcile above: pitch-only, same settle tempo.
-    if (!twinOpen && !busyFlight && source === 'native-zoomend' && isoRestoreDue && shouldCenter(z) && prox && !prox.near) {
+    if (!twinOpen && !busyFlight && source === 'native-zoomend' && isoRestoreDue && shouldCenter(z) && prox && !prox.armed) {
       let pCatch = null;
       try {
         pCatch = +mapRef.getPitch();
@@ -2396,7 +2414,7 @@ function onNativeZoomStep(snap, source) {
     // near && blend>0 predicate — instead of the z-band. Retreating below
     // the mask or drifting off-site aborts; holding intent keeps the boot
     // through the whole pre-iso climb the old floor would have killed.
-    if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && !(prox && prox.near && blend > 0)) {
+    if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && !(prox && prox.armed && blend > 0)) {
       try {
         abortEarlyBootTwin();
       } catch { /* abort is best-effort */ }
@@ -2410,7 +2428,7 @@ function onNativeZoomStep(snap, source) {
     // once drift is ~0. Intent loss releases (same predicate as the boot
     // abort above) so pan restores the moment the journey is abandoned;
     // Esc/close/commit/unwind release through the existing unfreeze sites.
-    if (!twinOpen && !transitId && !stagedActive && prox && prox.near && blend > 0) {
+    if (!twinOpen && !transitId && !stagedActive && prox && prox.armed && blend > 0) {
       if (!stagedFrozen) {
         try {
           freezeStagedFrame(false);
@@ -2756,7 +2774,7 @@ function flyToSectorThenTwin(id, opts = {}) {
       setSatScrubbed(satOpacityForZoom(Number.isFinite(liveZ) ? liveZ : Z_HANDOFF));
     } catch { /* sat stage is best-effort */ }
     const proxNow = proximityInfo();
-    const nearNow = !!(proxNow && proxNow.near);
+    const nearNow = !!(proxNow && proxNow.armed);
     // Reduced-motion never stages (no scroll-driven dissolve to follow) —
     // the unstaged prewarm below reveals instantly inside prewarmThenReveal.
     // Read here (hoisted above the wash write) so the wash decision knows
@@ -2788,6 +2806,7 @@ function flyToSectorThenTwin(id, opts = {}) {
         try {
           entryRx = entry && Number.isFinite(entry.rx) ? +entry.rx.toFixed(1) : null;
           entryRy = entry && Number.isFinite(entry.ry) ? +entry.ry.toFixed(1) : null;
+          entryCy = entry && Number.isFinite(entry.cy) ? +entry.cy.toFixed(1) : null;
         } catch { /* entry cache is best-effort */ }
       } catch { /* radii re-derive is best-effort */ }
       if (deep && !reducedMotion) showVignette(true);
@@ -2823,6 +2842,7 @@ function flyToSectorThenTwin(id, opts = {}) {
       if (!nearNow) {
         entryRx = null;
         entryRy = null;
+        entryCy = null;
       }
       try {
         if (mapRef && typeof mapRef.setMaxZoom === 'function') mapRef.setMaxZoom(Z_HANDOFF);
@@ -3180,9 +3200,12 @@ function driveStagedHold(st) {
           try { zLive = +mapRef.getZoom(); } catch { zLive = NaN; }
           const proxLive = proximityInfo();
           if (Number.isFinite(zLive) && proxLive) {
-            if (proxLive.near) {
+            if (proxLive.armed) {
               const e = writeEnclosureEllipse(proxLive, zLive);
-              if (e && Number.isFinite(e.rx) && e.rx > 0) { entryRx = +e.rx.toFixed(1); entryRy = +e.ry.toFixed(1); }
+              if (e && Number.isFinite(e.rx) && e.rx > 0) {
+                entryRx = +e.rx.toFixed(1); entryRy = +e.ry.toFixed(1);
+                entryCy = Number.isFinite(e.cy) ? +e.cy.toFixed(1) : 0;
+              }
             } else {
               // Off-centre: the spot clamps to the viewport via the SINGLE
               // RADIUS LAW corner (viewportCornerPx, shared with the live
@@ -3197,26 +3220,43 @@ function driveStagedHold(st) {
                 chh = (el && el.clientHeight) || window.innerHeight || 600;
               } catch { cw = 800; chh = 600; }
               const corner = viewportCornerPx(proxLive.sx, proxLive.sy, cw, chh);
-              const ec = enclosureEllipsePxForZoom(zLive, SITE.lat, MAP_VIGNETTE_RING_M, corner);
-              if (ec && Number.isFinite(ec.rx) && ec.rx > 0) { entryRx = +ec.rx.toFixed(1); entryRy = +ec.ry.toFixed(1); }
+              const ec = enclosureEllipsePxForZoom(zLive, SITE.lat, MAP_VIGNETTE_RING_M, corner, chh);
+              if (ec && Number.isFinite(ec.rx) && ec.rx > 0) {
+                entryRx = +ec.rx.toFixed(1); entryRy = +ec.ry.toFixed(1);
+                entryCy = Number.isFinite(ec.cy) ? +ec.cy.toFixed(1) : 0;
+              }
             }
           }
         }
       } catch { /* entry refresh is best-effort; stale entry still blends */ }
-      const seam = seamHoldEllipseForS(stagedS);
+      const seam = seamHoldEllipseForS(stagedS, frameSize().h);
       if (seam && Number.isFinite(seam.rx) && Number.isFinite(seam.ry) && seam.rx > 0) {
         const rev = clamp01(st && Number.isFinite(st.reveal) ? st.reveal : 0);
         const eRx = Number.isFinite(entryRx) && entryRx > 0 ? entryRx : seam.rx;
         const eRy = Number.isFinite(entryRy) && entryRy > 0 ? entryRy : seam.ry;
+        const eCy = Number.isFinite(entryCy) ? entryCy : (Number.isFinite(seam.cy) ? seam.cy : 0);
+        const sCy = Number.isFinite(seam.cy) ? seam.cy : 0;
         const rx = (eRx * (1 - rev) + seam.rx * rev) * (1 - ringClose);
         const ry = (eRy * (1 - rev) + seam.ry * rev) * (1 - ringClose);
+        const cy = (eCy * (1 - rev) + sCy * rev) * (1 - ringClose);
         const holdVr = rx.toFixed(1) + 'px';
         const holdVrY = ry.toFixed(1) + 'px';
         if (lastVrWritten !== holdVr) { app.style.setProperty('--vr', holdVr); lastVrWritten = holdVr; }
         if (lastVrYWritten !== holdVrY) { app.style.setProperty('--vr-y', holdVrY); lastVrYWritten = holdVrY; }
+        // The hold owns the vertical centre too: the projected ellipse's cy
+        // rides the same entry->seam reveal blend, so the mask's centre and
+        // the twin clip's centre stay identical through the dissolve.
+        try {
+          const sp = mapRef.project(SITE_LNGLAT);
+          if (sp && Number.isFinite(+sp.y)) {
+            const vyStr = Math.round(+sp.y + cy) + 'px';
+            if (lastVyWritten !== vyStr) { app.style.setProperty('--vy', vyStr); lastVyWritten = vyStr; }
+          }
+        } catch { /* hold centre is best-effort */ }
         try {
           window.__mapProbe.vignetteR = +rx.toFixed(1);
           window.__mapProbe.vignetteRy = +ry.toFixed(1);
+          window.__mapProbe.vignetteCy = +cy.toFixed(1);
         } catch { /* probe cosmetic */ }
       }
     }
@@ -3398,7 +3438,7 @@ function driveStagedOverlay() {
     let proxNear = false;
     try {
       const proxGate = proximityInfo();
-      proxNear = !!(proxGate && proxGate.near);
+      proxNear = !!(proxGate && proxGate.armed);
     } catch { proxNear = false; }
     let scaleNear = false;
     try {
@@ -3656,6 +3696,7 @@ function exitStaged() {
   contentVerdictFalseMs = 0;
   entryRx = null; // unwind clears the entry radii — the next hold re-caches its own arrival
   entryRy = null;
+  entryCy = null;
   lastPostedStagedS = null; // symmetric unwind: the S stream ends with the hold
   const hadOpen = twinOpen; // an open twin killed here skips the close chain — it still needs the flatten guarantor below
   restoreMaxZoom();
@@ -5842,19 +5883,22 @@ function installBandTakeover() {
       let z = null;
       try { z = +mapRef.getZoom(); } catch { z = null; }
       if (!Number.isFinite(z)) return;
-      if (z < Z_TAKEOVER_FLOOR || z > Z_HANDOFF + 0.5) return;
+      if (z > Z_HANDOFF + 0.5) return;
       let prox = null;
       try { prox = proximityInfo(); } catch { prox = null; }
-      // Aimed (hotspot near cursor/center) OR already journeying (the scrub
-      // engaged): below the band the law is flat so native is exact there;
-      // inside the band an engaged journey must stay single-writer even when
-      // the projection drifts off the cursor.
+      // Aimed (hotspot near OR in view) OR already journeying (the scrub
+      // engaged): below the mask band the whole-rate law is identical to the
+      // native dolly, so claiming an aimed tick from world zoom only adds the
+      // aim — the owner's "each scroll should get it aligned to center".
       let journeying = false;
       try { journeying = isoScrubOwned || isoRestoreDue || scrubProgress > 0; } catch { journeying = false; }
-      if (!prox || !(prox.near || (z >= Z_ISO_START && journeying))) return;
-      // Round-10 dive-start prewarm: first aimed engagement boots the twin
-      // iframe early (once per dive — guarded inside). No state flips.
-      if (prox && prox.near) {
+      if (!prox || !(prox.armed || (z >= Z_ISO_START && journeying))) return;
+      // Boot on MASK-band intent, not world intent: a world-frame twin boots
+      // off-site (its anchor/range clamp to the rail, tiles resolve nothing
+      // useful) and the stall then freezes the dive waiting for content that
+      // only the arrival retarget can deliver. The aim above still starts at
+      // the first in-view tick; the prewarm keeps its 3-level lead.
+      if (prox && prox.armed && centerBlendForZoom(z) > 0) {
         try {
           earlyBootTwin();
         } catch { /* prewarm never breaks input */ }
@@ -5873,18 +5917,21 @@ function installBandTakeover() {
       e.preventDefault();
       e.stopPropagation();
       const rate = Math.abs(dy) < 4 ? TRACK_RATE : WHEEL_RATE;
-      // GAIN-LINK: while the enclosing mask is armed (hotspot near — the
-      // blend itself is the mask's forming parameter, 0 while the mask is
-      // down), the tick runs at the mask-anchored dip gain — a pure
-      // function of live mask state, so no timer owns the motion and
-      // zoom-out retraces it symmetrically. The slowdown starts exactly on
-      // the tick the mask appears and releases at iso (gain 1 there, so
-      // the commit is intact). S feed below stays unscaled so the staged
-      // commit keeps its full scroll budget.
-      let dipGain = 1;
-      try { dipGain = maskGainForBlend(centerBlendForZoom(z), !!(prox && prox.near)); } catch { dipGain = 1; }
-      if (!Number.isFinite(dipGain) || dipGain <= 0) dipGain = 1;
-      const target = z + dy * rate * dipGain;
+      // NO MASK GAIN: the old 1.0 -> 0.700 -> 1.0 dip was a second, invisible
+      // brake across the same stretch as the mask growth; the owner read it
+      // as the transition slowing down enough to notice the switch. The only
+      // brake left is the load-driven stall below, which exists to fit tile
+      // arrival and fires only while the twin truly holds no content.
+      let target = z + dy * rate;
+      // Clamp to the map's own zoom limits before the settle law sees it:
+      // the aim is evaluated at the zoom the camera can actually reach, so
+      // the pan and the dolly cannot disagree at the world floor.
+      try {
+        const mn = +mapRef.getMinZoom();
+        const mx = +mapRef.getMaxZoom();
+        if (Number.isFinite(mn)) target = Math.max(mn, target);
+        if (Number.isFinite(mx)) target = Math.min(mx, target);
+      } catch { /* clamp is best-effort */ }
       let around = null;
       try {
         const ctn = mapRef.getContainer();
@@ -5911,19 +5958,18 @@ function installBandTakeover() {
       // re-anchors and would void it).
       let correctTo = null;
       let cBlend = 0;
-      if (prox && prox.near) {
+      if (prox && prox.armed) {
         try {
-          const b = centerBlendForZoom(z);
-          if (Number.isFinite(b) && b > 0) {
-            noteCenterArm(prox, z);
-            // Direction-free: the settle law is a pure function of zoom, so
-            // the SAME write serves the dive and the retrace — one camera
-            // update per tick, never a zoom-then-pan pair the eye can catch.
-            const t = centerSettleTargetFor(target);
-            if (t) {
-              correctTo = t;
-              cBlend = centerSettleForZoom(target, centerArm ? centerArm.z : z, CENTER_SETTLE_SPAN_Z);
-            }
+          noteCenterArm(prox, z);
+          // Direction-free: the settle law is a pure function of zoom, so
+          // the SAME write serves the dive and the retrace — one camera
+          // update per tick, never a zoom-then-pan pair the eye can catch.
+          // The arm now captures at the FIRST armed tick (any zoom), not at
+          // the mask band, so every scroll aims from the start.
+          const t = centerSettleTargetFor(target);
+          if (t) {
+            correctTo = t;
+            cBlend = centerSettleForZoom(target, centerArm ? centerArm.z : z, CENTER_SETTLE_SPAN_Z);
           }
         } catch { correctTo = null; cBlend = 0; }
       }
@@ -5932,7 +5978,7 @@ function installBandTakeover() {
       // the cursor anchor — zoom-out ticks hold the live center instead, so
       // framing never pans around the cursor after the mask appears. Mask
       // down keeps the cursor anchor (finger-owned framing, park-safe).
-      const maskNow = centerBlendForZoom(z) > 0 && !!(prox && prox.near);
+      const maskNow = centerBlendForZoom(z) > 0 && !!(prox && prox.armed);
       let holdCenter = null;
       if (maskNow && !correctTo) {
         try {
@@ -5945,9 +5991,12 @@ function installBandTakeover() {
         // camera cannot lag the fingers and no timer ever owns the motion.
         const opts = {
           zoom: target,
-          pitch: pitchTargetForZoom(target),
           duration: 0,
         };
+        // Tilt ownership stays at/above the mask floor, exactly as before:
+        // the aim now claims world-view ticks too, and flattening a user's
+        // oblique frame there would be a new yank, not a journey law.
+        if (target >= Z_CENTER) opts.pitch = pitchTargetForZoom(target);
         if (correctTo) opts.center = correctTo;
         else if (holdCenter) opts.center = holdCenter;
         else if (around) opts.around = around;
@@ -5959,7 +6008,7 @@ function installBandTakeover() {
       try {
         feedStagedScroll(-dy);
       } catch { /* S feed is best-effort */ }
-      try { window.__mapProbe.takeover = true; window.__mapProbe.zoomGain = +dipGain.toFixed(3); } catch { /* probe cosmetic */ }
+      try { window.__mapProbe.takeover = true; window.__mapProbe.zoomGain = 1; } catch { /* probe cosmetic */ }
       try { window.__mapProbe.centerSteer = +cBlend.toFixed(3); } catch { /* probe cosmetic */ }
     } catch { /* takeover never breaks input */ }
   };
@@ -6005,30 +6054,39 @@ function installWheelFlip(rootEl, laneEl, ctx) {
       // (zoom math, events, zoomend) — only the anchor moves.
       let px = null, py = null;
       let locked = false;
-      try { locked = !!(ctx && ctx.map && ctx.maskArmed && ctx.maskArmed()); } catch { locked = false; }
+      let laneRect = null;
+      try {
+        locked = !!((ctx && ctx.map && ctx.maskArmed && ctx.maskArmed()) || stagedActive || pendingReveal);
+      } catch { locked = false; }
       if (locked) {
         try {
           const H = ctx.map.project(SITE_LNGLAT);
-          const r = laneEl.getBoundingClientRect();
-          const P = lockAroundPoint(+H.x, +H.y, (r.width || 800) / 2, (r.height || 600) / 2, false);
+          // The canvas CONTAINER collapses to h=0 in this layout (the canvas
+          // is absolutely positioned), so its rect gives centre y=300 on a
+          // 700px map — the 50px offset that drifted the site by ~41px over
+          // the last level. Measure the MAP container (the element MapLibre
+          // was constructed into); the clone is still dispatched to laneEl.
+          const host = (ctx.map.getContainer && ctx.map.getContainer()) || laneEl;
+          const r = host.getBoundingClientRect();
+          laneRect = { l: +r.left.toFixed(0), t: +r.top.toFixed(0), w: +r.width.toFixed(0), h: +r.height.toFixed(0) };
+          if (!(r.width > 0) || !(r.height > 0)) throw new Error('host rect unreadable');
+          const P = lockAroundPoint(+H.x, +H.y, r.width / 2, r.height / 2, false);
           if (P) { px = r.left + P.x; py = r.top + P.y; }
           else locked = false;
         } catch { locked = false; }
       }
-      // GAIN-LINK: while the lock holds (mask armed) the flipped clone
-      // carries the mask-anchored dip gain — a pure function of the live
-      // enclosure blend (0 while the mask is down, so the slowdown starts
-      // exactly when the mask appears) releasing to 1 at iso, so the
-      // fingers dwell longer through mask formation with no timer owning
-      // the motion. Zoom-out retraces symmetrically (gain is
-      // direction-free); far frames never lock so they keep full rate.
-      // Pinch (ctrl+wheel) bypasses here.
-      let dipGain = 1;
-      if (locked) {
-        try { dipGain = maskGainForBlend(centerBlendForZoom(+ctx.map.getZoom()), true); } catch { dipGain = 1; }
-        if (!Number.isFinite(dipGain) || dipGain <= 0) dipGain = 1;
-      }
-      try { window.__mapProbe.zoomLock = locked; window.__mapProbe.zoomGain = +dipGain.toFixed(3); } catch { /* probe cosmetic */ }
+      // NO MASK GAIN (parity with the takeover): the flip clone carries the
+      // raw user delta. Load-driven stalls remain the only brake.
+      try { window.__mapProbe.zoomLock = locked; window.__mapProbe.zoomGain = 1; } catch { /* probe cosmetic */ }
+      try {
+        window.__mapProbe.lastAnchor = {
+          locked,
+          x: px == null ? +e.clientX : +px,
+          y: py == null ? +e.clientY : +py,
+          ex: +e.clientX, ey: +e.clientY,
+          rect: laneRect,
+        };
+      } catch { /* probe cosmetic */ }
       // HARD-STOP: mask armed + twin unloaded → forward stalls HERE (raw dy>0
       // = dive under the up-out convention): swallowed, loader on, depth
       // frozen by the ceiling in refresh. Reverse always passes to the clone.
@@ -6052,7 +6110,7 @@ function installWheelFlip(rootEl, laneEl, ctx) {
           bubbles: true,
           cancelable: true,
           deltaX: flipWheelDelta(+e.deltaX || 0),
-          deltaY: flipWheelDelta(dy) * dipGain,
+          deltaY: flipWheelDelta(dy),
           deltaZ: +e.deltaZ || 0,
           deltaMode: e.deltaMode,
           clientX: px == null ? e.clientX : px,
@@ -6112,33 +6170,27 @@ function installAnchorGuard() {
         }
       } catch { /* stall never breaks input */ }
       let armed = false;
-      try { armed = maskArmed(); } catch { armed = false; }
+      try { armed = maskArmed() || stagedActive || pendingReveal; } catch { armed = false; }
       if (!armed) return;
       if (!mapRef || typeof mapRef.getCanvasContainer !== 'function') return;
       const lane = mapRef.getCanvasContainer();
       if (!lane || typeof lane.contains !== 'function' || !lane.contains(e.target)) return;
-      const r = lane.getBoundingClientRect();
-      const cx = r.left + (r.width || 800) / 2;
-      const cy = r.top + (r.height || 600) / 2;
-      // GAIN-LINK (pinch parity with the wheel/flip lanes): the centered
-      // clone carries the same mask-anchored dip gain the flip lane applies
-      // at 4031 — without it every pinch tick runs at full rate through
-      // mask formation while wheel dwells. Same law, same arm (mask armed
-      // checked above), direction-free so zoom-out retraces symmetrically.
-      let pinchDip = 1;
-      try {
-        const pz = +mapRef.getZoom();
-        if (Number.isFinite(pz)) pinchDip = maskGainForBlend(centerBlendForZoom(pz), true);
-      } catch { pinchDip = 1; }
-      if (!Number.isFinite(pinchDip) || pinchDip <= 0) pinchDip = 1;
-      try { window.__mapProbe.zoomGain = +pinchDip.toFixed(3); } catch { /* probe cosmetic */ }
+      const host = (mapRef.getContainer && mapRef.getContainer()) || lane;
+      const r = host.getBoundingClientRect();
+      if (!(r.width > 0) || !(r.height > 0)) return;
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      // NO MASK GAIN (parity with the wheel/flip lanes): the centered pinch
+      // clone carries the raw pinch delta. Load-driven stalls remain the only
+      // brake.
+      try { window.__mapProbe.zoomGain = 1; } catch { /* probe cosmetic */ }
       let clone = null;
       try {
         clone = new WheelEvent('wheel', {
           bubbles: true,
           cancelable: true,
           deltaX: +e.deltaX || 0,
-          deltaY: (+e.deltaY || 0) * pinchDip,
+          deltaY: +e.deltaY || 0,
           deltaZ: +e.deltaZ || 0,
           deltaMode: e.deltaMode,
           clientX: cx, clientY: cy,
@@ -6210,6 +6262,20 @@ function feedStagedScroll(dyFlip) {
     if (dy < 0 && stallSwallowForward()) {
       try { driveStagedOverlay(); } catch { /* frozen repaint is best-effort */ }
       return;
+    }
+    // ARRIVAL GATE: forward S opens only once the camera is at the handoff
+    // pose. Until then the dolly keeps travelling to the ceiling and the
+    // mask keeps shrinking with it (the live enclosure law still owns the
+    // radii); without this the dissolve ran on the same ticks as the last
+    // 0.99 zoom levels, which is exactly the owner's "the masked circle
+    // remains and I keep zooming inside it". Reverse always drains.
+    if (dy < 0 && mapRef) {
+      let zNow = null;
+      try { zNow = +mapRef.getZoom(); } catch { zNow = null; }
+      if (Number.isFinite(zNow) && zNow < Z_HANDOFF - 0.01) {
+        try { driveStagedOverlay(); } catch { /* hold repaint is best-effort */ }
+        return;
+      }
     }
     const sPrev = stagedS;
     // UNWIND LAW (reverse): a reverse tick (dy>0 — the same convention the

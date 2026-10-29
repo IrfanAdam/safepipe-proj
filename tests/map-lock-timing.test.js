@@ -51,7 +51,7 @@ test('driver: every zoom write path gates on the mask arm, never the lock', () =
     'takeover zoom-out under the mask holds the live center instead of the cursor',
   );
   assert.ok(
-    main.includes('const maskNow = centerBlendForZoom(z) > 0 && !!(prox && prox.near);'),
-    'the takeover consults the same near-and-blend arm as the vignette',
+    main.includes('const maskNow = centerBlendForZoom(z) > 0 && !!(prox && prox.armed);'),
+    'the takeover consults the same armed gate as the vignette',
   );
 });

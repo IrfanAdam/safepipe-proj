@@ -20,6 +20,7 @@
 // Pure helpers are node-checkable: no map imports (the single site.js
 // import below is pure geo constants, no maplibre/three), callbacks injected.
 import { RING_RADIUS_M, SANGACHAL } from '../ring2/site.js';
+import { MAP_FOV_RAD } from '../ring2/sync.js';
 
 /* Web-mercator ground-scale constants (hoisted with the zoom laws above:
  * the seam hold derives from the projector at module scope, so the
@@ -312,24 +313,105 @@ export function pitchTargetForZoom(z) {
 }
 /** Degrees-to-radians factor for the tilt->squash projection (named, never bare). */
 export const DEG2RAD = Math.PI / 180;
-/** Mask squash for the pitched ground circle: the CSS enclosure mask is a
- * fixed circle but the pitched ground circle projects to an ellipse,
- * vertical x cos(pitch). 1 at/below Z_ISO_START (flat grade), cos(45deg)
- * at/above Z_TOP (the iso pole holds through the handoff). Pure +
- * node-checkable; zoom-out retraces it. */
-export function maskSquashForZoom(z) {
-  return Math.cos(pitchTargetForZoom(z) * DEG2RAD);
+/* PROJECTED GROUND-RING ELLIPSE (procedural mask geometry).
+ *
+ * The enclosure is the map-side stand-in for the twin's hard clip: the ring
+ * of RING_RADIUS_M around the site, seen through the pitched camera. A pitched
+ * ground circle is NOT a circle squashed by cos(pitch) and it is NOT centred
+ * on the site — the near half of the ring projects further than the far half,
+ * so the ellipse's centre sits below the site. Measured against MapLibre's own
+ * map.project at the handoff pose (z11.5, pitch45, 1122x700): the old
+ * cos-squash mask read 484.5 x 342.6 centred, while the true projection is
+ * 513.2 wide, 258.6 up / 508.8 down, centre +125.1 — an 84px top overshoot,
+ * a 166px short near rim and a 129px centre drift, which is exactly what the
+ * owner saw as the twin's fade not matching the plane.
+ *
+ * This law derives the ellipse from the SAME projection MapLibre uses:
+ *   d  = 0.5 * h / tan(fov/2)     (cameraToCenterDistance, 512-px grid)
+ *   r  = ringM / metersPerPixel(z, lat)
+ *   rx = r / sqrt(1 - (r*sin(pitch)/d)^2)
+ *   yN =  d*r*cos(pitch)/(d - r*sin(pitch))
+ *   yF = -d*r*cos(pitch)/(d + r*sin(pitch))
+ *   ry = (yN - yF)/2,  cy = (yN + yF)/2
+ * Verified within 1.0px of map.project across z 8..12, pitch 0..45 and
+ * h 500..700. Null when the ring crosses the horizon (r*sin(pitch) >= d) —
+ * the projection is unbounded there and callers must park, never invent a
+ * number. Pure + node-checkable; no map imports. */
+export function projectedRingEllipse({
+  zoom,
+  pitchDeg,
+  heightPx,
+  latDeg,
+  ringM = MAP_VIGNETTE_RING_M,
+  fovRad = MAP_FOV_RAD,
+} = {}) {
+  const z = +zoom;
+  const p = +pitchDeg;
+  const h = +heightPx;
+  const lat = +latDeg;
+  const R = +ringM;
+  const fov = +fovRad;
+  if (![z, p, h, lat, R, fov].every((n) => Number.isFinite(n))) return null;
+  if (!(h > 0) || !(R > 0) || !(fov > 0)) return null;
+  const rPx = vignetteRadiusPxForZoom(z, lat, R);
+  if (!Number.isFinite(rPx) || !(rPx > 0)) return null;
+  const d = 0.5 * h / Math.tan(fov / 2);
+  if (!(d > 0)) return null;
+  const th = p * DEG2RAD;
+  const s = Math.sin(th);
+  const c = Math.cos(th);
+  const k = (rPx * s) / d;
+  if (!(Math.abs(k) < 1)) return null; // ring crosses the horizon: unbounded
+  const den = Math.sqrt(1 - k * k);
+  if (!(den > 0)) return null;
+  const rx = rPx / den;
+  const yNear = (d * rPx * c) / (d - rPx * s);
+  const yFar = (-d * rPx * c) / (d + rPx * s);
+  if (![rx, yNear, yFar].every((n) => Number.isFinite(n))) return null;
+  return { rx, ry: (yNear - yFar) / 2, cy: (yNear + yFar) / 2, rPx, d };
 }
-/** Enclosure ellipse: rx is the forming-law circle radius unchanged, ry is
- * rx squashed by the tilt projection. Null wherever the circle parks
- * (below the band / no viewport corner). Pure in (z, corner), symmetric on
- * zoom-out. */
-export function enclosureEllipsePxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M, cornerPx = null) {
-  const rx = enclosureRadiusPxForZoom(zoom, latDeg, ringM, cornerPx);
-  if (!Number.isFinite(rx)) return null;
-  const squash = maskSquashForZoom(zoom);
-  if (!Number.isFinite(squash)) return null;
-  return { rx, ry: rx * squash, squash };
+/** The seam is the same projection evaluated at the handoff pose — the pose
+ * the twin's clip is built for. Viewport height is the live container height,
+ * so the seam follows any gallery/embed size instead of a 700px literal. */
+export function projectedSeamEllipse(heightPx, latDeg = SANGACHAL.lat, ringM = MAP_VIGNETTE_RING_M) {
+  return projectedRingEllipse({
+    zoom: Z_HANDOFF,
+    pitchDeg: pitchTargetForZoom(Z_HANDOFF),
+    heightPx,
+    latDeg,
+    ringM,
+  });
+}
+/** Enclosure ellipse while it forms: the display radius starts at the
+ * viewport corner (a circle that just covers the frame) and converges onto
+ * the projected seam ellipse across the shared enclosure span. rx and ry
+ * blend independently so t=0 is a true circle (ry==rx) and t=1 is the exact
+ * projection; cy drifts from 0 to the projection's centre offset on the same
+ * t. No cos-squash literal and no viewport literal — the endpoint is the
+ * camera's own projection. Parks (null) below the band or without a corner. */
+export function enclosureEllipsePxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M, cornerPx = null, heightPx = null) {
+  const n = +zoom;
+  const c = +cornerPx;
+  if (!Number.isFinite(n) || !Number.isFinite(c) || !(c > 0)) return null;
+  const t = enclosureTForZoom(n);
+  if (!(t > 0)) return null;
+  const seam = projectedSeamEllipse(heightPx, latDeg, ringM);
+  if (seam) {
+    const rx = c * (1 - t) + seam.rx * t;
+    const ry = c * (1 - t) + seam.ry * t;
+    const cy = seam.cy * t;
+    if (![rx, ry, cy].every((v) => Number.isFinite(v))) return null;
+    return { rx, ry, cy, seam };
+  }
+  // Horizon-crossing fallback (very short viewport): keep the old end-shape
+  // squash at the iso pole, but still start from a true circle.
+  const vr = vignetteRadiusPxForZoom(Z_HANDOFF, latDeg, ringM);
+  if (!Number.isFinite(vr)) return null;
+  const squashEnd = Math.cos(pitchTargetForZoom(Z_HANDOFF) * DEG2RAD);
+  const rx = c * (1 - t) + vr * t;
+  const ry = c * (1 - t) + vr * squashEnd * t;
+  if (![rx, ry].every((v) => Number.isFinite(v))) return null;
+  return { rx, ry, cy: 0, seam: null };
 }
 /** Top-down checkpoint reached (bearing/pitch -> 0). */
 export function isTopDown(z) {
@@ -540,48 +622,35 @@ export function vignetteRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_
   if (!Number.isFinite(mpp) || !(mpp > 0)) return null;
   return R / mpp;
 }
-/* Enclosure forming wash (map side): the displayed vignette circle starts at
+/* Enclosure forming wash (map side): the displayed vignette ellipse starts at
  * the hotspot's farthest screen corner (clear frame, darkness only biasing
- * in from the edges) and closes onto the projected ring across the SHARED
- * enclosure span Z_CENTER..Z_HANDOFF (enclosureTForZoom — the same law as the
- * bracket clip-k, so circle and brackets stay in sync) — display =
- * corner*(1-t) + projected*t. At/above Z_HANDOFF t=1 so it IS the twin's clip
- * circle exactly; the circle never shrinks below that radius, so the map-side
- * enclosing and the twin clip meet without a re-open or an over-zoom.
- * cornerPx is viewport-relative (driver passes the hotspot's farthest-corner
- * distance), so the enclosure always reaches the screen edges on any aspect —
- * never a peephole. Pure in (z, corner), symmetric on zoom-out. */
-export function enclosureRadiusPxForZoom(zoom, latDeg, ringM = MAP_VIGNETTE_RING_M, cornerPx = null) {
-  const n = +zoom;
-  if (!Number.isFinite(n)) return null;
-  // The projected ring is evaluated at the HANDOFF zoom: the twin's clip is a
-  // fixed ground circle at that pose. Holding at the earlier Z_TOP projection
-  // over-zoomed the map (242.2px vs the twin's 484.5px clip) — the owner sees the
-  // circle shrink too far before the twin arrives. Evaluate at the handoff so
-  // the circle lands on the twin's clip and holds there.
-  const vr = vignetteRadiusPxForZoom(Z_HANDOFF, latDeg, ringM);
-  const c = +cornerPx;
-  if (!Number.isFinite(vr) || !Number.isFinite(c) || !(c > 0)) return null;
-  const t = enclosureTForZoom(n);
-  if (!(t > 0)) return null;
-  return c * (1 - t) + vr * t;
-}
+ * in from the edges) and closes onto the PROJECTED seam ellipse across the
+ * SHARED enclosure span Z_CENTER..Z_HANDOFF (enclosureTForZoom — the same law
+ * as the bracket clip-k, so mask and brackets stay in sync). At/above
+ * Z_HANDOFF t=1, so it IS the twin's clip projection exactly (rx, ry AND the
+ * centre offset cy, all from projectedSeamEllipse). It never shrinks below
+ * that shape, so the map-side enclosing and the twin clip meet without a
+ * re-open or an over-zoom. cornerPx is viewport-relative (driver passes the
+ * hotspot's farthest-corner distance), so the enclosure always reaches the
+ * screen edges on any aspect — never a peephole. Pure in (z, corner,
+ * height), symmetric on zoom-out. */
 /* Seam hold definition (derives from the projector above — never a tuned
- * literal): the hold leg parks on the live forming law evaluated at the
- * handoff zoom over the site parallel, i.e. exactly the radius the forming
- * law converges to (corner*(1-t) + vr*t is vr at t=1). The exported seam
- * pins that derivation at written precision (0.1px — the driver writes
- * --vr/--vr-y to 0.1px, so the written seam and the written live law at the
- * handoff are the identical string, never a 1-frame snap). Pure fns of S:
- * rx is zoom-free past the gate by construction. */
+ * literal): the hold leg parks on the projected seam ellipse at the handoff
+ * pose, i.e. exactly the shape the forming law converges to at t=1. The
+ * height is the live container height, so the hold matches the twin's clip
+ * at any gallery/embed size. The height-free fallback (SEAM_HOLD_RX_PX) is
+ * the un-pitched ground radius, used only when no viewport exists yet. Pure
+ * fns of S: the shape is zoom-free past the gate by construction. */
 export function seamHoldRxPx(latDeg = SANGACHAL.lat, ringM = MAP_VIGNETTE_RING_M) {
   return vignetteRadiusPxForZoom(Z_HANDOFF, latDeg, ringM);
 }
 export const SEAM_HOLD_RX_PX = +seamHoldRxPx().toFixed(1);
-export function seamHoldEllipseForS(s) {
+export function seamHoldEllipseForS(s, heightPx = null) {
   void s; // the value is the seam itself — S owns the repaint cadence, not the radius
+  const seam = projectedSeamEllipse(heightPx);
+  if (seam) return { rx: seam.rx, ry: seam.ry, cy: seam.cy };
   const rx = SEAM_HOLD_RX_PX;
-  return { rx, ry: rx * Math.cos(ISO_PITCH_DEG * DEG2RAD) };
+  return { rx, ry: rx * Math.cos(ISO_PITCH_DEG * DEG2RAD), cy: 0 };
 }
 /** At (or below tolerance of) the min-zoom cap — mirrored-reverse home. */
 export function isHomeZoom(z) {
@@ -761,39 +830,13 @@ export function lockAroundPoint(hx, hy, cx, cy, zoomIn) {
   return { x: +hx + (+hx - +cx) * K, y: +hy + (+hy - +cy) * K };
 }
 
-/* Mask-anchored scroll-gain dip (pure, node-checkable): the slowdown rides
- * the enclosing mask itself, not absolute zoom. Input is the live enclosure
- * blend b (centerBlendForZoom — 0 while the mask is down) plus the mask-arm
- * predicate (hotspot near): gain is 1 whenever the mask is down, dips to
- * MASK_GAIN_MIN mid-formation through a smoothstepped sine window (zero
- * slope at both ends, so the entry joins the full-rate law without a kink
- * and the release meets full rate exactly at the iso checkpoint Z_TOP),
- * and stays 1 at/above iso so the handoff commit runs at full rate.
- * Strictly scroll-governed: a pure function of live mask state, so no
- * timer ever owns camera motion; zoom-out retraces it symmetrically (gain
- * is direction-free). Far frames keep full rate at any zoom because the
- * arm predicate owns the gate — the zoom value alone can never dip. */
-export const MASK_GAIN_MIN = 0.7; // deepest slowdown: 30% off at mid mask formation
-export const MASK_GAIN_RELEASE_BLEND = enclosureTForZoom(Z_TOP); // blend at the iso checkpoint (~0.874): the dip releases here
-export function maskGainForBlend(blend, armed) {
-  if (!armed) return 1;
-  const b = +blend;
-  if (!Number.isFinite(b) || b <= 0) return 1;
-  const t = clamp01(b / MASK_GAIN_RELEASE_BLEND);
-  if (t <= 0 || t >= 1) return 1;
-  const u = smooth01(t);
-  return 1 - (1 - MASK_GAIN_MIN) * Math.sin(Math.PI * u);
-}
-/* Legacy absolute-zoom entry: kept so older imports keep working. Delegates
- * to the mask law with the span-implied arm — the live mask predicate in
- * main.js owns the real gating. */
-export const LOCK_GAIN_MIN = MASK_GAIN_MIN;
-export function zoomGainForZoom(z) {
-  const n = +z;
-  if (!Number.isFinite(n)) return 1;
-  const armed = n > Z_CENTER && n < Z_TOP;
-  return maskGainForBlend(centerBlendForZoom(n), armed);
-}
+/* NO SCROLL-GAIN DIP. The old mask-anchored gain (1 -> 0.700 -> 1 across
+ * blend 0..iso) slowed every wheel tick through the exact stretch where the
+ * mask forms; the owner read that speed change as the transition announcing
+ * itself ("slowed down enough for me to notice the change"). The only brake
+ * is now the load-driven stall (main.js stallSwallowForward), which exists to
+ * fit tile arrival and holds only while the twin truly has no content. Do not
+ * reintroduce a zoom-keyed gain: pacing belongs to the user's fingers. */
 
 /* Viewport ground-scale telemetry (pure, node-checkable): web-mercator
  * meters-per-pixel at a latitude, scaled by a CSS-px span. Lets the owner

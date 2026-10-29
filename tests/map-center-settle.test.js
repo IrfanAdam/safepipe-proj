@@ -164,23 +164,34 @@ test('the map writers ride the one law: arm on the mask edge, apply before the r
   // one frame behind the frame it is drawn on.
   const dStart = main.indexOf('function onNativeZoomStep(');
   const driver = main.slice(dStart, main.indexOf('\nfunction ', dStart + 10));
-  const settleAt = driver.indexOf('if (applyCenterSettle(z)) {');
+  const settleAt = driver.indexOf('if (blend > 0 && applyCenterSettle(z)) {');
   const ringAt = driver.indexOf('if (!writeEnclosureEllipse(proxUse, z)) parkEnclosureEllipse();');
   assert.ok(settleAt > 0 && ringAt > 0, 'both writers live in the driver pass');
   assert.ok(settleAt < ringAt, 'the centre settles before the enclosure writes');
   assert.ok(driver.includes('frameProxCache = null; // the pass memo predates the camera jump'),
     'the pass re-reads proximity after the jump (no stale ring centre)');
-  // The takeover carries the same law synchronously on its tick.
+  // The takeover carries the same law synchronously on its tick — and it
+  // arms on the FIRST site-in-view tick, not on the mask band: every scroll
+  // aims, with one arm snapshot and the zoom-keyed settle.
   assert.ok(main.includes('const t = centerSettleTargetFor(target);'), 'the band takeover carries the law');
+  assert.ok(main.includes('if (prox && prox.armed) {'), 'the takeover aims whenever the site is armed');
+  assert.ok(main.includes('if (prox.armed) {\n          noteCenterArm(prox, z);'), 'the driver arms on view, not on blend');
+  assert.ok(main.includes('armed: cursorNear || centerNear || inView'), 'one armed gate feeds every predicate');
   // Flights keep the camera: the law must never steer a programmatic flight.
   const apply = main.slice(main.indexOf('function applyCenterSettle('), main.indexOf('function updateRingClip('));
   assert.ok(apply.includes('transitId'), 'flights are exempt from the settle');
   assert.ok(apply.includes('stagedActive'), 'the staged hold keeps its own SITE pin');
   // The flip anchors the native zoom on the canvas centre while armed — the
   // law owns the pan, so a beyond-spot phantom would fight it tick by tick.
+  // It must measure the MAP container: the canvas container collapses to h=0
+  // in this layout, which put the anchor 50px above the true centre and
+  // drifted the site 41px over the last level.
   const flip = main.slice(main.indexOf('function installWheelFlip('), main.indexOf('function installAnchorGuard('));
-  assert.ok(flip.includes('lockAroundPoint(+H.x, +H.y, (r.width || 800) / 2, (r.height || 600) / 2, false)'),
-    'the flip asks for the canvas-centre anchor in both directions');
-  assert.ok(!flip.includes('lockAroundPoint(+H.x, +H.y, (r.width || 800) / 2, (r.height || 600) / 2, dy > 0)'),
+  assert.ok(flip.includes('lockAroundPoint(+H.x, +H.y, r.width / 2, r.height / 2, false)'),
+    'the flip asks for the true canvas-centre anchor in both directions');
+  assert.ok(flip.includes('ctx.map.getContainer && ctx.map.getContainer()'),
+    'the centre comes from the map container, not the collapsed canvas container');
+  assert.ok(!flip.includes('(r.height || 600) / 2'), 'no 600px fallback centre');
+  assert.ok(!flip.includes('lockAroundPoint(+H.x, +H.y, r.width / 2, r.height / 2, dy > 0)'),
     'no beyond-spot phantom for zoom-in (it moved the spot the law had just placed)');
 });

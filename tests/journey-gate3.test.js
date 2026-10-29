@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
-  enclosureRadiusPxForZoom,
+  enclosureEllipsePxForZoom,
+  projectedSeamEllipse,
   vignetteRadiusPxForZoom,
   enclosureTForZoom,
   pitchTargetForZoom,
@@ -101,52 +102,45 @@ test('FIX 2: the deep handoff clamps regardless of `near`', () => {
 
 test('FIX 3: the enclosure holds at the handoff instead of over-zooming', () => {
   const C = 900; // hotspot farthest-corner distance on the test viewport
-  const atHandoff = enclosureRadiusPxForZoom(Z_HANDOFF, SITE.lat, MAP_VIGNETTE_RING_M, C);
+  const H = 700; // live container height
+  const E = (z, c = C) => enclosureEllipsePxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, c, H);
+  const atHandoff = E(Z_HANDOFF)?.rx;
   assert.ok(Number.isFinite(atHandoff), 'the enclosure exists at the handoff');
   assert.equal(
-    atHandoff, vignetteRadiusPxForZoom(Z_HANDOFF, SITE.lat),
+    atHandoff, projectedSeamEllipse(H, SITE.lat).rx,
     'at the handoff the enclosure IS the projected ring the twin clips to',
   );
-  // The old hold evaluated the projection at Z_TOP: 242.2px, half the twin's
-  // 484.5px clip — the owner's "enclosure zooming in too much".
-  const oldHold = vignetteRadiusPxForZoom(Z_TOP, SITE.lat);
+  // The old hold evaluated a cos-squash at Z_TOP: 484.5px ground radius
+  // against the twin's true 512.5px projected rim — the geometry mismatch
+  // the owner saw during the fade.
+  const oldHold = vignetteRadiusPxForZoom(Z_HANDOFF, SITE.lat);
   assert.ok(
-    atHandoff - oldHold > 100,
-    `the old Z_TOP hold over-zoomed by ${(atHandoff - oldHold).toFixed(1)}px`,
+    atHandoff - oldHold > 20,
+    `the old ground-radius hold under-shot by ${(atHandoff - oldHold).toFixed(1)}px`,
   );
-  // The circle keeps closing through the band, then HOLDS on the twin clip.
-  const atTop = enclosureRadiusPxForZoom(Z_TOP, SITE.lat, MAP_VIGNETTE_RING_M, C);
-  assert.ok(atTop > atHandoff, 'the circle still has room to close at Z_TOP');
+  // The ellipse keeps closing through the band, then HOLDS on the twin clip.
+  const atTop = E(Z_TOP)?.rx;
+  assert.ok(atTop > atHandoff, 'the ellipse still has room to close at Z_TOP');
   for (const z of [Z_HANDOFF, 12, 12.1, 13, 13.4, Z_MAX]) {
-    assert.equal(
-      enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C), atHandoff,
-      `z=${z} holds the handoff enclosure`,
-    );
+    assert.equal(E(z)?.rx, atHandoff, `z=${z} holds the handoff enclosure`);
   }
   // The forming law is untouched: it still starts at the screen corners and
   // closes in across the shared span.
-  assert.equal(enclosureRadiusPxForZoom(6.9, SITE.lat, MAP_VIGNETTE_RING_M, C), null, 'parks below the band');
-  assert.ok(
-    Math.abs(enclosureRadiusPxForZoom(7.01, SITE.lat, MAP_VIGNETTE_RING_M, C) - C) < 5,
-    'still starts AT the corners',
-  );
+  assert.equal(E(6.9), null, 'parks below the band');
+  assert.ok(Math.abs(E(7.01).rx - C) < 5, 'still starts AT the corners');
   let prev = Infinity;
   for (let z = 7.5; z <= Z_HANDOFF; z += 0.5) {
-    const r = enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C);
+    const r = E(z).rx;
     assert.ok(r < prev, `z=${z} still closes in from the edges`);
     prev = r;
   }
   // Symmetric on retrace: the law is a pure function of z.
-  assert.equal(
-    enclosureRadiusPxForZoom(9, SITE.lat, MAP_VIGNETTE_RING_M, C),
-    enclosureRadiusPxForZoom(9, SITE.lat, MAP_VIGNETTE_RING_M, C),
-    'the law is pure in z',
-  );
-  // The projection law itself is untouched (a live-zoom radius is still
-  // available for anything that needs it).
+  assert.equal(E(9).rx, E(9).rx, 'the law is pure in z');
+  // The ground-scale projector itself is untouched (available for anything
+  // that needs the un-pitched radius).
   assert.equal(
     vignetteRadiusPxForZoom(12, SITE.lat), MAP_VIGNETTE_RING_M / metersPerPixel(12, SITE.lat),
-    'the live-zoom projection law is unchanged',
+    'the live-zoom ground radius is unchanged',
   );
 });
 

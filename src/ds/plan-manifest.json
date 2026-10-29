@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-29T07:12:22.691Z",
+  "generated": "2026-10-29T07:53:53.864Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "5359164",
+      "full": "53591644b88bf19966604de3171fbb9657dfcaf5",
+      "date": "2026-10-29",
+      "time": "12:42",
+      "subject": "docs(plan): audit lock-aim, mask geometry, convergence stop, pace [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "2821284",
       "full": "2821284ff3da3fcfb968dadaafa50d5822372aa2",
@@ -6700,6 +6709,10 @@
     }
   ],
   "wip": [
-    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
+    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+    "ops3d-map.html",
+    "public/version.json",
+    "src/map/main.js",
+    "src/map/scrolltrigger.js"
   ]
 }

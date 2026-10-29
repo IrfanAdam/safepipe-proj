@@ -390,7 +390,7 @@ test('driver: live hold drives visible travel on every staged tick, pre-grant', 
   assert.ok(main.includes('stagedHoldRingCloseForS(stagedS)'), 'hold ring rides the S law');
   assert.ok(main.includes('holdOwned'), 'tilt pump carries the hold instead of parking on the prewarm');
   assert.ok(main.includes('pumpIsoPitch(); // live-hold carry'), 'staged entry restarts the tilt pump under the clamp');
-  assert.ok(main.includes('seamHoldEllipseForS(stagedS)'), 'hold ring parks the V7 seam ellipse, finger-driven');
+  assert.ok(main.includes('seamHoldEllipseForS(stagedS, frameSize().h)'), 'hold ring parks the projected seam ellipse, finger-driven');
 });
 
 test('V7 seam hold: the ellipse parks on the handoff radius, identical at/above the gate', () => {
@@ -478,7 +478,7 @@ test('round-10 dive-start prewarm: early boot fires once per dive with no state 
   // display:none suspends rAF) with zero open-state side effects.
   const main = srcOf('../src/map/main.js');
   assert.ok(main.includes('function earlyBootTwin()'), 'dive-start boot exists');
-  assert.ok(main.includes('if (prox && prox.near)'), 'takeover fires the boot on aimed engagement');
+  assert.ok(main.includes('if (prox && prox.armed && centerBlendForZoom(z) > 0)'), 'takeover fires the boot on aimed mask-band engagement (never a world frame)');
   assert.ok(
     main.includes('earlyTwinArmed || twinOpen'),
     'the boot fires once per dive and never under an open/staged twin',
@@ -490,7 +490,7 @@ test('round-10 dive-start prewarm: early boot fires once per dive with no state 
   assert.ok(main.includes('function abortEarlyBootTwin()'), 'retreat abort exists');
   assert.ok(main.includes('abortEarlyBootTwin();'), 'the zoom step aborts a retreated dive-start boot');
   assert.ok(
-    main.includes('if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && !(prox && prox.near && blend > 0)) {'),
+    main.includes('if (earlyTwinArmed && !twinOpen && !stagedActive && !pendingReveal && !(prox && prox.armed && blend > 0)) {'),
     'the abort fires on intent loss (mask down / off-site) — the INTENT-PRECACHE revision moved it off the old z-band',
   );
   const abortStart = main.indexOf('function abortEarlyBootTwin()');

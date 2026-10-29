@@ -24,7 +24,7 @@ function intentBlock() {
 
 test('intent boots the twin + warms arrival tiles at the mask arm', () => {
   const block = intentBlock();
-  assert.ok(block.includes('prox && prox.near && blend > 0'), 'the lock-intent signal is the mask arm (near && blend>0)');
+  assert.ok(block.includes('prox && prox.armed && blend > 0'), 'the lock-intent signal is the mask arm (armed && blend>0)');
   assert.ok(block.includes('earlyBootTwin()'), 'lock intent boots the twin iframe early');
   for (const z of ['9', '10', '11']) {
     assert.ok(block.includes(`prefetchSatTiles(SITE_LNGLAT, ${z})`), `lock intent warms the arrival-level site tiles (z${z})`);
@@ -47,14 +47,14 @@ test('intent re-arms when intent drops; the takeover boot stays a backstop', () 
   const block = intentBlock();
   assert.ok(block.includes('intentWarmed = false'), 'lost intent re-arms the per-dive warm for the next dive');
   const main = srcOf('../src/map/main.js');
-  assert.ok(main.includes('// Round-10 dive-start prewarm: first aimed engagement boots the twin'), 'the in-band dive-start boot stays as the backstop');
+  assert.ok(main.includes('if (prox && prox.armed && centerBlendForZoom(z) > 0)'), 'the in-band dive-start boot stays as the backstop');
 });
 
 test('the early-boot abort keys off intent-loss, not the old z-band', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(
-    main.includes('!(prox && prox.near && blend > 0)) {'),
-    'the armed-boot abort fires on intent-loss (the same near && blend>0 predicate)',
+    main.includes('!(prox && prox.armed && blend > 0)) {'),
+    'the armed-boot abort fires on intent-loss (the same armed && blend>0 predicate)',
   );
   assert.ok(
     !main.includes('!pendingReveal && z < Z_ISO_START - 1'),

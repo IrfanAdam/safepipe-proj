@@ -125,16 +125,12 @@ test('pinch stall gate runs before the mask predicate (staged twinOpen bypass)',
   assert.ok(armedAfter > gate, 'maskArmed is consulted only after the stall gate passes');
 });
 
-test('pinch lane carries the mask-anchored dip gain', () => {
+test('no mask-anchored gain in any lane (pace belongs to the fingers)', () => {
   const main = srcOf('../src/map/main.js');
-  assert.ok(
-    main.includes('maskGainForBlend(centerBlendForZoom(pz), true)'),
-    'the pinch guard derives the same mask-anchored dip as the wheel lanes',
-  );
-  assert.ok(
-    main.includes('deltaY: (+e.deltaY || 0) * pinchDip,'),
-    'the centered pinch clone scales deltaY by the dip gain',
-  );
+  assert.ok(!main.includes('maskGainForBlend'), 'the wheel/pinch gain law is gone');
+  assert.ok(!main.includes('pinchDip'), 'the pinch clone carries the raw delta');
+  assert.ok(main.includes('deltaY: +e.deltaY || 0,'), 'the pinch clone is unscaled');
+  assert.ok(main.includes('window.__mapProbe.zoomGain = 1'), 'the probe reports full rate');
 });
 
 test('preventive touch/keyboard guard swallows forward only, never traps reverse', () => {

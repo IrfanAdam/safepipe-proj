@@ -20,7 +20,8 @@ import {
   handoffStagesForScroll,
   accumStagedS,
   vignetteRadiusPxForZoom,
-  enclosureRadiusPxForZoom,
+  enclosureEllipsePxForZoom,
+  projectedSeamEllipse,
   MAP_VIGNETTE_RING_M,
   metersPerPixel,
 } from '../src/map/scrolltrigger.js';
@@ -105,31 +106,29 @@ test('vignette radius: projected R, coincides with the twin clip at handoff', ()
   assert.equal(vignetteRadiusPxForZoom(12, SITE.lat, -1), null, 'non-positive ring parks');
 });
 
-test('enclosure forming wash: screen corners close onto the clip circle', () => {
+test('enclosure forming wash: screen corners close onto the projected clip', () => {
   const C = 900; // hotspot farthest-corner distance on the test viewport
-  assert.equal(enclosureRadiusPxForZoom(6.9, SITE.lat, MAP_VIGNETTE_RING_M, C), null, 'parks below the band — never blacks the frame');
-  assert.equal(enclosureRadiusPxForZoom(8, SITE.lat, MAP_VIGNETTE_RING_M, null), null, 'parks without a viewport corner');
-  assert.equal(enclosureRadiusPxForZoom(8, SITE.lat, MAP_VIGNETTE_RING_M, -4), null, 'parks on a non-positive corner');
-  const at7 = enclosureRadiusPxForZoom(7.01, SITE.lat, MAP_VIGNETTE_RING_M, C);
+  const H = 700;
+  const E = (z, c = C) => enclosureEllipsePxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, c, H);
+  assert.equal(E(6.9), null, 'parks below the band — never blacks the frame');
+  assert.equal(E(8, null), null, 'parks without a viewport corner');
+  assert.equal(E(8, -4), null, 'parks on a non-positive corner');
+  const at7 = E(7.01).rx;
   assert.ok(Math.abs(at7 - C) < 5, `forming starts AT the corners (got ${at7.toFixed(1)}px)`);
   let prev = Infinity;
   for (let z = 7.5; z <= 11.5; z += 0.5) {
-    const r = enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C);
+    const r = E(z).rx;
     assert.ok(r < prev, `z=${z} closes in from the edges (${r.toFixed(0)}px < ${prev === Infinity ? 'inf' : prev.toFixed(0)}px)`);
     prev = r;
   }
-  // GATE-3 REVISION: past the HANDOFF the enclosure HOLDS at the handoff
-  // value — the twin's fixed ground clip radius. Holding at the earlier
-  // Z_TOP projection over-zoomed the map (242.2px vs the twin's 484.5px).
-  const atHandoff = enclosureRadiusPxForZoom(11.5, SITE.lat, MAP_VIGNETTE_RING_M, C);
+  // Past the HANDOFF the enclosure HOLDS at the projected seam — the twin's
+  // fixed ground clip projected by the same camera law.
+  const atHandoff = E(11.5).rx;
   for (const z of [11.5, 12, 12.1, 13, 13.4]) {
-    assert.equal(
-      enclosureRadiusPxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, C), atHandoff,
-      `z=${z} HOLDS the handoff enclosure (no over-zoom past the ring)`,
-    );
+    assert.equal(E(z).rx, atHandoff, `z=${z} HOLDS the handoff enclosure (no over-zoom past the ring)`);
   }
   assert.equal(
-    atHandoff, vignetteRadiusPxForZoom(11.5, SITE.lat),
+    atHandoff, projectedSeamEllipse(H, SITE.lat).rx,
     'at the handoff the enclosure IS the projected ring the twin clips to',
   );
 });
@@ -232,7 +231,7 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
   // part of the engagement, so the journey keeps the tilt until the law has
   // actually flattened it; the whole terrain->iso band starts at Z_ISO_START.
   assert.ok(
-    main.includes('(prox.near || isoScrubOwned || z >= Z_ISO_START || isoRestoreDue)'),
+    main.includes('(prox.armed || isoScrubOwned || z >= Z_ISO_START || isoRestoreDue)'),
     'iso scrub engages from the terrain grade, and keeps the tilt while the reverse still owes a flatten',
   );
   // The release waits for the law's value, not just the zoom.
@@ -283,8 +282,12 @@ test('map recede: gesture-owned reverse scrub, sat via the scrub law, no flight'
     'the tilt band owns aimed wheel ticks through a single-writer instant drive',
   );
   assert.ok(
-    main.includes('pitch: pitchTargetForZoom(target)'),
+    main.includes('opts.pitch = pitchTargetForZoom(target)'),
     'takeover drive carries the law pitch with the tick zoom',
+  );
+  assert.ok(
+    main.includes('if (target >= Z_CENTER) opts.pitch'),
+    'tilt ownership starts at the mask floor (world-view aim never flattens a user oblique)',
   );
   assert.ok(
     main.includes('duration: 0,'),
@@ -373,7 +376,7 @@ test('map vignette: ellipse from projected R, brackets ride the same law', () =>
   assert.ok(main.includes("app.style.setProperty('--vr'"), 'journey writes the vignette radius');
   assert.ok(main.includes("app.style.setProperty('--vr-y'"), 'journey writes the squashed vertical radius');
   assert.ok(main.includes('enclosureEllipsePxForZoom(z, SITE.lat'), 'display ellipse rides the forming law');
-  assert.ok(main.includes('showVignette(proxUse.near && blend > 0)'), 'enclosure gated past z=8: sub-pixel ring never blacks the frame (reads the post-settle proximity)');
+  assert.ok(main.includes('showVignette(proxUse.armed && blend > 0)'), 'enclosure gated past z=8: sub-pixel ring never blacks the frame (reads the post-settle proximity)');
   assert.ok(!main.includes('showVignette(prox.near);'), 'ungated proximity enclosure is gone');
   const html = srcOf('../ops3d-map.html');
   assert.ok(html.includes('@property --vr'), 'radius is registered animatable so the close-in glides');
@@ -421,7 +424,7 @@ test('forward path untouched: staged laws, intro legs, iso ownership, FOV', () =
   assert.ok(map.includes('mapRef.transform.setPitch(pTarget)'), 'iso scrub still owns the transform');
   assert.ok(map.includes('releaseNow = true'), 'release step zeroes the tilt in the landing step');
   assert.ok(map.includes('(isoScrubOwned || releaseNow)'), 'fast flick-out over the band cannot strand pitch');
-  assert.ok(map.includes('prox.near || isoScrubOwned'), 'owned scrub restores pitch even after pan-away');
+  assert.ok(map.includes('prox.armed || isoScrubOwned'), 'owned scrub restores pitch even after pan-away');
   assert.ok(map.includes('isoRestoreDue = true'), 'engage latches the restore due flag');
   assert.ok(map.includes("source === 'native-zoomend' && isoRestoreDue && !shouldCenter(z)"), 'below-band settle glides journey tilt home');
   assert.ok(map.includes('mapRef.jumpTo({ pitch: 0 })'), 'reconcile snaps pitch home instantly (no settle glide)');

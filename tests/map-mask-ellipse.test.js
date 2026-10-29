@@ -1,9 +1,10 @@
-// tests/map-mask-ellipse.test.js — the CSS enclosure mask is a fixed circle
-// but the pitched ground circle projects to an ellipse (vertical x cos p).
-// maskSquashForZoom pins the squash (1 flat, cos45 at the iso pole);
-// enclosureEllipsePxForZoom reuses the forming-law circle radius as rx and
-// squashes ry; the driver writes --vr AND --vr-y at both write sites and
-// the vignette rides the ellipse form.
+// tests/map-mask-ellipse.test.js — the enclosure mask is the PROJECTED ground
+// ring, not a cos-squash of the ground radius: rx/ry/cy come from MapLibre's
+// own camera model (cameraToCenterDistance at the live height, fov
+// MAP_TRUE_FOV_DEG) at the handoff pose, and the forming law converges onto
+// that exact ellipse. Pins the projection against the live-map numbers the
+// audit measured, the seam, the driver writes, and the CSS feather living
+// outside the disc (never straddling the twin's rim).
 // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,12 +12,13 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  maskSquashForZoom,
+  projectedRingEllipse,
+  projectedSeamEllipse,
   enclosureEllipsePxForZoom,
-  enclosureRadiusPxForZoom,
-  DEG2RAD,
-  Z_ISO_START,
-  Z_TOP,
+  seamHoldEllipseForS,
+  SEAM_HOLD_RX_PX,
+  vignetteRadiusPxForZoom,
+  Z_CENTER,
   Z_HANDOFF,
   MAP_VIGNETTE_RING_M,
 } from '../src/map/scrolltrigger.js';
@@ -25,90 +27,103 @@ import { SITE } from '../src/map/feed.js';
 const srcOf = (rel) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), rel), 'utf8');
 const main = () => srcOf('../src/map/main.js');
 const html = () => srcOf('../ops3d-map.html');
-const CORNER = 900; // hotspot farthest-corner distance on the test viewport
-const SQUASH_AT_POLE = 0.7071067812; // cos(45deg)
-const SQUASH_AT_MID = 0.9238795325; // cos(22.5deg)
+const CORNER = 800;
+const H = 700;
 
-test('squash pins: 1 at/below ISO_START, cos45 at/above TOP, cos22.5 mid-band', () => {
-  assert.equal(DEG2RAD, Math.PI / 180, 'the projection factor is a named constant');
-  assert.equal(maskSquashForZoom(Z_ISO_START), 1, 'the flat grade projects unsquashed');
-  assert.equal(maskSquashForZoom(Z_ISO_START - 2), 1, 'below the grade stays unsquashed');
-  assert.ok(
-    Math.abs(maskSquashForZoom(Z_TOP) - SQUASH_AT_POLE) < 1e-9,
-    `the iso pole squashes to cos45 (got ${maskSquashForZoom(Z_TOP)})`,
-  );
-  assert.ok(
-    Math.abs(maskSquashForZoom(Z_HANDOFF) - SQUASH_AT_POLE) < 1e-9,
-    'the squash holds through the handoff with the pole',
-  );
-  assert.ok(
-    Math.abs(maskSquashForZoom(Z_HANDOFF + 2) - SQUASH_AT_POLE) < 1e-9,
-    'above handoff the pole (and the squash) holds',
-  );
-  const mid = (Z_ISO_START + Z_TOP) / 2;
-  assert.ok(
-    Math.abs(maskSquashForZoom(mid) - SQUASH_AT_MID) < 1e-9,
-    `band midpoint squashes to cos22.5 (got ${maskSquashForZoom(mid)})`,
-  );
+// Live map.project of the 10km ring, measured at z11.5 / pitch45 / 1122x700
+// (site at the canvas centre): half-width 513.2, 258.6 up / 508.8 down.
+const LIVE = { rx: 513.15, ry: 383.73, cy: 125.08 };
+
+test('projected ring matches MapLibre at the handoff pose (≤1px)', () => {
+  const p = projectedRingEllipse({ zoom: Z_HANDOFF, pitchDeg: 45, heightPx: H, latDeg: SITE.lat });
+  assert.ok(p, 'the handoff pose projects');
+  assert.ok(Math.abs(p.rx - LIVE.rx) < 1.0, `rx ${p.rx} vs live ${LIVE.rx}`);
+  assert.ok(Math.abs(p.ry - LIVE.ry) < 1.0, `ry ${p.ry} vs live ${LIVE.ry}`);
+  assert.ok(Math.abs(p.cy - LIVE.cy) < 1.0, `cy ${p.cy} vs live ${LIVE.cy}`);
+  // The near half projects farther than the far half: the ellipse centre is
+  // BELOW the site, which is the whole reason a site-centred circle misses.
+  assert.ok(p.cy > 0, 'the pitched ellipse centre sits below the site');
+  assert.ok(p.ry > p.rx * 0.7 && p.ry < p.rx, 'ry is foreshortened but not cos45-short');
 });
 
-test('squash is monotonic non-increasing across the journey', () => {
-  let prev = 2;
-  for (let z = 4; z <= 16; z += 0.25) {
-    const s = maskSquashForZoom(z);
-    assert.ok(s <= prev + 1e-12, `z=${z} must not un-squash (${prev} -> ${s})`);
-    prev = s;
+test('projected ring: nadir is a centred circle; height scales it; horizon parks', () => {
+  const flat = projectedRingEllipse({ zoom: Z_HANDOFF, pitchDeg: 0, heightPx: H, latDeg: SITE.lat });
+  assert.ok(flat, 'nadir projects');
+  assert.ok(Math.abs(flat.rx - flat.ry) < 1e-9, 'pitch 0 is a circle');
+  assert.ok(Math.abs(flat.cy) < 1e-9, 'pitch 0 is centred');
+  assert.equal(+flat.rx.toFixed(2), +(vignette()).toFixed(2), 'rx is the ground radius at nadir');
+
+  const tall = projectedRingEllipse({ zoom: Z_HANDOFF, pitchDeg: 45, heightPx: 500, latDeg: SITE.lat });
+  const base = projectedRingEllipse({ zoom: Z_HANDOFF, pitchDeg: 45, heightPx: H, latDeg: SITE.lat });
+  assert.ok(tall && base && tall.rx !== base.rx, 'a different viewport height changes the projection');
+  assert.ok(tall.rx > base.rx, 'a shorter viewport magnifies the same ground ring');
+
+  // Past ~z13.4 the 10km ring's near edge crosses the camera's horizon at
+  // this height (rPx*sin45 >= d): the projection is unbounded there and must
+  // park (null), never return an invented radius.
+  assert.equal(projectedRingEllipse({ zoom: 13.6, pitchDeg: 45, heightPx: H, latDeg: SITE.lat }), null);
+});
+
+function vignette() {
+  return vignetteRadiusPxForZoom(Z_HANDOFF, SITE.lat);
+}
+
+test('one shape: the forming law converges onto the projected seam exactly', () => {
+  const seam = projectedSeamEllipse(H, SITE.lat);
+  assert.ok(seam, 'the seam projects at the live height');
+  const atGate = enclosureEllipsePxForZoom(Z_HANDOFF, SITE.lat, MAP_VIGNETTE_RING_M, CORNER, H);
+  assert.ok(atGate, 'the enclosure exists at the gate');
+  assert.equal(atGate.rx, seam.rx, 't=1 rx is the projected seam rx');
+  assert.equal(atGate.ry, seam.ry, 't=1 ry is the projected seam ry');
+  assert.equal(atGate.cy, seam.cy, 't=1 cy is the projected seam centre');
+  // Just inside the band the display is still a circle that covers the frame
+  // (ry == rx, cy == 0) — the morph to the projection rides the same t.
+  const justIn = enclosureEllipsePxForZoom(Z_CENTER + 0.01, SITE.lat, MAP_VIGNETTE_RING_M, CORNER, H);
+  assert.ok(justIn, 'the ellipse exists just inside the band');
+  assert.ok(Math.abs(justIn.ry / justIn.rx - 1) < 0.01, 't≈0 is a circle (ry≈rx)');
+  assert.ok(Math.abs(justIn.cy) < 0.2, 't≈0 is centred on the site');
+  assert.equal(enclosureEllipsePxForZoom(Z_CENTER, SITE.lat, MAP_VIGNETTE_RING_M, CORNER, H), null, 'parks at the band floor');
+  assert.equal(enclosureEllipsePxForZoom(Z_HANDOFF, SITE.lat, MAP_VIGNETTE_RING_M, null, H), null, 'parks without a corner');
+});
+
+test('seam hold: projected at the live height, ground fallback without one', () => {
+  const seam = seamHoldEllipseForS(0, H);
+  const projected = projectedSeamEllipse(H, SITE.lat);
+  assert.equal(seam.rx, projected.rx, 'hold rx is the projected seam');
+  assert.equal(seam.ry, projected.ry, 'hold ry is the projected seam');
+  assert.equal(seam.cy, projected.cy, 'hold cy is the projected seam');
+  for (const s of [0, 125, 250, 500, 1000, NaN]) {
+    assert.deepEqual(seamHoldEllipseForS(s, H), seam, `S=${s} holds the same ellipse`);
   }
+  const fallback = seamHoldEllipseForS(0);
+  assert.equal(fallback.rx, SEAM_HOLD_RX_PX, 'no height falls back to the ground radius');
+  assert.equal(+fallback.cy.toFixed(1), 0, 'the fallback has no projected centre offset');
 });
 
-test('ellipse reuses the circle law: rx unchanged, ry == rx below the band', () => {
-  const atLow = enclosureEllipsePxForZoom(7.01, SITE.lat, MAP_VIGNETTE_RING_M, CORNER);
-  assert.ok(atLow, 'the ellipse exists just inside the band');
-  assert.equal(
-    atLow.rx, enclosureRadiusPxForZoom(7.01, SITE.lat, MAP_VIGNETTE_RING_M, CORNER),
-    'rx IS the forming-law circle radius',
-  );
-  assert.equal(atLow.squash, 1, 'below the tilt band the squash is 1');
-  assert.equal(atLow.ry, atLow.rx, 'ry == rx below the tilt band');
-  const atTop = enclosureEllipsePxForZoom(Z_TOP, SITE.lat, MAP_VIGNETTE_RING_M, CORNER);
-  assert.equal(
-    atTop.rx, enclosureRadiusPxForZoom(Z_TOP, SITE.lat, MAP_VIGNETTE_RING_M, CORNER),
-    'rx stays the circle law at the checkpoint too',
-  );
-  assert.ok(
-    Math.abs(atTop.ry - atTop.rx * SQUASH_AT_POLE) < 1e-6,
-    `ry is rx squashed by cos45 (got ${atTop.ry} vs rx ${atTop.rx})`,
-  );
-  assert.equal(enclosureEllipsePxForZoom(6.9, SITE.lat, MAP_VIGNETTE_RING_M, CORNER), null, 'parks below the band');
-  assert.equal(enclosureEllipsePxForZoom(8, SITE.lat, MAP_VIGNETTE_RING_M, null), null, 'parks without a viewport corner');
-});
-
-test('driver writes --vr-y everywhere it writes --vr (both sites)', () => {
+test('driver: every ellipse write passes the live height and the projected cy', () => {
   const src = main();
-  const vrWrites = (src.match(/setProperty\('--vr'/g) || []).length;
-  const vryWrites = (src.match(/setProperty\('--vr-y'/g) || []).length;
-  assert.ok(vrWrites >= 2, `both write sites set --vr (found ${vrWrites})`);
-  assert.equal(vryWrites, vrWrites, `--vr-y is written everywhere --vr is (${vryWrites} vs ${vrWrites})`);
-  assert.ok(!src.includes("removeProperty('--vr"), 'the park path never clears --vr/--vr-y to the 260px initial');
-  assert.ok(src.includes('parkEnclosureEllipse()'), 'the park path reuses the last live radii (else the seam constant)');
-  assert.ok(src.includes('enclosureEllipsePxForZoom('), 'both sites ride the ellipse law');
+  const calls = src.match(/enclosureEllipsePxForZoom\(/g) || [];
+  assert.ok(calls.length >= 2, `both ellipse sites exist (${calls.length})`);
+  assert.ok(src.includes('enclosureEllipsePxForZoom(z, SITE.lat, MAP_VIGNETTE_RING_M, corner, h)'),
+    'the live writer passes the measured height');
+  assert.ok(src.includes('enclosureEllipsePxForZoom(zLive, SITE.lat, MAP_VIGNETTE_RING_M, corner, chh)'),
+    'the entry refresh passes the measured height');
+  assert.ok(src.includes('seamHoldEllipseForS(stagedS, frameSize().h)'),
+    'the hold seam passes the live height');
+  assert.ok(src.includes('prox.sy + cy'), 'the live mask centre carries the projected cy');
+  assert.ok(src.includes('+sp.y + cy'), 'the hold mask centre carries the projected cy');
+  assert.ok(!src.includes('maskSquashForZoom'), 'no cos-squash path remains');
 });
 
-test('vignette rides the ellipse form; no circle var(--vr) remains', () => {
+test('vignette: clear core IS the disc; feather lives outside it', () => {
   const doc = html();
   const vig = /#map-vignette\s*\{[^}]*\}/.exec(doc);
   assert.ok(vig, 'the vignette rule exists');
-  assert.ok(
-    /radial-gradient\(ellipse var\(--vr\) var\(--vr-y, var\(--vr\)\)/.test(vig[0]),
-    'the surround is an ellipse on --vr / --vr-y',
-  );
-  assert.ok(!/circle var\(--vr\)/.test(vig[0]), 'no circle var(--vr) remains in #map-vignette');
-  assert.ok(doc.includes('@property --vr-y'), '--vr-y is a registered property');
-  assert.ok(
-    doc.includes('--rc-axis-y: calc(var(--vr-y, var(--vr)) * 0.7071067811865476)'),
-    'the vertical bracket axis derives from --vr-y (1/sqrt(2))',
-  );
-  const tops = (doc.match(/var\(--rc-axis-y\)/g) || []).length;
-  assert.equal(tops, 4, 'all four bracket tops ride --rc-axis-y');
-  assert.ok(!/top: calc\(var\(--vy[^)]*var\(--rc-axis\)/.test(doc), 'no bracket top rides the horizontal axis');
+  const rule = vig[0];
+  assert.ok(/radial-gradient\(ellipse var\(--vr\) var\(--vr-y, var\(--vr\)\)/.test(rule), 'the surround is an ellipse');
+  assert.ok(/transparent var\(--vr\)/.test(rule), 'the clear core ends exactly at the projected rim');
+  assert.ok(!/0\.74|1\.12/.test(rule), 'the old straddling feather stops are gone');
+  assert.ok(/--seam-feather:\s*calc\(var\(--vr\) \* 0\.19\)/.test(rule), 'the feather is a ratio of the rim, not a px literal');
+  assert.ok(/calc\(var\(--vr\) \+ var\(--seam-feather\)\)/.test(rule), 'the feather lands outside the rim');
+  assert.ok(!/var\(--ops-bg\) 100%/.test(rule), 'no stop before the outside feather (stops must not run backwards)');
 });

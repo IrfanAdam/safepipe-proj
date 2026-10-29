@@ -176,21 +176,24 @@
    * do NOT put --vr / --vr-y in `transition`: a transition on the property freezes
    * the gradient at its start value instead of gliding (verified headless).
    * The close-in reads as animation because the gesture streams steps.
-   * Colorless edge: transparent core dissolves across a feathered band
-    * straddling --vr / --vr-y (fade starts inside the ellipse edge, full
-    * black lands just outside it), then darkness feathers outward to the
-    * solid surround — no cut, no color stroke. Feather fractions of --vr
-    * (never literal px): at the seam they read the old 64/28px band
-    * (0.74/1.12), and the band breathes with the radius on every viewport. */
+   * Colorless edge: the clear core IS the projected disc (transparent to
+   * --vr / --vr-y exactly), then the feather lives entirely OUTSIDE the
+   * edge — full darkness lands one feather-width past the rim, then the
+   * solid surround. The old band straddled the edge (0.74..1.12 of --vr),
+   * which made the mask darken the twin's own rim by ~126px and read as a
+   * geometry mismatch during the fade. Feather width is a ratio of --vr
+   * (never literal px), so it scales with the projected seam on every
+   * viewport instead of encoding one 700px test size. */
   @property --vr { syntax: '<length>'; inherits: true; initial-value: 260px; }
   @property --vr-y { syntax: '<length>'; inherits: true; initial-value: 260px; }
   #map-vignette {
     position: absolute; inset: 0; z-index: 3; pointer-events: none;
+    --seam-feather: calc(var(--vr) * 0.19);
     background: radial-gradient(ellipse var(--vr) var(--vr-y, var(--vr)) at var(--vx, 50%) var(--vy, 50%),
       transparent 0,
-      transparent calc(var(--vr) * 0.74),
-      rgba(0, 0, 0, var(--ops-vignette-alpha)) calc(var(--vr) * 1.12),
-      var(--ops-bg) 100%);
+      transparent var(--vr),
+      rgba(0, 0, 0, var(--ops-vignette-alpha)) calc(var(--vr) + var(--seam-feather) * 0.3),
+      var(--ops-bg) calc(var(--vr) + var(--seam-feather)));
     opacity: 0; transition: opacity 0.45s ease; /* GATE-3 REVISION tempo */
   }
   #map-vignette.on { opacity: 1; }
