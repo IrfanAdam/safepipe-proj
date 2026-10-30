@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-30T10:06:29.706Z",
+  "generated": "2026-10-30T10:06:38.112Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "2190910",
+      "full": "2190910cabd9ecaf109badcc1d7d9c5384d6436f",
+      "date": "2026-10-30",
+      "time": "15:36",
+      "subject": "chore(sync): plan manifest + version after map-twin land [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "eb9b920",
       "full": "eb9b920d0696e0d9f0f8a10c5b561cf7db0c03dd",
