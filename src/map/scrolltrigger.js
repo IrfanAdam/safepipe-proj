@@ -631,6 +631,25 @@ export function accumStagedS(s, deltaY) {
   return Math.min(HANDOFF_STAGED_S_MAX, Math.max(0, cur - dy));
 }
 
+/** Auto-arrival S law: once an arrival has parked at the gate and the twin is
+ * released, the same dissolve must be able to finish without demanding one
+ * more wheel notch. Advance S at the shared flight tempo (the click prewarm
+ * already boots under that duration), clamped to the same S_MAX. Pure, dt-
+ * driven, frame-rate independent; the caller may stop/pause it on any wheel
+ * input or reverse. Never throws. */
+export function autoStagedSForDt(s, dtMs, { durationMs = 560, stagedMaxPx = HANDOFF_STAGED_S_MAX } = {}) {
+  try {
+    const cur = Number.isFinite(+s) ? Math.min(Math.max(0, +s), HANDOFF_STAGED_S_MAX) : 0;
+    const dt = Number(dtMs);
+    const dur = Number(durationMs);
+    const mx = Number.isFinite(+stagedMaxPx) ? Math.min(Math.max(0, +stagedMaxPx), HANDOFF_STAGED_S_MAX) : HANDOFF_STAGED_S_MAX;
+    if (!Number.isFinite(dt) || dt <= 0 || !Number.isFinite(dur) || dur <= 0 || mx <= cur) return Math.min(mx, cur);
+    return Math.min(mx, cur + (mx * dt) / dur);
+  } catch {
+    return Number.isFinite(+s) ? Math.max(0, +s) : 0;
+  }
+}
+
 /* STAGED BASE PARITY (seam pop, apply-order law): the twin frame keeps its
  * OWN satellite base under the 3D draw, and that base applies the handed
  * frame a beat AFTER the staged band opens — measured on 4ebde07: base z10.687

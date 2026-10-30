@@ -43,19 +43,19 @@ test('swallowed staged ticks repaint the frozen hold inline', () => {
   );
 });
 
-test('pill is fallback-only behind a grace delay and a fast-intent gate', () => {
+test('pill shows for every loading hold after its grace; intent stays telemetry', () => {
   const main = srcOf('../src/map/main.js');
   assert.ok(
     main.includes('const STALL_PILL_GRACE_MS = 2000;'),
     'the pill grace delay is pinned',
   );
   assert.ok(
-    main.includes('const show = hold && loading && intent.ok && stallWaitMs() >= STALL_PILL_GRACE_MS;'),
-    'pill visibility waits out the grace AND the dive-intent gate — slow warm dives never flash it',
+    main.includes('const show = hold && loading && stallWaitMs() >= STALL_PILL_GRACE_MS;'),
+    'pill visibility waits out the grace for EVERY still-loading arrival — a slow gate is never silent',
   );
   assert.ok(
     main.includes('function stallPillIntent()'),
-    'the dive-intent meter exists (arm-to-gate travel, not stall age alone)',
+    'the dive-intent meter still exists as telemetry (arm-to-gate travel)',
   );
   assert.ok(
     main.includes('STALL_PILL_MIN_INTENT_PX_PER_S') && main.includes('STALL_PILL_MAX_ARM_TO_GATE_MS'),

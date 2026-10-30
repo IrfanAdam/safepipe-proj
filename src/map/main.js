@@ -37,6 +37,7 @@ import {
   handoffStagesForScroll,
   HANDOFF_STAGED_S_MAX,
   accumStagedS,
+  autoStagedSForDt,
   stagedBaseParity,
   stagedPostStep,
   stagedPostSettled,
@@ -190,6 +191,19 @@ const REVEAL_TIMEOUT_MS = 4000;
 // extended by the flight: the reveal only waits for the move to LAND, not for
 // a timer (see clickFlightActive / deferRevealToFlightLand).
 const CLICK_FLIGHT_MS = 560;
+// CLICK STAGING: a click is the same intent as a scroll arrival, so it must
+// enter the SAME enclosure + S-dissolve hold at the landing, not open an
+// unstaged overlay. `clickStagedPending` kills any timed reveal during the
+// flight (the ready/paint grants may land mid-move); the arm timer promotes
+// the hold on the landing frame. A sequence token makes a stale timer inert
+// after an unwind/re-entry. The auto-S pump is the other half: once the twin
+// is released, the dissolve may finish without demanding one more notch.
+let clickStagedPending = false;
+let clickStagedSeq = 0;
+let clickArmTimer = null;
+let stagedAutoOn = false;
+const STAGED_AUTO_IDLE_MS = 180; // wheel debounce: the auto pump never races an active finger
+const STAGED_AUTO_STOP_EPS_PX = 0.25; // S epsilon: the pump stops when the law owns the last step
 // The live click flight: { t0, ms, timer } while the camera is moving to the
 // site; null once landed (or when the entry was a discrete reduced-motion cut).
 let clickFlight = null;
@@ -1086,9 +1100,16 @@ function twinLoaded() {
   // READINESS-HYSTERESIS: a latched staged grant survives tile gaps — the
   // feeder (stallSwallowForward) and the loader share this predicate, so
   // without the latch each mid-dissolve gap re-froze S and re-lit the pill.
-  // Scoped to the live staged hold: the pre-gate climb stays strict.
+  // RELEASE-GATED: content alone is not a revealable twin — the consumer must
+  // have applied the handed pose and left its intro hold. A painted frame
+  // that has not released would let the law run to 1 under a zero opacity and
+  // commit as a cut. Scoped to the live staged hold; the pre-gate climb stays
+  // strict.
   try {
-    if (stagedActive && !stagedCommitted && stagedTilesGranted) return true;
+    if (stagedActive && !stagedCommitted) {
+      if (!stagedTilesGranted) return false;
+      try { return twinReleased(); } catch { return false; }
+    }
   } catch { /* latch read is best-effort */ }
   try { return twinFrameHasContent(); } catch { return false; }
 }
@@ -1150,7 +1171,7 @@ function ensureStallLoading() {
     el.id = 'twin-loading';
     el.setAttribute('aria-hidden', 'true');
     el.hidden = true;
-    el.innerHTML = '<b>TWIN LOADING</b><span>forward held &middot; scroll up releases</span>';
+    el.innerHTML = '<b>TWIN LOADING</b><span>loading terrain &middot; scroll up to cancel</span>';
     const app = document.getElementById('app');
     if (app) app.appendChild(el);
     return el;
@@ -1339,14 +1360,13 @@ function refreshStallLoading() {
     // because the message serves no purpose there.
     let loading = false;
     try { loading = twinLoadingInFlight(); } catch { loading = false; }
-    // FAST-INTENT: the pill is a fast-dive fallback only. A slow approach
-    // preloads the twin on the way in, so a cold arrival there keeps the
-    // message dark (the hold still protects the commit underneath — this
-    // gates presentation, nothing else). The decision is measured from this
-    // dive (mask arm -> gate arrival), never asserted.
+    // FAST-INTENT is telemetry only now: the owner asked for a loading delay
+    // whenever the arrival still waits. A slow arrival that boots past the
+    // grace would otherwise show a silent, frozen gate. The hold and ceiling
+    // are unchanged; this gates the message only.
     let intent = { ok: false, basis: 'none', armToGateMs: -1, wheelPx: -1, ratePxPerS: null, basisBy: 'none' };
     try { intent = stallPillIntent(); } catch { intent = { ok: false, basis: 'none', armToGateMs: -1, wheelPx: -1, ratePxPerS: null, basisBy: 'none' }; }
-    const show = hold && loading && intent.ok && stallWaitMs() >= STALL_PILL_GRACE_MS;
+    const show = hold && loading && stallWaitMs() >= STALL_PILL_GRACE_MS;
     if (el) el.hidden = !show;
     try { window.__mapProbe.stall.loading = loading; } catch { /* probe cosmetic */ }
     try { window.__mapProbe.pill = { shown: show, intent }; } catch { /* probe cosmetic */ }
@@ -3567,6 +3587,190 @@ function deferRevealToFlightLand() {
   } catch { /* deferral is best-effort */ }
 }
 
+/** AUTO-ARRIVAL S: the user stopped at the gate; the twin has released; the
+ * hold must not wait for one more wheel notch. Feed the same S law from a
+ * frame clock (pure dt -> S), pausing while the stall owns the frame and
+ * while fingers are active. Any reverse stops it (the user is leaving); the
+ * commit path stops it when S_MAX lands. Never throws. */
+function startStagedAutoPump() {
+  if (stagedAutoOn) return;
+  if (typeof requestAnimationFrame !== 'function') return;
+  stagedAutoOn = true;
+  let last = nowMs();
+  const step = () => {
+    if (!stagedAutoOn) return;
+    try {
+      if (!stagedActive || stagedCommitted || receding) {
+        stagedAutoOn = false;
+        return;
+      }
+      const now = nowMs();
+      const dt = Math.min(80, Math.max(0, now - last));
+      last = now;
+      let z = NaN;
+      try { z = mapRef ? +mapRef.getZoom() : NaN; } catch { z = NaN; }
+      // The arrival seat owns the gate; below it the flight/gesture still
+      // travels, so the pump waits instead of advancing S over a moving frame.
+      if (!(z >= Z_HANDOFF - 0.01)) {
+        requestAnimationFrame(step);
+        return;
+      }
+      let holding = false;
+      try { holding = stallArmed(); } catch { holding = false; }
+      let hardExpired = false;
+      try { hardExpired = stagedActive && !stagedCommitted && stallWaitMs() >= HARD_STOP_HOLD_MS; } catch { hardExpired = false; }
+      if (holding && !hardExpired) {
+        try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
+        try { driveStagedOverlay(); } catch { /* frozen repaint is best-effort */ }
+        requestAnimationFrame(step);
+        return;
+      }
+      // RELEASE-GATED, not just content-gated: a painted/tile-ready twin still
+      // has not applied the handed pose (base parity) and its intro has not
+      // reached the release. Advancing S there would run the law to 1 under a
+      // zero opacity and commit as a cut on release. The pump holds at the
+      // gate until the consumer is actually released, then dissolves. The
+      // hard-stop cap keeps a dead frame from parking the pump forever.
+      let released = false;
+      try { released = twinReleased(); } catch { released = false; }
+      if (!released && !hardExpired) {
+        try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
+        requestAnimationFrame(step);
+        return;
+      }
+      try {
+        const parity = stagedBaseParityCheck(true, released);
+        if (parity && parity.gate) {
+          try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
+          requestAnimationFrame(step);
+          return;
+        }
+      } catch { /* parity read is best-effort */ }
+      // Active fingers own S; the pump resumes only after the wheel settles.
+      if (lastStagedInputMs > 0 && now - lastStagedInputMs < STAGED_AUTO_IDLE_MS) {
+        requestAnimationFrame(step);
+        return;
+      }
+      if (stagedS < HANDOFF_STAGED_S_MAX - STAGED_AUTO_STOP_EPS_PX) {
+        stagedS = autoStagedSForDt(stagedS, dt, { durationMs: CLICK_FLIGHT_MS });
+        try { driveStagedOverlay(); } catch { /* staged drive is best-effort */ }
+        try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
+      }
+      if (!stagedActive || stagedCommitted) {
+        stagedAutoOn = false;
+        return;
+      }
+      requestAnimationFrame(step);
+    } catch {
+      stagedAutoOn = false;
+    }
+  };
+  try { requestAnimationFrame(step); } catch { stagedAutoOn = false; }
+}
+function stopStagedAutoPump() {
+  stagedAutoOn = false;
+}
+
+/** Promote a CLICK arrival (or any explicit arrival) into the SAME staged
+ * enclosure hold the scroll path uses. The prewarm already booted under the
+ * flight; this arms the gate state on the landing frame, paints the seam
+ * enclosure and lets the shared auto-S pump finish the dissolve once the twin
+ * releases. It must never run while the camera is still flying. */
+function armStagedHoldAtGate(id, frame, opts = {}) {
+  try {
+    const s = sectors.find((x) => x.id === id);
+    if (!s || !mapRef) return false;
+    if (stagedActive && !stagedCommitted) return true; // already holding
+    try { mapRef.setMaxZoom(Z_HANDOFF); } catch { /* clamp is best-effort */ }
+    stagedActive = true;
+    stagedS = 0;
+    stagedCommitted = false;
+    stagedHanded = null;
+    stagedFeedFwd = true;
+    stagedTilesT0 = nowMs();
+    stagedTilesGranted = false;
+    contentVerdictFalseMs = 0;
+    contentVerdictIgnored = false;
+    baseParityFalseMs = 0;
+    baseParityIgnored = false;
+    stagedPostCur = 0;
+    stagedCommitRetryT = 0;
+    lastPostedStagedS = null;
+    lastStagedInputMs = 0; // no finger owns S yet: the arrival pump may finish
+    try { freezeStagedFrame(); } catch { /* freeze is best-effort */ }
+    const stagedFrame = frame || liveFrame();
+    if (stagedFrame) {
+      stagedFrame.cx = SITE_LNGLAT[0];
+      stagedFrame.cy = SITE_LNGLAT[1];
+    }
+    stagedHanded = stagedFrame && Number.isFinite(+stagedFrame.z)
+      ? { z: +stagedFrame.z, cx: +stagedFrame.cx, cy: +stagedFrame.cy }
+      : null;
+    try { pumpIsoPitch(); } catch { /* pump is best-effort */ }
+    try {
+      scrubRenderTarget = 0;
+      scrubRenderShown = 0;
+      const ov = document.getElementById('twin-overlay');
+      if (ov && ov.style.opacity !== '0') ov.style.opacity = '0';
+    } catch { /* follower seed is best-effort */ }
+    // Seam enclosure: the click path skipped the wash during the flight, so
+    // paint the gate's projected seam now — the same shape the scroll hold
+    // shows at the gate.
+    try {
+      const proxNow = proximityInfo();
+      const entry = writeEnclosureEllipse(proxNow, Z_HANDOFF);
+      entryRx = entry && Number.isFinite(entry.rx) ? +entry.rx.toFixed(1) : null;
+      entryRy = entry && Number.isFinite(entry.ry) ? +entry.ry.toFixed(1) : null;
+      entryCy = entry && Number.isFinite(entry.cy) ? +entry.cy.toFixed(1) : null;
+      showVignette(true);
+    } catch { /* enclosure paint is best-effort */ }
+    // Reuse the booted shell; the initial staged prewarm under the click
+    // already opened it. Only arm the reveal record when there is none (a
+    // direct arrival that did not prewarm) — re-running prewarmThenReveal
+    // here would reset a paint/ready grant the warm frame already posted.
+    if (!twinOpen || !pendingReveal) {
+      prewarmThenReveal(id, stagedFrame || liveFrame(), { ...opts, staged: true });
+    }
+    try {
+      window.__mapProbe.staged = { active: true, s: 0, committed: false, source: opts.source || 'click' };
+      window.__mapProbe.stagedHanded = stagedHanded ? { ...stagedHanded } : null;
+    } catch { /* probe cosmetic */ }
+    try { armRevealFallback(); } catch { /* idle fallback is best-effort */ }
+    try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
+    startStagedAutoPump();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Arm the click hold on the landing frame, never mid-flight. The sequence
+ * token makes a stale timer harmless after Esc/re-entry. */
+function scheduleClickStagedArm(id, frame, opts = {}) {
+  try {
+    if (!clickFlight) return;
+    const seq = clickStagedSeq;
+    let now = Date.now();
+    try {
+      if (typeof performance !== 'undefined' && performance.now) now = performance.now();
+    } catch { now = Date.now(); }
+    const wait = Math.max(0, Math.round(clickFlight.t0 + clickFlight.ms - now)) + 8;
+    clickArmTimer = setTimeout(() => {
+      try {
+        if (seq !== clickStagedSeq || !clickStagedPending) return;
+        if (!twinOpen || !pendingReveal || pendingReveal.revealed) return;
+        const ok = armStagedHoldAtGate(id, frame, { ...opts, source: 'click', replace: true });
+        clickStagedPending = false;
+        if (!ok) {
+          // The hold could not arm (map/frame gone): never leave the pending
+          // bit blocking the ordinary reveal — fall back to the timed path.
+          try { revealTwin(false); } catch { /* fallback reveal is best-effort */ }
+        }
+      } catch { /* arm is best-effort; the map stays live */ }
+    }, wait);
+  } catch { /* scheduling is best-effort */ }
+}
+
 /** Task-35 scrubbed handoff (replaces the 650ms timed flight): native zoom
  * OWNS z — this stages the twin at the LIVE scrubbed frame and never flies
  * the camera on the scroll path. Progress toward handoff is driven purely by
@@ -3833,11 +4037,28 @@ function flyToSectorThenTwin(id, opts = {}) {
       // pill clears when content lands even if the fingers are still).
       try { armRevealFallback(); } catch { /* poll is best-effort */ }
       try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
+      startStagedAutoPump();
     } else {
       // CLICK FLIGHT: hand the twin the ARRIVAL pose the camera is flying to
       // (the site at the gate), not the pre-flight live frame — the twin
       // boots on the pose the flight lands on, so the crossfade superimposes.
-      prewarmThenReveal(id, clickFlying && clickDest ? clickDest : liveFrame(), opts);
+      // A click is the same intent as a scroll arrival: boot staged (no timed
+      // fallback), then promote to the SAME gate enclosure + S-dissolve on
+      // the landing frame (scheduleClickStagedArm). `clickStagedPending`
+      // suppresses any ready/paint reveal that lands mid-flight.
+      const clickFrame = clickFlying && clickDest ? clickDest : liveFrame();
+      if (clickFlying) {
+        clickStagedPending = true;
+        clickStagedSeq += 1;
+        if (clickArmTimer) {
+          try { clearTimeout(clickArmTimer); } catch { /* timer teardown is best-effort */ }
+          clickArmTimer = null;
+        }
+        prewarmThenReveal(id, clickFrame, { ...opts, staged: true });
+        scheduleClickStagedArm(id, clickFrame, opts);
+      } else {
+        prewarmThenReveal(id, clickFrame, opts);
+      }
     }
   } finally {
     transitId = null;
@@ -4802,6 +5023,8 @@ function twinFrameHasContent() {
  * (flags, probe, focus) and unclamp native zoom. Idempotent. */
 function finalizeStagedReveal(root) {
   if (stagedCommitted) return;
+  stopStagedAutoPump();
+  clickStagedPending = false;
   stagedCommitted = true;
   stagedActive = false;
   stagedTilesT0 = 0; // HARD-STOP: commit disarms the hold (loader already cleared by content)
@@ -4851,6 +5074,7 @@ function finalizeStagedReveal(root) {
  * only other exit (forward, via driveStagedOverlay). */
 function exitStaged() {
   const had = stagedActive || stagedS !== 0;
+  stopStagedAutoPump();
   stagedActive = false;
   stagedS = 0;
   stagedCommitted = false;
@@ -5132,6 +5356,11 @@ function restoreDiveCam(reason = 'unwind') {
  * overlay is mounted but no twin is open, e.g. a fork-resolved hold). */
 function quiesceTwinLayers() {
   try {
+    clickStagedSeq += 1;
+    clickStagedPending = false;
+    if (clickArmTimer) clearTimeout(clickArmTimer);
+    clickArmTimer = null;
+    stopStagedAutoPump();
     if (overlayEls && overlayEls.root) {
       overlayEls.root.hidden = true;
       overlayEls.root.classList.remove('closing');
@@ -5192,6 +5421,15 @@ function unwindDive(reason = 'esc', opts = {}) {
     if (clickFlight && clickFlight.timer) clearTimeout(clickFlight.timer);
   } catch { /* timer teardown is best-effort */ }
   clickFlight = null;
+  // CLICK STAGING: a stale arm timer must never promote a dive the escape
+  // already tore down. Bump the token, drop the pending bit and the timer.
+  clickStagedSeq += 1;
+  clickStagedPending = false;
+  try {
+    if (clickArmTimer) clearTimeout(clickArmTimer);
+  } catch { /* timer teardown is best-effort */ }
+  clickArmTimer = null;
+  stopStagedAutoPump();
   try { if (stallPollT) clearTimeout(stallPollT); } catch { /* timer teardown is best-effort */ }
   stallPollT = 0;
   stallT0 = 0;
@@ -5919,6 +6157,11 @@ function armRevealFallback() {
 function revealTwin(instant = false) {
   try {
     if (pendingReveal && pendingReveal.revealed) return true;
+    // CLICK STAGING: the ready/paint grants can land mid-flight, before the
+    // gate hold exists. A timed fade here would open the twin unenclosed and
+    // the S arm would have nothing left to dissolve. The landing arm owns
+    // the reveal; only an instant commit may bypass it.
+    if (clickStagedPending && !instant) return false;
     // Reveal continuity / single writer: while the staged hold owns the
     // dissolve, the S law (driveStagedOverlay) is the ONLY opacity writer. A
     // timed crossfade here would ease 0->1 on a timer while the law still
@@ -7459,6 +7702,10 @@ function feedStagedScroll(dyFlip) {
     // writes the law. Set before the stall/arrival guards: a swallowed forward
     // tick is still forward intent.
     stagedFeedFwd = dy < 0;
+    // AUTO-S: a reverse tick is the user leaving the hold. Stop the arrival
+    // pump for the rest of this hold so a parked S cannot auto-dissolve after
+    // the fingers have asked to back out.
+    if (!stagedFeedFwd) stopStagedAutoPump();
     // HARD-STOP: forward (flip-space dy<0) stalls at frozen S until the twin
     // holds content — no accumulate, so neither the overlay dissolve nor the
     // twin-plane scrub (both pure fns of the same S) advances. The frozen
@@ -7502,13 +7749,15 @@ function feedStagedScroll(dyFlip) {
       }
     }
     const sPrev = stagedS;
-    // UNWIND LAW (reverse): a reverse tick (dy>0 — the same convention the
-    // forward swallow above reads) while the hold is STALLED is the user
-    // asking to back out of a frozen hold: unwind now and restore the frame
-    // the dive left. The S-drain test cannot express this — the hard stop
-    // seeds S at 0, so a stalled hold has nothing to drain.
+    // UNWIND LAW (reverse): a reverse tick while the hold is STALLED is the
+    // user asking to back out of a frozen hold. RELEASE THE HOLD and let the
+    // wheel retrace the camera; do not `unwindDive` to the pre-dive frame —
+    // that cut the whole gate-to-home distance in one tick (the owner's fast
+    // exit read as a jump). The native zoom-out owns the return; the terminal
+    // flatten law owns the tilt when it settles below the band. Esc still
+    // restores the exact pre-dive frame through the single unwind path.
     if (dy > 0 && stallArmed()) {
-      try { unwindDive('reverse-stalled', { source: 'reverse' }); } catch { /* unwind is best-effort */ }
+      try { exitStaged(); } catch { /* hold release is best-effort */ }
       return;
     }
     stagedS = accumStagedS(stagedS, dy); // symmetric: scroll-up retraces the same law

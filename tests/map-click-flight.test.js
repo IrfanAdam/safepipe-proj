@@ -75,8 +75,11 @@ test('the click entry flies before it reads proximity (explicit intent, no curso
   assert.ok(fly > 0 && prox > 0, 'both the flight and the proximity read are in the entry');
   assert.ok(fly < prox, 'the flight is issued before any proximity predicate is read');
   assert.match(body, /clickDest = clickArrivalPose\(\);/, 'the entry derives the arrival pose');
-  assert.match(body, /prewarmThenReveal\(id, clickFlying && clickDest \? clickDest : liveFrame\(\), opts\)/,
-    'the twin is handed the pose the flight lands on, not the pre-flight frame');
+  assert.match(body, /prewarmThenReveal\(id, clickFrame, \{ \.\.\.opts, staged: true \}\)/,
+    'the twin boots staged under the flight — no timed unstaged reveal');
+  assert.match(body, /scheduleClickStagedArm\(id, clickFrame, opts\)/,
+    'the same staged enclosure hold is promoted on the landing frame');
+  assert.match(body, /clickStagedPending = true/, 'a mid-flight grant cannot open an unenclosed twin');
 });
 
 test('the arrival pose rides the shared pitch law at the gate', () => {

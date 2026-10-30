@@ -344,13 +344,14 @@ test('readiness-hysteresis: the tiles grant latches, tile gaps never re-arm the 
     'the hold reads the latch — a mid-dissolve tile gap never re-arms it',
   );
   assert.ok(
-    main.includes('if (stagedActive && !stagedCommitted && stagedTilesGranted) return true;'),
-    'the feeder/loader predicate honors the latch, so S never re-freezes mid-dissolve (pre-gate climb stays strict)',
+    main.includes('if (!stagedTilesGranted) return false;')
+      && main.includes('return twinReleased();'),
+    'the feeder/loader predicate honors the content latch AND the consumer release — S never re-freezes mid-dissolve, and never runs ahead of the applied pose',
   );
   assert.equal(
     (main.match(/stagedTilesGranted = false/g) || []).length,
-    4,
-    'entry, commit, and unwind all consume the grant (declaration + 3 resets) — the next hold restages cold',
+    5,
+    'entry, click arm, commit, and unwind all consume the grant (declaration + 4 resets) — the next hold restages cold',
   );
   assert.ok(
     main.includes('tilesGranted: stagedTilesGranted,'),
