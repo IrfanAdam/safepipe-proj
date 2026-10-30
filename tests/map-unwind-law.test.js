@@ -185,9 +185,14 @@ test('the release watch is sampled from the drive and the presentation refresh',
   assert.ok(watch.includes('unwindDive(reason, { source: \'release-watch\' })'), 'firing unwinds with the named reason');
 });
 
-test('reverse drains out of a stalled hold through the same unwind', () => {
-  assert.ok(main().includes("unwindDive('reverse-drained', { source: 'reverse' })"),
-    'scroll-up from a stalled hold unwinds with a named reason');
+test('reverse drains out of a staged hold and releases without a camera cut', () => {
+  const m = main();
+  const feed = m.slice(m.indexOf('function feedStagedScroll('), m.indexOf('async function boot('));
+  assert.ok(feed.includes('if (dy > 0) {'), 'reverse is handled before the stall/arrival gates');
+  assert.ok(feed.includes('if (stagedS <= 0) {'), 'a drained S releases on the first reverse tick');
+  assert.ok(feed.includes('exitStaged()'), 'the release is the hold teardown, not the home unwind');
+  assert.ok(!feed.includes("unwindDive('reverse-drained'"),
+    'a reverse tick never cuts the whole gate-to-home distance in one tick');
 });
 
 test('progress beats the clock: a painting twin is never yanked out of its dive', () => {
