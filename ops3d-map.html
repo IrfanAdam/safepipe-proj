@@ -194,23 +194,28 @@
    * do NOT put --vr / --vr-y in `transition`: a transition on the property freezes
    * the gradient at its start value instead of gliding (verified headless).
    * The close-in reads as animation because the gesture streams steps.
-   * Colorless edge: the clear core IS the projected disc (transparent to
-   * --vr / --vr-y exactly), then the feather lives entirely OUTSIDE the
-   * edge — full darkness lands one feather-width past the rim, then the
-   * solid surround. The old band straddled the edge (0.74..1.12 of --vr),
-   * which made the mask darken the twin's own rim by ~126px and read as a
-   * geometry mismatch during the fade. Feather width is a ratio of --vr
-   * (never literal px), so it scales with the projected seam on every
-   * viewport instead of encoding one 700px test size. */
+   * Colorless edge: the clear core ends at 0.9R — the twin's own photo
+   * vignette start (RIM_FADE_IN) — and the feather lands on the projected
+   * rim at 1.0R, so map and twin darken through the SAME band during the
+   * dissolve. Full darkness lands one feather-width past the rim, then the
+   * solid surround. Feathering OUTSIDE a 1.0R clear core read as a second
+   * ring beside the twin's 0.9R rim (owner: "not exactly coinciding on hand
+   * off"). Feather width is a ratio of --vr (never literal px), so it scales
+   * with the projected seam on every viewport instead of encoding one 700px
+   * test size. */
   @property --vr { syntax: '<length>'; inherits: true; initial-value: 260px; }
   @property --vr-y { syntax: '<length>'; inherits: true; initial-value: 260px; }
   #map-vignette {
     position: absolute; inset: 0; z-index: 3; pointer-events: none;
-    --seam-feather: calc(var(--vr) * 0.19);
+    /* The photo vignette's fade starts at RIM_FADE_IN (0.9R) and lands at the
+     * 10 km rim; the map mask must use the SAME band, or the two fades read
+     * as a double ring during the dissolve (owner: "not exactly coinciding on
+     * hand off"). Feather now lives INSIDE the rim, on the twin's law. */
+    --seam-feather: calc(var(--vr) * 0.10);
     background: radial-gradient(ellipse var(--vr) var(--vr-y, var(--vr)) at var(--vx, 50%) var(--vy, 50%),
       transparent 0,
-      transparent var(--vr),
-      rgba(0, 0, 0, var(--ops-vignette-alpha)) calc(var(--vr) + var(--seam-feather) * 0.3),
+      transparent calc(var(--vr) * 0.90),
+      rgba(0, 0, 0, var(--ops-vignette-alpha)) var(--vr),
       var(--ops-bg) calc(var(--vr) + var(--seam-feather)));
     opacity: 0; transition: opacity 0.45s ease; /* GATE-3 REVISION tempo */
   }

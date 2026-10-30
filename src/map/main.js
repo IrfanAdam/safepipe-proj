@@ -3698,14 +3698,54 @@ function armStagedHoldAtGate(id, frame, opts = {}) {
     lastPostedStagedS = null;
     lastStagedInputMs = 0; // no finger owns S yet: the arrival pump may finish
     try { freezeStagedFrame(); } catch { /* freeze is best-effort */ }
-    const stagedFrame = frame || liveFrame();
-    if (stagedFrame) {
-      stagedFrame.cx = SITE_LNGLAT[0];
-      stagedFrame.cy = SITE_LNGLAT[1];
+    // GATE-ANCHORED SCALE: the staged frame must be the LIVE gate frame, not
+    // the frame captured when the dive armed. The arm frame is earlier in the
+    // climb (measured z10.67 vs gate 11.5); the twin measures its opening
+    // range from the handed z, so booting from the arm frame made the 10 km
+    // ring ~1.78x too small under the 512.5 px mask — the owner's "scale
+    // mismatch between states". Pin the live gate z on every hold; the twin
+    // re-pins its hold range to it through an arrival retarget below.
+    const gateFrame = liveFrame();
+    if (gateFrame) {
+      gateFrame.cx = SITE_LNGLAT[0];
+      gateFrame.cy = SITE_LNGLAT[1];
+      try {
+        const zLive = +mapRef.getZoom();
+        if (Number.isFinite(zLive)) gateFrame.z = zLive;
+      } catch { /* live zoom is best-effort */ }
     }
+    const stagedFrame = gateFrame || frame || liveFrame();
     stagedHanded = stagedFrame && Number.isFinite(+stagedFrame.z)
       ? { z: +stagedFrame.z, cx: +stagedFrame.cx, cy: +stagedFrame.cy }
       : null;
+    // Reuse the booted shell; the initial staged prewarm under the click
+    // already opened it. Only arm the reveal record when there is none (a
+    // direct arrival that did not prewarm) — re-running prewarmThenReveal
+    // here would reset a paint/ready grant the warm frame already posted.
+    // Either way the live shell must re-pin to the GATE frame (arrival
+    // retarget), never keep the arm frame's range.
+    let gateRetargeted = false;
+    if (twinOpen && pendingReveal && overlayEls && overlayEls.frame) {
+      try {
+        const win = overlayEls.frame.contentWindow;
+        const probe = win && win.__ring2;
+        if (probe && typeof probe.handoffPhase === 'function' && probe.handoffPhase() === 'hold') {
+          const msg = buildTwinRetargetMessage(stagedFrame);
+          if (msg) {
+            msg.arrival = true;
+            win.postMessage(msg, '*');
+            gateRetargeted = true;
+            window.__mapProbe.gateRetarget = { z: stagedFrame.z, at: nowMs() };
+          }
+        }
+      } catch { /* gate retarget is best-effort */ }
+    }
+    if (!gateRetargeted) {
+      // No live hold shell to re-pin: arm the arrival through the normal
+      // prewarm (a cold navigation is still exact; a stale warm range is
+      // not). This is the only path that resets grants at the gate.
+      prewarmThenReveal(id, stagedFrame || liveFrame(), { ...opts, staged: true });
+    }
     try { pumpIsoPitch(); } catch { /* pump is best-effort */ }
     try {
       scrubRenderTarget = 0;
@@ -3724,13 +3764,6 @@ function armStagedHoldAtGate(id, frame, opts = {}) {
       entryCy = entry && Number.isFinite(entry.cy) ? +entry.cy.toFixed(1) : null;
       showVignette(true);
     } catch { /* enclosure paint is best-effort */ }
-    // Reuse the booted shell; the initial staged prewarm under the click
-    // already opened it. Only arm the reveal record when there is none (a
-    // direct arrival that did not prewarm) — re-running prewarmThenReveal
-    // here would reset a paint/ready grant the warm frame already posted.
-    if (!twinOpen || !pendingReveal) {
-      prewarmThenReveal(id, stagedFrame || liveFrame(), { ...opts, staged: true });
-    }
     try {
       window.__mapProbe.staged = { active: true, s: 0, committed: false, source: opts.source || 'click' };
       window.__mapProbe.stagedHanded = stagedHanded ? { ...stagedHanded } : null;
@@ -4020,6 +4053,13 @@ function flyToSectorThenTwin(id, opts = {}) {
       if (stagedFrame) {
         stagedFrame.cx = SITE_LNGLAT[0];
         stagedFrame.cy = SITE_LNGLAT[1];
+        // GATE-ANCHORED SCALE + POLAR: this arm runs at the deep checkpoint
+        // (measured z10.67), but the hold it starts ends at the gate. Handing
+        // the checkpoint z made the twin measure its opening range from a
+        // lower zoom (10 km ring ~1.78x too small under the 512.5 px mask at
+        // 11.5) and hold at the shallow-frame polar instead of the gate's
+        // iso. Hand the GATE frame — the pose the reveal actually opens on.
+        stagedFrame.z = Z_HANDOFF;
       }
       // SEAM POP: remember exactly the frame this hold HANDS OVER (SITE-centered,
       // gate zoom). The base-parity gate compares the twin's OWN satellite base
@@ -7748,26 +7788,32 @@ function feedStagedScroll(dyFlip) {
         return;
       }
     }
-    const sPrev = stagedS;
-    // UNWIND LAW (reverse): a reverse tick while the hold is STALLED is the
-    // user asking to back out of a frozen hold. RELEASE THE HOLD and let the
-    // wheel retrace the camera; do not `unwindDive` to the pre-dive frame —
-    // that cut the whole gate-to-home distance in one tick (the owner's fast
-    // exit read as a jump). The native zoom-out owns the return; the terminal
-    // flatten law owns the tilt when it settles below the band. Esc still
-    // restores the exact pre-dive frame through the single unwind path.
-    if (dy > 0 && stallArmed()) {
-      try { exitStaged(); } catch { /* hold release is best-effort */ }
+    // REVERSE IS ALWAYS AN EXIT: a reverse tick never needs the stall to be
+    // in a particular readiness state. If the dissolve has already drained to
+    // S=0, release the hold and hand the next tick to native zoom-out. This
+    // is the freeze the owner hit: a ready/content twin made the stall gate
+    // false, so the reverse branch was skipped, S stayed 0, and every wheel
+    // was swallowed by the staged lane — only pinch (ctrlKey, outside the
+    // lane) escaped. A reverse tick is the escape; Esc still restores the
+    // exact pre-dive frame.
+    if (dy > 0) {
+      if (stagedS <= 0) {
+        try { exitStaged(); } catch { /* hold release is best-effort */ }
+        try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
+        return;
+      }
+      const sPrevRev = stagedS;
+      stagedS = accumStagedS(stagedS, dy);
+      if (stagedS <= 0 && sPrevRev > 0) {
+        try { exitStaged(); } catch { /* hold release is best-effort */ }
+        try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
+        return;
+      }
+      driveStagedOverlay();
       return;
     }
+    // FORWARD FROM HERE: the reversed cases returned above.
     stagedS = accumStagedS(stagedS, dy); // symmetric: scroll-up retraces the same law
-    // UNWIND LAW (reverse): S drained back to 0 (direction-agnostic — the two
-    // wheel conventions disagree on sign, the S value does not) while the hold
-    // is stalled. Nothing is left to retrace, so unwind through the same path.
-    if (stagedS < sPrev && stagedS <= 0 && stallArmed()) {
-      try { unwindDive('reverse-drained', { source: 'reverse' }); } catch { /* unwind is best-effort */ }
-      return;
-    }
     // HARD-STOP: S advances only past the content grant (or the long-cap
     // escape) — the overlay stays a pure function of scroll, so every tick
     // paints. Forward intent while unloaded never reaches this line (stalled

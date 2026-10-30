@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-30T09:16:13.823Z",
+  "generated": "2026-10-30T09:57:49.874Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "0f94077",
+      "full": "0f94077910419b0f75bb727af791b17233d0f117",
+      "date": "2026-10-30",
+      "time": "14:46",
+      "subject": "docs(plan): record arrival-hold-feel headless sha [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "320c0fe",
       "full": "320c0fe343275faa09d40aa7e997a767552a4352",
@@ -6808,6 +6817,9 @@
     }
   ],
   "wip": [
-    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
+    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+    "ops3d-map.html",
+    "public/version.json",
+    "src/map/main.js"
   ]
 }

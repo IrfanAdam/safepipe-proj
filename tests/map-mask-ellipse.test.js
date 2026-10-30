@@ -143,15 +143,18 @@ test('driver: every ellipse write passes the live height and the projected cy', 
   assert.ok(!src.includes('maskSquashForZoom'), 'no cos-squash path remains');
 });
 
-test('vignette: clear core IS the disc; feather lives outside it', () => {
+test('vignette: clear core + feather match the twin RIM_FADE_IN band', () => {
   const doc = html();
   const vig = /#map-vignette\s*\{[^}]*\}/.exec(doc);
   assert.ok(vig, 'the vignette rule exists');
   const rule = vig[0];
   assert.ok(/radial-gradient\(ellipse var\(--vr\) var\(--vr-y, var\(--vr\)\)/.test(rule), 'the surround is an ellipse');
-  assert.ok(/transparent var\(--vr\)/.test(rule), 'the clear core ends exactly at the projected rim');
+  assert.ok(/transparent calc\(var\(--vr\) \* 0\.90\)/.test(rule),
+    'the clear core ends at the twin photo vignette start (0.9R), not 1.0R');
+  assert.ok(/rgba\(0, 0, 0, var\(--ops-vignette-alpha\)\) var\(--vr\)/.test(rule),
+    'the fade lands on the projected rim');
   assert.ok(!/0\.74|1\.12/.test(rule), 'the old straddling feather stops are gone');
-  assert.ok(/--seam-feather:\s*calc\(var\(--vr\) \* 0\.19\)/.test(rule), 'the feather is a ratio of the rim, not a px literal');
-  assert.ok(/calc\(var\(--vr\) \+ var\(--seam-feather\)\)/.test(rule), 'the feather lands outside the rim');
+  assert.ok(/--seam-feather:\s*calc\(var\(--vr\) \* 0\.10\)/.test(rule), 'the feather is a ratio of the rim, not a px literal');
+  assert.ok(/calc\(var\(--vr\) \+ var\(--seam-feather\)\)/.test(rule), 'the outer stop still lands past the rim');
   assert.ok(!/var\(--ops-bg\) 100%/.test(rule), 'no stop before the outside feather (stops must not run backwards)');
 });

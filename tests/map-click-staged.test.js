@@ -89,3 +89,29 @@ test('reverse stops the auto pump; commit and unwind stop it too', () => {
   assert.match(fnBody(m, 'exitStaged'), /stopStagedAutoPump\(\);/, 'unwind stops the pump');
   assert.match(fnBody(m, 'quiesceTwinLayers'), /clickStagedPending = false;/, 'teardown drops a pending click arm');
 });
+
+test('the staged twin is gate-anchored, not armed-checkpoint-anchored', () => {
+  const m = main();
+  const arrival = fnBody(m, 'flyToSectorThenTwin');
+  assert.match(arrival, /stagedFrame\.z = Z_HANDOFF;/,
+    'the deep arm hands the GATE zoom, not the lower checkpoint zoom');
+  assert.match(arrival, /GATE-ANCHORED SCALE \+ POLAR/,
+    'the scale/polar reason is recorded at the source');
+  const arm = fnBody(m, 'armStagedHoldAtGate');
+  assert.match(arm, /const gateFrame = liveFrame\(\);/,
+    'the click hold reads the live gate frame');
+  assert.match(arm, /gateFrame\.z = zLive;/,
+    'the click hold pins the live gate zoom');
+  assert.match(arm, /buildTwinRetargetMessage\(stagedFrame\)/,
+    'a warm shell is retargeted to the gate before S opens');
+});
+
+test('a reverse tick is an unconditional escape from a staged hold', () => {
+  const feed = fnBody(main(), 'feedStagedScroll');
+  assert.match(feed, /if \(dy > 0\) \{/,
+    'reverse is handled before the stall/arrival gates');
+  assert.match(feed, /if \(stagedS <= 0\) \{/,
+    'a drained hold releases on the first reverse tick');
+  assert.ok(!feed.includes('dy > 0 && stallArmed()'),
+    'the escape no longer depends on the stall readiness predicate');
+});
