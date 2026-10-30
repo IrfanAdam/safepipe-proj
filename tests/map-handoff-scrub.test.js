@@ -350,8 +350,8 @@ test('readiness-hysteresis: the tiles grant latches, tile gaps never re-arm the 
   );
   assert.equal(
     (main.match(/stagedTilesGranted = false/g) || []).length,
-    5,
-    'entry, click arm, commit, and unwind all consume the grant (declaration + 4 resets) — the next hold restages cold',
+    6,
+    'entry, click arm, commit, unwind, and close-reset all consume the grant (declaration + 5 resets) — the next hold restages cold',
   );
   assert.ok(
     main.includes('tilesGranted: stagedTilesGranted,'),

@@ -122,3 +122,43 @@ test('fresh opens and unwinds never inherit a reverse dissolve', () => {
   const unwind = m.slice(m.indexOf('function unwindDive('), m.indexOf('function escapeKeyDown('));
   assert.ok(unwind.includes('if (retraceDissolve) endRetraceDissolve();'), 'a mid-retrace escape lands the dissolve before the camera restore');
 });
+
+/* ---------- slow-reverse freeze (owner 2026-10-30) ---------- */
+
+test('a slow reverse at the gate cannot re-open the twin', () => {
+  const m = main();
+  const begin = m.slice(m.indexOf('function beginRetraceDissolve('), m.indexOf('function driveRetraceDissolve('));
+  const drive = m.slice(m.indexOf('function driveRetraceDissolve('), m.indexOf('function endRetraceDissolve('));
+  const stop = m.slice(m.indexOf('function stopRetraceMode('), m.indexOf('function beginRetraceDissolve('));
+  assert.ok(begin.includes('retraceLastZ = z;'), 'begin records the gate zoom');
+  assert.ok(drive.includes('const movedIn = Number.isFinite(retraceLastZ) && z > retraceLastZ + 0.005;'),
+    're-open is gated on a real inward movement, not on a frame that merely stayed at the gate');
+  assert.ok(drive.includes('if (!movedIn) {'), 'the no-movement case keeps the retrace armed');
+  assert.ok(drive.indexOf('if (!movedIn)') < drive.indexOf('twinOpen = true'),
+    'the direction guard runs before the re-open side effects');
+  assert.ok(stop.includes('retraceLastZ = NaN;'), 'every mode stop clears the direction sample');
+});
+
+test('the retrace owns the pointer and blocks a mid-recede twin boot', () => {
+  const m = main();
+  const begin = m.slice(m.indexOf('function beginRetraceDissolve('), m.indexOf('function driveRetraceDissolve('));
+  const early = m.slice(m.indexOf('function earlyBootTwin()'), m.indexOf('function abortEarlyBootTwin('));
+  const idle = m.slice(m.indexOf('function preloadTwinShellIdle()'), m.indexOf('/** Handoff-4 Lane A seeded reveal', m.indexOf('function preloadTwinShellIdle()')));
+  assert.ok(begin.includes("fr.style.pointerEvents = 'none'"), 'the frame cannot re-enable pointer ownership over the retrace');
+  assert.ok(begin.includes('fr.blur?.()'), 'focus leaves the hidden twin');
+  assert.ok(early.includes('if (receding || retraceDissolve || reverseWait) return false;'),
+    'a gesture reverse never boots a fresh twin under the fingers');
+  assert.ok(idle.includes('if (receding || retraceDissolve || reverseWait) return false;'),
+    'the idle shell never races the retrace');
+});
+
+test('closing a committed twin clears its staging ownership', () => {
+  const m = main();
+  const close = m.slice(m.indexOf('function doCloseTwin('), m.indexOf('function holdHandoffPoseForReverse('));
+  const reset = m.slice(m.indexOf('function resetStagedOwnership()'), m.indexOf('/** THE ESCAPE.'));
+  assert.ok(close.includes('resetStagedOwnership();'), 'the close chain drops the flags after the overlay is handled');
+  for (const line of ['stagedActive = false;', 'stagedS = 0;', 'stagedCommitted = false;']) {
+    assert.ok(reset.includes(line), `reset clears ${line.trim()}`);
+  }
+  assert.ok(!reset.includes('root.hidden'), 'the flags-only reset never hides a frame the retrace still owns');
+});

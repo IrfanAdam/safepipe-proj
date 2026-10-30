@@ -5433,6 +5433,28 @@ function quiesceTwinLayers() {
   try { history.replaceState(null, '', mapUrlWithSector(null)); } catch { /* history is best-effort */ }
 }
 
+/** Flags-only staged reset for the close chain: a committed twin must not
+ * leave `stagedCommitted` (or a parked S) behind after its overlay is gone,
+ * or a later slow reverse can keep reading a stage that no longer exists.
+ * Never touches the camera, overlay, or prewarm — doCloseTwin owns those. */
+function resetStagedOwnership() {
+  stopStagedAutoPump();
+  stagedActive = false;
+  stagedS = 0;
+  stagedCommitted = false;
+  stagedTilesT0 = 0;
+  stagedTilesGranted = false;
+  contentVerdictFalseMs = 0;
+  baseParityFalseMs = 0;
+  baseParityIgnored = false;
+  stagedPostCur = 0;
+  stagedCommitRetryT = 0;
+  stagedHanded = null;
+  entryRx = null; entryRy = null; entryCy = null;
+  lastPostedStagedS = null;
+  try { window.__mapProbe.staged = { active: false, s: 0, committed: false }; } catch { /* probe cosmetic */ }
+}
+
 /** THE ESCAPE. Drives every dive state (intent lock, staged hold, dissolve
  * ramp, stalled arm, parked ceiling, mid-commit, committed twin) back to the
  * pre-dive camera with the twin closed and every staged flag cleared.
@@ -5775,6 +5797,11 @@ function releaseWatchTick() {
  * arrival reuses the warm shell via retarget, never a reload. */
 function earlyBootTwin() {
   try {
+    // A gesture reverse is owning the frame: re-booting during the retrace
+    // put a live iframe over a map the fingers were scrolling out, and a
+    // slow wheel could land in that twin instead of the map (freeze, pinch
+    // only). The next deliberate dive boots after the recede lands.
+    if (receding || retraceDissolve || reverseWait) return false;
     if (earlyTwinArmed || twinOpen || transitId || pendingReveal || stagedActive) {
       // Boot-once warm re-entry: the shell for this hotspot already lives —
       // report warm so repeat intent/takeover ticks reuse it, never re-boot.
@@ -5921,6 +5948,9 @@ function abortEarlyBootTwin() {
 let idleShellTimer = 0;
 function preloadTwinShellIdle() {
   try {
+    // Never race a gesture reverse: the retrace owns the frame until it lands
+    // (see earlyBootTwin — a mid-retrace shell is a wheel trap on slow scroll).
+    if (receding || retraceDissolve || reverseWait) return false;
     if (twinOpen || transitId || pendingReveal || stagedActive || earlyTwinArmed) return false;
     if (!mapRef) return false;
     const frame = liveFrame();
@@ -6439,6 +6469,8 @@ function doCloseTwin(opts = {}) {
   // LOCK-EARLY: Esc/reverse during a staged hold must restore pan — unwind
   // the hold (no-op when nothing is staged) and release the camera lock even
   // for holds a fork guard already resolved (those leak frozen handlers).
+  // A committed twin is NOT torn down here: the close chain below must keep
+  // the mounted frame for the gesture-retrace dissolve.
   try { if (stagedActive && !stagedCommitted) exitStaged(); } catch { /* unwind is best-effort */ }
   try { unfreezeStagedFrame(); } catch { /* unlock is best-effort */ }
   try {
@@ -6549,6 +6581,10 @@ function doCloseTwin(opts = {}) {
     }
     closeSource = null;
   }
+  // STATE HYGIENE: the overlay is gone or the retrace owns it — no staged
+  // ownership may survive the close (a stale committed flag was readable by
+  // the next slow reverse). Flags only: overlay/camera already handled above.
+  try { resetStagedOwnership(); } catch { /* reset is best-effort */ }
 }
 
 /** GESTURE-REVERSE hand-off (see doCloseTwin): consume the dive record and
@@ -6589,16 +6625,20 @@ function holdHandoffPoseForReverse() {
  * same law; reaching the gate re-opens the twin with nothing to snap).
  * State: retraceDissolve while the zoom-keyed fade owns the overlay. */
 let retraceDissolve = false;
+let retraceLastZ = NaN; // last zoom the reverse dissolve painted (direction law)
 /** Stop owning the overlay fade without hiding anything (the active close /
  * unwind path owns visibility). Restores twin interaction when the twin is
  * still the frame (re-open / fresh open). Never throws. */
 function stopRetraceMode() {
   retraceDissolve = false;
+  retraceLastZ = NaN;
   try {
     const root = overlayEls && overlayEls.root;
     if (root) {
       if (root.style.pointerEvents === 'none') root.style.pointerEvents = '';
     }
+    const fr = overlayEls && overlayEls.frame;
+    if (fr && fr.style.pointerEvents === 'none') fr.style.pointerEvents = '';
   } catch { /* pointer restore is best-effort */ }
 }
 /** Begin the zoom-keyed reverse dissolve. True when the overlay is mounted
@@ -6621,6 +6661,7 @@ function beginRetraceDissolve() {
     try { z = mapRef ? +mapRef.getZoom() : NaN; } catch { z = NaN; }
     if (!Number.isFinite(z) || z <= Z_TOP) return false;
     retraceDissolve = true;
+    retraceLastZ = z;
     try {
       // Suspend the transition FIRST: per-tick law writes must BE the
       // rendered value (the forward scrub lesson) — otherwise each write
@@ -6628,8 +6669,13 @@ function beginRetraceDissolve() {
       if (!root.classList.contains('scrubbing')) root.classList.add('scrubbing');
       // The fade owns no interaction: wheels pass through to the map canvas
       // so the fingers drive the zoom the fade reads. The twin already
-      // walked back; nothing up there needs the pointer.
+      // walked back; nothing up there needs the pointer. Set the frame too:
+      // a child can re-enable pointer-events over an inherited none, and a
+      // slow wheel that keeps landing on the hidden twin never reaches the
+      // map (the owner's "scroll out too slow freezes; pinch works").
       root.style.pointerEvents = 'none';
+      if (fr.style.pointerEvents !== 'none') fr.style.pointerEvents = 'none';
+      try { fr.blur?.(); } catch { /* focus handoff is best-effort */ }
     } catch { /* presentation is best-effort */ }
     try { window.__mapProbe.recede = 'out'; } catch { /* probe cosmetic */ }
     driveRetraceDissolve();
@@ -6653,6 +6699,22 @@ function driveRetraceDissolve() {
       // back inside the committed frame with the twin live. The reverse is
       // over: disarm the recede (a later wheel-out starts a fresh twin-posted
       // cycle), so no stale landing outlives the frame it was armed for.
+      //
+      // DIRECTION LAW: a SLOW reverse can leave the live zoom at the gate for
+      // a frame (MapLibre writes sub-step targets); that must not count as a
+      // push back into the twin. Without this, the first slow outward notch
+      // re-opened the twin at z11.5, parked the map in the committed frame and
+      // only pinch could leave. Re-open only when the camera actually moved
+      // IN (z above the last painted zoom); otherwise keep the retrace armed
+      // and let the fingers carry the same outward tick below the gate.
+      const movedIn = Number.isFinite(retraceLastZ) && z > retraceLastZ + 0.005;
+      if (!movedIn) {
+        retraceLastZ = z;
+        try {
+          if (root.style.opacity !== '1') root.style.opacity = '1';
+        } catch { /* cosmetic */ }
+        return;
+      }
       retraceDissolve = false;
       twinOpen = true;
       try { window.__mapProbe.twinOpen = true; } catch { /* probe cosmetic */ }
@@ -6674,6 +6736,7 @@ function driveRetraceDissolve() {
       endRetraceDissolve();
       return;
     }
+    retraceLastZ = z;
     const op = retraceOpacityForZoom(z);
     try {
       const s = String(+op.toFixed(4));
@@ -6692,6 +6755,7 @@ function driveRetraceDissolve() {
  * no unwind. Never throws. */
 function endRetraceDissolve() {
   retraceDissolve = false;
+  retraceLastZ = NaN;
   try {
     const root = overlayEls && overlayEls.root;
     const fr = overlayEls && overlayEls.frame;
@@ -6704,6 +6768,7 @@ function endRetraceDissolve() {
       try { root.classList.remove('prewarm'); } catch { /* cosmetic */ }
     }
     if (fr) {
+      try { if (fr.style.pointerEvents === 'none') fr.style.pointerEvents = ''; } catch { /* cosmetic */ }
       try { setFrameUrl(fr, 'about:blank'); } catch { /* teardown is best-effort */ }
       twinBootKey = null;
       try { window.__mapProbe.twinBootKey = null; } catch { /* probe cosmetic */ }
