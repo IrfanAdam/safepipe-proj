@@ -176,7 +176,8 @@ test('the map writers ride the one law: arm on the mask edge, apply before the r
   assert.ok(main.includes('const t = centerSettleTargetFor(target);'), 'the band takeover carries the law');
   assert.ok(main.includes('if (prox && prox.armed) {'), 'the takeover aims whenever the site is armed');
   assert.ok(main.includes('if (prox.armed) {\n          noteCenterArm(prox, z);'), 'the driver arms on view, not on blend');
-  assert.ok(main.includes('armed: cursorNear || centerNear || inView'), 'one armed gate feeds every predicate');
+  assert.ok(main.includes('armed: journeyArmed({ cursorNear, centerNear })'), 'one armed gate feeds every predicate');
+  assert.ok(!/armed:\s*cursorNear \|\| centerNear \|\| inView/.test(main), 'being merely on screen is never intent');
   // Flights keep the camera: the law must never steer a programmatic flight.
   const apply = main.slice(main.indexOf('function applyCenterSettle('), main.indexOf('function updateRingClip('));
   assert.ok(apply.includes('transitId'), 'flights are exempt from the settle');

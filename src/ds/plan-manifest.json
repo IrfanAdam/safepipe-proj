@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-29T17:22:43.472Z",
+  "generated": "2026-10-30T08:24:49.945Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,33 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "af6e72a",
+      "full": "af6e72add928a1866091f6251cf5fb78891b284d",
+      "date": "2026-10-30",
+      "time": "12:54",
+      "subject": "docs(plan): eval intent-gated handoff ux [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "a9b7750",
+      "full": "a9b77502c802dc0d309640f5e5bea2fe600dfe50",
+      "date": "2026-10-29",
+      "time": "22:53",
+      "subject": "chore(sync): plan manifest + version after continuity eval-2 [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
+    {
+      "sha": "898914a",
+      "full": "898914a402d9e7234618ee638476564153022c23",
+      "date": "2026-10-29",
+      "time": "22:53",
+      "subject": "feat(map-twin): gate fade on applied frame, glide melt, 560px band, precache ladder, fast-only pill [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "4ebde07",
       "full": "4ebde07a80404b700eec01b9a9c950213d9f8715",
@@ -6755,8 +6782,11 @@
   ],
   "wip": [
     ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+    "ops3d-map.html",
     "public/version.json",
     "src/map/main.js",
-    "src/map/scrolltrigger.js"
+    "src/map/scrolltrigger.js",
+    "src/ring2/main.js",
+    "src/ring2/sector.js"
   ]
 }

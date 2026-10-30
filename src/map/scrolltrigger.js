@@ -213,6 +213,20 @@ export function shouldCenter(z) {
   return Number.isFinite(+z) && +z >= Z_CENTER;
 }
 
+/** JOURNEY INTENT — the ONE arm predicate for the hotspot journey (mask,
+ * centre settle, intent prewarm/boot, intent lock, deep latch). Intent is
+ * CURSOR-NEAR or CENTRE-NEAR: the two places a user can be aiming at the
+ * hotspot. Being merely ON SCREEN is not intent — with the hotspot parked on
+ * the periphery, every ordinary scroll-to-zoom anywhere in the frame armed
+ * the whole journey (enclosing mask, twin boot, zoom ceiling, automatic
+ * handoff to Sangachal) and hijacked the exploration. `inView` therefore
+ * stays a diagnostic field on the proximity read and never a door into
+ * `armed`. Pure + node-checkable; main.js is the only caller. */
+export function journeyArmed(prox = {}) {
+  const p = prox || {};
+  return !!(p.cursorNear || p.centerNear);
+}
+
 /** Stall-ceiling pin law: the pre-gate depth freeze never parks below the
  * staging-arm threshold — pin at max(live, Z_TOP) so the gate stays
  * reachable while the hold owns the frame. Pinning at a sub-gate live zoom
@@ -297,6 +311,30 @@ export function pitchTargetForZoom(z) {
   const n = +z;
   if (!Number.isFinite(n)) return 0;
   return ISO_PITCH_DEG * smooth01((n - Z_ISO_START) / (Z_TOP - Z_ISO_START));
+}
+/** Terminal flatten tolerance: below the band the law is exactly flat, so a
+ * pose inside this of 0 needs no write (never a fight with a settle that
+ * already landed on the law). */
+export const FLATTEN_TOL_DEG = 0.5;
+/** TERMINAL FLATTEN predicate (pure, node-checkable): a reverse SETTLE below
+ * the iso band must end FLAT — pitch 0 and bearing 0 — because the plane's
+ * skew is a property of the band, not of the gesture that left it. The
+ * slew-capped retrace needs intermediate steps and the settle reconcile needs
+ * isoRestoreDue, so a fast flick that clears the band in one step can settle
+ * with the large plane still skewed and nothing left to restore it. Every
+ * caller writes the flat pose with ONE instant jumpTo (no timer) when this
+ * says so; at/above the band, with the twin open, or on an already-flat pose
+ * it is false and no camera write happens. */
+export function settleFlattenDue({ z, pitch, bearing, twinOpen = false, bandStart = Z_ISO_START, tol = FLATTEN_TOL_DEG } = {}) {
+  if (twinOpen) return false; // the twin owns the frame — never write under it
+  const zz = +z;
+  if (!Number.isFinite(zz) || zz >= bandStart) return false; // still in the band: the law owns the tilt
+  const p = +pitch;
+  const b = +bearing;
+  const tolD = Number.isFinite(+tol) ? Math.abs(+tol) : FLATTEN_TOL_DEG;
+  const pOut = Number.isFinite(p) && Math.abs(p) > tolD;
+  const bOut = Number.isFinite(b) && Math.abs(b) > tolD;
+  return pOut || bOut;
 }
 /** Degrees-to-radians factor for the tilt->squash projection (named, never bare). */
 export const DEG2RAD = Math.PI / 180;

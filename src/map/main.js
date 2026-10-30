@@ -29,6 +29,7 @@ import {
   centerForSiteOffset,
   CENTER_SETTLE_SPAN_Z,
   shouldCenter,
+  journeyArmed,
   isTopDown,
   needsHandoff,
   retraceOpacityForZoom,
@@ -49,6 +50,7 @@ import {
   flipWheelDelta,
   lockAroundPoint,
   pitchTargetForZoom,
+  settleFlattenDue,
   metersPerPixel,
   formatGround,
   spanFrac,
@@ -88,6 +90,14 @@ import {
 
 const POSITRON_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 const ESRI_IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+// DEM-PRECACHE: the flat map draws no raster-dem layer of its own, but the
+// twin's terrain stages read this EXACT tile source (src/ops3d/dem.js
+// terrariumTileUrl, sat-base.js TERRARIUM_TERRAIN) through the one HTTP cache
+// the page and its same-origin iframe share — so warming here is warming the
+// twin's first DEM stage. Same source string, never a second host.
+const TERRARIUM_TILE = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+const TERRARIUM_MAXZOOM = 15; // z16 404s (dem.js pins the same ceiling)
+const DEM_COARSE_ZOOM = 12; // mirrors dem.js TERRARIUM_COARSE_ZOOM: the twin's first DEM stage
 const SAT_SOURCE_ID = 'esri-sat';
 const SAT_LAYER_ID = 'esri-sat';
 const SEL_KEY = 'ops3d-map-selected';
@@ -173,6 +183,16 @@ let closeSeq = 0;
 // signal; prewarm is true while the overlay iframe loads hidden at opacity 0.
 let pendingReveal = null;
 const REVEAL_TIMEOUT_MS = 4000;
+// CLICK FLIGHT (owner rev 2026-10-30): a hotspot click is explicit intent, so
+// the arrival is ONE continuous camera move from the live pose to the site at
+// the gate — never the old one-frame jumpTo that read as "no zoom at all".
+// The tempo sits under the prewarm it overlaps, so the twin boot is never
+// extended by the flight: the reveal only waits for the move to LAND, not for
+// a timer (see clickFlightActive / deferRevealToFlightLand).
+const CLICK_FLIGHT_MS = 560;
+// The live click flight: { t0, ms, timer } while the camera is moving to the
+// site; null once landed (or when the entry was a discrete reduced-motion cut).
+let clickFlight = null;
 let lastFallbackArmT = 0; // staged fallback re-arms at most once/sec while the hold flows: every-tick clear+set churns a 4000ms timer that only matters after S stalls
 let earlyTwinArmed = false; // round-10 dive-start prewarm: early iframe boot armed, consumed at arrival or aborted on retreat
 let staleCloseGuardUntil = 0; // round-10 stale-echo guard: arrival replaces a LIVE early twin, whose pagehide posts a close echo that lands after twinOpen flips and would tear down the fresh prewarm — closes inside this window are dropped (set only when consuming an armed early boot, so plain opens keep exact Esc behavior). UNWIND LAW: the window is short (a replaced frame's echo lands within a frame) and is bypassed the moment the fresh shell grants or releases, so a genuine close is never lost.
@@ -586,15 +606,32 @@ function ensureOverlay() {
   root.innerHTML =
     '<div class="twin-overlay__bar">' +
     '<span class="twin-overlay__label" id="twin-label"></span>' +
-    '<button id="twin-close" title="Close twin (Esc)">&#x2715; CLOSE</button>' +
+    '<button id="twin-fs" type="button" aria-pressed="false" title="Fullscreen twin">&#x26F6; FULLSCREEN</button>' +
+    '<button id="twin-close" type="button" title="Close twin (Esc)">&#x2715; CLOSE</button>' +
     '</div>' +
     '<iframe id="twin-frame" title="Sector twin" data-url="about:blank"></iframe>';
   document.getElementById('app').appendChild(root);
   const frame = root.querySelector('#twin-frame');
   const closeBtn = root.querySelector('#twin-close');
+  const fsBtn = root.querySelector('#twin-fs');
   const label = root.querySelector('#twin-label');
   closeBtn.addEventListener('click', () => closeTwin());
-  overlayEls = { root, frame, closeBtn, label };
+  // PARENT-OWNED FULLSCREEN: requestFullscreen needs a real user activation in
+  // the document that calls it. The twin's posted message handler has none (a
+  // message event is not a gesture), so Safari rejects it outright — the
+  // control has to live here, on the parent's own overlay bar, and be clicked.
+  // It is inside #twin-overlay, so it stays visible windowed AND in
+  // overlay-fullscreen (close keeps its place beside it).
+  // The toggle reads the DOCUMENT, not the twinFs mirror: the twin may post its
+  // own fullscreen state at any time, so a mirror-driven toggle can drift and
+  // a second click would re-request instead of exiting.
+  fsBtn.addEventListener('click', () => {
+    let isFs = false;
+    try { isFs = document.fullscreenElement === root; } catch { isFs = false; }
+    setTwinFs(!isFs);
+    syncFsProbe();
+  });
+  overlayEls = { root, frame, closeBtn, fsBtn, label };
   return overlayEls;
 }
 
@@ -1550,12 +1587,13 @@ function proximityInfo() {
       } catch { /* cursor math is best-effort */ }
     }
     const centerNear = distCenter <= PROX_CENTER_PX;
-    // SITE-IN-VIEW: the journey arms on the hotspot being on screen, not
-    // only on the cursor being within 140px of it. With one hotspot visible
-    // and the cursor elsewhere, every old `near` gate stayed false (measured:
-    // 48 wheel ticks, mask never armed, site 101k px off-centre). The margin
-    // REUSES the cursor radius — no new constant — so a spot just outside the
-    // frame still counts as intent.
+    // SITE-IN-VIEW (DIAGNOSTIC ONLY — never a gate): whether the hotspot is
+    // on screen at all, with the cursor radius reused as the margin so a spot
+    // just outside the frame still reads. This used to feed `armed`, which
+    // armed the whole journey (mask, prewarm, settle, deep latch) the moment
+    // the hotspot sat anywhere in the frame — a periphery hotspot hijacked
+    // ordinary scroll-to-zoom exploration. Intent is near-only now
+    // (journeyArmed); inView survives for telemetry.
     const inView =
       pt.x >= -PROX_CURSOR_PX && pt.x <= cw + PROX_CURSOR_PX &&
       pt.y >= -PROX_CURSOR_PX && pt.y <= ch + PROX_CURSOR_PX;
@@ -1566,8 +1604,9 @@ function proximityInfo() {
       cursorNear, centerNear, inView,
       near: cursorNear || centerNear,
       // Every journey predicate (mask, settle, takeover, prewarm, abort,
-      // intent-lock) reads `armed`: near OR in view, one gate, no second door.
-      armed: cursorNear || centerNear || inView,
+      // intent-lock, deep latch) reads `armed`: cursor-near OR centre-near,
+      // one gate, no second door. On-screen is not intent.
+      armed: journeyArmed({ cursorNear, centerNear }),
     };
     // Memoised for the rest of THIS pass only: the driver, the ring clip and
     // the staged hold ask the same question about the same camera. Reads
@@ -1737,6 +1776,10 @@ function holdVectorWarm(reason) {
   try {
     if (mapRef && typeof mapRef.triggerRepaint === 'function') mapRef.triggerRepaint();
   } catch { /* repaint is best-effort */ }
+  // VECTOR-TILE WARM: the held style names its own MVT templates — warm the
+  // site patch at the live integer zoom so the refill reads cache (best-effort;
+  // a style with no template records the blocker instead).
+  try { warmVectorTiles(reason); } catch { /* vector warm is best-effort */ }
   try {
     window.__mapProbe.vectorWarm = true;
     window.__mapProbe.vectorCache = 'held';
@@ -2174,6 +2217,11 @@ function onNativeZoomStep(snap, source) {
           try { prefetchSatTiles(SITE_LNGLAT, 9); } catch { /* warm is best-effort */ }
           try { prefetchSatTiles(SITE_LNGLAT, 10); } catch { /* warm is best-effort */ }
           try { prefetchSatTiles(SITE_LNGLAT, 11); } catch { /* warm is best-effort */ }
+          // DEM-PRECACHE: same intent gate, the twin's OWN terrain levels —
+          // the coarse stage (z12) and the fine stage (z15, clamped by
+          // TERRARIUM_MAXZOOM). Dedupe makes the repeat free.
+          try { prefetchDemTiles(SITE_LNGLAT, DEM_COARSE_ZOOM); } catch { /* warm is best-effort */ }
+          try { prefetchDemTiles(SITE_LNGLAT, TERRARIUM_MAXZOOM); } catch { /* warm is best-effort */ }
           try {
             if (!window.__mapProbe.bootTiming.intentMs) window.__mapProbe.bootTiming.intentMs = nowMs();
           } catch { /* probe cosmetic */ }
@@ -2262,6 +2310,10 @@ function onNativeZoomStep(snap, source) {
         if (zl !== lastDeepWarmZ) { lastDeepWarmZ = zl; prefetchSatTiles(SITE_LNGLAT, zl); }
         const za = Math.floor(z) + 1;
         if (za !== lastArriveWarmZ) { lastArriveWarmZ = za; prefetchSatTiles(SITE_LNGLAT, za); }
+        // DEM-PRECACHE: the same two levels for Terrarium (dedupe makes the
+        // overlap with the intent seed free); the twin's coarse stage is z12,
+        // which this band reaches exactly as the camera approaches the gate.
+        try { prefetchDemTiles(SITE_LNGLAT, zl); } catch { /* warm is best-effort */ }
       } catch { /* warm is best-effort */ }
     } else if (lastDeepWarmZ !== -1) {
       lastDeepWarmZ = -1;
@@ -2467,7 +2519,38 @@ function onNativeZoomStep(snap, source) {
         }
       }
     }
-    if (!twinOpen && !busyNow && z >= Z_TOP) {
+    // (4c) TERMINAL FLATTEN — every reverse SETTLE below the iso band ends
+    // FLAT (pitch 0, bearing 0) with ONE instant jumpTo, no timer. The
+    // slew-capped retrace needs intermediate steps and the reconcile above
+    // needs isoRestoreDue, so a fast flick that clears the band in a single
+    // step settles with the large plane still skewed and nothing left to
+    // restore it — the owner's "it never becomes fully flat in time". Below
+    // the band the law IS flat, so this only ever writes the law.
+    if (!twinOpen && !busyFlight && source === 'native-zoomend') {
+      let pSettle = null;
+      let bSettle = null;
+      try { pSettle = +mapRef.getPitch(); } catch { pSettle = null; }
+      try { bSettle = +mapRef.getBearing(); } catch { bSettle = null; }
+      if (settleFlattenDue({ z, pitch: pSettle, bearing: bSettle, twinOpen })) {
+        try {
+          mapRef.jumpTo({ pitch: 0, bearing: 0 });
+          isoScrubOwned = false;
+          isoRestoreDue = false;
+          try { window.__mapProbe.flatten = 'settle'; } catch { /* probe cosmetic */ }
+        } catch (err) {
+          errors.push('SETTLE-FLATTEN: ' + (err && err.message));
+        }
+      }
+    }
+    // DEEP-INTENT: the automatic handoff is reserved for REAL lock-in intent.
+    // Native zoom alone is not intent — this latch used to fire on `z >= Z_TOP`
+    // with no proximity test, so zooming into any location at all clamped the
+    // ceiling at Z_HANDOFF and jumped the camera to Sangachal. The latch now
+    // reads the same arm predicate as every other journey stage (prox.armed:
+    // cursor-near or centre-near). With intent absent nothing clamps and
+    // nothing flies: the dive stays a plain terrain + iso zoom.
+    const deepIntent = !!(prox && prox.armed);
+    if (!twinOpen && !busyNow && z >= Z_TOP && deepIntent) {
       if (!scrubFired) {
         scrubFired = true; // latched now; staging runs next frame (afterFrame)
         // Clamp the ceiling SYNCHRONOUSLY on the latch tick — never deferred
@@ -2494,12 +2577,27 @@ function onNativeZoomStep(snap, source) {
           try {
             if (twinOpen || transitId || receding) { scrubFired = false; restoreMaxZoom(); return; } // twin/staging owns it
             if (!Number.isFinite(mapRef.getZoom()) || mapRef.getZoom() < Z_TOP) { scrubFired = false; restoreMaxZoom(); return; }
+            // INTENT GATE (one frame later): the cursor or the camera can
+            // leave the hotspot between the latch and this callback, and a
+            // clamped ceiling plus a flight to SITE on a stale latch is the
+            // exact hijack this lane removes. Re-read the arm predicate live
+            // (drop the pass memo first) and unclamp + re-arm when it is gone.
+            frameProxCache = null;
+            const lateProx = proximityInfo();
+            if (!(lateProx && lateProx.armed)) { scrubFired = false; restoreMaxZoom(); return; }
             flyToSectorThenTwin(siteSector);
           } catch { /* handoff best-effort */ }
         });
       }
-    } else if (z < REARM_DOWN_BELOW && scrubFired && !twinOpen) {
+    } else if (scrubFired && !twinOpen && !stagedActive && !pendingReveal && (z < REARM_DOWN_BELOW || !deepIntent)) {
       scrubFired = false; // re-arm: a fresh deep zoom may hand off again
+      // Intent-less depth owns the whole ceiling: restore it so the frame the
+      // user is actually looking at keeps zooming (Z_MAX) instead of parking
+      // at the handoff clamp it never earned. Restoring on the re-arm tick
+      // also means a later INTENDED dive starts from an unclamped ceiling.
+      // Only the LATCH's clamp is released here — a staged hold or a pending
+      // reveal clamps on purpose and its own exits restore the ceiling.
+      restoreMaxZoom();
       // Keep tilt ownership until the pitch actually flattened — clearing on
       // zoom alone strands 45deg through the whole reverse (the law below the
       // band is 0; the line-1159 release owns the handoff on pitch, not zoom).
@@ -2913,6 +3011,354 @@ function warmSatLadder(center, levelNow, dir, reason) {
     precacheLadderActive = false;
   }
 }
+
+/* DEM-PRECACHE: warm the Terrarium patches the twin's terrain stages read.
+ * The flat map has no raster-dem layer of its own, so this is pure cache work
+ * for the twin's first DEM stage (z12 coarse; z15 fine once intent is real) —
+ * the page and its same-origin iframe share ONE HTTP cache, so a tile warmed
+ * here is a tile the twin's fetch() reads without a network round-trip. Same
+ * discipline as the satellite warm: one 3x3 patch per level, hotspot-first,
+ * dedupe hits are free, a stepped cap with oldest-first eviction, and a hard
+ * per-trigger URL budget. Requests go out as CORS fetches because the twin
+ * reads these tiles with fetch() — a no-cors image warm would not be the
+ * cache entry its fetch reuses. Best-effort: an offline DEM fetch must never
+ * error the journey. */
+const DEM_TRIGGER_MAX_URLS = 18; // one trigger: two levels x the 3x3 patch
+const DEM_CAP_STEPS = Object.freeze([48, 96]); // stepped warm-set cap (oldest-first beyond it)
+const DEM_CAP_STEP_HEADROOM = 6; // step up when the set sits this close to the current cap
+const DEM_LADDER_LEVELS = 2; // live integer level + the next along the climb
+let demCapStep = 0;
+let demLadderActive = false; // a ladder owns the per-trigger budget across its levels
+let demTriggerAttempts = 0; // attempted DEM fetches in the CURRENT trigger
+let demTriggerName = '';
+const demTileSeen = new Set(); // url -> warm (insertion-ordered oldest-first evict)
+let demPrefetched = 0;
+let demHits = 0;
+let demDeepest = -1;
+/** Current DEM warm-set cap (the stepped ceiling, never a bare literal). */
+function demCapNow() {
+  return DEM_CAP_STEPS[demCapStep] | 0;
+}
+function stepDemCap() {
+  if (demCapStep < DEM_CAP_STEPS.length - 1) demCapStep += 1;
+}
+function demTileUrl(z, x, y) {
+  return TERRARIUM_TILE.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+}
+/** Per-level DEM coverage row (warm stamp only; the map never "arrives" at a
+ * DEM level, so no arrival column). */
+function demLevelRow(z) {
+  const p = precacheProbe();
+  if (!p) return null;
+  try {
+    if (!p.dem || typeof p.dem !== 'object') p.dem = {};
+    const d = p.dem;
+    if (!d.levels || typeof d.levels !== 'object') d.levels = {};
+    let row = d.levels[z];
+    if (!row) {
+      row = { z, warmT: null, attempts: 0 };
+      d.levels[z] = row;
+    }
+    return row;
+  } catch {
+    return null;
+  }
+}
+/** Pre-fetch the 3x3 Terrarium patch around center at zoom (best-effort).
+ * `reason` names the trigger for the probe + the per-level table. Unwrapped
+ * calls are their own trigger; warmDemLadder owns ONE budget across levels. */
+function prefetchDemTiles(center, zoom, reason) {
+  try {
+    const z = Math.max(0, Math.min(TERRARIUM_MAXZOOM, Math.floor(+zoom)));
+    if (!Number.isFinite(z)) return;
+    // Band gate: the twin's terrain stages read Terrarium at the coarse stage
+    // (z12) and the fine ceiling (z15) only — a patch below z12 is bytes no
+    // stage can read, so the warm never leaves that band.
+    if (z < DEM_COARSE_ZOOM) return;
+    const c = Array.isArray(center) && center.length === 2 ? center : SITE_LNGLAT;
+    if (!Number.isFinite(+c[0]) || !Number.isFinite(+c[1])) return;
+    const t = lngLatToTile(c[0], c[1], z);
+    const n = Math.pow(2, z);
+    if (!demLadderActive) { // an unwrapped patch is its own single trigger
+      demTriggerAttempts = 0;
+      demTriggerName = reason || 'single';
+    }
+    let attempts = 0;
+    // Hotspot-first: the site tile is the twin's first DEM read.
+    const order = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    for (const [dx, dy] of order) {
+      const x = t.x + dx;
+      const y = t.y + dy;
+      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= n || y >= n) continue;
+      const url = demTileUrl(z, x, y);
+      try {
+        if (demTileSeen.has(url)) {
+          demHits += 1;
+          continue;
+        }
+        // Per-trigger budget: a ladder's levels share it, so one trigger can
+        // never exceed DEM_TRIGGER_MAX_URLS (dedupe hits are free).
+        if (demTriggerAttempts >= DEM_TRIGGER_MAX_URLS) break;
+        demTriggerAttempts += 1;
+        attempts += 1;
+        demTileSeen.add(url);
+        while (demTileSeen.size > demCapNow()) { // stepped cap: oldest-first
+          const oldest = demTileSeen.values().next();
+          if (oldest && !oldest.done) {
+            try { demTileSeen.delete(oldest.value); } catch { break; }
+          } else break;
+        }
+        if (demTileSeen.size >= demCapNow() - DEM_CAP_STEP_HEADROOM) stepDemCap();
+        // CORS fetch (not an <img>): the twin reads these with fetch(), so the
+        // stored response must be the one a CORS request may reuse. Body is
+        // consumed so the entry actually lands; low priority = a speculative
+        // warm never contends the live frame.
+        try {
+          const p = fetch(url, {
+            mode: 'cors',
+            credentials: 'omit',
+            priority: dx === 0 && dy === 0 ? 'high' : 'low',
+          });
+          p.then((res) => (res && res.ok ? res.arrayBuffer() : null)).catch(() => {});
+        } catch { /* preload is best-effort */ }
+        demPrefetched += 1;
+      } catch { /* per-tile best-effort */ }
+    }
+    // Only a level that actually cost a fetch mints a warm stamp.
+    if (attempts > 0) {
+      const row = demLevelRow(z);
+      if (row) {
+        try {
+          if (row.warmT === null) row.warmT = +precacheNowMs().toFixed(1);
+          row.attempts = (row.attempts | 0) + attempts;
+        } catch { /* probe cosmetic */ }
+      }
+    }
+    try {
+      const probe = precacheProbe();
+      if (probe) {
+        if (!probe.dem || typeof probe.dem !== 'object') probe.dem = {};
+        probe.dem.fetched = demPrefetched;
+        probe.dem.hits = demHits;
+        probe.dem.warm = demTileSeen.size;
+        probe.dem.cap = demCapNow();
+        probe.dem.capStep = demCapStep;
+        probe.dem.deepest = demDeepest;
+        probe.dem.trigger = { name: demTriggerName, attempts, budget: DEM_TRIGGER_MAX_URLS };
+      }
+    } catch { /* probe cosmetic */ }
+  } catch { /* DEM precache never breaks the map */ }
+}
+/** DEM ladder: the live integer level plus the next along the predicted climb
+ * (at most DEM_LADDER_LEVELS levels, DEM_TRIGGER_MAX_URLS URLs per call, live
+ * level first) — the same shape as warmSatLadder, so intent/level crossings
+ * gate both warms with one signal and neither can starve the other. */
+function warmDemLadder(center, levelNow, dir, reason) {
+  const before = demPrefetched;
+  try {
+    const base = Math.floor(+levelNow);
+    if (!Number.isFinite(base)) return 0;
+    const d = dir < 0 ? -1 : 1;
+    const name = reason || 'crossing';
+    demLadderActive = true;
+    demTriggerAttempts = 0;
+    demTriggerName = name;
+    let levels = 0;
+    let deepest = base;
+    for (let i = 0; i < DEM_LADDER_LEVELS; i += 1) {
+      if (demTriggerAttempts >= DEM_TRIGGER_MAX_URLS) break;
+      const z = base + d * i;
+      if (z < DEM_COARSE_ZOOM || z > TERRARIUM_MAXZOOM) continue;
+      prefetchDemTiles(center, z, name);
+      levels += 1;
+      deepest = z;
+    }
+    demDeepest = deepest;
+    try {
+      const probe = precacheProbe();
+      if (probe) {
+        if (!probe.dem || typeof probe.dem !== 'object') probe.dem = {};
+        const prevT = (probe.dem.ladder && probe.dem.ladder.triggers) | 0;
+        probe.dem.ladder = {
+          triggers: prevT + 1,
+          reason: name,
+          dir: d,
+          levels,
+          attempts: demPrefetched - before,
+          budget: DEM_TRIGGER_MAX_URLS,
+          base,
+          deepest,
+        };
+        probe.dem.deepest = deepest;
+      }
+    } catch { /* probe cosmetic */ }
+    return demPrefetched - before;
+  } catch {
+    return demPrefetched - before;
+  } finally {
+    demLadderActive = false;
+  }
+}
+
+/* VECTOR-TILE WARM: the vector basemap is MVT tiles named by the LIVE style's
+ * own source templates (CARTO positron ships explicit `tiles` templates, so no
+ * TileJSON round-trip is needed; the versioned path v/<stamp>/... is read from
+ * the style, never hardcoded). Warm the site patch at the live integer zoom so
+ * the zoom-out refill reads cache instead of the CDN. A style whose sources
+ * expose no template (url-only TileJSON, or no vector source) records the
+ * blocker on the probe and warms nothing — never a throw, never a guess. */
+const VECTOR_TRIGGER_MAX_URLS = 9; // one trigger: one 3x3 patch
+const VECTOR_CAP_STEPS = Object.freeze([32, 64]);
+const VECTOR_CAP_STEP_HEADROOM = 4;
+let vectorCapStep = 0;
+let vectorPrefetched = 0;
+let vectorHits = 0;
+let lastVectorWarmZ = -1;
+const vectorTileSeen = new Set();
+function vectorCapNow() {
+  return VECTOR_CAP_STEPS[vectorCapStep] | 0;
+}
+/** Tile templates the live style exposes, with the source maxzoom that bounds
+ * them. Reads the RUNTIME source first (a TileJSON `url` source resolves its
+ * templates there), then the style JSON. Null when nothing is warmable. */
+function vectorTileTemplates() {
+  try {
+    if (!mapRef || typeof mapRef.getStyle !== 'function') return null;
+    const style = mapRef.getStyle();
+    const out = [];
+    const sources = (style && style.sources) || {};
+    for (const id of Object.keys(sources)) {
+      const src = sources[id];
+      if (!src || src.type !== 'vector') continue;
+      let tiles = Array.isArray(src.tiles) ? src.tiles : null;
+      let maxzoom = Number.isFinite(+src.maxzoom) ? +src.maxzoom : 15;
+      if (!tiles || !tiles.length) {
+        try {
+          const live = typeof mapRef.getSource === 'function' ? mapRef.getSource(id) : null;
+          if (live && Array.isArray(live.tiles) && live.tiles.length) {
+            tiles = live.tiles;
+            if (Number.isFinite(+live.maxzoom)) maxzoom = +live.maxzoom;
+          }
+        } catch { /* runtime source read is best-effort */ }
+      }
+      if (!tiles || !tiles.length) continue;
+      for (const t of tiles) {
+        if (typeof t === 'string' && t.includes('{z}') && t.includes('{x}') && t.includes('{y}')) {
+          out.push({ template: t, maxzoom });
+        }
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+/** Warm the site vector patch at the live integer zoom (best-effort). */
+function warmVectorTiles(reason) {
+  const before = vectorPrefetched;
+  try {
+    const templates = vectorTileTemplates();
+    const probe = precacheProbe();
+    if (!templates || !templates.length) {
+      try {
+        if (probe) {
+          probe.vector = probe.vector || {};
+          probe.vector.blocker = 'no vector tile template in the live style (url-only source or no vector source)';
+          probe.vector.warm = vectorTileSeen.size;
+          probe.vector.fetched = vectorPrefetched;
+        }
+      } catch { /* probe cosmetic */ }
+      return 0;
+    }
+    let liveZ = 0;
+    try { liveZ = Math.floor(+mapRef.getZoom()); } catch { liveZ = 0; }
+    if (!Number.isFinite(liveZ)) liveZ = 0;
+    // Visibility gate: the vector basemap is only on screen below the sat fade
+    // ceiling (Z_FADE1) — warming vector tiles under full satellite would be
+    // bytes no frame can show. Recede re-warms as it descends through the band.
+    if (liveZ > Math.ceil(Z_FADE1)) {
+      try {
+        if (probe) {
+          probe.vector = {
+            level: liveZ,
+            skipped: 'above-vector-band',
+            fetched: vectorPrefetched,
+            hits: vectorHits,
+            warm: vectorTileSeen.size,
+          };
+        }
+      } catch { /* probe cosmetic */ }
+      return 0;
+    }
+    // Level gate: one patch per integer level (a re-warm of the same level is
+    // dedupe hits only, so the gate is about not walking the set per tick).
+    if (liveZ === lastVectorWarmZ && vectorTileSeen.size > 0) {
+      try { if (probe) probe.vector = { ...(probe.vector || {}), level: liveZ, hits: vectorHits, fetched: vectorPrefetched, warm: vectorTileSeen.size }; } catch { /* probe cosmetic */ }
+      return 0;
+    }
+    lastVectorWarmZ = liveZ;
+    const t = lngLatToTile(SITE_LNGLAT[0], SITE_LNGLAT[1], Math.max(0, Math.min(15, liveZ)));
+    const n = Math.pow(2, Math.max(0, Math.min(15, liveZ)));
+    const order = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    let attempts = 0;
+    for (const { template, maxzoom } of templates) {
+      if (attempts >= VECTOR_TRIGGER_MAX_URLS) break;
+      const z = Math.max(0, Math.min(maxzoom, liveZ));
+      for (const [dx, dy] of order) {
+        if (attempts >= VECTOR_TRIGGER_MAX_URLS) break;
+        const x = t.x + dx;
+        const y = t.y + dy;
+        if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= n || y >= n) continue;
+        const url = template.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+        try {
+          if (vectorTileSeen.has(url)) {
+            vectorHits += 1;
+            continue;
+          }
+          vectorTileSeen.add(url);
+          attempts += 1;
+          while (vectorTileSeen.size > vectorCapNow()) {
+            const oldest = vectorTileSeen.values().next();
+            if (oldest && !oldest.done) {
+              try { vectorTileSeen.delete(oldest.value); } catch { break; }
+            } else break;
+          }
+          if (vectorTileSeen.size >= vectorCapNow() - VECTOR_CAP_STEP_HEADROOM
+            && vectorCapStep < VECTOR_CAP_STEPS.length - 1) vectorCapStep += 1;
+          // CORS fetch: the vector source reads these with fetch(), so the warm
+          // must store a response a CORS request may reuse.
+          try {
+            const p = fetch(url, {
+              mode: 'cors',
+              credentials: 'omit',
+              priority: dx === 0 && dy === 0 ? 'high' : 'low',
+            });
+            p.then((res) => (res && res.ok ? res.arrayBuffer() : null)).catch(() => {});
+          } catch { /* preload is best-effort */ }
+          vectorPrefetched += 1;
+        } catch { /* per-tile best-effort */ }
+      }
+    }
+    try {
+      if (probe) {
+        probe.vector = {
+          level: liveZ,
+          attempts,
+          fetched: vectorPrefetched,
+          hits: vectorHits,
+          warm: vectorTileSeen.size,
+          cap: vectorCapNow(),
+          reason: reason || null,
+          sources: templates.length,
+        };
+      }
+    } catch { /* probe cosmetic */ }
+    return vectorPrefetched - before;
+  } catch {
+    return vectorPrefetched - before;
+  }
+}
+
 /** Track journey velocity, predict the next frame, keep it warm. Called on
  * every scrub step (both directions). Vector hold re-asserts on fast
  * motion (throttled by the prefetch gate); sat tiles pre-fetch along path. */
@@ -3006,6 +3452,9 @@ function trackAndPrecache(p) {
         // Level crossing on an armed dive: the ladder owns this trigger
         // (live + two ahead along the predicted climb, <= 27 URLs).
         warmSatLadder(SITE_LNGLAT, levelNow, precVel < -0.05 ? -1 : 1, 'crossing');
+        // DEM-PRECACHE: the same crossing trigger, its own 18-URL budget
+        // (live level + the next along the climb) — never the sat budget.
+        try { warmDemLadder(SITE_LNGLAT, levelNow, precVel < -0.05 ? -1 : 1, 'crossing'); } catch { /* warm is best-effort */ }
       } else {
         prefetchSatTiles(predCenter, predZoom, 'predict');
       }
@@ -3014,36 +3463,110 @@ function trackAndPrecache(p) {
   } catch { /* precache never breaks the map */ }
 }
 
-/** Handoff-5 wide first zoom: pixel padding ≈28% of the viewport's smaller
- * side, so the ring-bounds fit stops WIDE (whole flat map / ring + generous
- * context margin) and the flat→sat crossfade plays over the full map. */
-function wideFitPadding() {
+/** CLICK FLIGHT — the arrival pose for a click that starts BELOW the gate.
+ * One law, no fit heuristics: the site dead centre, the handoff gate zoom,
+ * the shared pitch law at that zoom (45 through the handoff), bearing flat.
+ * The same pose the scroll path ends on, so the twin is handed a frame it can
+ * superimpose on (the old wide ring fit handed it a pose the gesture never
+ * reached). */
+function clickArrivalPose() {
+  const z = Z_HANDOFF;
+  return {
+    cx: SITE_LNGLAT[0],
+    cy: SITE_LNGLAT[1],
+    z,
+    pitch: pitchTargetForZoom(z),
+    bearing: 0,
+  };
+}
+
+/** Live click flight? True until the move lands (or is superseded). */
+function clickFlightActive() {
+  if (!clickFlight) return false;
+  let now = Date.now();
   try {
-    const el = mapRef ? mapRef.getContainer() : null;
-    const w = (el && el.clientWidth) || window.innerWidth || 800;
-    const h = (el && el.clientHeight) || window.innerHeight || 600;
-    return Math.round(Math.min(w, h) * 0.28);
-  } catch {
-    return 180;
+    if (typeof performance !== 'undefined' && performance.now) now = performance.now();
+  } catch { now = Date.now(); }
+  return now < clickFlight.t0 + clickFlight.ms;
+}
+
+/** Start the click flight: ONE continuous camera move (live pose -> arrival
+ * pose) that the eye can follow, with the prewarm booting underneath it. The
+ * pitch rides pitchTargetForZoom on the same move (no second writer), so the
+ * iso tilt arrives with the zoom instead of snapping at the end. `essential`
+ * keeps the animation running regardless of the OS motion query — reduced
+ * motion is handled here by keeping the discrete cut instead. Never throws;
+ * returns true when a real flight is running. */
+function startClickFlight(dest, reduced) {
+  try {
+    clickFlight = null;
+    if (!mapRef || !dest) return false;
+    if (reduced) {
+      // Reduced motion: one honest cut to the SAME arrival pose (no animation
+      // by request) — never the old wide fit, so the twin frame still matches.
+      mapRef.jumpTo({
+        center: [dest.cx, dest.cy], zoom: dest.z, pitch: dest.pitch, bearing: dest.bearing,
+      });
+      try { window.__mapProbe.clickFlight = { reduced: true, z: +dest.z.toFixed(2) }; } catch { /* probe cosmetic */ }
+      return false;
+    }
+    let t0 = Date.now();
+    try {
+      if (typeof performance !== 'undefined' && performance.now) t0 = performance.now();
+    } catch { t0 = Date.now(); }
+    clickFlight = { t0, ms: CLICK_FLIGHT_MS, timer: null };
+    try {
+      window.__mapProbe.clickFlight = {
+        reduced: false, ms: CLICK_FLIGHT_MS, z: +dest.z.toFixed(2), from: liveCamFrame(),
+      };
+    } catch { /* probe cosmetic */ }
+    try {
+      // easeTo supersedes any glide still running under the click (it stops
+      // the previous ease itself) — the click owns the camera from here.
+      mapRef.easeTo({
+        center: [dest.cx, dest.cy],
+        zoom: dest.z,
+        bearing: dest.bearing,
+        pitch: dest.pitch,
+        duration: CLICK_FLIGHT_MS,
+        essential: true,
+        easing: smooth01,
+      });
+    } catch (err) {
+      clickFlight = null;
+      errors.push('CLICK-FLIGHT: ' + (err && err.message));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    clickFlight = null;
+    errors.push('CLICK-FLIGHT: ' + (err && err.message));
+    return false;
   }
 }
 
-/** Handoff-5-close wide destination: padded ring-bounds fit, then back off
- * 3.5 levels so the 10 km survey ring (20 km across) + margin fits the
- * viewport's short side — centered, never bleeding off edges. (MapLibre
- * reports zoom in 512-px tiles: res halves per level from 78271.5 m/px, so
- * the ring needs ~3.5 levels past the 1 km-hex fit to fill ~75% of a
- * ~577 px side.) Null when uncomputable (caller keeps the padded fit). */
-function wideZoomForBounds(bounds) {
+/** Defer the timed reveal to the flight's landing: the crossfade must land on
+ * the pose the twin was handed, not fade in over a moving camera. The prewarm
+ * is already booting under the flight, so this defers the FADE only — the
+ * click->twin time is unchanged (the flight is shorter than the boot). */
+function deferRevealToFlightLand() {
   try {
-    if (!mapRef || !bounds) return null;
-    const cam = mapRef.cameraForBounds(bounds, { padding: wideFitPadding() });
-    if (!cam || !Number.isFinite(cam.zoom)) return null;
-    return { center: cam.center, zoom: Math.min(cam.zoom - 3.5, 14) };
-  } catch {
-    return null;
-  }
+    if (!clickFlight || clickFlight.timer) return;
+    let now = Date.now();
+    try {
+      if (typeof performance !== 'undefined' && performance.now) now = performance.now();
+    } catch { now = Date.now(); }
+    const wait = Math.max(0, Math.round(clickFlight.t0 + clickFlight.ms - now)) + 16;
+    clickFlight.timer = setTimeout(() => {
+      try {
+        if (clickFlight) clickFlight.timer = null;
+        if (!pendingReveal || pendingReveal.revealed) return;
+        revealTwin(false);
+      } catch { /* deferred reveal is best-effort */ }
+    }, wait);
+  } catch { /* deferral is best-effort */ }
 }
+
 /** Task-35 scrubbed handoff (replaces the 650ms timed flight): native zoom
  * OWNS z — this stages the twin at the LIVE scrubbed frame and never flies
  * the camera on the scroll path. Progress toward handoff is driven purely by
@@ -3088,7 +3611,7 @@ function flyToSectorThenTwin(id, opts = {}) {
     restoreMaxZoom(); // latch may have clamped a frame earlier — an unstaged open must never inherit it
     return openTwin(id, opts);
   }
-  if (transitId) return false;
+  if (transitId || clickFlightActive()) return false;
   // Live arrival: native zoom owns z — read it, never set it on this path.
   let liveZ = null;
   try {
@@ -3099,8 +3622,7 @@ function flyToSectorThenTwin(id, opts = {}) {
   // Staging starts at the ISO checkpoint (Z_TOP), not the final handoff: the
   // terrain->iso motion is already complete there, so the twin prewarm and the
   // iso->twin dissolve get a full zoom level to run instead of starting after
-  // the map has already clamped. Click/fallback entries below Z_TOP keep the
-  // discrete jump path.
+  // the map has already clamped. Entries below Z_TOP fly in (click flight).
   const deep = Number.isFinite(liveZ) && liveZ >= Z_TOP;
   transitId = id;
   window.__mapProbe.transit = id;
@@ -3112,39 +3634,47 @@ function flyToSectorThenTwin(id, opts = {}) {
   try {
     showVectorHold(false);
   } catch { /* veil teardown is best-effort */ }
+  // Reduced-motion never stages (no scroll-driven dissolve to follow) — the
+  // unstaged prewarm below reveals instantly inside prewarmThenReveal. Read
+  // before the entry so the click flight knows whether to animate.
+  let reducedMotion = false;
+  try {
+    reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch { /* cosmetic */ }
+  // CLICK FLIGHT state for THIS entry: a click below the gate flies in.
+  let clickFlying = false;
+  let clickDest = null;
   try {
     if (!deep) {
-      // Click/fallback entry below handoff: place the staged frame
-      // synchronously (duration-0 jump to the SAME wide site fit the old
-      // flight framed — ring + margin, never terminal-tight) so the twin
-      // anchors on the site at a legal zoom. No ease, no timers: a discrete
-      // open carries one honest cut (reduced-motion keeps this exact path).
-      const w = wideZoomForBounds(bounds);
-      try {
-        if (w) mapRef.jumpTo({ center: w.center, zoom: w.zoom, bearing: 0, pitch: pitchTargetForZoom(w.zoom) });
-        else mapRef.fitBounds(bounds, { bearing: 0, pitch: 0, duration: 0, padding: wideFitPadding(), maxZoom: Z_MAX });
-        try {
-          liveZ = +mapRef.getZoom();
-        } catch { /* keep the pre-jump read */ }
-      } catch { /* jump is best-effort; stage the live frame below */ }
+      // CLICK ENTRY (owner rev): the click is EXPLICIT INTENT, so the arrival
+      // is ONE continuous camera move from the live pose to the site at the
+      // gate — never the old duration-0 jump to a wide ring fit, which the
+      // owner could not see at all (the map was already somewhere else by the
+      // first painted frame). The prewarm boots UNDER the flight, so the twin
+      // never waits on it; the reveal waits only for the landing (see
+      // revealTwin). Reduced motion keeps one honest cut to the same pose.
+      clickDest = clickArrivalPose();
+      clickFlying = startClickFlight(clickDest, reducedMotion);
+      // The arrival pose is what this entry ends on — the probe, the staged
+      // seed and the handed twin frame all read the destination, not the
+      // pre-flight live pose.
+      liveZ = +clickDest.z;
     }
+  } catch { /* flight is best-effort; the prewarm below still opens */ }
+  try {
     // Forward-path sat: PURE function of z (the scrub law) — never the timed
     // setSatForced ramp. Past the fade band this is already ~1 (asserted by
-    // every zoom step); the re-assert covers the jumpTo above.
-    try {
-      setSatScrubbed(satOpacityForZoom(Number.isFinite(liveZ) ? liveZ : Z_HANDOFF));
-    } catch { /* sat stage is best-effort */ }
+    // every zoom step); the re-assert covers the reduced-motion cut. During a
+    // click flight the per-zoom-step driver scrubs it along the move instead:
+    // asserting the destination here would snap the whole world to satellite
+    // while the camera is still wide.
+    if (!clickFlying) {
+      try {
+        setSatScrubbed(satOpacityForZoom(Number.isFinite(liveZ) ? liveZ : Z_HANDOFF));
+      } catch { /* sat stage is best-effort */ }
+    }
     const proxNow = proximityInfo();
     const nearNow = !!(proxNow && proxNow.armed);
-    // Reduced-motion never stages (no scroll-driven dissolve to follow) —
-    // the unstaged prewarm below reveals instantly inside prewarmThenReveal.
-    // Read here (hoisted above the wash write) so the wash decision knows
-    // the path: staged arrivals wash now, unstaged arrivals defer to the
-    // reveal tick (MASK-SYNC co-fire in revealTwin).
-    let reducedMotion = false;
-    try {
-      reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch { /* cosmetic */ }
     // Wash only when ARMED: re-derive the center from the live projection and
     // require the proximity predicate. An off-screen arrival (zoom-around-
     // cursor can park the spot 100k+ px out) skips the wash — never the
@@ -3157,7 +3687,11 @@ function flyToSectorThenTwin(id, opts = {}) {
     // gated), so the 450ms mask fade and the 450ms twin crossfade start on
     // the same tick as one motion instead of the mask parking seconds
     // before the twin-ready/fallback timer fires the twin.
-    if (nearNow) {
+    // CLICK FLIGHT: the frame here is still the PRE-FLIGHT camera (the move
+    // has only just been issued), so its projection/radii would be the wide
+    // pose's, not the arrival's — the reveal tick re-derives both from the
+    // landed camera instead (see revealTwin), so nothing is written now.
+    if (nearNow && !clickFlying) {
       try {
         // Wash opens at the true radius after jumps — never the stale size or
         // the 260px initial. The return is cached as the staged-entry radii:
@@ -3184,7 +3718,7 @@ function flyToSectorThenTwin(id, opts = {}) {
     // before, native zoom untouched.
     try {
       window.__mapProbe.deepHandoff = Number.isFinite(liveZ)
-        ? { z: +liveZ.toFixed(2), scrub: +handoffScrubForZoom(liveZ).toFixed(4), staged: deep && !reducedMotion }
+        ? { z: +liveZ.toFixed(2), scrub: +handoffScrubForZoom(liveZ).toFixed(4), staged: deep && !reducedMotion, flight: clickFlying }
         : null;
     } catch { /* probe cosmetic */ }
     // GATE-3 REVISION: the DEEP arrival clamps REGARDLESS of `near`.
@@ -3300,7 +3834,10 @@ function flyToSectorThenTwin(id, opts = {}) {
       try { armRevealFallback(); } catch { /* poll is best-effort */ }
       try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
     } else {
-      prewarmThenReveal(id, liveFrame(), opts);
+      // CLICK FLIGHT: hand the twin the ARRIVAL pose the camera is flying to
+      // (the site at the gate), not the pre-flight live frame — the twin
+      // boots on the pose the flight lands on, so the crossfade superimposes.
+      prewarmThenReveal(id, clickFlying && clickDest ? clickDest : liveFrame(), opts);
     }
   } finally {
     transitId = null;
@@ -4648,6 +5185,13 @@ function unwindDive(reason = 'esc', opts = {}) {
     if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
   } catch { /* timer teardown is best-effort */ }
   pendingReveal = null;
+  // CLICK FLIGHT: the escape owns the camera (restoreDiveCam jumpTo's the
+  // pre-dive frame, which stops the ease) — drop the flight record and its
+  // deferred reveal so no later entry is refused by a stale in-flight window.
+  try {
+    if (clickFlight && clickFlight.timer) clearTimeout(clickFlight.timer);
+  } catch { /* timer teardown is best-effort */ }
+  clickFlight = null;
   try { if (stallPollT) clearTimeout(stallPollT); } catch { /* timer teardown is best-effort */ }
   stallPollT = 0;
   stallT0 = 0;
@@ -5388,6 +5932,15 @@ function revealTwin(instant = false) {
       } catch { /* staged drive is best-effort */ }
       return false;
     }
+    // CLICK FLIGHT: the crossfade must land on the pose the twin was handed,
+    // never fade in over a camera still flying to it. The prewarm is already
+    // booting under the flight, so this defers the FADE only (the click->twin
+    // time is the boot, unchanged); the instant paths (reduced motion,
+    // S-commit) never wait.
+    if (!instant && clickFlightActive()) {
+      deferRevealToFlightLand();
+      return false;
+    }
     if (pendingReveal) pendingReveal.revealed = true;
     try {
       if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
@@ -5403,7 +5956,15 @@ function revealTwin(instant = false) {
     // on a stale center.
     try {
       const pxNow = proximityInfo();
-      if (pxNow && pxNow.near) showVignette(true);
+      if (pxNow && pxNow.near) {
+        // Radii + center are re-derived from the LIVE (landed) camera on the
+        // same tick as the wash: the arrival write above is skipped on a click
+        // flight (its frame was pre-flight), and the per-step driver is parked
+        // once the twin owns the frame — without this the mask would open at
+        // whatever size the last wide frame wrote.
+        try { writeEnclosureEllipse(pxNow, null); } catch { /* radii are best-effort */ }
+        showVignette(true);
+      }
     } catch { /* wash co-fire is best-effort */ }
     // GATE-3 REVISION: the timed crossfade needs its transition BACK. The
     // staged scrub suspends it (`.scrubbing`) so the law's value is the
@@ -6087,13 +6648,20 @@ function recedeToHome() {
     // Last-chance flatten: the home arrival below clears isoRestoreDue, so a
     // tilt that never retraced (fast flick over the band landing home on a
     // live step, where the zoomend-gated reconcile above cannot fire) would
-    // strand at iso at world zoom. Pitch-only INSTANT snap (jumpTo, no
-    // timers) — zoom and center untouched, flat arrivals no-op inside
-    // tolerance. No timer ever owns camera motion on this path.
+    // strand at iso at world zoom. TERMINAL FLATTEN law: pitch AND bearing
+    // written flat in one INSTANT jumpTo (no timers) — zoom and center
+    // untouched, flat arrivals no-op inside tolerance. No timer ever owns
+    // camera motion on this path.
     try {
-      const pHome = mapRef ? +mapRef.getPitch() : null;
-      if (Number.isFinite(pHome) && Math.abs(pHome) > ISO_SETTLE_TOL_DEG) {
-        mapRef.jumpTo({ pitch: 0 });
+      const cHome = liveCamFrame();
+      if (settleFlattenDue({
+        z: cHome && cHome.zoom,
+        pitch: cHome && cHome.pitch,
+        bearing: cHome && cHome.bearing,
+        twinOpen,
+      })) {
+        mapRef.jumpTo({ pitch: 0, bearing: 0 });
+        try { window.__mapProbe.flatten = 'home'; } catch { /* probe cosmetic */ }
       }
     } catch (err) {
       errors.push('RECEDE-HOME-PITCH: ' + (err && err.message));
@@ -6387,6 +6955,11 @@ function syncFsProbe() {
     try { window.__mapProbe.twinFs = fsEl === (overlayEls && overlayEls.root); } catch { /* probe cosmetic */ }
     const b = document.getElementById('map-fs');
     if (b) b.setAttribute('aria-pressed', String(fsEl === app));
+    // Parent-owned twin fullscreen button: pressed state mirrors the ACTUAL
+    // fullscreen element (never the request), so an Esc exit or a rejected
+    // request leaves the control honest.
+    const fb = (overlayEls && overlayEls.fsBtn) || document.getElementById('twin-fs');
+    if (fb) fb.setAttribute('aria-pressed', String(fsEl === (overlayEls && overlayEls.root)));
   } catch { /* probe sync is cosmetic */ }
   try {
     if (!document.fullscreenElement && twinFs) {
@@ -7265,6 +7838,14 @@ async function boot() {
         onProgress: (snap, source) => scheduleNativeZoomStep(snap, source),
         onDown: () => {
           try {
+            // INTENT GATE: this edge is the z>=Z_HANDOFF takeover entry — a
+            // journey opener just like the deep latch, so it reads the same
+            // live arm predicate. Without it an intent-less dive that is no
+            // longer clamped at Z_TOP would still be captured by the twin the
+            // moment the fingers crossed the handoff zoom.
+            frameProxCache = null;
+            const p = proximityInfo();
+            if (!(p && p.armed)) return;
             if (!scrubFired && !twinOpen && !transitId) {
               scrubFired = true;
               flyToSectorThenTwin(siteSector);
@@ -7286,6 +7867,10 @@ async function boot() {
     try {
       for (let zb = 9; zb <= 11; zb++) prefetchSatTiles(SITE_LNGLAT, zb);
     } catch { /* best-effort */ }
+    // DEM-PRECACHE: seed the twin's first terrain stage (Terrarium z12 coarse
+    // window around the site) at journey start, so the first dive's DEM read
+    // is a cache hit instead of 9 S3 round-trips behind the twin's boot.
+    try { prefetchDemTiles(SITE_LNGLAT, DEM_COARSE_ZOOM); } catch { /* best-effort */ }
   });
 
   map.on('error', (e) => {

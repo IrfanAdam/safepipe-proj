@@ -6,7 +6,20 @@
 <title>Ops 3D — Hotspot launcher map</title>
 <link rel="icon" href="data:," />
 <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin />
+<link rel="dns-prefetch" href="https://server.arcgisonline.com" />
+<!-- Esri BACKUP host: the twin's World Imagery fallback (sat-base.js
+     ESRI_WORLD_IMAGERY_BACKUP) — warming it costs no request until used. -->
+<link rel="preconnect" href="https://services.arcgisonline.com" crossorigin />
+<link rel="dns-prefetch" href="https://services.arcgisonline.com" />
+<!-- CARTO: style.json host AND the tile/glyph/sprite host (the style's own
+     sources point at tiles.basemaps.cartocdn.com, not the style host). -->
 <link rel="preconnect" href="https://basemaps.cartocdn.com" crossorigin />
+<link rel="dns-prefetch" href="https://basemaps.cartocdn.com" />
+<link rel="preconnect" href="https://tiles.basemaps.cartocdn.com" crossorigin />
+<link rel="dns-prefetch" href="https://tiles.basemaps.cartocdn.com" />
+<!-- AWS Terrarium DEM (the twin's terrain tiles, warmed by the map precache). -->
+<link rel="preconnect" href="https://s3.amazonaws.com" crossorigin />
+<link rel="dns-prefetch" href="https://s3.amazonaws.com" />
 <link rel="stylesheet" href="./design-system/ops-tokens.css" />
 <style>
   html, body { margin: 0; height: 100%; background: var(--ops-bg); }
@@ -149,7 +162,11 @@
     font: 10px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.12em;
     color: var(--ops-dim);
   }
-  #twin-close {
+  /* The overlay bar owns BOTH controls: FULLSCREEN (parent-owned — the twin's
+   * posted message carries no user activation, so Safari rejects a
+   * requestFullscreen from it) and CLOSE. Same chrome, so the bar reads as one
+   * unit windowed and in overlay-fullscreen. */
+  #twin-close, #twin-fs {
     padding: 8px 18px; cursor: pointer;
     background: var(--ops-map-panel);
     border: 1px solid var(--ops-line);
@@ -157,7 +174,8 @@
     font: 10px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.12em;
     color: var(--ops-map-ink);
   }
-  #twin-close:hover { color: var(--ops-amber); }
+  #twin-close:hover, #twin-fs:hover { color: var(--ops-amber); }
+  #twin-fs[aria-pressed="true"] { color: var(--ops-amber); border-color: var(--ops-amber); }
   /* Handoff-3 Lane 1: overlay-fullscreen guarantee. Fullscreen is requested
    * on #twin-overlay ITSELF, so the CLOSE bar (a child) stays visible in
    * every state: windowed, map-fullscreen, overlay-fullscreen. */

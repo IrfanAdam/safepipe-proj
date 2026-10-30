@@ -16,7 +16,7 @@
  */
 import * as maplibregl from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
-import { VEX } from './site.js';
+import { VEX, SANGACHAL } from './site.js';
 import { ensureField, getStatus } from './field.js';
 import { mountMapBase, assertTerrainOn, releaseMap, sampleBasemapTone } from './mapbase.js';
 import { applyTwinToMap, assertTerrainVex, pitchForPose, bearingForPose, groundResForZoom, niceScale, MAP_TRUE_FOV_DEG, TWIN_MAX_RANGE_M, aspectMismatch } from './sync.js';
@@ -28,7 +28,7 @@ import { mountVectorsFromData } from './vectors.js';
 import { mountMixBar, loadMix } from './mix.js';
 import { buildRingHud } from './hud.js';
 import { scaleForLevel } from './hud-furniture.js';
-import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor, twinContentPass, frameAnchorOnSite, twinContentVerdict, TWIN_CONTENT_MIN_MIX, stagedReleaseAnchors, poseAtRangePure } from './sector.js';
+import { parseSectorQuery, resolveSector, TWIN_CLOSE_MSG, TWIN_READY_MSG, TWIN_FULLSCREEN_MSG, frameTarget, frameRange, clampHandoffRange, holdPolarForFrame, easeInOutCubic, easeInOutSmoother, buildTwinCloseMessage, buildTwinReadyMessage, buildTwinPaintedMessage, firstPaintDue, isTwinCloseMessage, isTwinFullscreenMessage, reversePlanForPhase, twinHoldPoseMatch, twinHoldPoseError, precacheStatus, toneGradeForMix, HANDOFF_PREWARM_MIN_FRAMES, READY_SETTLE_FRAMES, HANDOFF_HOLD_MS, HANDOFF_SWOOP_MS, HANDOFF_PUSH_MS, HANDOFF_REVERSE_MS, HANDOFF_START_MIX, HANDOFF_END_MIX, handoffRangeForFrame, HANDOFF_ISO_POLAR_DEG, isAtMaxZoom, scrubProgressForWheel, scrubProgressForWalk, scrubEntryForDelta, poseForScrubProgress, TWIN_SCRUB_PINCH_ENTER_PX, scrubTotalMs, buildForwardLegs, fwdProgressForStagedS, forwardRingPForProgress, poseAtIsoPolar, isTwinStagedMessage, isTwinRetargetMessage, parseTwinRetargetFrame, fwdStagedOwnsIntro, fwdAutoplayHeld, TWIN_FWD_REVEAL_START_PX, terminalPoseForAnchor, handoffRefitDue, poseAtAnchor, twinContentPass, frameAnchorOnSite, twinContentVerdict, TWIN_CONTENT_MIN_MIX, stagedReleaseAnchors, poseAtRangePure } from './sector.js';
 import { isSizedWH, waitForSized } from './sizeGate.js';
 import { overlayPaintsNow, renderDue, sampleDue } from '../map/frame-pacing.js';
 /* Namespace read of the inbound stage table (Handoff-6-closewalk): the
@@ -818,19 +818,33 @@ async function boot() {
       return fallback;
     }
   }
-  /* STAGED SCALE LOCK (lane eval-scale): the map side HOLDS its gate pose
-   * (maxZoom = Z_HANDOFF) for the whole staged band, so every frame the
-   * overlay dissolves over is drawn at ONE fixed ground scale. The twin has
-   * to sit on that same scale or the dissolve is a double image — hence the
-   * gate zoom projected through THIS camera's own viewport/fov/lat
-   * (frameRange is the exact inverse of the map's metres-per-pixel), through
-   * the shared orbit rails. Viewport-derived, never a metre literal: the same
-   * law that pinned the hold at the handoff. */
+  /* STAGED SCALE LOCK (lane eval-scale + twin-start-scale): the map side
+   * HOLDS its gate pose for the whole staged band, so every frame the overlay
+   * dissolves over is drawn at ONE ground scale. The twin has to sit on that
+   * same scale or the dissolve is a double image — hence the HANDED frame's
+   * zoom projected through THIS camera's own viewport/fov/lat
+   * (handoffRangeForFrame -> frameRange, the exact inverse of the map's
+   * metres-per-pixel), through the shared orbit rails. Viewport-derived and
+   * frame-derived, never a metre literal and never Z_HANDOFF restated: a
+   * parent that hands z 11.58 owns 11.58, and the twin's opening ring lands on
+   * the mask instead of 5.5% inside it. Falls back to the handed frame when
+   * the freshest staged zoom is missing, then to null (callers keep their
+   * anchor — never a canned range). */
   function lockStagedRange(latDeg) {
     try {
-      const r = frameRange(Z_HANDOFF, { viewportPx: viewportPxNow(), lat: latDeg });
-      const cl = clampHandoffRange(r);
-      return Number.isFinite(cl) && cl > 0 ? cl : null;
+      const f = handoff.frame;
+      /* The HANDED frame is the contract (the parent re-hands its live gate
+       * frame at grant — isTwinRetargetMessage refreshes handoff.frame), so
+       * it owns the zoom; the freshest posted staged zoom is the fallback for
+       * a shell whose frame lost the boot race. */
+      let z = Number(f?.z);
+      if (!Number.isFinite(z)) {
+        const posted = handoff.fwdStagedZ;
+        z = posted === null || posted === undefined ? NaN : Number(posted);
+      }
+      if (!Number.isFinite(z)) return null;
+      const lat = Number.isFinite(Number(latDeg)) ? Number(latDeg) : Number(f?.cy);
+      return handoffRangeForFrame({ z, cy: lat }, { viewportPx: viewportPxNow() });
     } catch {
       return null;
     }
@@ -946,6 +960,83 @@ async function boot() {
     twin.controls.target.set(target.x, target.y, target.z);
     twin.camera.position.set(eye.x, eye.y, eye.z);
   }
+  /* BASE-APPLIED GATE (twin-start-scale; FWD-1 seam pop). Has the twin's own
+   * satellite base actually APPLIED the handed frame — center, zoom, bearing
+   * and the handed pitch law — or is it still sitting on its mount seed?
+   * The base is the arbiter of "applied": the twin's clip is drawn from the
+   * camera pose while the imagery under it comes from this instance, so a
+   * base one tick behind reads as ~1.75x coarser ground inside the disc and
+   * snaps a tick later (measured: base z 10.687 inside the z11.5 clip at the
+   * first visible reveal tick). Tolerances are the reveal gate's own — one
+   * law, no second set of numbers. False without a base or a frame (callers
+   * treat that as "not asserted", never as an applied frame). */
+  function baseFrameApplied(frame = null) {
+    try {
+      const f = frame || handoff.frame;
+      if (!map || !f) return false;
+      const c = map.getCenter?.();
+      const z = map.getZoom?.();
+      const clon = Array.isArray(c) ? c[0] : c?.lng;
+      const clat = Array.isArray(c) ? c[1] : c?.lat;
+      if (![clon, clat, z].every(Number.isFinite)) return false;
+      if (Math.abs(clon - f.cx) > 2e-4) return false;
+      if (Math.abs(clat - f.cy) > 2e-4) return false;
+      if (Math.abs(z - f.z) > 0.05) return false;
+      const b = map.getBearing?.();
+      if (Number.isFinite(b)) {
+        const want = ((Number(f.bearing) || 0) % 360 + 360) % 360;
+        const d = Math.abs((((b - want + 540) % 360) + 360) % 360 - 180);
+        if (d > 0.5) return false;
+      }
+      const p = map.getPitch?.();
+      // Pose-match: the map end frame carries the handed polar (iso for deep
+      // frames, top-down for shallow) — the twin hold pins the same law, so
+      // agreement means registered images. Expected polar reads from the
+      // pinned start (falls back to the handed frame law).
+      if (Number.isFinite(p)) {
+        let wantPitch = Number(handoff.start?.polar);
+        if (!Number.isFinite(wantPitch)) {
+          try {
+            wantPitch = holdPolarForFrame(f);
+          } catch {
+            wantPitch = 0;
+          }
+        }
+        if (!Number.isFinite(wantPitch)) wantPitch = 0;
+        if (Math.abs(p - wantPitch) > 0.5) return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /* BASE SEED APPLY (twin-start-scale): land the handed frame on the base
+   * instance directly. The per-frame twin->map sync is the normal writer, but
+   * it asserts VEX and SKIPS while the DEM is still engaging — exactly the
+   * window the reveal opens in — so a base that missed its mount seed (late
+   * resize, remount, a retarget) would draw the wrong ground scale under a
+   * correctly-clipped twin. jumpTo needs no terrain, so this closes that
+   * window; it is a no-op once the base already agrees. Bounded to the hold
+   * (callers decide), never a second camera owner. */
+  function seedBaseToHandedFrame() {
+    try {
+      const f = handoff.frame;
+      if (!map || !f) return false;
+      if (![+f.cx, +f.cy, +f.z].every(Number.isFinite)) return false;
+      if (baseFrameApplied(f)) return true;
+      let polar = Number(handoff.start?.polar);
+      if (!Number.isFinite(polar)) polar = holdPolarForFrame(f);
+      map.jumpTo({
+        center: [+f.cx, +f.cy],
+        zoom: +f.z,
+        bearing: Number.isFinite(+f.bearing) ? +f.bearing : 0,
+        pitch: Number.isFinite(polar) ? polar : 0,
+      });
+      return baseFrameApplied(f);
+    } catch {
+      return false;
+    }
+  }
   /* FRAME-MATCH read (Lane B): true once the hold satellite frame
    * is actually on screen — map instance up, at least one twin frame
    * painted, flight still pinned at the hold pose, slider at full satellite.
@@ -993,41 +1084,9 @@ async function boot() {
       // the per-frame twin->map sync skips (assertTerrainVex) and the map
       // sits at its mount camera — claiming a match then would be false, so
       // hold runs to the cap instead and Lane A's timeout owns the reveal.
-      try {
-        const c = map.getCenter?.();
-        const z = map.getZoom?.();
-        const clon = Array.isArray(c) ? c[0] : c?.lng;
-        const clat = Array.isArray(c) ? c[1] : c?.lat;
-        if (![clon, clat, z].every(Number.isFinite)) return false;
-        if (Math.abs(clon - handoff.frame.cx) > 2e-4) return false;
-        if (Math.abs(clat - handoff.frame.cy) > 2e-4) return false;
-        if (Math.abs(z - handoff.frame.z) > 0.05) return false;
-        const b = map.getBearing?.();
-        if (Number.isFinite(b)) {
-          const want = ((Number(handoff.frame.bearing) || 0) % 360 + 360) % 360;
-          const d = Math.abs((((b - want + 540) % 360) + 360) % 360 - 180);
-          if (d > 0.5) return false;
-        }
-        const p = map.getPitch?.();
-        // Pose-match: the map end frame carries the handed polar (iso for
-        // deep frames, top-down for shallow) — the twin hold pins the same
-        // law, so agreement means registered images. Expected polar reads
-        // from the pinned start (falls back to the handed frame law).
-        if (Number.isFinite(p)) {
-          let wantPitch = Number(handoff.start?.polar);
-          if (!Number.isFinite(wantPitch)) {
-            try {
-              wantPitch = holdPolarForFrame(handoff.frame);
-            } catch {
-              wantPitch = 0;
-            }
-          }
-          if (!Number.isFinite(wantPitch)) wantPitch = 0;
-          if (Math.abs(p - wantPitch) > 0.5) return false;
-        }
-      } catch {
-        return false;
-      }
+      // ONE law for both the reveal gate and the first-paint gate
+      // (baseFrameApplied) — the base is the arbiter of "applied".
+      if (!baseFrameApplied(handoff.frame)) return false;
       return true;
     } catch {
       return false;
@@ -1089,10 +1148,12 @@ async function boot() {
       const eye = poseAt(handoff.anchor.x, aty, handoff.anchor.z, r, HANDOFF_ISO_POLAR_DEG, handoff.azim);
       handoff.mid = { eye, target: { x: handoff.anchor.x, y: aty, z: handoff.anchor.z } };
       // Terminal rebuild (sector.js terminalPoseForAnchor — the SAME derivation
-      // the boot terminal uses): without it the retargeted shell kept its boot
-      // terminal, so the commit landed on the boot frame's content.
+      // the boot terminal uses, on the SAME handoff range `r` the refit just
+      // pinned): without it the retargeted shell kept its boot terminal, so the
+      // commit landed on the boot frame's content; with a different range it
+      // also reintroduced a commit-time scale step.
       try {
-        const term = terminalPoseForAnchor(handoff.anchor.x, aty, handoff.anchor.z, handoff.azim);
+        const term = terminalPoseForAnchor(handoff.anchor.x, aty, handoff.anchor.z, handoff.azim, r);
         if (term && term.eye && term.target) handoff.to = term;
       } catch { /* terminal rebuild is best-effort — keep the boot pose */ }
       driveMix(HANDOFF_START_MIX);
@@ -1316,6 +1377,13 @@ async function boot() {
         try {
           if (refitHandoffRange()) handoff.readyHits = 0;
         } catch { /* refit is best-effort */ }
+        // BASE-APPLIED HOLD (twin-start-scale): keep the base instance on the
+        // handed frame while the hold runs, so the reveal can never open over
+        // imagery from a different ground scale. jumpTo (not the VEX-gated
+        // sync) because the DEM may still be engaging; no-op once it agrees.
+        try {
+          seedBaseToHandedFrame();
+        } catch { /* base seed is best-effort */ }
         // GATE-3 predictive precache (defect 6, twin side): from inbound hold
         // progress + pose-settle velocity, track scene-warm / pose-warm /
         // ready BEFORE the reveal lands (probe: __ring2.precache()). Never
@@ -1424,12 +1492,14 @@ async function boot() {
             : null;
           // Lane eval-scale: a STAGED release dissolves over a map that is
           // HELD at the gate, so the twin's mid AND terminal both take the
-          // gate's scale (lockStagedRange) instead of the arrival/posted zoom
-          // — which can still be travelling under a parked S — or the fixed
-          // 18 km terminal (a metre literal: viewport-scaled mid vs constant
-          // terminal is what made the delta swing from -0.41x at the dissolve
-          // start to +0.38x at its end on an 800px viewport). The push then
-          // rides stagedReleaseAnchors, i.e. a pure recentre at constant range.
+          // gate's scale (lockStagedRange -> handoffRangeForFrame) instead of
+          // the arrival/posted zoom — which can still be travelling under a
+          // parked S. The retired constant-metre terminal (a second law:
+          // viewport-scaled mid vs 18 km) is what made the delta swing from
+          // -0.41x at the dissolve start to +0.38x at its end on an 800px
+          // viewport, and it moved the ground scale again at the commit. The
+          // push now rides stagedReleaseAnchors, i.e. a pure recentre at
+          // constant range.
           const stagedRelease = fwdStagedOwnsIntro({ stagedS: handoff.fwdStagedS, deepFrame: frameDeep });
           let midPose = releaseFreshMid(handoff.mid);
           let toPose = handoff.to;
@@ -2093,6 +2163,29 @@ async function boot() {
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     } catch { /* label sync never breaks boot */ }
   }
+  /* Embed-mode HUD fullscreen (owner verdict 2026-10-29): fullscreen needs
+   * transient user activation in the PARENT document, and a postMessage
+   * handler has none — so the parent owns the real control (its overlay-bar
+   * button, a true gesture). The iframe button therefore must not be the only
+   * control: in embed mode it is DEMOTED out of the chrome (hidden, out of the
+   * tab order, aria-hidden) while the delegated message path below stays wired
+   * for a parent that echoes state or re-enables it. Standalone keeps the
+   * native button exactly as before. */
+  function demoteEmbeddedFsButton(btn) {
+    try {
+      if (!btn) return false;
+      btn.hidden = true;
+      btn.setAttribute('aria-hidden', 'true');
+      btn.setAttribute('tabindex', '-1');
+      btn.setAttribute('data-ring2-fs', 'demoted');
+      try {
+        btn.style.display = 'none';
+      } catch { /* inline style is best-effort */ }
+      return true;
+    } catch {
+      return false;
+    }
+  }
   function wireDelegatedFullscreen(embedded) {
     fsDelegated = !!embedded;
     let btn = null;
@@ -2107,6 +2200,9 @@ async function boot() {
       window.__ring2.fsBtn = btn;
     } catch { /* probe ref is best-effort */ }
     if (!embedded) return false; // standalone: native self-fullscreen stands
+    // Demote, never remove: the delegated path below keeps working, the
+    // parent's own bar button is the primary control.
+    demoteEmbeddedFsButton(btn);
     // Ancestor capture runs before hud-overlays.js' bubble-phase native
     // handler on the button itself (a same-node capture listener would lose
     // the registration-order race at target). stopPropagation at this level
@@ -2221,6 +2317,24 @@ async function boot() {
     handoff,
     requestTwinClose,
     handoffPhase: () => handoff.phase,
+    /* BASE-APPLIED probe (twin-start-scale): the base instance's own camera
+     * against the handed frame — the arbiter the reveal/first-paint gates
+     * read. `applied` null = no handed frame (not asserted). */
+    base: () => {
+      try {
+        const f = handoff.frame;
+        return {
+          up: !!map,
+          applied: f ? baseFrameApplied(f) : null,
+          zoom: map && typeof map.getZoom === 'function' ? map.getZoom() : null,
+          pitch: map && typeof map.getPitch === 'function' ? map.getPitch() : null,
+          want: f ? { z: f.z, pitch: holdPolarForFrame(f) } : null,
+          range: Number.isFinite(Number(handoff.start?.range)) ? Number(handoff.start.range) : null,
+          ready: handoff.readyPosted === true,
+          painted: paintedPosted === true,
+        };
+      } catch { return null; }
+    },
     // Force a fresh basemap tone readback (probe/verification hook: the seam
     // is measured at the pose the dissolve opens over, so the harness needs
     // to re-sample after it parks the camera there).
@@ -2448,9 +2562,17 @@ async function boot() {
         // (country prewarm) would otherwise ask for TWIN_MAX_RANGE_M and
         // paint an empty 42 km plate.
         if (sectorQ.frame && frameOwnsAnchor) {
-          startRange = frameRange(sectorQ.frame.z, { viewportPx: vp, lat: sectorQ.frame.cy });
+          startRange = handoffRangeForFrame(sectorQ.frame, { viewportPx: vp });
         }
-        if (!Number.isFinite(startRange) || startRange <= 0) startRange = 12000;
+        /* No handed frame (sector-only / standalone deep link): open at the
+         * map's gate frame — the shared Z_HANDOFF constant projected through
+         * this camera — instead of a metre literal. That is the frame the map
+         * hands over on every path, so the twin's opening scale is the same
+         * whether it was handed a frame or not. */
+        if (!Number.isFinite(startRange) || startRange <= 0) {
+          startRange = clampHandoffRange(frameRange(Z_HANDOFF, { viewportPx: vp, lat: SANGACHAL.lat }));
+        }
+        if (!Number.isFinite(startRange) || startRange <= 0) startRange = clampHandoffRange(12000) ?? 12000;
         // Shared orbit rails (sync.js single source, via the sector.js pure
         // clamp) — the handed zoom is accepted as-is inside the rails, never
         // replaced by a canned pose; only the rail breach clamps.
@@ -2477,9 +2599,10 @@ async function boot() {
         const ety = groundYNear(etx, etz);
         // Single derivation (sector.js terminalPoseForAnchor): the hold refit
         // rebuilds this exact terminal on every retarget, so a reused shell
-        // commits on the arrival frame, never the boot frame.
-        const terminal = terminalPoseForAnchor(etx, ety, etz, azim) ?? {
-          eye: poseAt(etx, ety, etz, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, azim),
+        // commits on the arrival frame, never the boot frame. The range is the
+        // SAME handoff range the hold/mid ride — one scale, no commit step.
+        const terminal = terminalPoseForAnchor(etx, ety, etz, azim, startRange) ?? {
+          eye: poseAt(etx, ety, etz, startRange, HANDOFF_ISO_POLAR_DEG, azim),
           target: { x: etx, y: ety, z: etz },
           mix: HANDOFF_END_MIX,
         };
@@ -2709,6 +2832,14 @@ async function boot() {
     } catch {
       /* mix bar drives on without us */
     }
+    /* BASE APPLY at adopt (twin-start-scale): the mount seed is the handed
+     * frame, but a remount/re-adopt that lands after the frame moved (retarget,
+     * late viewport) must be corrected BEFORE the first visible frame — the
+     * per-frame sync cannot (it asserts VEX) and the reveal is already
+     * allowed once the twin has painted. */
+    try {
+      seedBaseToHandedFrame();
+    } catch { /* adopt seed is best-effort */ }
     try {
       assertTerrainOn(map);
     } catch (err) {
@@ -3044,7 +3175,19 @@ async function boot() {
        * frame is already registered. A map that never mounts leaves the
        * reveal to Lane A's own fallback (orbited, never stalled). */
       const baseUp = !!map;
-      if (baseUp && !paintedPosted && firstPaintDue({ frames: twinFrames, mapIdle, sceneLive, elapsedMs: elapsed })) {
+      /* BOUNDED LOADING HOLD (twin-start-scale): the painted post arms the
+       * parent's fallback reveal, so it must not advertise a frame whose base
+       * has not applied the handed zoom — the overlay would open on ~1.75x
+       * coarser imagery and snap a tick later (the measured stutter). Held at
+       * opacity 0 until the base agrees; firstPaintDue keeps the wall cap as
+       * the bounded escape so a slow/hung base still reveals (never stranded,
+       * never a false "applied"). No handed frame = not asserted (standalone,
+       * shallow click path). */
+      let baseApplied = null;
+      try {
+        if (handoff.frame) baseApplied = baseFrameApplied(handoff.frame);
+      } catch { baseApplied = null; }
+      if (baseUp && !paintedPosted && firstPaintDue({ frames: twinFrames, mapIdle, sceneLive, baseApplied, elapsedMs: elapsed })) {
         paintedPosted = true;
         try {
           window.parent?.postMessage(buildTwinPaintedMessage(), '*');

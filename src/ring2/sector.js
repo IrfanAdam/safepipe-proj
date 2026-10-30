@@ -77,9 +77,17 @@ export const HANDOFF_REVERSE_MS = HANDOFF_PUSH_MS + HANDOFF_SWOOP_MS;
 /* Slider drive: overlay opens at full satellite, swoops to full twin. */
 export const HANDOFF_START_MIX = 0;
 export const HANDOFF_END_MIX = 100;
-/* Iso terminal view (matches the sector reframe in main.js): two zoom levels
- * out from the old 4500 m stance — ~12 km footprint holds the ~3 km facility
- * + margin in frame at the same iso angle. Slider still drives to 100.
+/* Iso terminal view: the twin arrives at the SAME ground scale the map hands
+ * over — the gate frame projected through this camera (handoffRangeForFrame,
+ * below) — so there is no scale step at the reveal or the commit. The retired
+ * 18 km constant-metre terminal was a SECOND law: the staged mid pinned
+ * frameRange(Z_HANDOFF) (~21.7 km at a 700 px viewport) while the terminal sat
+ * at 18 km, so the commit moved the ground scale 1.2x in one frame, and the
+ * twin's own opening read 5.5% smaller than the mask it dissolved from
+ * (484.5 px ring vs 512.5 px mask at 1122x700) — the owner's "too small start"
+ * plus the post-commit push, read as a second terrain->twin transition. ONE
+ * range now drives hold, start, mid and terminal; nothing in this file
+ * restates a metre.
  * Task-35 angle coincidence: the map-side iso scrub holds pitch at
  * ISO_PITCH_DEG through the handoff cut and carries it (nothing on the
  * forward path resets pitch to 0), so the twin's swoop/terminal iso lands
@@ -90,8 +98,7 @@ export const HANDOFF_END_MIX = 100;
  * The twin hold itself pins the handed pitch law (holdPolarForFrame);
  * Task 36 scrubs the intro so the
  * cut dissolves end-to-end. Decision recorded: carry-45-through + meet at
- * the shared pole (this constant), not flatten-to-0. */
-export const HANDOFF_ISO_RANGE_M = 18000;
+ * the shared pole, not flatten-to-0. */
 export const HANDOFF_ISO_POLAR_DEG = ISO_PITCH_DEG;
 
 /* Hold-pose pitch (LANE twin-pose-match): the twin's first revealed frame
@@ -342,6 +349,35 @@ export function clampHandoffRange(r) {
   }
 }
 
+/* HANDOFF RANGE LAW (single source — replaces the 18 km metre literal).
+ *
+ * The twin's ENTIRE handoff sits on one range: the ground scale of the frame
+ * the map hands over, projected through THIS camera at the LIVE viewport
+ * (frameRange is the exact inverse of the map's metres-per-pixel, so the
+ * twin's 10 km ring lands on the map mask by construction), clamped to the
+ * shared orbit rails. Hold, release start, ring-iso mid and push terminal all
+ * read this one value:
+ *   - the opening ring registers to the mask at the reveal (no 5.5% small
+ *     opening: 484.5 px porthole vs 512.5 px mask at 1122x700 was the twin
+ *     measuring a TOP-DOWN radius while the map's mask is the pitched ring's
+ *     own projection);
+ *   - the commit is a pure recentre — no ground-scale step between the last
+ *     dissolved frame and the first committed one, hence no post-commit push.
+ * Handed zoom + handed latitude + live viewport, never a constant metre and
+ * never Z_HANDOFF restated: a parent that hands z 11.58 owns 11.58. Null on
+ * any non-finite input — callers withhold, never guess. Node-checkable. */
+export function handoffRangeForFrame(frame, { viewportPx = 600, fovDeg = MAP_TRUE_FOV_DEG } = {}) {
+  try {
+    const z = Number(frame?.z);
+    if (!Number.isFinite(z)) return null;
+    const r = frameRange(z, { viewportPx, fovDeg, lat: frame?.cy });
+    if (!Number.isFinite(r) || !(r > 0)) return null;
+    return clampHandoffRange(r);
+  } catch {
+    return null;
+  }
+}
+
 /** Pure: easeInOutCubic flight easing (0..1 -> 0..1). Kept as the static
  * contract — existing callers/tests import this name. */
 export function easeInOutCubic(t) {
@@ -392,14 +428,20 @@ export function buildTwinPaintedMessage() {
  * signal (a slow network is not a dead twin). */
 export const TWIN_PAINT_MAX_MS = 8000;
 /** Pure: first paint is due once PREWARM frames ran AND the scene is live
- * (map tile-idle + terrain draped), or once the wall cap hits regardless.
- * False below PREWARM frames or on any non-finite input — withhold, never
- * guess. Node-checkable. */
-export function firstPaintDue({ frames = 0, mapIdle = false, sceneLive = false, elapsedMs = 0 } = {}) {
+ * (map tile-idle + terrain draped) AND the satellite base has APPLIED the
+ * handed frame (baseApplied — the base's own camera, not the pin command:
+ * a base still sitting on its mount seed draws the wrong ground scale under
+ * the twin's clip for the whole reveal, the measured FWD-1 seam pop), or once
+ * the wall cap hits regardless (bounded — a slow network is not a dead
+ * twin). `baseApplied` undefined means "not asserted" (standalone boot,
+ * shallow click path): only an explicit false withholds. False below PREWARM
+ * frames or on any non-finite input — withhold, never guess.
+ * Node-checkable. */
+export function firstPaintDue({ frames = 0, mapIdle = false, sceneLive = false, baseApplied = null, elapsedMs = 0 } = {}) {
   try {
     const f = Number(frames);
     if (!Number.isFinite(f) || f < HANDOFF_PREWARM_MIN_FRAMES) return false;
-    if (mapIdle === true && sceneLive === true) return true;
+    if (mapIdle === true && sceneLive === true && baseApplied !== false) return true;
     const ms = Number(elapsedMs);
     return Number.isFinite(ms) && ms >= TWIN_PAINT_MAX_MS;
   } catch {
@@ -1202,13 +1244,17 @@ export function poseAtAnchor(ax, ay, az0, range, polarDeg, azimRad) {
 }
 
 /** Pure: terminal (push/done) pose for a handoff anchor — the same
- * derivation the boot terminal uses (iso range, iso pole, attached
- * angle, end mix), so a hold refit onto a retargeted anchor rebuilds the
- * identical terminal the boot would have pinned on that frame. Null on
- * any non-finite input — caller keeps the boot pose, never a guess. */
-export function terminalPoseForAnchor(ax, ay, az, azimRad) {
+ * derivation the boot terminal uses (iso pole, attached angle, end mix) on
+ * the ONE handoff range (handoffRangeForFrame) the caller derived from the
+ * handed gate frame. The range is REQUIRED: the old constant-metre terminal
+ * (18 km) disagreed with the staged mid and moved the ground scale at the
+ * commit. Null on any non-finite input/range — caller keeps the boot pose,
+ * never a guess. */
+export function terminalPoseForAnchor(ax, ay, az, azimRad, rangeM) {
   try {
-    const pose = poseAtAnchor(ax, ay, az, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, azimRad);
+    const r = Number(rangeM);
+    if (!Number.isFinite(r) || !(r > 0)) return null;
+    const pose = poseAtAnchor(ax, ay, az, r, HANDOFF_ISO_POLAR_DEG, azimRad);
     if (!pose || !pose.eye || !pose.target) return null;
     return { eye: { ...pose.eye }, target: { ...pose.target }, mix: HANDOFF_END_MIX };
   } catch {

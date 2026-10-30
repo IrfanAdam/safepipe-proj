@@ -4,7 +4,9 @@
 // hold and the commit landed on the boot world (eye/target ~-3.2e6, coverage 0)
 // — the "blank, only the controls" state the owner reported after the iso
 // stage. Pins the anchor-aware refit + terminal re-derivation on the arrival
-// frame.
+// frame, now on the ONE handoff range derived from the handed gate frame (the
+// retired 18 km constant-metre terminal is gone: hold, mid and terminal share
+// the gate frame's ground scale).
 // [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,13 +17,16 @@ import {
   handoffRefitDue,
   terminalPoseForAnchor,
   poseAtAnchor,
-  clampHandoffRange,
-  HANDOFF_ISO_RANGE_M,
+  handoffRangeForFrame,
   HANDOFF_ISO_POLAR_DEG,
 } from '../src/ring2/sector.js';
 
 const srcOf = (rel) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), rel), 'utf8');
 const MAIN = srcOf('../src/ring2/main.js');
+
+// The handed gate frame (deep scroll arrival) and the ONE range it owns.
+const FRAME = { cx: 49.48127, cy: 40.201262, z: 11.5, bearing: 0, pitch: 45 };
+const GATE_RANGE = handoffRangeForFrame(FRAME, { viewportPx: 700 });
 
 // The boot shell is pinned at the home frame; the arrival pin is the SITE.
 // callee shapes: handoffRefitDue takes the pin {tx,tz} and the anchor {x,z}.
@@ -31,7 +36,8 @@ const SITE = { tx: 49.68, tz: 40.19 };
 const SITE_A = { x: 49.68, z: 40.19 };
 
 test('anchor-aware refit: a moved pin rebuilds even at identical rail range', () => {
-  const range = clampHandoffRange(HANDOFF_ISO_RANGE_M);
+  const range = GATE_RANGE;
+  assert.ok(Number.isFinite(range) && range > 0, 'the gate frame owns a finite range');
   // Boot pin on the home frame, same clamped range as the arrival pin.
   const bootPin = { tx: HOME.tx, tz: HOME.tz, range };
   assert.equal(
@@ -52,8 +58,8 @@ test('anchor-aware refit: a moved pin rebuilds even at identical rail range', ()
 
 test('terminal re-derived on the arrival anchor lands on the SITE world, not home', () => {
   const azim = -0.42;
-  const homeTerm = terminalPoseForAnchor(HOME.tx, 120, HOME.tz, azim);
-  const siteTerm = terminalPoseForAnchor(SITE.tx, 120, SITE.tz, azim);
+  const homeTerm = terminalPoseForAnchor(HOME.tx, 120, HOME.tz, azim, GATE_RANGE);
+  const siteTerm = terminalPoseForAnchor(SITE.tx, 120, SITE.tz, azim, GATE_RANGE);
   assert.ok(homeTerm?.eye && homeTerm?.target, 'home terminal builds');
   assert.ok(siteTerm?.eye && siteTerm?.target, 'site terminal builds');
 
@@ -72,20 +78,31 @@ test('terminal re-derived on the arrival anchor lands on the SITE world, not hom
   );
   assert.ok(dHome > 30, 'terminal target is not the boot home frame');
 
-  // Same iso law as boot: iso range + iso pole, so the push is a pure range
-  // change off the arrival ring iso.
-  const hand = poseAtAnchor(SITE.tx, 120, SITE.tz, HANDOFF_ISO_RANGE_M, HANDOFF_ISO_POLAR_DEG, azim);
+  // Same iso law as boot: the handed gate range + iso pole, so the push is a
+  // pure recentre (zero scale travel) off the arrival ring iso.
+  const hand = poseAtAnchor(SITE.tx, 120, SITE.tz, GATE_RANGE, HANDOFF_ISO_POLAR_DEG, azim);
   assert.ok(hand?.eye, 'reference pose builds');
   const dEye = Math.hypot(
     siteTerm.eye.x - hand.eye.x,
     siteTerm.eye.y - hand.eye.y,
     siteTerm.eye.z - hand.eye.z,
   );
-  assert.ok(dEye < 1e-6, `terminal eye matches the boot iso derivation (got ${dEye})`);
+  assert.ok(dEye < 1e-6, `terminal eye matches the gate-frame derivation (got ${dEye})`);
 
-  // Non-finite anchor withholds — the caller keeps the boot pose instead of
-  // committing on a guess.
-  assert.equal(terminalPoseForAnchor(NaN, 0, 0, azim), null);
+  // The commit range IS the hold range: no ground-scale step at the seam.
+  const rTerm = Math.hypot(
+    siteTerm.eye.x - siteTerm.target.x,
+    siteTerm.eye.y - siteTerm.target.y,
+    siteTerm.eye.z - siteTerm.target.z,
+  );
+  assert.ok(Math.abs(rTerm - GATE_RANGE) < 1e-6, `terminal range ${rTerm} === gate range ${GATE_RANGE}`);
+
+  // A terminal without a range is refused (no constant-metre fallback).
+  assert.equal(terminalPoseForAnchor(SITE.tx, 120, SITE.tz, azim), null);
+  // Non-finite anchor/range withholds — the caller keeps the boot pose instead
+  // of committing on a guess.
+  assert.equal(terminalPoseForAnchor(NaN, 0, 0, azim, GATE_RANGE), null);
+  assert.equal(terminalPoseForAnchor(SITE.tx, 0, SITE.tz, azim, NaN), null);
 });
 
 test('refitHandoffRange is anchor-aware and rebuilds the terminal (wiring)', () => {
@@ -95,12 +112,12 @@ test('refitHandoffRange is anchor-aware and rebuilds the terminal (wiring)', () 
     /const old = handoff\.start\?\.range;\s*\n\s*if \(Number\.isFinite\(old\) && Math\.abs\(old - r\) < 1\) return false;/,
     'range-only guard must not come back',
   );
-  assert.match(MAIN, /const term = terminalPoseForAnchor\(handoff\.anchor\.x, aty, handoff\.anchor\.z, handoff\.azim\)/);
+  assert.match(MAIN, /const term = terminalPoseForAnchor\(handoff\.anchor\.x, aty, handoff\.anchor\.z, handoff\.azim, r\)/);
   assert.match(MAIN, /handoff\.to = term/);
 });
 
 test('boot terminal comes from the same single derivation (no second law)', () => {
-  assert.match(MAIN, /const terminal = terminalPoseForAnchor\(etx, ety, etz, azim\)/);
+  assert.match(MAIN, /const terminal = terminalPoseForAnchor\(etx, ety, etz, azim, startRange\)/);
   assert.match(MAIN, /eye: terminal\.eye/);
   assert.match(MAIN, /target: terminal\.target/);
   assert.doesNotMatch(MAIN, /eye: isoEye/, 'stale boot-eye reference breaks the tree');
