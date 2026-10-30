@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-30T08:24:49.945Z",
+  "generated": "2026-10-30T08:26:04.936Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "96a32ad",
+      "full": "96a32adfcd0cd895c03bbad197e0d727c935786a",
+      "date": "2026-10-30",
+      "time": "13:55",
+      "subject": "feat(map-twin): intent-gated handoff, matched twin start, click flight, flat exit, parent fullscreen, DEM warm [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "af6e72a",
       "full": "af6e72add928a1866091f6251cf5fb78891b284d",
@@ -6781,12 +6790,6 @@
     }
   ],
   "wip": [
-    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md",
-    "ops3d-map.html",
-    "public/version.json",
-    "src/map/main.js",
-    "src/map/scrolltrigger.js",
-    "src/ring2/main.js",
-    "src/ring2/sector.js"
+    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ]
 }
