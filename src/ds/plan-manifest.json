@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-30T10:00:15.109Z",
+  "generated": "2026-10-30T10:06:29.706Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "eb9b920",
+      "full": "eb9b920d0696e0d9f0f8a10c5b561cf7db0c03dd",
+      "date": "2026-10-30",
+      "time": "15:30",
+      "subject": "test(map-twin): pin the reverse escape law [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "9c5d618",
       "full": "9c5d6184a6d9284483355c4786c96aad59c4ef13",
