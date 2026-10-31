@@ -40,8 +40,10 @@ test('X/Esc/back auto-retrace the gesture reverse instead of cutting', () => {
   assert.ok(close.includes('autoReverseTargetFrame()'), 'the close destination is explicit');
   assert.ok(close.includes('stagedActive && !stagedCommitted && !autoReverse'), 'an uncommitted visible twin keeps its frame for the retrace');
   const target = fn('autoReverseTargetFrame', 'function autoReverseCloseFlight(');
-  assert.ok(target.includes('zoom: MAP_FLOOR'), 'the explicit close always lands on the flat world');
-  assert.ok(!target.includes('diveCam'), 'a zoomed pre-dive frame cannot stop the close before flat');
+  assert.ok(target.includes('zoom: Z_CENTER - CLOSE_BEFORE_MASK_EPS'), 'the explicit close stops at the mask threshold');
+  assert.ok(target.includes('CLOSE_BEFORE_MASK_EPS'), 'the stop is derived from the mask forming boundary');
+  assert.ok(!target.includes('diveCam'), 'a zoomed pre-dive frame cannot stop the close before the threshold');
+  assert.ok(!target.includes('MAP_FLOOR'), 'the explicit close does not run all the way home');
   assert.ok(close.includes('startAutoReverseWheelDrive(autoTarget)'), 'the explicit close feeds the same outward wheel lane');
   assert.ok(close.includes('autoReverseCloseFlight(autoTarget)'), 'the one-shot ease remains the lane fallback');
   assert.ok(close.includes('beginRetraceDissolve()'), 'the fade is the shared zoom-keyed dissolve');

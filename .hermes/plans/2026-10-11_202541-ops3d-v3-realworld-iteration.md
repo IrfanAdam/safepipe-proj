@@ -326,6 +326,11 @@ Build the geographically grounded twin of the REAL Sangachal Terminal on the shi
   - HEADLESS (WebKit, actual `#twin-close`, committed twin): z 11.5→11.13→10.89→10.52 (overlay 1.00→0.70→0.52→0.0015)→10 (pitch 33°), →8.4 (pitch 0), →3.2, →**1.132**; overlay hidden, vignette 0, twin false, `recede='home'`, min/max 1/14. The close-world screenshot is the flat vector map.
   - GATES: 994 tests, 993 pass / 1 pre-existing deploy-stamp red; `node --check` clean; `git diff --check` clean; `npm run build` green. RESIDUALS: owner Safari sign-off; effective final zoom is 1.132 (the map's live floor) rather than the requested 1.0, still the flat world. If a browser refuses synthetic wheel events the one-shot ease now also targets the flat world.
 
+  - REF GATE 3 · rev 2026-10-30 close-before-mask — verdict OPEN (headless at pending; owner Safari pending). OWNER: "i want to close the gate, but one last thing, for the close interaction do no zoom all the way out only right before the enclosing mask begins to appear"; "and make that transition smooth".
+  - LAW: `enclosureEllipsePxForZoom` forms the mask across `Z_CENTER..Z_TOP`; below `Z_CENTER` it parks (null). The explicit close target is therefore `Z_CENTER - CLOSE_BEFORE_MASK_EPS` (`6.98`), centered on the site, pitch/bearing 0 — literally the frame just before the mask can begin, not the flat world and not the pre-dive frame. The close still runs the same outward wheel retrace; native scrollZoom owns every tick, so the pitch, satellite and vignette laws hand over smoothly to that rest frame. Continuing to scroll out from there remains the user's choice.
+  - HEADLESS (WebKit, actual `#twin-close`, committed twin): the retrace reached z **6.8** (one native tick past the 6.98 request, still below the mask onset at 7.0), pitch **0**, overlay hidden, vignette **0**, twin false; close-before-mask screenshot shows the plain country/terrain map with only the Sangachal marker, no enclosure mask or twin. No page errors.
+  - GATES: 994 tests, **994 pass / 0 fail**; `node --check` clean; `git diff --check` clean; `npm run build` green (`✓ built in 9.37s`). RESIDUALS: owner Safari sign-off; the last wheel tick can overshoot the boundary by up to one tick (~0.2 z) but never re-enters the mask and never approaches the flat floor.
+
 ## Phase 06 — Lock
 *Due: 2026-10-20*
 <!-- {#phase-06} -->

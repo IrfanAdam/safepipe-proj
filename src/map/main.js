@@ -6691,17 +6691,19 @@ function stopAutoReverseWheelDrive() {
   } catch { /* timer teardown is best-effort */ }
   autoReverseWheelTimer = null;
 }
-/** The explicit close's destination: ALWAYS the flat world, never the frame
- * the dive happened to leave. The owner's close contract is "zoom out until
- * I see it flat", and a dive can start from a manually zoomed map (or a
- * scroll entry) whose pre-dive frame is still oblique/near the site — using
- * that frame made the close stop while the basemap switched to vector, which
- * reads as a style swap rather than a way home. The gesture reverse remains
- * finger-owned and may stop anywhere the user chooses. */
+/** The explicit close's destination: just OUTSIDE the enclosure's forming
+ * span. `enclosureEllipsePxForZoom` starts growing the mask at Z_CENTER and
+ * completes the seal at Z_TOP, so stopping a hair below Z_CENTER is literally
+ * "right before the enclosing mask begins to appear": no mask, no twin, no
+ * satellite handoff, and no unnecessary trip to the flat world. The close
+ * still uses the full gesture retrace to get here; the gesture reverse itself
+ * remains finger-owned and can continue past this checkpoint if the user
+ * keeps scrolling. */
+const CLOSE_BEFORE_MASK_EPS = 0.02;
 function autoReverseTargetFrame() {
   return {
-    center: { lng: COUNTRY_CENTER[0], lat: COUNTRY_CENTER[1] },
-    zoom: MAP_FLOOR,
+    center: { lng: SITE.lon, lat: SITE.lat },
+    zoom: Z_CENTER - CLOSE_BEFORE_MASK_EPS,
     pitch: 0,
     bearing: 0,
   };
