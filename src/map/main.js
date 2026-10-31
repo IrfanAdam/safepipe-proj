@@ -6684,29 +6684,21 @@ const AUTO_REVERSE_FADE_TICK_MS = 85;
 const AUTO_REVERSE_FADE_DELTA = 55;
 const AUTO_REVERSE_MAX_TICKS = 140;
 let autoReverseWheelTimer = null;
+let autoReverseLandingTarget = NaN; // NaN = no deferred auto landing armed
 function stopAutoReverseWheelDrive() {
   try {
     if (autoReverseWheelTimer) clearTimeout(autoReverseWheelTimer);
   } catch { /* timer teardown is best-effort */ }
   autoReverseWheelTimer = null;
 }
-/** The auto flight's true destination. `recedeToHome` normally lands at the
- * country home (Z_MIN) as soon as the live zoom crosses it; the explicit
- * close may be returning to a fuller pre-dive world (the floor), so its
- * landing must wait for the flight target instead of jumping the pitch at
- * Z_MIN and cancelling the ease. NaN = no auto landing in flight. */
-let autoReverseLandingTarget = NaN;
+/** The explicit close's destination: ALWAYS the flat world, never the frame
+ * the dive happened to leave. The owner's close contract is "zoom out until
+ * I see it flat", and a dive can start from a manually zoomed map (or a
+ * scroll entry) whose pre-dive frame is still oblique/near the site — using
+ * that frame made the close stop while the basemap switched to vector, which
+ * reads as a style swap rather than a way home. The gesture reverse remains
+ * finger-owned and may stop anywhere the user chooses. */
 function autoReverseTargetFrame() {
-  try {
-    if (diveCam && diveCam.center && Number.isFinite(+diveCam.zoom)) {
-      return {
-        center: { lng: +diveCam.center.lng, lat: +diveCam.center.lat },
-        zoom: +diveCam.zoom,
-        pitch: Number.isFinite(+diveCam.pitch) ? +diveCam.pitch : 0,
-        bearing: Number.isFinite(+diveCam.bearing) ? +diveCam.bearing : 0,
-      };
-    }
-  } catch { /* fall through to the country home */ }
   return {
     center: { lng: COUNTRY_CENTER[0], lat: COUNTRY_CENTER[1] },
     zoom: MAP_FLOOR,

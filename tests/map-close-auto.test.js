@@ -37,8 +37,11 @@ test('the click flight is long enough to read the world->plate sweep', () => {
 test('X/Esc/back auto-retrace the gesture reverse instead of cutting', () => {
   const close = fn('doCloseTwin', 'function holdHandoffPoseForReverse(');
   assert.ok(close.includes('let autoReverse = false;'), 'the auto path is an explicit close intent');
-  assert.ok(close.includes('autoReverseTargetFrame()'), 'the pre-dive frame is captured before teardown');
+  assert.ok(close.includes('autoReverseTargetFrame()'), 'the close destination is explicit');
   assert.ok(close.includes('stagedActive && !stagedCommitted && !autoReverse'), 'an uncommitted visible twin keeps its frame for the retrace');
+  const target = fn('autoReverseTargetFrame', 'function autoReverseCloseFlight(');
+  assert.ok(target.includes('zoom: MAP_FLOOR'), 'the explicit close always lands on the flat world');
+  assert.ok(!target.includes('diveCam'), 'a zoomed pre-dive frame cannot stop the close before flat');
   assert.ok(close.includes('startAutoReverseWheelDrive(autoTarget)'), 'the explicit close feeds the same outward wheel lane');
   assert.ok(close.includes('autoReverseCloseFlight(autoTarget)'), 'the one-shot ease remains the lane fallback');
   assert.ok(close.includes('beginRetraceDissolve()'), 'the fade is the shared zoom-keyed dissolve');
