@@ -39,10 +39,16 @@ test('X/Esc/back auto-retrace the gesture reverse instead of cutting', () => {
   assert.ok(close.includes('let autoReverse = false;'), 'the auto path is an explicit close intent');
   assert.ok(close.includes('autoReverseTargetFrame()'), 'the pre-dive frame is captured before teardown');
   assert.ok(close.includes('stagedActive && !stagedCommitted && !autoReverse'), 'an uncommitted visible twin keeps its frame for the retrace');
-  assert.ok(close.includes('autoReverseCloseFlight(autoTarget)'), 'the explicit close flies the same way home');
+  assert.ok(close.includes('startAutoReverseWheelDrive(autoTarget)'), 'the explicit close feeds the same outward wheel lane');
+  assert.ok(close.includes('autoReverseCloseFlight(autoTarget)'), 'the one-shot ease remains the lane fallback');
   assert.ok(close.includes('beginRetraceDissolve()'), 'the fade is the shared zoom-keyed dissolve');
   assert.ok(close.includes('stopStagedAutoPump()'), 'the staged commit pump cannot re-park the gate under the auto flight');
   assert.ok(close.includes('stagedActive = false;'), 'the auto flight stops staged ownership before driving z');
+  const drive = fn('startAutoReverseWheelDrive', 'function doCloseTwin(');
+  assert.ok(drive.includes('deltaY: -tickDelta'), 'raw negative = outward under the owner up-out convention');
+  assert.ok(drive.includes('host.dispatchEvent(ev)'), 'the event enters the same map wheel lane as a finger');
+  assert.ok(drive.includes('AUTO_REVERSE_FADE_DELTA'), 'the overlay band gets readable smaller ticks');
+  assert.ok(SRC.includes("mode: 'wheel'"), 'the probe names the gesture-shaped close');
   const recede = fn('recedeToHome', 'function mountChrome(');
   assert.ok(recede.includes('autoReverseLandingTarget'), 'the home landing defers to the wider auto destination');
   assert.ok(SRC.includes('finishTwinClose({ autoReverse: true })'), 'the explicit close entries pass the intent through');

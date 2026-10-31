@@ -6664,13 +6664,32 @@ function openTwin(id, opts = {}) {
 /** AUTO-REVERSE (explicit close): the X/Esc/back path is the user's own
  * reverse intent, so it must retrace the SAME world->twin geometry the wheel
  * path does. The scroll path is finger-owned; an explicit close has no
- * fingers, so this arms a camera ease from the handoff back to the frame the
- * dive left while the retrace dissolve reads the live zoom. At Z_TOP the
- * overlay is already dissolved and the map continues over the held vector
- * basemap to the flat world. Reduced motion keeps the instant restore. */
+ * fingers, so it synthesizes the user's outward wheel lane (same flipped
+ * delta, same native scrollZoom path, same onNativeZoomStep laws) at a
+ * readability cadence. `autoReverseCloseFlight` remains the fallback for a
+ * browser that refuses synthetic wheel events. Reduced motion keeps the
+ * instant restore. */
 const AUTO_REVERSE_MS_PER_ZOOM = 160;
 const AUTO_REVERSE_MIN_MS = 900;
 const AUTO_REVERSE_MAX_MS = 1900;
+// One synthetic outward tick: native scrollZoom delta (positive = out after
+// the lane's flip), paced at the owner's normal wheel cadence. The close is a
+// gesture retrace, not an ease: z, mask, satellite and pitch all move through
+// the same per-tick driver the fingers use. While the retrace dissolve still
+// owns the overlay, ticks are smaller/slower so the sat/vector crossfade is
+// READ, not blinked; below Z_TOP the world can widen at normal wheel pace.
+const AUTO_REVERSE_TICK_MS = 100;
+const AUTO_REVERSE_TICK_DELTA = 180;
+const AUTO_REVERSE_FADE_TICK_MS = 85;
+const AUTO_REVERSE_FADE_DELTA = 55;
+const AUTO_REVERSE_MAX_TICKS = 140;
+let autoReverseWheelTimer = null;
+function stopAutoReverseWheelDrive() {
+  try {
+    if (autoReverseWheelTimer) clearTimeout(autoReverseWheelTimer);
+  } catch { /* timer teardown is best-effort */ }
+  autoReverseWheelTimer = null;
+}
 /** The auto flight's true destination. `recedeToHome` normally lands at the
  * country home (Z_MIN) as soon as the live zoom crosses it; the explicit
  * close may be returning to a fuller pre-dive world (the floor), so its
@@ -6714,11 +6733,127 @@ function autoReverseCloseFlight(target) {
       easing: smooth01,
     });
     try {
-      window.__mapProbe.autoReverse = { from: +fromZ.toFixed(3), to: +toZ.toFixed(3), ms };
+      window.__mapProbe.autoReverse = { from: +fromZ.toFixed(3), to: +toZ.toFixed(3), ms, mode: 'flight' };
     } catch { /* probe cosmetic */ }
     return true;
   } catch (err) {
     errors.push('AUTO-REVERSE: ' + (err && err.message));
+    return false;
+  }
+}
+/** Gesture-shaped auto reverse: feed the SAME outward wheel lane the owner
+ * uses (positive native delta on the canvas container, marked as an already
+ * flipped clone) at a normal wheel cadence. Native scrollZoom then supplies
+ * every transition the close was missing — per-tick zoom animation, cursor
+ * anchor, onNativeZoomStep pitch/sat/mask retrace, and the home landing.
+ * The one difference from a finger is the clock: the close runs the ticks
+ * itself because there is no hand on the trackpad. Returns false when the
+ * lane is unavailable; the caller falls back to the one-shot ease. */
+function startAutoReverseWheelDrive(target) {
+  try {
+    if (!mapRef || !target) return false;
+    const lane = mapRef.getCanvasContainer && mapRef.getCanvasContainer();
+    const host = mapRef.getContainer && mapRef.getContainer();
+    if (!lane || !host) return false;
+    const fromZ = +mapRef.getZoom();
+    const toZ = Number.isFinite(+target.zoom) ? +target.zoom : MAP_FLOOR;
+    if (!Number.isFinite(fromZ) || !Number.isFinite(toZ)) return false;
+    if (Math.abs(fromZ - toZ) < 0.01) return false;
+    const seq = closeSeq;
+    let ticks = 0;
+    let lastZ = fromZ;
+    let stalled = 0;
+    let fallbackUsed = false;
+    const stop = () => {
+      try {
+        if (autoReverseWheelTimer) clearTimeout(autoReverseWheelTimer);
+      } catch { /* timer teardown is best-effort */ }
+      autoReverseWheelTimer = null;
+    };
+    const land = () => {
+      stop();
+      if (seq !== closeSeq) return;
+      autoReverseLandingTarget = NaN;
+      try { if (recedeLandHome) recedeLandHome(); } catch { /* landing is best-effort */ }
+    };
+    const fallback = () => {
+      if (fallbackUsed) return;
+      fallbackUsed = true;
+      stop();
+      let ok = false;
+      try { ok = autoReverseCloseFlight(target); } catch { ok = false; }
+      if (!ok) return;
+      let ms = AUTO_REVERSE_MAX_MS;
+      try {
+        const ar = window.__mapProbe && window.__mapProbe.autoReverse;
+        if (ar && Number.isFinite(+ar.ms)) ms = +ar.ms;
+      } catch { /* probe cosmetic */ }
+      setTimeout(() => {
+        if (seq !== closeSeq || !receding) return;
+        autoReverseLandingTarget = NaN;
+        try { if (recedeLandHome) recedeLandHome(); } catch { /* landing is best-effort */ }
+      }, ms + 250);
+    };
+    const tick = () => {
+      autoReverseWheelTimer = null;
+      if (seq !== closeSeq || twinOpen || !receding) return;
+      let z = NaN;
+      try { z = +mapRef.getZoom(); } catch { z = NaN; }
+      if (!Number.isFinite(z)) return;
+      if (z <= toZ + 0.02 || z <= MAP_FLOOR + 0.01) { land(); return; }
+      if (ticks >= AUTO_REVERSE_MAX_TICKS) { fallback(); return; }
+      const inFade = z > Z_TOP + 0.001;
+      const tickDelta = inFade ? AUTO_REVERSE_FADE_DELTA : AUTO_REVERSE_TICK_DELTA;
+      const tickMs = inFade ? AUTO_REVERSE_FADE_TICK_MS : AUTO_REVERSE_TICK_MS;
+      try {
+        const r = host.getBoundingClientRect();
+        if (!(r.width > 0) || !(r.height > 0)) { fallback(); return; }
+        const ev = new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          deltaMode: 0,
+          deltaX: 0,
+          // RAW outward gesture: under the owner's up-out convention this is
+          // a negative wheel. The in-band takeover reads it as an outward
+          // tick (dy<0); below the band the map's capture flip turns it into
+          // the native positive zoom-out clone. Sending an already-flipped
+          // clone only feeds the takeover a false inward tick (measured +0.4z
+          // and a twin re-open at the gate).
+          deltaY: -tickDelta,
+          clientX: r.left + r.width / 2,
+          clientY: r.top + r.height / 2,
+          screenX: r.left + r.width / 2,
+          screenY: r.top + r.height / 2,
+          ctrlKey: false,
+          shiftKey: false,
+          altKey: false,
+          metaKey: false,
+        });
+        host.dispatchEvent(ev);
+      } catch { fallback(); return; }
+      ticks += 1;
+      if (z < lastZ - 0.005) stalled = 0;
+      else stalled += 1;
+      lastZ = z;
+      if (stalled >= 10) { fallback(); return; }
+      try {
+        window.__mapProbe.autoReverse = {
+          mode: 'wheel', from: +fromZ.toFixed(3), to: +toZ.toFixed(3),
+          tickMs, delta: tickDelta, ticks,
+        };
+      } catch { /* probe cosmetic */ }
+      autoReverseWheelTimer = setTimeout(tick, tickMs);
+    };
+    try {
+      window.__mapProbe.autoReverse = {
+        mode: 'wheel', from: +fromZ.toFixed(3), to: +toZ.toFixed(3),
+        tickMs: AUTO_REVERSE_TICK_MS, delta: AUTO_REVERSE_TICK_DELTA, ticks: 0,
+      };
+    } catch { /* probe cosmetic */ }
+    autoReverseWheelTimer = setTimeout(tick, AUTO_REVERSE_TICK_MS);
+    return true;
+  } catch (err) {
+    errors.push('AUTO-REVERSE-WHEEL: ' + (err && err.message));
     return false;
   }
 }
@@ -6733,6 +6868,7 @@ function autoReverseCloseFlight(target) {
  * timed legs on that path). Pending hide/recede steps are seq-guarded so a
  * fresh open cancels them (no blanked twin, no yanked map). */
 function doCloseTwin(opts = {}) {
+  try { stopAutoReverseWheelDrive(); } catch { /* auto drive teardown is best-effort */ }
   // Handoff-3: if the overlay is the fullscreen element, drop fullscreen
   // silently first (flag cleared so fullscreenchange can't recede twice).
   try {
@@ -6884,10 +7020,11 @@ function doCloseTwin(opts = {}) {
       }
     } else if (autoReverse) {
       // Explicit close: keep the overlay mounted exactly like the gesture
-      // path, then drive the camera home. `recedeToHome` was armed above the
-      // same way; its zoom-step landing owns the final home/flat state.
+      // path, then feed the SAME outward wheel lane the fingers use. The
+      // retrace dissolve reads the live zoom and the native scrollZoom ticks
+      // own every transition (pitch, sat, mask, landing).
       // The staged auto-pump must stop first: its commit guard re-parks the
-      // map on Z_HANDOFF every tick, which would cancel the auto ease at the
+      // map on Z_HANDOFF every tick, which would cancel the reverse at the
       // gate. Flags only — the frame is deliberately kept for the retrace.
       try { stopStagedAutoPump(); } catch { /* pump teardown is best-effort */ }
       stagedActive = false;
@@ -6896,24 +7033,29 @@ function doCloseTwin(opts = {}) {
       try { holdHandoffPoseForReverse(); } catch { /* retrace hand-off never breaks teardown */ }
       try { retraced = beginRetraceDissolve(); } catch { retraced = false; }
       if (retraced) {
+        try { retraced = startAutoReverseWheelDrive(autoTarget); } catch { retraced = false; }
+      }
+      // Lane unavailable (or a browser without synthetic wheel): keep the
+      // geometry with the one-shot ease rather than cutting home.
+      if (!retraced) {
         try { retraced = autoReverseCloseFlight(autoTarget); } catch { retraced = false; }
       }
       if (retraced) {
-        // The home landing normally fires from the zoom step below Z_MIN. If
-        // the map clamps the flight just short of the recorded pre-dive zoom
-        // (MapLibre can stop on its own effective floor), a moveend/zoom event
-        // may never carry the state home. One bounded timer guarantees the
-        // same landing after the flight, so `receding` can never stay armed.
+        // The wheel drive lands from its own target check. Only the flight
+        // fallback needs a bounded landing if MapLibre stops just short of
+        // the recorded floor and no zoom step carries the state home.
         try {
           const ar = window.__mapProbe && window.__mapProbe.autoReverse;
-          const ms = ar && Number.isFinite(+ar.ms) ? +ar.ms : AUTO_REVERSE_MAX_MS;
-          setTimeout(() => {
-            try {
-              if (!receding || !recedeLandHome) return;
-              autoReverseLandingTarget = NaN;
-              recedeLandHome();
-            } catch { /* landing fallback is best-effort */ }
-          }, ms + 250);
+          if (!ar || ar.mode !== 'wheel') {
+            const ms = ar && Number.isFinite(+ar.ms) ? +ar.ms : AUTO_REVERSE_MAX_MS;
+            setTimeout(() => {
+              try {
+                if (!receding || !recedeLandHome) return;
+                autoReverseLandingTarget = NaN;
+                recedeLandHome();
+              } catch { /* landing fallback is best-effort */ }
+            }, ms + 250);
+          }
         } catch { /* bounded landing is best-effort */ }
       }
       if (!retraced) {
