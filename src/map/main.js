@@ -856,6 +856,12 @@ let scrubFired = false;
 let stagedActive = false;
 let stagedS = 0;
 let stagedCommitted = false;
+// ENCLOSURE ZOOM LOCK: once the mask has converged at the handoff, the map
+// camera is a still plate. Scroll owns the PLANE (S), never depth. Pinning
+// both bounds (not only maxZoom) closes the reverse hole: wheel/pinch-out
+// could still zoom the map under a held mask, which read as "the map inside
+// the mask becomes zoomable". Released by every staged exit/close path.
+let stagedZoomLocked = false;
 // SEAM POP / APPLY ORDER: the frame this hold handed to the twin ({ z, cx, cy }
 // at arm — SITE-centered by construction) and the patience flags that bound
 // the base-parity gate. The twin's own satellite base applies that handed
@@ -2099,6 +2105,18 @@ function onNativeZoomStep(snap, source) {
       z = MAP_FLOOR;
     }
     const progress = zoomToProgress(z);
+    // ZOOM-OUT WARM: arm the next lower viewport patch before the camera
+    // reaches it. Runs on every step (both directions; the function gates to
+    // actual outbound movement) so a recede, a wheel-out or an ease all warm
+    // the world the eye is about to see.
+    try { noteZoomDirection(z); } catch { /* outbound warm is best-effort */ }
+    // ENCLOSURE ZOOM LOCK: the instant the live frame reaches the converged
+    // handoff, seal both zoom bounds. From here the scroll is the PLANE's
+    // scale (S), never the map's depth — wheel, pinch, keys and buttons all
+    // clamp to a still plate until the hold is exited/closed.
+    if (stagedActive && !stagedCommitted) {
+      try { lockStagedZoomAtGate(); } catch { /* lock is best-effort */ }
+    }
     scrubProgress = progress;
     holdVectorWarm(source === 'native-zoomend' ? 'zoomend' : 'native-zoom');
     // (2) FADE WHERE YOU ARE — zoom-keyed opacity at whatever center the
@@ -2894,11 +2912,34 @@ function lngLatToTile(lon, lat, z) {
   const y = Math.floor(((1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2) * n);
   return { x, y };
 }
+/** Viewport patch offsets for a zoom-out warm, centre tile first.
+ * The dive ladder warms a 3x3 around the site (the twin's target), but a
+ * zoom-out frame is the whole viewport: at 1122×700 that is ~5×4 256px tiles,
+ * so a 3x3 leaves the edge tiles cold and they visibly stream in as the world
+ * widens. Derive the radius from the live frame and sort centre-out; the
+ * caller's URL budget trims the excess. Pure math (no DOM read inside). */
+function viewportTileOffsets(wPx, hPx, tilePx = 256) {
+  const w = Number.isFinite(+wPx) && +wPx > 0 ? +wPx : 1122;
+  const h = Number.isFinite(+hPx) && +hPx > 0 ? +hPx : 700;
+  const rx = Math.max(1, Math.ceil(w / (2 * tilePx)) + 1);
+  const ry = Math.max(1, Math.ceil(h / (2 * tilePx)) + 1);
+  const out = [];
+  for (let dx = -rx; dx <= rx; dx += 1) {
+    for (let dy = -ry; dy <= ry; dy += 1) {
+      // Normalise the ellipse so the near-square viewport is not over-warmed
+      // vertically; the centre tile always wins the first slot.
+      out.push([dx, dy, Math.hypot(dx / rx, dy / ry), Math.abs(dx) + Math.abs(dy)]);
+    }
+  }
+  out.sort((a, b) => a[2] - b[2] || a[3] - b[3] || (a[0] - b[0]) || (a[1] - b[1]));
+  return out.map(([dx, dy]) => [dx, dy]);
+}
+
 /** Pre-fetch the 3x3 sat tile patch around center at zoom (best-effort).
  * `reason` names the trigger for the probe + the coverage table. Unwrapped
  * calls are their own trigger (fresh budget); a ladder (warmSatLadder) owns
  * ONE budget across its three levels. */
-function prefetchSatTiles(center, zoom, reason) {
+function prefetchSatTiles(center, zoom, reason, opts = {}) {
   try {
     const z = Math.max(0, Math.min(19, Math.floor(+zoom)));
     if (!Number.isFinite(z)) return;
@@ -2910,7 +2951,9 @@ function prefetchSatTiles(center, zoom, reason) {
     // CACHE-FAST hotspot-first: the center tile (the dive target) heads the
     // patch so it wins the connection race; the ring follows. Order only —
     // same 9 URLs, same cap, same dedupe.
-    const order = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    const order = opts.viewport
+      ? viewportTileOffsets(opts.wPx, opts.hPx)
+      : [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
     for (const [dx, dy] of order) {
       const x = t.x + dx;
       const y = t.y + dy;
@@ -2950,8 +2993,8 @@ function prefetchSatTiles(center, zoom, reason) {
         try {
           const img = new Image();
           img.decoding = 'async';
-          // CACHE-FAST: the hotspot tile loads first (high), the ring deprioritized (low) so speculative warms never contend the live frame.
-          try { img.fetchPriority = hot ? 'high' : 'low'; } catch { /* priority hint is best-effort */ }
+          // CACHE-FAST: the hotspot tile loads first (high), the ring deprioritized (low) so speculative warms never contend the live frame. Zoom-out warms are ALL low: they are for the next frame, never the one on screen.
+          try { img.fetchPriority = opts.lowPriority ? 'low' : (hot ? 'high' : 'low'); } catch { /* priority hint is best-effort */ }
           img.src = url; // warm the HTTP cache; never inserted in the DOM
         } catch { /* preload is best-effort */ }
         precachePrefetched += 1;
@@ -3274,7 +3317,7 @@ function vectorTileTemplates() {
   }
 }
 /** Warm the site vector patch at the live integer zoom (best-effort). */
-function warmVectorTiles(reason) {
+function warmVectorTiles(reason, opts = {}) {
   const before = vectorPrefetched;
   try {
     const templates = vectorTileTemplates();
@@ -3293,14 +3336,19 @@ function warmVectorTiles(reason) {
     let liveZ = 0;
     try { liveZ = Math.floor(+mapRef.getZoom()); } catch { liveZ = 0; }
     if (!Number.isFinite(liveZ)) liveZ = 0;
+    // Outbound warms name the TARGET level (the viewport the camera is about
+    // to show); the default path follows the live camera as before.
+    const warmZ = Number.isFinite(+opts.level) ? Math.floor(+opts.level) : liveZ;
+    const levelGate = opts.levelGate !== false;
+    const maxUrls = Number.isFinite(+opts.maxUrls) ? Math.max(1, Math.min(64, +opts.maxUrls)) : VECTOR_TRIGGER_MAX_URLS;
     // Visibility gate: the vector basemap is only on screen below the sat fade
     // ceiling (Z_FADE1) — warming vector tiles under full satellite would be
     // bytes no frame can show. Recede re-warms as it descends through the band.
-    if (liveZ > Math.ceil(Z_FADE1)) {
+    if (warmZ > Math.ceil(Z_FADE1)) {
       try {
         if (probe) {
           probe.vector = {
-            level: liveZ,
+            level: warmZ,
             skipped: 'above-vector-band',
             fetched: vectorPrefetched,
             hits: vectorHits,
@@ -3312,20 +3360,23 @@ function warmVectorTiles(reason) {
     }
     // Level gate: one patch per integer level (a re-warm of the same level is
     // dedupe hits only, so the gate is about not walking the set per tick).
-    if (liveZ === lastVectorWarmZ && vectorTileSeen.size > 0) {
-      try { if (probe) probe.vector = { ...(probe.vector || {}), level: liveZ, hits: vectorHits, fetched: vectorPrefetched, warm: vectorTileSeen.size }; } catch { /* probe cosmetic */ }
+    if (levelGate && warmZ === lastVectorWarmZ && vectorTileSeen.size > 0) {
+      try { if (probe) probe.vector = { ...(probe.vector || {}), level: warmZ, hits: vectorHits, fetched: vectorPrefetched, warm: vectorTileSeen.size }; } catch { /* probe cosmetic */ }
       return 0;
     }
-    lastVectorWarmZ = liveZ;
-    const t = lngLatToTile(SITE_LNGLAT[0], SITE_LNGLAT[1], Math.max(0, Math.min(15, liveZ)));
-    const n = Math.pow(2, Math.max(0, Math.min(15, liveZ)));
-    const order = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    lastVectorWarmZ = warmZ;
+    const c = Array.isArray(opts.center) && opts.center.length === 2 ? opts.center : SITE_LNGLAT;
+    const t = lngLatToTile(c[0], c[1], Math.max(0, Math.min(15, warmZ)));
+    const n = Math.pow(2, Math.max(0, Math.min(15, warmZ)));
+    const order = opts.viewport
+      ? viewportTileOffsets(opts.wPx, opts.hPx)
+      : [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
     let attempts = 0;
     for (const { template, maxzoom } of templates) {
-      if (attempts >= VECTOR_TRIGGER_MAX_URLS) break;
-      const z = Math.max(0, Math.min(maxzoom, liveZ));
+      if (attempts >= maxUrls) break;
+      const z = Math.max(0, Math.min(maxzoom, warmZ));
       for (const [dx, dy] of order) {
-        if (attempts >= VECTOR_TRIGGER_MAX_URLS) break;
+        if (attempts >= maxUrls) break;
         const x = t.x + dx;
         const y = t.y + dy;
         if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= n || y >= n) continue;
@@ -3351,7 +3402,7 @@ function warmVectorTiles(reason) {
             const p = fetch(url, {
               mode: 'cors',
               credentials: 'omit',
-              priority: dx === 0 && dy === 0 ? 'high' : 'low',
+              priority: opts.lowPriority ? 'low' : (dx === 0 && dy === 0 ? 'high' : 'low'),
             });
             p.then((res) => (res && res.ok ? res.arrayBuffer() : null)).catch(() => {});
           } catch { /* preload is best-effort */ }
@@ -3362,7 +3413,7 @@ function warmVectorTiles(reason) {
     try {
       if (probe) {
         probe.vector = {
-          level: liveZ,
+          level: warmZ,
           attempts,
           fetched: vectorPrefetched,
           hits: vectorHits,
@@ -3377,6 +3428,96 @@ function warmVectorTiles(reason) {
   } catch {
     return vectorPrefetched - before;
   }
+}
+
+/** Zoom-out warm: the opposite direction of the dive ladder. A lower level
+ * is warmed while the camera is still a level above it, using the VIEWPORT
+ * patch (not the site 3x3) so the widened world arrives from cache instead of
+ * streaming tile-by-tile. One level per integer crossing is enough lead: the
+ * next crossing arms the one after it. Low priority — the live frame always
+ * outranks the speculative frame. Also warms the vector basemap once the
+ * target is inside the visible vector band. Never throws. */
+let lastOutboundLevel = null;
+let lastOutboundAt = 0;
+function warmOutboundLevel(levelNow, reason) {
+  try {
+    const level = Math.floor(+levelNow);
+    if (!Number.isFinite(level)) return 0;
+    const now = precacheNowMs();
+    if (lastOutboundLevel === level && now - lastOutboundAt < 350) return 0;
+    lastOutboundLevel = level;
+    lastOutboundAt = now;
+    const target = level - 1;
+    if (target < MAP_FLOOR || target > PRECACHE_LEVEL_MAX) return 0;
+    let center = COUNTRY_CENTER;
+    try {
+      const c = mapRef && mapRef.getCenter ? mapRef.getCenter() : null;
+      if (c && Number.isFinite(+c.lng) && Number.isFinite(+c.lat)) center = [+c.lng, +c.lat];
+    } catch { /* center is best-effort */ }
+    const fs = frameSize();
+    const before = precachePrefetched;
+    // Only warm pixels that frame can actually show: satellite is fully faded
+    // below Z_FADE0, so low-level sat warms are pure waste (the vector basemap
+    // is the visible surface there); vector is invisible under full satellite
+    // above the fade. This keeps the outbound budget on the surface that will
+    // paint, instead of doubling traffic for layers behind another.
+    const satVisible = satOpacityForZoom(target) > 0.02;
+    const vectorVisible = target < Z_FADE1;
+    if (satVisible) {
+      prefetchSatTiles(center, target, reason || 'outbound', {
+        viewport: true,
+        wPx: fs.w,
+        hPx: fs.h,
+        lowPriority: true,
+      });
+    }
+    let vector = 0;
+    try {
+      if (vectorVisible) {
+        vector = warmVectorTiles(reason || 'outbound', {
+          center,
+          level: target,
+          viewport: true,
+          wPx: fs.w,
+          hPx: fs.h,
+          levelGate: false,
+          maxUrls: 27,
+          lowPriority: true,
+        });
+      }
+    } catch { vector = 0; }
+    try {
+      const p = precacheProbe();
+      if (p) {
+        p.outbound = {
+          level: target,
+          from: level,
+          sat: precachePrefetched - before,
+          vector,
+          at: +now.toFixed(1),
+        };
+      }
+    } catch { /* probe cosmetic */ }
+    return precachePrefetched - before;
+  } catch {
+    return 0;
+  }
+}
+
+/** Detect a zoom-out crossing from the per-step driver and arm the next lower
+ * level. Camera direction only — never inferred from wheel sign (a pinch, a
+ * click flight and a programmatic ease all converge here). */
+let lastDirectionalZoom = null;
+function noteZoomDirection(z) {
+  try {
+    const zz = +z;
+    if (!Number.isFinite(zz)) return;
+    const prev = lastDirectionalZoom;
+    lastDirectionalZoom = zz;
+    if (prev == null || !(zz < prev - 1e-4)) return;
+    if (zz < MAP_FLOOR + 0.001) return;
+    warmOutboundLevel(zz, 'outbound');
+  } catch { /* direction note never breaks the driver */ }
 }
 
 /** Track journey velocity, predict the next frame, keep it warm. Called on
@@ -3683,6 +3824,9 @@ function armStagedHoldAtGate(id, frame, opts = {}) {
     if (stagedActive && !stagedCommitted) return true; // already holding
     try { mapRef.setMaxZoom(Z_HANDOFF); } catch { /* clamp is best-effort */ }
     stagedActive = true;
+    // The click (and any explicit arrival) lands ON the gate; seal both
+    // bounds now so the first wheel tick after the hold cannot move the map.
+    try { lockStagedZoomAtGate(); } catch { /* lock is best-effort */ }
     stagedS = 0;
     stagedCommitted = false;
     stagedHanded = null;
@@ -3980,6 +4124,10 @@ function flyToSectorThenTwin(id, opts = {}) {
         if (mapRef && typeof mapRef.setMaxZoom === 'function') mapRef.setMaxZoom(Z_HANDOFF);
       } catch { /* clamp is best-effort */ }
       stagedActive = true;
+      // If this arrival is already AT the gate, seal it now; a climb that
+      // stages at Z_TOP keeps its last level of native zoom and the per-step
+      // driver seals the instant z reaches Z_HANDOFF.
+      try { lockStagedZoomAtGate(); } catch { /* lock is best-effort */ }
       try {
         freezeStagedFrame(); // MAP FRAME FREEZE: snapshot anchor + kill pan drift
       } catch { /* freeze is best-effort */ }
@@ -4107,12 +4255,58 @@ function flyToSectorThenTwin(id, opts = {}) {
   return true;
 }
 
+/** Enclosure zoom lock: at the converged handoff the map is a STILL plate.
+ * The scroll owns the plane (S) and the twin; depth must not move at all —
+ * not in (maxZoom already clamped) and not OUT (the hole the owner saw as
+ * "the map inside the mask becomes zoomable"). Pin both bounds at the gate;
+ * `applyStallCeiling` may re-pin the ceiling while holding, but the min bound
+ * keeps the floor sealed until a staged exit/close releases it. */
+function lockStagedZoomAtGate() {
+  try {
+    if (!mapRef || stagedZoomLocked) return false;
+    let z = NaN;
+    try { z = +mapRef.getZoom(); } catch { z = NaN; }
+    if (!(z >= Z_HANDOFF - 0.02)) return false;
+    if (typeof mapRef.setMaxZoom === 'function') mapRef.setMaxZoom(Z_HANDOFF);
+    if (typeof mapRef.setMinZoom === 'function') mapRef.setMinZoom(Z_HANDOFF);
+    stagedZoomLocked = true;
+    lastCeilingPin = Z_HANDOFF;
+    try {
+      window.__mapProbe.stagedZoomLock = { locked: true, min: Z_HANDOFF, max: Z_HANDOFF, z: +z.toFixed(3) };
+    } catch { /* probe cosmetic */ }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Release the enclosure zoom lock on every staged exit/close/unwind. Sets
+ * the floor FIRST so the max write can never transiently invert the bounds. */
+function releaseStagedZoomLock() {
+  if (!stagedZoomLocked) return false;
+  stagedZoomLocked = false;
+  try {
+    if (mapRef && typeof mapRef.setMinZoom === 'function') mapRef.setMinZoom(MAP_FLOOR);
+    if (mapRef && typeof mapRef.setMaxZoom === 'function') mapRef.setMaxZoom(Z_MAX);
+    lastCeilingPin = Z_MAX;
+    try {
+      window.__mapProbe.stagedZoomLock = { locked: false, min: MAP_FLOOR, max: Z_MAX };
+    } catch { /* probe cosmetic */ }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Task-35 staged-scrub helpers: restore the native zoom ceiling (unclamp).
- * Idempotent — safe from every staged exit path. */
+ * Idempotent — safe from every staged exit path. The enclosure lock keeps its
+ * own max bound while active, so a stall-ceiling release can never unseal the
+ * upper bound under a held mask. */
 function restoreMaxZoom() {
   try {
-    if (mapRef && typeof mapRef.setMaxZoom === 'function') mapRef.setMaxZoom(Z_MAX);
-    lastCeilingPin = Z_MAX; // the pin cache follows every ceiling write
+    const cap = stagedZoomLocked ? Z_HANDOFF : Z_MAX;
+    if (mapRef && typeof mapRef.setMaxZoom === 'function') mapRef.setMaxZoom(cap);
+    lastCeilingPin = cap; // the pin cache follows every ceiling write
   } catch { /* unclamp is best-effort */ }
 }
 
@@ -5063,6 +5257,9 @@ function twinFrameHasContent() {
  * (flags, probe, focus) and unclamp native zoom. Idempotent. */
 function finalizeStagedReveal(root) {
   if (stagedCommitted) return;
+  // The commit lands on the gate: keep the map plate sealed under the twin.
+  // doCloseTwin is the release point (a committed twin still owns the frame).
+  try { lockStagedZoomAtGate(); } catch { /* lock is best-effort */ }
   stopStagedAutoPump();
   clickStagedPending = false;
   stagedCommitted = true;
@@ -5114,6 +5311,12 @@ function finalizeStagedReveal(root) {
  * only other exit (forward, via driveStagedOverlay). */
 function exitStaged() {
   const had = stagedActive || stagedS !== 0;
+  // Release the enclosure seal BEFORE restoring the ceiling: the reverse exit
+  // must hand the fingers a map that can zoom out again.
+  try { releaseStagedZoomLock(); } catch { /* unlock is best-effort */ }
+  // Head start for the way out: warm the level below while the release still
+  // has the gate on screen. The per-step detector will continue the ladder.
+  try { warmOutboundLevel(Z_HANDOFF, 'exit'); } catch { /* warm is best-effort */ }
   stopStagedAutoPump();
   stagedActive = false;
   stagedS = 0;
@@ -5354,6 +5557,7 @@ function restoreDiveCam(reason = 'unwind') {
   stallCeilingOn = false;
   lastCeilingPin = null;
   stallT0 = 0;
+  try { releaseStagedZoomLock(); } catch { /* unlock is best-effort */ }
   try { restoreMaxZoom(); } catch { /* unclamp is best-effort */ }
   const landed = liveCamFrame();
   const zLand = landed && Number.isFinite(landed.zoom) ? landed.zoom : cam.zoom;
@@ -6471,6 +6675,16 @@ function doCloseTwin(opts = {}) {
   // for holds a fork guard already resolved (those leak frozen handlers).
   // A committed twin is NOT torn down here: the close chain below must keep
   // the mounted frame for the gesture-retrace dissolve.
+  // The enclosure zoom seal dies with the close chain too: the retrace and
+  // the fingers' way home must be free to zoom out from the first tick.
+  try { releaseStagedZoomLock(); } catch { /* unlock is best-effort */ }
+  // The retrace is the world widening: warm the next lower level from the
+  // live close pose so the first outbound frames are not tile-starved.
+  try {
+    let zClose = Z_HANDOFF;
+    try { zClose = +mapRef.getZoom(); } catch { zClose = Z_HANDOFF; }
+    if (Number.isFinite(zClose)) warmOutboundLevel(zClose, 'close');
+  } catch { /* warm is best-effort */ }
   try { if (stagedActive && !stagedCommitted) exitStaged(); } catch { /* unwind is best-effort */ }
   try { unfreezeStagedFrame(); } catch { /* unlock is best-effort */ }
   try {
@@ -7908,6 +8122,13 @@ async function boot() {
     scrollZoom: true,
     minZoom: MAP_FLOOR,
     maxZoom: Z_MAX,
+    // OUTBOUND RETENTION: the default out-of-view tile cache spans a few zoom
+    // levels; a reversed journey crosses up to ten, so levels warmed on the
+    // way in were evicted before the way out and re-streamed as the world
+    // widened. Keep a deeper per-source cache (bounded; viewport-derived) and
+    // a hard ceiling so a pathological viewport cannot grow unbounded.
+    maxTileCacheSize: 384,
+    maxTileCacheZoomLevels: 8,
     // Single world: no side-by-side repeats, so the widest honest span is
     // one Earth. Drag pans freely (the journey only recenters on settle
     // when the spot is near, never mid-drag).

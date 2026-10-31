@@ -89,7 +89,7 @@ test('the vector warm reads the live style templates and reports a blocker', () 
   assert.ok(b.includes('{z}') && b.includes('{x}') && b.includes('{y}'), 'only real tile templates are used');
   assert.ok(b.includes('probe.vector.blocker'), 'a style with no template records the exact blocker');
   assert.ok(b.includes("mode: 'cors'"), 'the warm matches the vector source reader');
-  assert.ok(b.includes('if (liveZ > Math.ceil(Z_FADE1))'), 'no vector bytes under full satellite');
+  assert.ok(b.includes('if (warmZ > Math.ceil(Z_FADE1))'), 'no vector bytes under full satellite (target level aware)');
   const hold = block('/** Hold the vector style/tiles warm', '/** Scrubbed sat opacity');
   assert.ok(hold.includes('warmVectorTiles(reason)'), 'the vector hold triggers the tile warm');
 });

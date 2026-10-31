@@ -76,7 +76,7 @@ test('every tile patch orders hotspot-first with priority hints', () => {
   const orderAt = body.indexOf('[[0, 0]');
   assert.ok(orderAt !== -1, 'the patch order starts at the center tile');
   assert.ok(body.indexOf('[1, 1]') > orderAt, 'the ring follows the center');
-  assert.ok(body.includes("img.fetchPriority = hot ? 'high' : 'low'"), 'hotspot high, ring deprioritized');
+  assert.ok(body.includes("opts.lowPriority ? 'low' : (hot ? 'high' : 'low')"), 'hotspot high, ring deprioritized (outbound all low)');
 });
 
 test('boot->grant wall-clock is instrumented on the probe', () => {
