@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-31T07:27:57.320Z",
+  "generated": "2026-10-31T07:28:19.892Z",
   "plans": [
     "2026-10-05_150017-safepipe-domain-logic.md",
     "2026-10-05_150017-safepipe-ds-extraction.md",
@@ -20,6 +20,15 @@
     "2026-10-19_150735-changelog-readability.md"
   ],
   "commits": [
+    {
+      "sha": "054ccfe",
+      "full": "054ccfe361d353d9b9bb7c219cda1b34f56adb52",
+      "date": "2026-10-31",
+      "time": "12:58",
+      "subject": "perf(map): outbound viewport prewarm, deeper tile cache, enclosure zoom seal [plan:2026-10-11_202541-ops3d-v3-realworld-iteration.md#phase-03]",
+      "plan": "2026-10-11_202541-ops3d-v3-realworld-iteration.md",
+      "anchor": "phase-03"
+    },
     {
       "sha": "0da46eb",
       "full": "0da46ebef19786604734e9b8385132677fa056c6",
@@ -6880,8 +6889,6 @@
     }
   ],
   "wip": [
-    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md",
-    "public/version.json",
-    "src/map/main.js"
+    ".hermes/plans/2026-10-11_202541-ops3d-v3-realworld-iteration.md"
   ]
 }
