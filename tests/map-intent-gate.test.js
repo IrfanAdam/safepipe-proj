@@ -75,10 +75,10 @@ test('the deep latch is gated on live intent: no intent, no clamp, no flight', (
   const main = mainSrc();
   assert.ok(main.includes('const deepIntent = !!(prox && prox.armed);'),
     'the latch reads the live arm predicate');
-  assert.ok(main.includes('if (!twinOpen && !busyNow && z >= Z_TOP && deepIntent)'),
-    'the latch requires intent alongside the iso checkpoint');
-  assert.ok(!main.includes('if (!twinOpen && !busyNow && z >= Z_TOP) {'),
-    'the old zoom-only latch is gone');
+  assert.ok(main.includes('if (!twinOpen && !busyNow && z >= Z_HANDOFF - 0.01 && deepIntent)'),
+    'the latch requires intent alongside the handoff gate');
+  assert.ok(!main.includes('if (!twinOpen && !busyNow && z >= Z_HANDOFF - 0.01) {'),
+    'the zoom-only latch is gone');
   // The clamp + the flight live INSIDE the gated branch: neither can run for
   // an intent-less dive.
   const latch = main.slice(

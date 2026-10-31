@@ -178,15 +178,15 @@ test('accumulator-owned reveal: S seeds from live zoom at entry, wheel owns it a
     'the staged entry seeds S from the LIVE zoom (fast wheel bursts already at the handoff)',
   );
   assert.ok(
-    main.includes('if (!twinOpen && !busyNow && z >= Z_TOP && deepIntent)'),
-    'the handoff/twin prewarm begins at the iso checkpoint — and only with lock-in intent',
+    main.includes('if (!twinOpen && !busyNow && z >= Z_HANDOFF - 0.01 && deepIntent)'),
+    'the handoff/twin latch waits for the gate — and only with lock-in intent',
   );
   assert.ok(
     main.includes('const deepIntent = !!(prox && prox.armed);'),
     'the latch reads the live arm predicate, never zoom alone',
   );
   assert.ok(
-    main.includes('mapRef.getZoom() < Z_TOP'),
+    main.includes('mapRef.getZoom() < Z_HANDOFF - 0.01'),
     'the deferred trigger aborts if the zoom dropped below the checkpoint',
   );
 });

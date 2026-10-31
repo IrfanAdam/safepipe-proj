@@ -55,8 +55,8 @@ test('click arrival flies: one easeTo with a real duration, no wide-fit cut', ()
   assert.match(flight, /duration: CLICK_FLIGHT_MS/, 'the ease has a named duration');
   assert.match(flight, /essential: true/, 'the flight runs regardless of the OS motion query');
   const ms = +(/const CLICK_FLIGHT_MS = (\d+);/.exec(m) || [])[1];
-  assert.ok(Number.isFinite(ms) && ms >= 200 && ms <= 800,
-    `the flight is long enough to read and short enough to beat the prewarm (got ${ms})`);
+  assert.ok(Number.isFinite(ms) && ms >= 1000 && ms <= 2000,
+    `the flight is long enough to read the world->site sweep (got ${ms})`);
   // The old one-frame cut and its wide-fit helpers are gone from the file.
   assert.ok(!m.includes('wideZoomForBounds'), 'the wide ring-fit jump target is deleted');
   assert.ok(!m.includes('wideFitPadding'), 'the wide-fit padding helper is deleted');

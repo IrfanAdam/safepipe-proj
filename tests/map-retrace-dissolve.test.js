@@ -77,7 +77,7 @@ test('grant-time re-hand adopts the live zoom; no camera write survives in it', 
 test('gesture close keeps the overlay mounted and dissolves it by zoom', () => {
   const m = main();
   const close = m.slice(m.indexOf('function doCloseTwin('), m.indexOf('function flattenJourneyTiltToLaw('));
-  assert.ok(close.includes('if (!gestureReverse) {'), 'the instant hide is skipped on a gesture reverse');
+  assert.ok(close.includes('if (!gestureReverse && !autoReverse) {'), 'the instant hide is skipped on a gesture/auto reverse');
   assert.ok(close.includes('beginRetraceDissolve()'), 'the gesture path begins the zoom-keyed dissolve');
   assert.ok(close.includes('if (!retraced)'), 'a begin with nothing to dissolve falls back to the instant hide');
   assert.ok(m.includes('function beginRetraceDissolve('), 'begin owns the mount check');

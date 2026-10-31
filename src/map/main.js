@@ -190,7 +190,15 @@ const REVEAL_TIMEOUT_MS = 4000;
 // The tempo sits under the prewarm it overlaps, so the twin boot is never
 // extended by the flight: the reveal only waits for the move to LAND, not for
 // a timer (see clickFlightActive / deferRevealToFlightLand).
-const CLICK_FLIGHT_MS = 560;
+// Owner rev 2026-10-30: 560 ms read as a cut — the world map never showed
+// its arrival at the twin plate. The flight is the EXPLANATION of the handoff,
+// not a shortcut: 1.4 s keeps the full world->site sweep legible while still
+// landing well before the twin's paint grant. Reduced motion keeps the honest
+// single cut below.
+const CLICK_FLIGHT_MS = 1400;
+/** The auto-S pump uses the OLD 560 ms beat: the camera flight got slower to
+ * be readable, but the post-grant dissolve must not become a second wait. */
+const CLICK_DISSOLVE_MS = 560;
 // CLICK STAGING: a click is the same intent as a scroll arrival, so it must
 // enter the SAME enclosure + S-dissolve hold at the landing, not open an
 // unstaged overlay. `clickStagedPending` kills any timed reveal during the
@@ -2114,7 +2122,7 @@ function onNativeZoomStep(snap, source) {
     // handoff, seal both zoom bounds. From here the scroll is the PLANE's
     // scale (S), never the map's depth — wheel, pinch, keys and buttons all
     // clamp to a still plate until the hold is exited/closed.
-    if (stagedActive && !stagedCommitted) {
+    if ((stagedActive || clickStagedPending) && !stagedCommitted) {
       try { lockStagedZoomAtGate(); } catch { /* lock is best-effort */ }
     }
     scrubProgress = progress;
@@ -2586,9 +2594,13 @@ function onNativeZoomStep(snap, source) {
     // ceiling at Z_HANDOFF and jumped the camera to Sangachal. The latch now
     // reads the same arm predicate as every other journey stage (prox.armed:
     // cursor-near or centre-near). With intent absent nothing clamps and
-    // nothing flies: the dive stays a plain terrain + iso zoom.
+    // nothing flies: the dive stays a plain terrain + iso zoom. Stage at the
+    // GATE, not the iso checkpoint: once the enclosing hold exists the map is
+    // a still plate (only S scales), so there is no final level of map zoom
+    // inside the mask. The prewarm already runs at mask intent, so the extra
+    // level is boot time, not a cold start.
     const deepIntent = !!(prox && prox.armed);
-    if (!twinOpen && !busyNow && z >= Z_TOP && deepIntent) {
+    if (!twinOpen && !busyNow && z >= Z_HANDOFF - 0.01 && deepIntent) {
       if (!scrubFired) {
         scrubFired = true; // latched now; staging runs next frame (afterFrame)
         // Clamp the ceiling SYNCHRONOUSLY on the latch tick — never deferred
@@ -2614,7 +2626,7 @@ function onNativeZoomStep(snap, source) {
         afterFrame(() => {
           try {
             if (twinOpen || transitId || receding) { scrubFired = false; restoreMaxZoom(); return; } // twin/staging owns it
-            if (!Number.isFinite(mapRef.getZoom()) || mapRef.getZoom() < Z_TOP) { scrubFired = false; restoreMaxZoom(); return; }
+            if (!Number.isFinite(mapRef.getZoom()) || mapRef.getZoom() < Z_HANDOFF - 0.01) { scrubFired = false; restoreMaxZoom(); return; }
             // INTENT GATE (one frame later): the cursor or the camera can
             // leave the hotspot between the latch and this callback, and a
             // clamped ceiling plus a flight to SITE on a stale latch is the
@@ -3793,7 +3805,7 @@ function startStagedAutoPump() {
         return;
       }
       if (stagedS < HANDOFF_STAGED_S_MAX - STAGED_AUTO_STOP_EPS_PX) {
-        stagedS = autoStagedSForDt(stagedS, dt, { durationMs: CLICK_FLIGHT_MS });
+        stagedS = autoStagedSForDt(stagedS, dt, { durationMs: CLICK_DISSOLVE_MS });
         try { driveStagedOverlay(); } catch { /* staged drive is best-effort */ }
         try { refreshStallLoading(); } catch { /* presentation is best-effort */ }
       }
@@ -4000,11 +4012,12 @@ function flyToSectorThenTwin(id, opts = {}) {
   } catch {
     liveZ = null;
   }
-  // Staging starts at the ISO checkpoint (Z_TOP), not the final handoff: the
-  // terrain->iso motion is already complete there, so the twin prewarm and the
-  // iso->twin dissolve get a full zoom level to run instead of starting after
-  // the map has already clamped. Entries below Z_TOP fly in (click flight).
-  const deep = Number.isFinite(liveZ) && liveZ >= Z_TOP;
+  // STAGING STARTS AT THE GATE. The old checkpoint arm (Z_TOP) left one
+  // whole level of native camera zoom to run AFTER the enclosure existed —
+  // the owner's intermittent "map inside the mask zooms" sighting. Gate-only
+  // staging makes the held mask a still plate from its first frame. The
+  // prewarm still starts at mask intent, so this costs no boot lead.
+  const deep = Number.isFinite(liveZ) && liveZ >= Z_HANDOFF - 0.01;
   transitId = id;
   window.__mapProbe.transit = id;
   // Task-37: a fresh handoff disarms an armed gesture recede (the camera is
@@ -6648,15 +6661,77 @@ function openTwin(id, opts = {}) {
   return true;
 }
 
-/** Actual teardown: instant cut to the map (never a timed fade), keeps hex
- * + selection (Task 19). Handoff-5-close single chain: EVERY close path
- * (X/Esc/back/twin-Esc) runs the same reverse — overlay hidden
- * synchronously, then the map sits at its law pose awaiting the fingers
- * (scroll owns every following motion; no auto recede, no timed legs).
- * Pending hide/recede steps are seq-guarded so a fresh open cancels them
- * (no blanked twin, no yanked map). No timers anywhere on this path: the
- * 450ms fade + recede-delay choreography is removed — the map underneath
- * is already at the law pose, so there is nothing to blend toward. */
+/** AUTO-REVERSE (explicit close): the X/Esc/back path is the user's own
+ * reverse intent, so it must retrace the SAME world->twin geometry the wheel
+ * path does. The scroll path is finger-owned; an explicit close has no
+ * fingers, so this arms a camera ease from the handoff back to the frame the
+ * dive left while the retrace dissolve reads the live zoom. At Z_TOP the
+ * overlay is already dissolved and the map continues over the held vector
+ * basemap to the flat world. Reduced motion keeps the instant restore. */
+const AUTO_REVERSE_MS_PER_ZOOM = 160;
+const AUTO_REVERSE_MIN_MS = 900;
+const AUTO_REVERSE_MAX_MS = 1900;
+/** The auto flight's true destination. `recedeToHome` normally lands at the
+ * country home (Z_MIN) as soon as the live zoom crosses it; the explicit
+ * close may be returning to a fuller pre-dive world (the floor), so its
+ * landing must wait for the flight target instead of jumping the pitch at
+ * Z_MIN and cancelling the ease. NaN = no auto landing in flight. */
+let autoReverseLandingTarget = NaN;
+function autoReverseTargetFrame() {
+  try {
+    if (diveCam && diveCam.center && Number.isFinite(+diveCam.zoom)) {
+      return {
+        center: { lng: +diveCam.center.lng, lat: +diveCam.center.lat },
+        zoom: +diveCam.zoom,
+        pitch: Number.isFinite(+diveCam.pitch) ? +diveCam.pitch : 0,
+        bearing: Number.isFinite(+diveCam.bearing) ? +diveCam.bearing : 0,
+      };
+    }
+  } catch { /* fall through to the country home */ }
+  return {
+    center: { lng: COUNTRY_CENTER[0], lat: COUNTRY_CENTER[1] },
+    zoom: MAP_FLOOR,
+    pitch: 0,
+    bearing: 0,
+  };
+}
+function autoReverseCloseFlight(target) {
+  try {
+    if (!mapRef || !target) return false;
+    const live = liveCamFrame();
+    const fromZ = live && Number.isFinite(+live.zoom) ? +live.zoom : Z_HANDOFF;
+    const toZ = Number.isFinite(+target.zoom) ? +target.zoom : MAP_FLOOR;
+    if (Math.abs(fromZ - toZ) < 0.01) return false;
+    const ms = Math.max(AUTO_REVERSE_MIN_MS, Math.min(AUTO_REVERSE_MAX_MS,
+      Math.round(Math.abs(fromZ - toZ) * AUTO_REVERSE_MS_PER_ZOOM)));
+    mapRef.easeTo({
+      center: [target.center.lng, target.center.lat],
+      zoom: target.zoom,
+      pitch: target.pitch,
+      bearing: target.bearing,
+      duration: ms,
+      essential: true,
+      easing: smooth01,
+    });
+    try {
+      window.__mapProbe.autoReverse = { from: +fromZ.toFixed(3), to: +toZ.toFixed(3), ms };
+    } catch { /* probe cosmetic */ }
+    return true;
+  } catch (err) {
+    errors.push('AUTO-REVERSE: ' + (err && err.message));
+    return false;
+  }
+}
+
+/** Actual teardown: keeps hex + selection (Task 19). Every close entry
+ * reaches this single chain; the overlay path differs by intent:
+ * the gesture reverse keeps the mounted frame for the zoom-keyed retrace,
+ * an explicit close now runs the same retrace as an auto flight, and only
+ * the reduced-motion / no-frame cases fall through to the instant hide.
+ * The map sits at its law pose awaiting the fingers where the gesture
+ * path owns it (scroll owns every following motion; no auto recede, no
+ * timed legs on that path). Pending hide/recede steps are seq-guarded so a
+ * fresh open cancels them (no blanked twin, no yanked map). */
 function doCloseTwin(opts = {}) {
   // Handoff-3: if the overlay is the fullscreen element, drop fullscreen
   // silently first (flag cleared so fullscreenchange can't recede twice).
@@ -6670,11 +6745,29 @@ function doCloseTwin(opts = {}) {
       }
     }
   } catch { /* fullscreen teardown is best-effort */ }
+  // CLOSE INTENT FIRST: an explicit close is the same reverse the wheel
+  // retraces, but it has no fingers to finish the journey. Resolve that here
+  // so the staged teardown below knows to keep the mounted frame for the
+  // retrace. Reduced motion leaves autoReverse false and uses the instant cut.
+  const gestureReverse = !!(opts && opts.gestureReverse);
+  let autoReverse = false;
+  let autoTarget = null;
+  if (opts && opts.autoReverse && !gestureReverse) {
+    try {
+      let reduced = false;
+      try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { reduced = false; }
+      if (!reduced) {
+        autoTarget = autoReverseTargetFrame();
+        autoReverse = !!autoTarget;
+      }
+    } catch { autoReverse = false; }
+  }
   // LOCK-EARLY: Esc/reverse during a staged hold must restore pan — unwind
   // the hold (no-op when nothing is staged) and release the camera lock even
   // for holds a fork guard already resolved (those leak frozen handlers).
   // A committed twin is NOT torn down here: the close chain below must keep
-  // the mounted frame for the gesture-retrace dissolve.
+  // the mounted frame for the gesture-retrace dissolve. An auto-reverse keeps
+  // an UNCOMMITTED but visible twin mounted for the same reason.
   // The enclosure zoom seal dies with the close chain too: the retrace and
   // the fingers' way home must be free to zoom out from the first tick.
   try { releaseStagedZoomLock(); } catch { /* unlock is best-effort */ }
@@ -6685,7 +6778,7 @@ function doCloseTwin(opts = {}) {
     try { zClose = +mapRef.getZoom(); } catch { zClose = Z_HANDOFF; }
     if (Number.isFinite(zClose)) warmOutboundLevel(zClose, 'close');
   } catch { /* warm is best-effort */ }
-  try { if (stagedActive && !stagedCommitted) exitStaged(); } catch { /* unwind is best-effort */ }
+  try { if (stagedActive && !stagedCommitted && !autoReverse) exitStaged(); } catch { /* unwind is best-effort */ }
   try { unfreezeStagedFrame(); } catch { /* unlock is best-effort */ }
   try {
     if (pendingReveal && pendingReveal.timer) clearTimeout(pendingReveal.timer);
@@ -6726,9 +6819,10 @@ function doCloseTwin(opts = {}) {
   // carry it home through the same laws, and the teardown lands at Z_TOP.
   // A begin that finds nothing to dissolve (already home, no frame) falls
   // back to the instant hide so no overlay ever strands.
-  const gestureReverse = !!(opts && opts.gestureReverse);
+  // The gesture/auto split was resolved before the staged teardown (see
+  // CLOSE INTENT FIRST) so neither path loses the mounted frame.
   let retraced = false;
-  if (!gestureReverse) {
+  if (!gestureReverse && !autoReverse) {
     try {
       finishHide();
     } catch { /* hide is best-effort */ }
@@ -6746,9 +6840,12 @@ function doCloseTwin(opts = {}) {
     const lz = mapRef ? +mapRef.getZoom() : NaN;
     const lp = proximityInfo();
     const driverOwns = Number.isFinite(lz) && lp && lp.near && centerBlendForZoom(lz) > 0;
-    if (!driverOwns) showVignette(false);
+    if (!autoReverse && !driverOwns) showVignette(false);
   } catch { /* cosmetic */ }
   try {
+    autoReverseLandingTarget = autoReverse && autoTarget && Number.isFinite(+autoTarget.zoom)
+      ? +autoTarget.zoom
+      : NaN;
     recedeToHome();
   } catch { /* recede is best-effort */ }
   try {
@@ -6784,6 +6881,49 @@ function doCloseTwin(opts = {}) {
       try { retraced = beginRetraceDissolve(); } catch { retraced = false; }
       if (!retraced) {
         try { finishHide(); } catch { /* fallback hide is best-effort */ }
+      }
+    } else if (autoReverse) {
+      // Explicit close: keep the overlay mounted exactly like the gesture
+      // path, then drive the camera home. `recedeToHome` was armed above the
+      // same way; its zoom-step landing owns the final home/flat state.
+      // The staged auto-pump must stop first: its commit guard re-parks the
+      // map on Z_HANDOFF every tick, which would cancel the auto ease at the
+      // gate. Flags only — the frame is deliberately kept for the retrace.
+      try { stopStagedAutoPump(); } catch { /* pump teardown is best-effort */ }
+      stagedActive = false;
+      clickStagedPending = false;
+      stagedCommitted = false;
+      try { holdHandoffPoseForReverse(); } catch { /* retrace hand-off never breaks teardown */ }
+      try { retraced = beginRetraceDissolve(); } catch { retraced = false; }
+      if (retraced) {
+        try { retraced = autoReverseCloseFlight(autoTarget); } catch { retraced = false; }
+      }
+      if (retraced) {
+        // The home landing normally fires from the zoom step below Z_MIN. If
+        // the map clamps the flight just short of the recorded pre-dive zoom
+        // (MapLibre can stop on its own effective floor), a moveend/zoom event
+        // may never carry the state home. One bounded timer guarantees the
+        // same landing after the flight, so `receding` can never stay armed.
+        try {
+          const ar = window.__mapProbe && window.__mapProbe.autoReverse;
+          const ms = ar && Number.isFinite(+ar.ms) ? +ar.ms : AUTO_REVERSE_MAX_MS;
+          setTimeout(() => {
+            try {
+              if (!receding || !recedeLandHome) return;
+              autoReverseLandingTarget = NaN;
+              recedeLandHome();
+            } catch { /* landing fallback is best-effort */ }
+          }, ms + 250);
+        } catch { /* bounded landing is best-effort */ }
+      }
+      if (!retraced) {
+        try { finishHide(); } catch { /* fallback hide is best-effort */ }
+        try {
+          mapRef.jumpTo({
+            center: [autoTarget.center.lng, autoTarget.center.lat],
+            zoom: autoTarget.zoom, pitch: autoTarget.pitch, bearing: autoTarget.bearing,
+          });
+        } catch { /* fallback restore is best-effort */ }
       }
     } else {
       try {
@@ -7113,14 +7253,14 @@ function closeTwin() {
           try {
             window.__mapProbe.reverseFallback = true;
           } catch { /* probe cosmetic */ }
-          finishTwinClose();
+          finishTwinClose({ autoReverse: true });
         }, TWIN_REVERSE_WAIT_MS),
       };
       const timerHandle = reverseWait.timer;
       return;
     }
   } catch { /* request is best-effort; fall through to teardown */ }
-  finishTwinClose();
+  finishTwinClose({ autoReverse: true });
 }
 
 window.addEventListener('popstate', (e) => {
@@ -7191,6 +7331,18 @@ function recedeToHome() {
   }
   const landHome = () => {
     if (recedeDone) return; // idempotent: first arrival wins (FM-2 token)
+    // AUTO-REVERSE DEFERRED LANDING: the country home (Z_MIN) is an
+    // intermediate checkpoint when the pre-dive frame was wider. If the pitch
+    // flatten jumped here it would cancel the auto ease; wait for its true
+    // target, then run the normal landing (flatten/reset/probe) once.
+    try {
+      if (Number.isFinite(autoReverseLandingTarget)
+        && autoReverseLandingTarget < Z_MIN - 0.01) {
+        const zNow = mapRef ? +mapRef.getZoom() : NaN;
+        if (Number.isFinite(zNow) && zNow > autoReverseLandingTarget + 0.02) return;
+      }
+    } catch { /* landing guard is best-effort */ }
+    autoReverseLandingTarget = NaN;
     recedeDone = true;
     receding = false;
     recedeLandHome = null;
@@ -7392,13 +7544,19 @@ window.addEventListener('message', (e) => {
     // GESTURE REVERSE (see doCloseTwin): a recede nobody here asked for is
     // the twin answering the user's own wheel — the camera keeps the handoff
     // pose so the fingers retrace the journey continuously instead of the
-    // close teleporting back to the frame the dive left.
-    const gestureReverse = !reverseWait && !closeSource;
+    // close teleporting back to the frame the dive left. A recede while an
+    // explicit close is awaited (X/Esc/back) is still the SAME retrace, but
+    // there are no fingers to finish it: autoReverse drives the camera home.
+    const explicitClose = !!reverseWait || !!closeSource;
     setSatForced(true);
-    finishTwinClose({ gestureReverse });
+    finishTwinClose(explicitClose ? { autoReverse: true } : { gestureReverse: true });
     return;
   }
-  finishTwinClose();
+  // Legacy/bare close (the twin's own X or an old shell): no fingers own it,
+  // so use the same automatic retrace as the parent's X/Esc rather than the
+  // old instant cut. A gesture recede always carries the extended payload
+  // above; this branch is explicit-close intent.
+  finishTwinClose({ autoReverse: true });
 });
 
 function mountChrome(map, overlay, setSat) {

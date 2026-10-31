@@ -75,8 +75,8 @@ test('the loader is visible for any loading hold after the grace', () => {
     'the pill no longer hides slow arrivals behind the fast-intent gate');
   const pump = fnBody(m, 'startStagedAutoPump');
   assert.match(pump, /stallArmed\(\)/, 'the pump holds while the twin is not released');
-  assert.match(pump, /autoStagedSForDt\(stagedS, dt, \{ durationMs: CLICK_FLIGHT_MS \}\)/,
-    'the pump advances through the shared flight beat');
+  assert.match(pump, /autoStagedSForDt\(stagedS, dt, \{ durationMs: CLICK_DISSOLVE_MS \}\)/,
+    'the pump advances through the shared dissolve beat, independent of the camera flight');
   assert.match(pump, /lastStagedInputMs/, 'active fingers pause the pump');
 });
 
